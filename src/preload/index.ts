@@ -165,6 +165,42 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: NolaTranslatorApi = {
+  listComics: () => invoke('language-model:comics'),
+  gameTranslation: {
+    snapshot: () => invoke('game:snapshot'),
+    sources: () => invoke('game:sources'),
+    command: command => invoke('game:command', command),
+    onChanged: listener => {
+      const receive = (_event: Electron.IpcRendererEvent, value: Parameters<typeof listener>[0]) => listener(value)
+      ipcRenderer.on('game:changed', receive)
+      return () => ipcRenderer.off('game:changed', receive)
+    },
+  },
+  comic: {
+    listProjects: () => invoke('comic:list'),
+    openProject: id => invoke('comic:open', id),
+    importProject: request => invoke('comic:import', request),
+    edit: request => invoke('comic:edit', request),
+    run: request => invoke('comic:run', request),
+    cancel: (projectId, jobId) => invoke('comic:cancel', { projectId, jobId }),
+    image: (projectId, pageId, kind) => invoke('comic:image', { projectId, pageId, kind }),
+    exportProject: request => invoke('comic:export', request),
+    onChanged: listener => {
+      const receive = (_event: Electron.IpcRendererEvent, value: Parameters<typeof listener>[0]) => listener(value)
+      ipcRenderer.on('comic:changed', receive)
+      return () => ipcRenderer.off('comic:changed', receive)
+    },
+  },
+  glossary: {
+    snapshot: () => invoke('glossary:snapshot'),
+    command: request => invoke('glossary:command', request),
+    testMatch: request => invoke('glossary:test', request),
+    onChanged: listener => {
+      const receive = (_event: Electron.IpcRendererEvent, value: Parameters<typeof listener>[0]) => listener(value)
+      ipcRenderer.on('glossary:changed', receive)
+      return () => ipcRenderer.off('glossary:changed', receive)
+    },
+  },
   screenTranslation: createScreenPreload(ipcRenderer),
   workspaceView: {
     read: () => invoke('workspace:view'),

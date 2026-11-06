@@ -1,4 +1,5 @@
 export const latencyZh = {
+  connectionFailed: '无法读取同传会话的延迟数据，请重试。',
   title: '延迟检测',
   toggleHint: '同传启动后打开独立窗口，查看总延迟和各阶段耗时。',
   reopen: '打开检测窗口',
@@ -30,6 +31,7 @@ export const latencyZh = {
 type LatencyMessages = { [K in keyof typeof latencyZh]: string }
 
 export const latencyEn: LatencyMessages = {
+  connectionFailed: 'Could not read session latency data. Try again.',
   title: 'Latency Monitor',
   toggleHint: 'Open a separate window after the session starts to see total latency and stage timings.',
   reopen: 'Open latency monitor',
@@ -47,6 +49,7 @@ export const latencyEn: LatencyMessages = {
 }
 
 export const latencyTw: LatencyMessages = {
+  connectionFailed: '無法讀取口譯工作階段的延遲資料，請再試一次。',
   title: '延遲檢測',
   toggleHint: '口譯啟動後開啟獨立視窗，查看總延遲及各階段的耗時。',
   reopen: '開啟檢測視窗',
@@ -65,12 +68,14 @@ export const latencyTw: LatencyMessages = {
 
 export const latencyHk: LatencyMessages = {
   ...latencyTw,
+  connectionFailed: '未能讀取傳譯工作階段的延遲資料，請重試。',
   toggleHint: '傳譯啟動後開啟獨立視窗，查看總延遲及各階段的耗時。',
   loading: '正在連線至傳譯工作階段',
   timeline: '音頻時間軸', input: '輸入音頻', output: '輸出音頻',
 }
 
 export const latencyJa: LatencyMessages = {
+  connectionFailed: '通訳セッションの遅延データを取得できませんでした。再試行してください。',
   title: '遅延モニター',
   toggleHint: '通訳の開始後に別ウィンドウを開き、合計遅延と処理段階ごとの時間を表示します。',
   reopen: '遅延モニターを開く',
@@ -88,6 +93,7 @@ export const latencyJa: LatencyMessages = {
 }
 
 export const latencyKo: LatencyMessages = {
+  connectionFailed: '통역 세션의 지연 데이터를 읽지 못했습니다. 다시 시도하세요.',
   title: '지연 모니터',
   toggleHint: '통역이 시작되면 별도 창에서 전체 지연과 단계별 시간을 확인할 수 있습니다.',
   reopen: '지연 모니터 열기',

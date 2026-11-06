@@ -6,6 +6,7 @@ import { resolveUiLanguage } from '../shared/languages'
 import { gatewayEn, gatewayJa, gatewayKo, gatewayHk, gatewayTw, gatewayZh } from '../renderer/i18n/gateway-ui'
 import { meetingLocales } from '../renderer/i18n/meeting-ui'
 import { screenLocales } from '../renderer/i18n/screen-ui'
+import { suiteLocales } from '../renderer/i18n/translation-suite-ui'
 
 export interface NolaTrayOptions {
   getSettings(): AppSettings
@@ -28,7 +29,8 @@ export class NolaTray {
   private dictionary() {
     const language = resolveUiLanguage(this.options.getSettings().uiLanguage, app.getLocale())
     const gateway = ({ 'zh-CN': gatewayZh, 'zh-TW': gatewayTw, 'zh-HK': gatewayHk, en: gatewayEn, ja: gatewayJa, ko: gatewayKo })[language]
-    return { ...gateway, meeting: meetingLocales[language].title, 'screen-translation': screenLocales[language].title, screen: screenLocales[language] }
+    return { ...gateway, meeting: meetingLocales[language].title, 'screen-translation': screenLocales[language].title,
+      'game-translation': suiteLocales[language].gameTitle, 'comic-translation': suiteLocales[language].comicTitle, screen: screenLocales[language] }
   }
   async initialize(): Promise<void> {
     // Use a bundled image instead of relying on Windows shell extraction or its icon cache.

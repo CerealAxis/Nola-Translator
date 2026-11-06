@@ -23,10 +23,10 @@ import { Spinner } from '@/components/ui/spinner'
 import type { RouteId } from '@/bridge'
 import { useI18n } from '@/i18n'
 
-export type SettingsTab = 'general' | 'audio' | 'appearance' | 'browser' | 'shortcuts' | 'engine' | 'storage' | 'help' | 'developer'
+export type SettingsTab = 'general' | 'audio' | 'appearance' | 'browser' | 'shortcuts' | 'engine' | 'storage' | 'glossary' | 'help' | 'developer'
 
 const ALL_SETTINGS_TABS: readonly SettingsTab[] = [
-  'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'help', 'developer',
+  'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'help', 'developer',
 ]
 
 /**
@@ -50,6 +50,11 @@ export interface Route {
   modelsTab?: 'downloads'
   /** 仅 `record` 有，是 meetingId。 */
   id?: string
+  projectId?: string
+  gameId?: string
+  pageId?: string
+  reader?: boolean
+  glossaryLibraryId?: string
   /** 规范化后的 hash，例如 `#/settings/audio`。用作过渡动画的 key。 */
   path: string
 }
@@ -76,6 +81,10 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab; id?: strin
       return '#/meeting'
     case 'screen-translation':
       return '#/screen-translation'
+    case 'game-translation':
+      return '#/game-translation'
+    case 'comic-translation':
+      return options?.id ? `#/comic-translation/${encodeURIComponent(options.id)}` : '#/comic-translation'
     case 'model-gateway':
       return '#/model-gateway'
     case 'records':
@@ -106,6 +115,8 @@ const PARENT_ROUTES: Record<RouteId, RouteId | null> = {
   overlay: 'home',
   meeting: 'home',
   'screen-translation': 'home',
+  'game-translation': 'home',
+  'comic-translation': 'home',
   'model-gateway': 'home',
   records: 'home',
   record: 'records',
@@ -142,6 +153,13 @@ export function parseRoute(hash: string): Route {
       return { route: 'meeting', path: '#/meeting' }
     case 'screen-translation':
       return { route: 'screen-translation', path: '#/screen-translation' }
+    case 'game-translation':
+      return { route: 'game-translation', ...(segments[1] ? { gameId: safeDecode(segments[1]) } : {}),
+        path: '#/game-translation' + (segments[1] ? `/${encodeURIComponent(safeDecode(segments[1]))}` : '') }
+    case 'comic-translation':
+      return { route: 'comic-translation', ...(segments[1] ? { projectId: safeDecode(segments[1]) } : {}),
+        ...(segments[2] === 'reader' ? { reader: true } : segments[2] ? { pageId: safeDecode(segments[2]) } : {}),
+        path: '#/comic-translation' + segments.slice(1, 3).map(segment => `/${encodeURIComponent(safeDecode(segment))}`).join('') }
     case 'model-gateway':
       return { route: 'model-gateway', path: '#/model-gateway' }
     case 'records': {
@@ -154,6 +172,10 @@ export function parseRoute(hash: string): Route {
       return segments[1] === 'downloads' ? { route: 'models', modelsTab: 'downloads', path: '#/models/downloads' } : { route: 'models', path: '#/models' }
     case 'settings': {
       const tab = normalizeTab(segments[1])
+      if (tab === 'glossary' && segments[2]) {
+        const glossaryLibraryId = safeDecode(segments[2])
+        return { route: 'settings', tab, glossaryLibraryId, path: `#/settings/glossary/${encodeURIComponent(glossaryLibraryId)}` }
+      }
       return { route: 'settings', tab, path: `#/settings/${tab}` }
     }
     case 'home':
@@ -237,12 +259,14 @@ export function useRoute(): UseRoute {
 // -- 渲染 ---------------------------------------------------------------------
 
 /** 路由 id 到页面标题。文案是页面自己的名字，不是"占位"两个字。 */
-const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title' | 'meeting.title' | 'screen.title'> = {
+const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title' | 'meeting.title' | 'screen.title' | 'suite.gameTitle' | 'suite.comicTitle'> = {
   home: 'nav.home',
   workspace: 'nav.workspace',
   overlay: 'shellUi.overlay',
   meeting: 'meeting.title',
   'screen-translation': 'screen.title',
+  'game-translation': 'suite.gameTitle',
+  'comic-translation': 'suite.comicTitle',
   'model-gateway': 'nav.modelGateway',
   records: 'nav.records',
   record: 'nav.records',

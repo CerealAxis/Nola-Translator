@@ -1,3 +1,4 @@
+import { suiteEntries, suiteLocales } from './translation-suite-ui'
 import { modelPolicyKo, modelPolicyEntries } from './model-policy-ui'
 import { screenEntries, screenLocales } from './screen-ui'
 import { shortcutEntries, shortcutLocales } from './shortcuts-ui'
@@ -11,6 +12,7 @@ import { onboardingEntries, onboardingKo } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
+  ...suiteEntries(suiteLocales.ko),
   ...screenEntries(screenLocales.ko),
   ...shortcutEntries(shortcutLocales.ko),
   ...latencyEntries(latencyKo),
@@ -642,6 +644,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'session.playbackFailed': '음성 재생 실패',
   'session.retryPlayback': '다시 시도',
   'session.skipPlayback': '이 문장 건너뛰기',
+  'session.pauseFailed': '통역을 일시 중지하거나 재개하지 못했습니다. 다시 시도하세요.',
   'session.playbackActionFailed': '음성 재생을 업데이트하지 못했습니다',
   'session.keepAudio': '오디오 녹음 저장',
   'session.keepAudioHint': '끄면 오디오가 저장되지 않아 다시 듣거나 내보낼 수 없습니다. 녹음은 이 기기에 저장되며 세션이 끝난 뒤 기록에서 재생할 수 있습니다.',
@@ -900,6 +903,8 @@ const koMessages: Record<DictionaryKey, string> = {
   "errors.invalidArgument": "매개변수가 잘못되었습니다. 입력을 확인하세요.",
   "errors.meetingNameEmpty": "회의 이름은 비워 둘 수 없습니다.",
   "errors.meetingNotFound": "회의 기록이 없습니다. 목록을 새로 고치세요.",
+  'errors.credentialDecryptFailed': '저장된 키를 현재 Windows 사용자로 복호화할 수 없습니다. 해당 API 설정에서 키를 다시 입력하세요.',
+  'errors.credentialEncryptionUnavailable': 'Windows 자격 증명 암호화를 사용할 수 없어 키를 읽거나 저장할 수 없습니다. 앱을 다시 시작한 후 다시 시도하세요.',
   "errors.invalidCredential": "자격 증명 유형 또는 값이 잘못되었습니다. 다시 입력하세요.",
   'errors.unknownFailure': '작업을 완료하지 못했습니다. 진단 정보를 복사하여 문제를 알려 주세요.',
   'errors.torchRuntimeUnavailable': 'PyTorch 런타임을 사용할 수 없습니다. 설정에서 확인하거나 복구하세요.',

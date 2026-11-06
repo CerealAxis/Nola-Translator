@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createIpcBridge } from '@/bridge/ipc/ipcBridge'
 import type { SessionConfig } from '@/bridge'
-import { attachSessionStore, detachSessionStore, resetSessionError, sessionStore, startSession, stopSession } from './sessionStore'
+import { attachSessionStore, detachSessionStore, pauseSession, resumeSession, resetSessionError, sessionStore, startSession, stopSession } from './sessionStore'
 import { isSessionAlreadyRunningError } from '../../shared/ipc-error'
 
 const remoteConfig: SessionConfig = {
@@ -17,6 +17,76 @@ const remoteConfig: SessionConfig = {
 afterEach(() => {
   detachSessionStore()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+it('forwards the pause IPC rejection instead of dropping it at the bridge', async () => {
+  const failure = new Error('pause transport unavailable')
+  vi.stubGlobal('nolaTranslator', { setSessionPaused: vi.fn().mockRejectedValue(failure) })
+  await expect(createIpcBridge().engine.setPaused('session-1', true)).rejects.toBe(failure)
+})
+
+it.each([false, true])('keeps the confirmed paused=%s state when changing it is rejected', async paused => {
+  const bridge = createIpcBridge()
+  vi.spyOn(bridge.engine, 'getEngineState').mockResolvedValue('ready')
+  vi.spyOn(bridge.engine, 'setPaused').mockRejectedValue(new Error('pause refused'))
+  attachSessionStore(bridge)
+  sessionStore.setState({ status: paused ? 'paused' : 'running', sessionId: 'session-1', startedAtMs: Date.now() })
+  await expect(paused ? resumeSession() : pauseSession()).rejects.toThrow('pause refused')
+  expect(sessionStore.getState()).toMatchObject({ status: paused ? 'paused' : 'running', pausePending: false })
+})
+
+it('waits for pause acknowledgement, prevents duplicates, and ignores a reply after stop', async () => {
+  const bridge = createIpcBridge()
+  vi.spyOn(bridge.engine, 'getEngineState').mockResolvedValue('ready')
+  let receive: Parameters<typeof bridge.events.onEngineEvent>[0] = () => {}
+  vi.spyOn(bridge.events, 'onEngineEvent').mockImplementation(listener => { receive = listener; return () => {} })
+  let finish!: () => void
+  const pause = vi.spyOn(bridge.engine, 'setPaused').mockImplementation(() => new Promise<void>(resolve => { finish = resolve }))
+  attachSessionStore(bridge)
+  sessionStore.setState({ status: 'running', sessionId: 'session-1', startedAtMs: Date.now() })
+  const result = pauseSession()
+  await pauseSession()
+  expect(pause).toHaveBeenCalledExactlyOnceWith('session-1', true)
+  expect(sessionStore.getState()).toMatchObject({ status: 'running', pausePending: true })
+  receive({ protocolVersion: 1, requestId: 'stopped', type: 'sessionStopped', sessionId: 'session-1' })
+  finish(); await result
+  expect(sessionStore.getState()).toMatchObject({ status: 'idle', sessionId: null, pausePending: false })
+})
+
+it('commits pause and resume only after the engine confirms each request', async () => {
+  const bridge = createIpcBridge()
+  vi.spyOn(bridge.engine, 'getEngineState').mockResolvedValue('ready')
+  vi.spyOn(bridge.engine, 'setPaused').mockResolvedValue()
+  attachSessionStore(bridge)
+  sessionStore.setState({ status: 'running', sessionId: 'session-1', startedAtMs: Date.now() })
+  await pauseSession()
+  expect(sessionStore.getState()).toMatchObject({ status: 'paused', pausePending: false })
+  await resumeSession()
+  expect(sessionStore.getState()).toMatchObject({ status: 'running', pausePending: false })
+})
+
+it('stops a paused session directly, blocks duplicate stops, and preserves a newer session', async () => {
+  const bridge = createIpcBridge()
+  vi.spyOn(bridge.engine, 'getEngineState').mockResolvedValue('ready')
+  const resume = vi.spyOn(bridge.engine, 'setPaused')
+  let finish!: () => void
+  const stop = vi.spyOn(bridge.engine, 'stopSession').mockImplementation(() => new Promise<void>(resolve => { finish = resolve }))
+  let receive: Parameters<typeof bridge.events.onEngineEvent>[0] = () => {}
+  vi.spyOn(bridge.events, 'onEngineEvent').mockImplementation(listener => { receive = listener; return () => {} })
+  attachSessionStore(bridge)
+  sessionStore.setState({ status: 'paused', sessionId: 'session-1', startedAtMs: Date.now() })
+  const result = stopSession()
+  receive({ protocolVersion: 1, requestId: 'late-pause', type: 'status', code: 'paused' })
+  receive({ protocolVersion: 1, requestId: 'late-listen', type: 'status', code: 'listening' })
+  expect(sessionStore.getState().status).toBe('stopping')
+  expect(resume).not.toHaveBeenCalled()
+  await expect(stopSession()).rejects.toThrow('正在结束中')
+  expect(stop).toHaveBeenCalledExactlyOnceWith('session-1')
+  receive({ protocolVersion: 1, requestId: 'stopped', type: 'sessionStopped', sessionId: 'session-1' })
+  sessionStore.setState({ status: 'running', sessionId: 'new-session', meetingId: 'new-record' })
+  finish(); await result
+  expect(sessionStore.getState()).toMatchObject({ status: 'running', sessionId: 'new-session', meetingId: 'new-record' })
 })
 
 it('continues desktop startup when the advisory browser status query rejects', async () => {

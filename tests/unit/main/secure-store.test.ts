@@ -13,6 +13,32 @@ const workingEncryption = {
 }
 
 describe('SecureCredentialStore', () => {
+  it('serializes concurrent changes without losing other provider credentials', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-concurrent-secrets-'))
+    try {
+      const store = new SecureCredentialStore(join(directory, 'credentials.json'), workingEncryption)
+      await Promise.all(Array.from({ length: 8 }, (_, index) => store.set(`provider-${index}`, `value-${index}`)))
+      await Promise.all([store.remove('provider-0'), store.set('provider-1', 'replacement')])
+      expect(await store.get('provider-0')).toBe('')
+      expect(await store.get('provider-1')).toBe('replacement')
+      for (let index = 2; index < 8; index++) expect(await store.get(`provider-${index}`)).toBe(`value-${index}`)
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
+  it('keeps accepting writes after a failed encryption attempt', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-retry-secrets-'))
+    try {
+      let available = false
+      const store = new SecureCredentialStore(join(directory, 'credentials.json'), {
+        ...workingEncryption, isEncryptionAvailable: () => available,
+      })
+      await expect(store.set('provider', 'first')).rejects.toThrow()
+      available = true
+      await store.set('provider', 'second')
+      expect(await store.get('provider')).toBe('second')
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
   it('removes retired translator keys without decryption and preserves unrelated credentials', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-free-translators-'))
     const path = join(directory, 'credentials.json')

@@ -22,8 +22,11 @@ import { SettingsPreview, type PreviewKind } from './components/SettingsPreview'
 import { NolaLogo } from './logo'
 import { DEFAULT_PREFERENCES, readPreferences, savePreferences, UI_LANGUAGES, type Preferences } from './preferences'
 import { ConnectionStatus, languageOptions, LiveServiceField, TargetLanguageField, usePreferences } from './settings-fields'
-import { createProvider, loadProviders, saveProviders, requestProviderAccess, PROVIDER_PRESETS, exportProviderConfig, importProviderConfig, type ProviderConnection, type Capability } from './providers'
-import { glossaryCsv, parseGlossaryCsv } from './ui/glossary-csv'
+import { createProvider, loadProviders, saveProviders, requestProviderAccess, PROVIDER_PRESETS, exportProviderConfig, type ProviderConnection, type Capability } from './providers'
+import { GlossaryManager } from './components/GlossaryManager'
+import { parseOptionsRoute } from './options-route'
+import { extensionGlossary, migrateLegacyGlossary, restoreExtensionConfiguration } from './glossary-store'
+import { emptyGlossary, glossaryDocumentSchema } from '../../src/shared/glossary'
 import { clearTranslationCache, synthesize, testProvider, translate } from './provider-client'
 import { browserText, errorKey, type BrowserKey } from './i18n'
 import './styles.css'
@@ -253,26 +256,6 @@ function TranslationCenter({ settings, providers, locale, t }: { settings: Prefe
     {feedback && <p role="alert" className="nola-error">{feedback}</p>}
   </div>
 }
-function Glossary({ settings, save, t }: { settings: Preferences; save: Save; t: T }) {
-  const [source, setSource] = useState('')
-  const [target, setTarget] = useState('')
-  const [sites, setSites] = useState('')
-  const [error, setError] = useState('')
-  return <FieldGroup>
-    <div className="nola-two-columns"><TextField label={t('sourceTerm')} value={source} onChange={setSource} /><TextField label={t('targetTerm')} value={target} onChange={setTarget} /></div>
-    <TextField label={t('sites')} value={sites} onChange={setSites} />
-    <Button disabled={!source.trim() || !target.trim()} onClick={() => { save('glossary', [...settings.glossary, { source: source.trim(), target: target.trim(), sites }]); setSource(''); setTarget('') }}>{t('add')}</Button>
-    <div className="nola-form-actions"><Button variant="outline" onClick={() => {
-      const url = URL.createObjectURL(new Blob([glossaryCsv(settings.glossary)], { type: 'text/csv;charset=utf-8' }))
-      const link = document.createElement('a'); link.href = url; link.download = 'nola-terminology.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
-    }}><Download data-icon="inline-start" />{t('exportCsv')}</Button><FileAction label={t('importCsv')} accept=".csv,text/csv" onFile={file => {
-      if (file.size > 10_000_000) { setError(t('invalidConfig')); return }
-      void file.text().then(text => { save('glossary', [...settings.glossary, ...parseGlossaryCsv(text)].slice(0, 20000)); setError('') }).catch(() => setError(t('invalidConfig')))
-    }} /></div>{error && <p className="nola-error" role="alert">{error}</p>}
-    {!settings.glossary.length && <Empty><EmptyHeader><EmptyMedia variant="icon"><BookOpen /></EmptyMedia><EmptyTitle>{t('noTerms')}</EmptyTitle><EmptyDescription>{t('noTermsHelp')}</EmptyDescription></EmptyHeader></Empty>}
-    {settings.glossary.length > 0 && <div className="nola-table-scroll"><table><thead><tr><th>{t('sourceTerm')}</th><th>{t('targetTerm')}</th><th>{t('sites')}</th><th><span className="sr-only">{t('remove')}</span></th></tr></thead><tbody>{settings.glossary.map((row, index) => <tr key={index}><td>{row.source}</td><td>{row.target}</td><td>{row.sites}</td><td><ConfirmAction label={t('remove')} description={row.source + ' → ' + row.target} t={t} onConfirm={() => savePreferences({ glossary: settings.glossary.filter((_, i) => i !== index) })} /></td></tr>)}</tbody></table></div>}
-  </FieldGroup>
-}
 function SiteRules({ settings, save, t }: { settings: Preferences; save: Save; t: T }) {
   const [host, setHost] = useState('')
   const [exclude, setExclude] = useState('')
@@ -290,7 +273,7 @@ function Backup({ settings, t, report }: { settings: Preferences; t: T; report: 
   const [importing, setImporting] = useState(false)
   async function exportConfig() {
     try {
-      const data = { version: 1, preferences: settings, providers: await exportProviderConfig(secrets) }
+      const data = { version: 2, preferences: settings, providers: await exportProviderConfig(secrets), glossary: await extensionGlossary.snapshot() }
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
       const link = document.createElement('a'); link.href = url; link.download = 'nola-extension.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch { report(t('internalError')) }
@@ -301,24 +284,27 @@ function Backup({ settings, t, report }: { settings: Preferences; t: T; report: 
     try {
       if (file.size > 10_000_000) throw new Error()
       const data: unknown = JSON.parse(await file.text())
-      if (!data || typeof data !== 'object' || !('version' in data) || data.version !== 1 || !('preferences' in data) || !data.preferences || typeof data.preferences !== 'object' || Array.isArray(data.preferences)) throw new Error()
+      if (!data || typeof data !== 'object' || !('version' in data) || ![1, 2].includes(data.version as number) || !('preferences' in data) || !data.preferences || typeof data.preferences !== 'object' || Array.isArray(data.preferences)) throw new Error()
       const imported = readPreferences(data.preferences as Record<string, unknown>)
-      if ('providers' in data) await importProviderConfig(data.providers)
-      await savePreferences(imported); report(t('saved'))
+      const currentGlossary = await extensionGlossary.snapshot()
+      const glossary = data.version === 2 && 'glossary' in data ? glossaryDocumentSchema.parse(data.glossary) : migrateLegacyGlossary(imported.glossary, t('suite.glossaryTitle'), t('suite.migrationReview'))
+      await restoreExtensionConfiguration({ glossary, preferences: imported, ...('providers' in data ? { providers: data.providers } : {}) }, currentGlossary.revision)
+      report(t('saved'))
     } catch { report(t('invalidConfig')) } finally { setImporting(false) }
   }
   return <>
     <Group title={t('exportConfig')}><p className="nola-muted">{t('exportHelp')}</p><Toggle label={t('includeKeys')} checked={secrets} onChange={setSecrets} /><div className="nola-form-actions"><Button variant="outline" onClick={() => void exportConfig()}><Download data-icon="inline-start" />{t('exportConfig')}</Button><FileAction label={t('importConfig')} accept="application/json,.json" disabled={importing} onFile={file => void importConfig(file)} /></div></Group>
     <Group title={t('storageActions')}>
       <Field><div className="nola-setting-copy"><FieldLabel>{t('clearCache')}</FieldLabel><p>{t('clearCacheHelp')}</p></div><Button variant="outline" onClick={() => { void clearTranslationCache().then(() => report(t('saved'))).catch(() => report(t('internalError'))) }}>{t('clearCache')}</Button></Field>
-      <Field><div className="nola-setting-copy"><FieldLabel>{t('resetSettings')}</FieldLabel><p>{t('resetHelp')}</p></div><ConfirmAction label={t('resetSettings')} description={t('confirmResetSettings')} t={t} onConfirm={async () => { await savePreferences(DEFAULT_PREFERENCES); report(t('saved')) }} /></Field>
+      <Field><div className="nola-setting-copy"><FieldLabel>{t('resetSettings')}</FieldLabel><p>{t('resetHelp')}</p></div><ConfirmAction label={t('resetSettings')} description={t('confirmResetSettings')} t={t} onConfirm={async () => { const glossary = await extensionGlossary.snapshot(); await restoreExtensionConfiguration({ glossary: emptyGlossary(), preferences: DEFAULT_PREFERENCES }, glossary.revision); report(t('saved')) }} /></Field>
     </Group>
   </>
 }
 
 export function Options() {
   const [settings, locale, t] = usePreferences()
-  const [section, setSection] = useState<typeof sections[number]>(() => sections.find(section => section === window.location.hash.slice(1)) ?? 'general')
+  const [section, setSection] = useState<typeof sections[number]>(() => sections.find(section => section === parseOptionsRoute(window.location.hash).section) ?? 'general')
+  const [libraryId, setLibraryId] = useState(() => parseOptionsRoute(window.location.hash).libraryId)
   const [query, setQuery] = useState('')
   const [message, setMessage] = useState('')
   const [shortcutError, setShortcutError] = useState('')
@@ -326,7 +312,7 @@ export function Options() {
   const searchInput = useRef<HTMLInputElement>(null)
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [section, query])
   useEffect(() => {
-    const navigate = () => { setSection(sections.find(key => key === window.location.hash.slice(1)) ?? 'general'); setQuery('') }
+    const navigate = () => { setSection(sections.find(key => key === parseOptionsRoute(window.location.hash).section) ?? 'general'); setLibraryId(parseOptionsRoute(window.location.hash).libraryId); setQuery('') }
     const search = (event: KeyboardEvent) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); searchInput.current?.focus() } }
     window.addEventListener('hashchange', navigate); window.addEventListener('keydown', search)
     return () => { window.removeEventListener('hashchange', navigate); window.removeEventListener('keydown', search) }
@@ -345,7 +331,7 @@ export function Options() {
   const toggle = (key: keyof Preferences, label: BrowserKey) => <Toggle label={t(label)} checked={Boolean(settings[key])} onChange={value => save(key, value as never)} />
   const text = (key: keyof Preferences, label: BrowserKey, multiline = false) => <TextField label={t(label)} value={String(settings[key])} onChange={value => save(key, value as never)} multiline={multiline} />
   const list = (key: 'autoSites' | 'neverAutoSites' | 'siteBlacklist' | 'skipLanguages' | 'autoSubtitleSites' | 'floatingDisabledSites' | 'selectionDisabledSites', label: BrowserKey) => <TextField description={key === 'skipLanguages' ? undefined : t('siteListHelp')} label={t(label)} value={settings[key].join('\n')} multiline onChange={value => save(key, value.split(/[\n,]/).map(item => item.trim()).filter(Boolean))} />
-  const filtered = sections.filter(key => [t(key), t(descriptions[key]), ...searchKeys[key].map(t), ...(key === 'apiProviders' ? providers.map(provider => provider.name) : [])].some(value => value.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())))
+  const filtered = sections.filter(key => [t(key), t(descriptions[key]), ...searchKeys[key].map(key => t(key)), ...(key === 'apiProviders' ? providers.map(provider => provider.name) : [])].some(value => value.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())))
   const active = query.trim() ? filtered : [section]
   return <main className="nola-settings-shell">
     <aside className="nola-settings-sidebar"><header className="nola-options-header"><NolaLogo /><strong>Nola Translator</strong></header><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput ref={searchInput} aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} /></InputGroup>
@@ -409,7 +395,7 @@ export function Options() {
       }} />)}</Group>}
       {active.includes('tts') && <Group>{bind('ttsProvider', 'provider', 'tts')}{text('ttsVoice', 'voice')}<RangeField label={t('rate')} value={settings.ttsRate} min={0.1} max={10} step={0.1} onChange={value => save('ttsRate', value)} />{['edge-tts', 'minimax'].includes(providers.find(provider => provider.id === settings.ttsProvider)?.preset ?? '') && <RangeField label={t('pitch')} value={settings.ttsPitch} min={0.5} max={2} step={0.1} onChange={value => save('ttsPitch', value)} />}<RangeField label={t('volume')} value={settings.ttsVolume} max={1} step={0.1} onChange={value => save('ttsVolume', value)} /></Group>}
       {active.includes('translationHub') && <Group><TranslationCenter settings={settings} providers={providers} locale={locale} t={t} /></Group>}
-      {active.includes('glossary') && <Group><Glossary settings={settings} save={save} t={t} /></Group>}
+      {active.includes('glossary') && <Group><GlossaryManager libraryId={query ? undefined : libraryId} locale={locale} t={t} /></Group>}
       {active.includes('backup') && <Backup settings={settings} t={t} report={setMessage} />}
     </div>
   </main>

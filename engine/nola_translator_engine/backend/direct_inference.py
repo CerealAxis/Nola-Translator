@@ -16,6 +16,7 @@ from .gateway.adapters import _decode_wav_data_url
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
 from .gateway.gateway import MatchRequest, ModelGateway
 from .gateway.operations import SynthesisResult
+from .glossary import GlossaryTerm, glossary_prompt
 
 Language = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64_000)]
@@ -45,6 +46,7 @@ class DirectMtRequest(_DirectRequest):
     text: Text
     source: Language = "auto"
     target: Language
+    glossary: list[GlossaryTerm] = Field(default_factory=list, max_length=256)
 
 
 class DirectTtsRequest(_DirectRequest):
@@ -146,6 +148,9 @@ async def run_direct_inference(
         provider_options=provider_options or {},
         task_mode=request.task_mode, max_concurrency=request.max_concurrency,
     )
+    if isinstance(request, DirectMtRequest) and request.glossary:
+        glossary_prompt(request.glossary)
+        ctx.translation_context["glossary"] = request.glossary
     match = MatchRequest(operation=operation, model_id=request.model)
     try:
         async with asyncio.timeout(deadline - time.monotonic()):

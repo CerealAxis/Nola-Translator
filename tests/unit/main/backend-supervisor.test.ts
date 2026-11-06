@@ -68,6 +68,18 @@ describe('BackendSupervisor', () => {
     expect(supervisor.currentState).toBe('failed')
   })
 
+  it('reads a ready frame after other lines in the same stdout chunk', async () => {
+    const child = fakeChild([])
+    spawnMock.mockReturnValue(child as never)
+    const supervisor = new BackendSupervisor({ spec, readyTimeoutMs: 100 })
+    const start = supervisor.start()
+    const frame = { type: 'ready', address: '127.0.0.1:5100', instance_id: supervisor.instanceId, protocol_version: 2 }
+    child.stdout.emit('data', Buffer.from('\nstartup noise\n' + JSON.stringify({ type: 'progress' }) + '\n'
+      + JSON.stringify({ ...frame, instance_id: 'stale-instance' }) + '\n' + JSON.stringify(frame) + '\n'))
+    await expect(start).resolves.toEqual(frame)
+    expect(child.kill).not.toHaveBeenCalled()
+  })
+
   it('fails when the child exits during startup', async () => {
     spawnMock.mockReturnValue(fakeChild([], { exitCode: 1 }) as never)
     const supervisor = new BackendSupervisor({ spec, readyTimeoutMs: 2000 })

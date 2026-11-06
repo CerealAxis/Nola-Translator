@@ -6,8 +6,15 @@ describe('normalizeThrownError', () => {
   it.each([
     ['INVALID_ARGUMENT', 'ARG-001'], ['MEETING_NAME_EMPTY', 'ARG-002'],
     ['MEETING_NOT_FOUND', 'ARG-003'], ['INVALID_CREDENTIAL', 'ARG-004'],
+    ['CREDENTIAL_DECRYPT_FAILED', 'ARG-005'],
   ])('preserves validation cause %s across IPC', (code, supportCode) => {
     expect(normalizeThrownError(new Error(code))).toMatchObject({ code, supportCode, retryable: false })
+  })
+  it('distinguishes unavailable encryption and full disks from invalid credentials', () => {
+    expect(normalizeThrownError(new Error('CREDENTIAL_ENCRYPTION_UNAVAILABLE'))).toMatchObject({ supportCode: 'ARG-006', retryable: true })
+    for (const code of ['ENOSPC', 'EDQUOT']) {
+      expect(normalizeThrownError(Object.assign(new Error('write failed'), { code }))).toMatchObject({ code: 'DISK_SPACE_INSUFFICIENT', supportCode: 'STO-022', retryable: false })
+    }
   })
   it('preserves distinct runtime failures and support codes', () => {
     expect(normalizeThrownError(new Error('RUNTIME_TORCH: 尚未安装 PyTorch'))).toMatchObject({

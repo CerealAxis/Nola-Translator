@@ -237,6 +237,7 @@ export interface CustomTranslationModel {
   maxOutputTokens: number
   languages: string[]
   sourceLanguages?: string[]
+  images?: boolean
 }
 
 /**

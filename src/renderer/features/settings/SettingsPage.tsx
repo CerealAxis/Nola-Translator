@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Fieldset } from '@base-ui/react/fieldset'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Captions, Cpu, CircleHelp, FolderOpen, FlaskConical, Keyboard, AudioLines, PanelsTopLeft, SlidersHorizontal, LoaderCircle } from 'lucide-react'
+import { Captions, Cpu, CircleHelp, FolderOpen, FlaskConical, Keyboard, AudioLines, PanelsTopLeft, SlidersHorizontal, LoaderCircle, BookOpen } from 'lucide-react'
 
 import type { AppSettings } from '@/bridge'
 import { Button } from '@/components/ui/button'
@@ -24,18 +24,19 @@ import { PerformanceTab } from './tabs/PerformanceTab'
 import { BrowserTab } from './tabs/BrowserTab'
 import { DeveloperTab } from './tabs/DeveloperTab'
 import { ShortcutsTab } from './tabs/ShortcutsTab'
+import { GlossaryTab } from './glossary/GlossaryTab'
 import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
 
-const NAV_ICONS = { general: SlidersHorizontal, audio: AudioLines, appearance: Captions, browser: PanelsTopLeft, shortcuts: Keyboard, engine: Cpu, storage: FolderOpen, help: CircleHelp, developer: FlaskConical }
+const NAV_ICONS = { general: SlidersHorizontal, audio: AudioLines, appearance: Captions, browser: PanelsTopLeft, shortcuts: Keyboard, engine: Cpu, storage: FolderOpen, glossary: BookOpen, help: CircleHelp, developer: FlaskConical }
 
 /** The nav hint is a Base UI popup, so it carries the same surface tokens as the other tooltips. */
 const NAV_TOOLTIP_CLASS = 'settings-nav__tooltip z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
 
 export function SettingsPage() {
   const { t, dictionary } = useI18n()
-  const { tab, navigate } = useRoute()
+  const { tab, navigate, glossaryLibraryId } = useRoute()
   const settings = useStore(stores.settings, (state) => state.settings)
   const loadError = useStore(stores.settings, (state) => state.loadError)
   const error = useStore(stores.settings, (state) => state.error)
@@ -79,12 +80,13 @@ export function SettingsPage() {
     shortcuts: t('modelsSettingsUi.shortcuts'), engine: t('modelsSettingsUi.engine'),
     storage: t('modelsSettingsUi.storage'), help: t('modelsSettingsUi.help'),
     developer: t('dev.tabLabel'),
+    glossary: t('suite.glossaryTitle'),
   }
   const NAV_HINTS: Partial<Record<SettingsTab, string>> = { engine: dictionary.compute.nextSession }
 
   return (
     <div className="settings-page">
-      <header className="settings-page__heading"><h1>{t('settings.title')}</h1><p>{t('modelsSettingsUi.settingsSubtitle')}</p></header>
+      <header className="settings-page__heading"><h1>{t('settings.title')}</h1></header>
       <TabsRoot orientation={compact ? 'horizontal' : 'vertical'} value={active}
         onValueChange={(value) => navigate(settingsPath(String(value) as SettingsTab))} className="settings-tabs">
         <div className="settings-nav">
@@ -118,6 +120,7 @@ export function SettingsPage() {
           </div></TabsContent>
           <TabsContent value="appearance" className="tabs__panel"><AppearanceTab settings={settings} /></TabsContent>
           <TabsContent value="storage" className="tabs__panel"><StorageTab settings={settings} /></TabsContent>
+          <TabsContent value="glossary" className="tabs__panel"><GlossaryTab libraryId={glossaryLibraryId} /></TabsContent>
           <TabsContent value="help" className="tabs__panel"><MoreTab /></TabsContent>
           <TabsContent value="browser" className="tabs__panel"><BrowserTab /></TabsContent>
           {import.meta.env.DEV ? <TabsContent value="developer" className="tabs__panel"><DeveloperTab /></TabsContent> : null}

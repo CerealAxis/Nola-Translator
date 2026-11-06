@@ -48,9 +48,12 @@ export type { HubCompatibility, HubInspectResult, HubModelSummary, HubSearchResu
 export type { PrewarmErrorCode, PrewarmResult } from '../../shared/contracts'
 
 /** Route id for this app's multi-window UI; `routes.tsx` holds the hash mapping. */
-export type RouteId = 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
+export type RouteId = 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'game-translation' | 'comic-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
 
 export interface NolaBridge {
+  glossary?: import('../../shared/glossary').GlossaryBridge
+  comic?: import('../../shared/comic').ComicBridge
+  gameTranslation?: import('../../shared/game-translation').GameTranslationBridge
   screenTranslation?: import('../../shared/screen-translation').ScreenTranslationBridge
   workspaceView?: import('../../shared/workspace-view').WorkspaceViewApi
   gateway?: import('../../shared/model-gateway').ModelGatewayApi
@@ -83,12 +86,8 @@ export interface NolaBridge {
      * The returned state says the process is up, never that captions can run.
      */
     ensureEngineReady(): Promise<EngineProcessState>
-    /**
-     * Pause/resume, returned synchronously: the UI stops the clock on the
-     * press and paints the pause without waiting for the engine. A refusal
-     * still arrives as an `error` event that puts the state back to error.
-     */
-    setPaused(sessionId: string, paused: boolean): void
+    /** Real IPC confirms or rejects the change; in-memory demos may complete synchronously. */
+    setPaused(sessionId: string, paused: boolean): Promise<void> | void
     /**
      * The engine subprocess state (`stopped | starting | ready | stopping |
      * recovering | failed`). Read-only, and it does not start the engine: it is
@@ -157,6 +156,7 @@ export interface NolaBridge {
    * button, which must not invent a start page to satisfy `shell.openExternal`.
    */
   app: {
+    listComics?(): Promise<import('../../shared/comic').ComicProjectSummary[]>
     openWorkbench?(surface: import('../../shared/workbench').WorkbenchSurface): Promise<void>
     cancelLanguageModel?(id: string): Promise<void>
     releaseDirectModel?(): Promise<void>
@@ -345,7 +345,7 @@ export const BRIDGE_MISSING_FIELDS: Record<string, string> = {
 export const BRIDGE_ADAPTER_NOTES: Record<string, string> = {
   'engine.prewarmModels': 'preload: prewarmModels() · engine:prewarm-models — 无参数，载荷由主进程从设置读出（引擎按 compute 键缓存已加载权重，调用方再传一份就会缓存不命中）；loading 态走事件通道，返回值只可能是 ready / failed',
   'engine.ensureEngineReady': 'preload: ensureEngineReady() · engine:ensure-ready — 只拉起进程并握手，不加载权重，返回值是进程状态而不是「字幕可用」',
-  'engine.setPaused': 'preload: setSessionPaused(sessionId, paused) · engine:set-session-paused — bridge 上是同步 void，promise 的失败走 error 事件',
+  'engine.setPaused': 'preload: setSessionPaused(sessionId, paused) · engine:set-session-paused — IPC 确认或拒绝暂停状态变更',
   'engine.getEngineState': 'preload: getEngineState() · engine:get-state — 只读，名字与语义都与主进程一致，适配器不做任何翻译（主进程那条处理器刻意不调 ensureReady，否则「问引擎在不在」会变成「启动引擎」）',
   'events.onEngineEvent':
     'preload: onEngineEvent(listener) · engine:event — 载荷是 EngineChannelEvent（协议事件 ∪ 主进程发的 engineStateChanged）。适配器原样透传，**不做**类型筛除：把生命周期事件滤掉就等于把「引擎崩了」重新变回界面看不见，而它靠推断已经猜错过三次。状态机归 sessionStore（ENGINE_PROCESS_STATE_TO_UI）',

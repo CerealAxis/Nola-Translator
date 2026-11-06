@@ -438,6 +438,32 @@ async def test_worker_timeout_stops_process_before_request_returns(monkeypatch) 
         await worker.close()
 
 
+async def test_worker_accepts_audio_responses_larger_than_default_pipe_limit(monkeypatch) -> None:
+    from nola_translator_engine.backend.gateway.worker import WorkerRequest
+
+    spawn = asyncio.create_subprocess_exec
+    audio = "A" * (256 * 1024)
+
+    async def spawn_audio_worker(*args, **kwargs):
+        return await spawn(
+            sys.executable, "-c",
+            "import json,sys; request=json.loads(sys.stdin.readline()); "
+            "print(json.dumps({'id': request['id'], 'audio': 'A' * (256 * 1024)}), flush=True); "
+            "sys.stdin.read()",
+            **kwargs,
+        )
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn_audio_worker)
+    worker = LocalModelWorker()
+    await worker.start()
+    try:
+        result = await worker.request(WorkerRequest(kind="tts", config={}), timeout=5)
+        assert result["audio"] == audio
+        assert worker.running
+    finally:
+        await worker.close()
+
+
 async def test_cancelled_load_releases_budget_and_can_retry() -> None:
     admission = ResourceAdmission()
     admission.register_device("cpu", total_mb=500)

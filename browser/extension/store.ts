@@ -115,7 +115,7 @@ function mergeDesktopConfig(previous: CaptionConfig, incoming: unknown): Caption
 function readSummary(value: unknown): BrowserSummary | null {
   if (!value || typeof value !== 'object' || !('uiLanguage' in value)) return null
   const summary = value as BrowserSummary
-  if ((summary.protocolVersion !== 1 && summary.protocolVersion !== 2 && summary.protocolVersion !== BROWSER_PROTOCOL_VERSION) || typeof summary.browserAudio !== 'boolean') return null
+  if ((summary.protocolVersion !== 1 && summary.protocolVersion !== 2 && summary.protocolVersion !== 3 && summary.protocolVersion !== BROWSER_PROTOCOL_VERSION) || typeof summary.browserAudio !== 'boolean') return null
   return { ...summary, captionServiceActive: flag(summary.captionServiceActive, false) }
 }
 function configuredCaption(previous: CaptionConfig, summary: BrowserSummary | undefined, preferences?: Preferences): CaptionConfig {

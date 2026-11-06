@@ -13,6 +13,7 @@ from ..model_capabilities import normalize
 from ..compute import cpu_threads, resolve_dtype
 from .m2m100 import _Bundle
 from .transformers_causal import CausalTranslationRuntime
+from ..backend.glossary import active_glossary
 
 PUBLIC_ENDPOINT = "https://index-translate.bilibili.com/v1"
 PUBLIC_MODEL = "Index-Translate-35B-A3B"
@@ -31,14 +32,14 @@ def prompt_text(text: str) -> str:
     return f"{REVISION_INSTRUCTIONS}\n\n{text.strip()}" if revision_context(text) else text.strip()
 
 
-def prompt_header(source: str, target: str) -> str:
+def prompt_header(source: str, target: str, *, include_glossary: bool = True) -> str:
     source, target = normalize(source), normalize(target)
     if target not in LANGUAGE_NAMES:
         raise ValueError(f"Index-Translate 不支持的目标语言：{target}")
     # The recognizer's primary-language hint need not cover every language in mixed speech.
     # An unmapped hint uses the official auto-source form instead of inventing a language name.
     source_name = LANGUAGE_NAMES.get(source, "")
-    return f"请将以下{source_name}文本翻译为{LANGUAGE_NAMES[target]}，直接输出翻译结果，不要进行任何解释。"
+    return f"请将以下{source_name}文本翻译为{LANGUAGE_NAMES[target]}，直接输出翻译结果，不要进行任何解释。" + (active_glossary.get() if include_glossary else '')
 
 
 class IndexTranslatePublicProvider(OpenAICompatibleProvider):
@@ -52,7 +53,7 @@ class IndexTranslatePublicProvider(OpenAICompatibleProvider):
                          context_window=32768, max_output_tokens=1024, requester=requester)
 
     def _system_prompt(self, source: str, target: str) -> str:
-        return prompt_header(source, target)
+        return prompt_header(source, target, include_glossary=False)
 
     def _headers(self) -> dict[str, str]:
         # Match the official reference client's public-service identification header.

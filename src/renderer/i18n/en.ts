@@ -1,3 +1,4 @@
+import { suiteLocales } from './translation-suite-ui'
 import { modelPolicyEn } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
@@ -26,6 +27,7 @@ export const en: Dictionary = {
   gateway: gatewayEn,
   meeting: meetingEn,
   modelsPolicy: modelPolicyEn,
+  suite: suiteLocales['en'],
   screen: screenLocales['en'],
   shortcuts: shortcutLocales['en'],
   workbench: workbenchEn,
@@ -203,6 +205,7 @@ export const en: Dictionary = {
     playbackFailed: 'Speech failed',
     retryPlayback: 'Retry',
     skipPlayback: 'Skip sentence',
+    'pauseFailed': 'Could not pause or resume the session. Try again.',
     playbackActionFailed: 'Could not update speech playback',
     keepAudio: 'Keep audio',
     keepAudioHint: 'Without audio you cannot replay or export the session. Audio is kept on this machine and stays replayable from the record afterwards.',
@@ -764,6 +767,8 @@ export const en: Dictionary = {
     "invalidArgument": "Invalid parameters. Check your input.",
     "meetingNameEmpty": "The meeting name cannot be empty.",
     "meetingNotFound": "Meeting not found. Refresh the list.",
+    'credentialDecryptFailed': 'The saved key cannot be decrypted for this Windows user. Enter it again in the corresponding API settings.',
+    'credentialEncryptionUnavailable': 'Windows credential encryption is unavailable. Keys cannot be read or saved. Restart the app and try again.',
     "invalidCredential": "Invalid credential type or value. Enter it again.",
 
     errorCodeLabel: 'Code {code}',

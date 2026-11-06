@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFile, mkdir, writeFile, rename } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { BrowserWindow, desktopCapturer, globalShortcut, ipcMain, screen, session } from 'electron'
+import { BrowserWindow, desktopCapturer, globalShortcut, ipcMain, nativeImage, screen, session } from 'electron'
 import type { IpcMainInvokeEvent, Rectangle, WebContents } from 'electron'
 import { electronShortcut } from '../shared/keyboard-shortcuts'
 import type { AppSettings } from '../shared/settings'
@@ -13,6 +13,11 @@ import { screenCommandSchema, screenConfigSchema, screenFrameSchema, screenShort
 import type { FeatureActivity, FeatureLease } from './feature-activity'
 import { isTrustedRendererUrl, resolvePreloadPath } from './window-options'
 import { ScreenPipeline, mergeScreenLines, type OcrBlock } from './screen-pipeline'
+import { observeScreenWindow } from './screen-target'
+import type { ScreenRegion } from '../shared/screen-translation'
+import { emptyGlossary, type GlossaryDocument } from '../shared/glossary'
+import { resolveGlossaryTerms } from '../shared/glossary-match'
+import { createScreenTextProbe, matchesScreenTextProbe, type ScreenTextProbe } from '../shared/screen-visual-probe'
 
 interface ScreenTranslationOptions {
   mainDir: string; configPath: string; prepareOcr(): Promise<() => void>
@@ -21,12 +26,14 @@ interface ScreenTranslationOptions {
   inferOcr(request: ScreenOcrRequest, signal: AbortSignal): Promise<ScreenOcrResult>
   settings(): AppSettings; inferModel(request: DirectModelRequest, signal: AbortSignal): Promise<DirectModelResult>
   publish(snapshot: ScreenSnapshot): void; activity?: FeatureActivity
+  glossary?(): Promise<GlossaryDocument>
 }
 export class ScreenTranslation {
   private state: ScreenSnapshot = { status: 'ready', config: screenConfigSchema.parse({}), sessionId: randomUUID(), epoch: 0, blocks: [], shortcutError: false, frames: 0, ocrMs: 0, translationMs: 0 }
   private readonly ready: Promise<void>
   private capture?: BrowserWindow
   private overlay?: BrowserWindow
+  private toolbar?: BrowserWindow
   private editor?: BrowserWindow
   private hiddenMainWindow?: BrowserWindow
   private highlights?: BrowserWindow
@@ -37,6 +44,19 @@ export class ScreenTranslation {
   private draft?: ScreenRegionSet
   private pipeline?: ScreenPipeline
   private processing = false
+  private pendingFrame?: ScreenFrame
+  private readonly observedHashes = new Map<string, string>()
+  private readonly visualProbes = new Map<string, ScreenTextProbe>()
+  private captureRegions: ScreenRegion[] = []
+  private cursorTimer?: ReturnType<typeof setInterval>
+  private switchingDisplay = false
+  private observedSourceId?: string
+  private overlayVisible = true
+  private glossaryDocument = emptyGlossary()
+  private singleRead = false
+  private readonly requestedRegions = new Set<string>()
+  private savedScreenConfig?: ScreenConfig
+  private readonly listeners = new Set<(snapshot: ScreenSnapshot) => void>()
   private userPaused = false
   private sourceAvailable = true
   private targetForeground = true
@@ -64,7 +84,11 @@ export class ScreenTranslation {
   constructor(private readonly options: ScreenTranslationOptions) {
     this.ready = readFile(options.configPath, 'utf8').then(raw => {
       const stored = JSON.parse(raw)
-      this.state.config = screenConfigSchema.parse(stored.version === 2 ? stored.config : stored)
+      const config = stored.version === 2 ? stored.config : stored
+      this.state.config = screenConfigSchema.parse({ captureMode: 'regions', ...config })
+      if (this.state.config.captureMode === 'window') {
+        this.state.config.sourceId = ''; this.state.config.sourceName = ''; this.state.config.windowIdentity = ''
+      }
       if (this.state.config.sourceId.startsWith('window:') && this.state.config.regions.length) this.state.config.reviewRequired = true
       this.presets = stored.version === 2 ? (stored.presets ?? []).map((item: unknown) => screenPresetSchema.parse(item)) : []
       this.draft = stored.draft ? screenRegionSetSchema.parse(stored.draft) : undefined
@@ -80,6 +104,13 @@ export class ScreenTranslation {
         if (event.sender !== this.editor?.webContents) throw new Error('Access denied')
       } else if (event.sender === this.capture?.webContents || event.sender === this.overlay?.webContents || event.sender === this.highlights?.webContents) throw new Error('Access denied')
       if (command.action === 'configure') await this.configure(command.config)
+      else if (command.action === 'toolbarSize') {
+        if (event.sender !== this.toolbar?.webContents) throw new Error('Access denied')
+        const bounds = this.toolbar.getBounds(), area = screen.getDisplayMatching(bounds).workArea
+        const width = Math.min(command.width, area.width), height = Math.min(command.height, area.height)
+        const x = Math.max(area.x, Math.min(bounds.x, area.x + area.width - width)), y = Math.max(area.y, Math.min(bounds.y, area.y + area.height - height))
+        if (bounds.width !== width || bounds.height !== height || bounds.x !== x || bounds.y !== y) this.toolbar.setBounds({ x, y, width, height })
+      }
       else if (command.action === 'shortcutRecording') {
         await this.ready
         if (this.disposed) throw new Error('Screen translation is unavailable')
@@ -111,7 +142,7 @@ export class ScreenTranslation {
       return this.snapshot()
     })
     handle('screen:bootstrap', event => {
-      const role = event.sender === this.capture?.webContents ? 'capture' : event.sender === this.editor?.webContents ? 'editor' : event.sender === this.overlay?.webContents ? 'overlay' : event.sender === this.highlights?.webContents ? 'regions' : undefined
+      const role = event.sender === this.capture?.webContents ? 'capture' : event.sender === this.editor?.webContents ? 'editor' : event.sender === this.overlay?.webContents ? 'overlay' : event.sender === this.highlights?.webContents ? 'regions' : event.sender === this.toolbar?.webContents ? 'toolbar' : undefined
       if (!role) throw new Error('Access denied')
       return { role, snapshot: this.snapshot() }
     })
@@ -125,11 +156,110 @@ export class ScreenTranslation {
     })
   }
 
-  snapshot(): ScreenSnapshot { return { ...this.state, config: { ...this.state.config, regions: [...this.state.config.regions] }, blocks: [...this.state.blocks], presets: structuredClone(this.presets), regionsVisible: !!this.highlights } }
+  snapshot(): ScreenSnapshot { return { ...this.state, config: { ...this.state.config, regions: [...this.state.config.regions] }, blocks: [...this.state.blocks], presets: structuredClone(this.presets), regionsVisible: !!this.highlights, captureRegions: this.captureRegions, overlayVisible: this.overlayVisible, visualProbes: [...this.visualProbes.values()] } }
+
+  subscribe(listener: (snapshot: ScreenSnapshot) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener) }
+
+  async startForGame(gameId: string, config: ScreenConfig): Promise<void> {
+    await this.ready
+    await this.stop()
+    this.savedScreenConfig = this.state.config
+    this.state.config = config
+    this.state.gameId = gameId
+    await this.start()
+  }
 
   async sources(): Promise<ScreenSource[]> {
-    return (await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }))
-      .map(source => ({ id: source.id, name: source.name, kind: 'screen', preview: '' }))
+    const own = new Set(BrowserWindow.getAllWindows().map(window => window.getMediaSourceId()))
+    return (await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 0, height: 0 } }))
+      .filter(source => !own.has(source.id))
+      .map(source => ({ id: source.id, name: source.name, kind: source.id.startsWith('window:') ? 'window' : 'screen', preview: '' }))
+  }
+
+  async showToolbar(): Promise<void> {
+    await this.ready
+    if (this.disposed) return
+    if (!this.toolbar || this.toolbar.isDestroyed()) {
+      const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).bounds
+      this.toolbar = this.openWindow('toolbar', { x: area.x + Math.max(0, area.width - 640), y: area.y, width: Math.min(640, area.width), height: 64 })
+      this.toolbar.once('ready-to-show', () => this.toolbar?.showInactive())
+      this.toolbar.once('closed', () => { this.toolbar = undefined })
+    } else this.toolbar.showInactive()
+  }
+
+  async hideToolbar(): Promise<void> { this.toolbar?.hide() }
+  async toggleOverlay(): Promise<void> { this.overlayVisible = !this.overlayVisible; this.publish() }
+  async readOnce(): Promise<void> {
+    const continuous = this.state.status === 'running' && !this.singleRead
+    if (this.state.status !== 'running') await this.start()
+    this.singleRead = !continuous
+    this.requestedRegions.clear()
+    for (const region of this.captureRegions) this.requestedRegions.add(region.id)
+    this.hashes.clear()
+  }
+
+  async refreshGlossary(): Promise<void> {
+    if (!this.options.glossary) return
+    const document = await this.options.glossary()
+    if (document.revision < this.glossaryDocument.revision) return
+    const changed = document.matchingRevision !== this.glossaryDocument.matchingRevision
+    this.glossaryDocument = document
+    if (!changed) return
+    for (const [regionId, result] of this.ocrResults) {
+      this.pipeline?.update(regionId, result.blocks, result.width, result.height, Date.now(), this.hashes.get(regionId) === this.observedHashes.get(regionId))
+    }
+  }
+
+  private glossaryMatch(text: string) {
+    return resolveGlossaryTerms(this.glossaryDocument, { text, targetLanguage: this.state.config.targetLanguage,
+      context: this.state.gameId ? { scenario: 'game', projectId: this.state.gameId } : { scenario: 'screen' }, selection: this.state.config.glossarySelection })
+  }
+
+  private updateCursorRegion(): void {
+    if (!this.bounds || this.state.config.captureMode !== 'cursor' || this.userPaused || this.switchingDisplay) return
+    const point = screen.getCursorScreenPoint(), bounds = this.bounds
+    const contains = (rect: Rectangle) => point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height
+    const ownSurface = BrowserWindow.getAllWindows().some(window => window !== this.capture && window !== this.overlay && window !== this.highlights && window.isVisible() && contains(window.getBounds()))
+    if (!contains(bounds) && !ownSurface && this.capture && String(screen.getDisplayNearestPoint(point).id) !== this.state.config.display?.id) {
+      void this.switchCursorDisplay()
+      return
+    }
+    if (!contains(bounds) || ownSurface) {
+      this.sourceAvailable = false
+      if (this.state.status === 'running') { this.invalidate(); this.state.status = 'waiting'; this.publish() }
+      return
+    }
+    const available = this.sourceAvailable
+    this.sourceAvailable = true
+    const width = Math.min(480 / bounds.width, 1), height = Math.min(220 / bounds.height, 1)
+    const x = (point.x - bounds.x) / bounds.width, y = (point.y - bounds.y) / bounds.height
+    const previous = this.captureRegions[0]
+    if (available && previous && previous.width === width && previous.height === height && Math.abs(x - previous.x - width / 2) < width / 4 && Math.abs(y - previous.y - height / 2) < height / 4) return
+    this.captureRegions = [{ id: previous?.id ?? randomUUID(), x: Math.max(0, Math.min(1 - width, x - width / 2)), y: Math.max(0, Math.min(1 - height, y - height / 2)), width, height }]
+    if (this.pipeline || this.state.status === 'waiting') this.resetPipeline()
+    if (this.state.status === 'waiting' && this.canRun()) this.state.status = 'running'
+    this.publish()
+  }
+
+  private async switchCursorDisplay(): Promise<void> {
+    if (this.switchingDisplay) return
+    this.switchingDisplay = true
+    const lifecycle = ++this.lifecycle
+    this.invalidate(); this.sourceAvailable = false; this.state.status = 'waiting'; this.publish()
+    try {
+      await this.closeCapture()
+      if (lifecycle !== this.lifecycle || this.disposed) return
+      await this.openCapture(lifecycle)
+      if (lifecycle !== this.lifecycle || this.disposed) return
+      this.switchingDisplay = false
+      this.captureRegions = []
+      this.updateCursorRegion()
+      this.resetPipeline()
+      this.state.status = this.canRun() ? 'running' : 'waiting'
+      this.publish()
+    } catch {
+      if (lifecycle === this.lifecycle && !this.disposed) this.fail('targetUnavailable')
+    } finally { this.switchingDisplay = false }
   }
 
   private regionSet(): ScreenRegionSet {
@@ -218,14 +348,54 @@ export class ScreenTranslation {
   }
 
   private async desktopSource(): Promise<boolean> {
+    const lifecycle = this.lifecycle
+    if (this.state.config.captureMode === 'window') {
+      const selected = (await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 } })).find(item => item.id === this.state.config.sourceId)
+      if (!selected) throw new Error('targetUnavailable')
+      this.state.config.sourceName = selected.name
+      if (this.observedSourceId === selected.id && this.bounds) return false
+      this.stopObserver?.()
+      await new Promise<void>((resolve, reject) => {
+        let initialized = false
+        const timeout = setTimeout(() => reject(new Error('targetUnavailable')), 5000)
+        this.observedSourceId = selected.id
+        this.stopObserver = observeScreenWindow(selected.id, target => {
+          if (this.observedSourceId !== selected.id) return
+          if (!initialized) {
+            initialized = true; clearTimeout(timeout)
+            if (!target.available) { reject(new Error('targetUnavailable')); return }
+            this.state.config.windowIdentity = target.identity
+            this.bounds = target.bounds
+            this.sourceAvailable = target.available; this.targetForeground = target.foreground
+            resolve()
+            return
+          }
+          if (target.identity !== this.state.config.windowIdentity) { this.fail('targetChanged'); return }
+          const wasAvailable = this.sourceAvailable && this.targetForeground
+          this.sourceAvailable = target.available; this.targetForeground = target.foreground
+          const dimensions = this.captureDimensions
+          const candidate = dimensions && target.candidates.find(item => Math.abs(item.width / item.height - dimensions.width / dimensions.height) < 0.03)
+          const bounds = candidate ? candidate.bounds : target.bounds
+          const resized = this.bounds && (bounds.width !== this.bounds.width || bounds.height !== this.bounds.height)
+          this.bounds = bounds
+          if (resized) { this.captureDimensions = undefined; if (this.pipeline) this.resetPipeline(); this.publish() }
+          this.updateBounds()
+          if (!this.canRun() && this.state.status === 'running') { this.invalidate(); this.state.status = 'waiting'; this.publish() }
+          else if (!wasAvailable && this.canRun() && this.state.status === 'waiting') { this.resetPipeline(); this.state.status = 'running'; this.publish() }
+        }, () => { clearTimeout(timeout); if (!initialized) reject(new Error('targetUnavailable')); else this.fail('targetUnavailable') })
+      })
+      return false
+    }
     const displays = screen.getAllDisplays()
     const stored = displays.find(item => String(item.id) === this.state.config.display?.id)
-    const display = stored ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+    const display = this.state.config.captureMode === 'cursor' ? screen.getDisplayNearestPoint(screen.getCursorScreenPoint()) : stored ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
     const selected = (await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } })).find(item => item.display_id === String(display.id))
+    if (lifecycle !== this.lifecycle || this.disposed) return false
     if (!selected) throw new Error('targetUnavailable')
     const previous = this.state.config.display
-    const changed = this.state.config.reviewRequired || this.state.config.sourceId.startsWith('window:') && !!this.state.config.regions.length
+    const changed = this.state.config.captureMode === 'regions' && (this.state.config.reviewRequired || this.state.config.sourceId.startsWith('window:') && !!this.state.config.regions.length
       || !!previous && (!stored || previous.width !== display.bounds.width || previous.height !== display.bounds.height || previous.scale !== display.scaleFactor)
+    )
     this.state.config = { ...this.state.config, sourceId: selected.id, sourceName: selected.name, windowIdentity: '',
       display: { id: String(display.id), width: display.bounds.width, height: display.bounds.height, scale: display.scaleFactor }, reviewRequired: changed }
     this.bounds = display.bounds
@@ -237,10 +407,16 @@ export class ScreenTranslation {
     if (this.shortcutRecorder) throw new Error('Finish recording the shortcut first')
     if (this.editor) throw new Error('Finish editing the translation regions first')
     const sourceChanged = config.sourceId !== this.state.config.sourceId
+    const previous = this.state.config
+    const gameId = this.state.gameId, saved = this.savedScreenConfig
+    const toolbar = this.toolbar; this.toolbar = undefined
     await this.stop()
+    this.toolbar = toolbar
+    this.state.gameId = gameId; this.savedScreenConfig = saved
     this.state.config = screenConfigSchema.parse({ ...config, ...(sourceChanged ? { regions: [], windowIdentity: '' } : {}) })
     this.registerShortcuts()
-    await this.save()
+    try { await this.save() }
+    catch (error) { this.state.config = previous; this.registerShortcuts(); this.publish(); throw error }
     this.publish()
   }
 
@@ -265,6 +441,7 @@ export class ScreenTranslation {
   async start(): Promise<void> {
     await this.ready
     await this.stopping
+    await this.showToolbar()
     if (this.state.status === 'starting' || this.state.status === 'running' || this.editor) return
     if (this.capture && this.lease) { await this.resume(); return }
     if (this.disposed) return
@@ -290,14 +467,18 @@ export class ScreenTranslation {
       if (lifecycle !== this.lifecycle || this.disposed) return
       if (changed) { await this.edit(); this.editReturn = 'running'; return }
       const config = this.state.config
-      if (!config.regions.length) { this.fail('regionsMissing'); return }
+      if (config.captureMode === 'regions' && !config.regions.length) { await this.edit(); this.editReturn = 'running'; return }
       if (config.sourceLanguage === config.targetLanguage) { this.fail('sameLanguage'); return }
       this.state.sessionId = randomUUID()
       this.state.frames = 0
       this.userPaused = false
+      this.singleRead = false
+      this.captureRegions = config.captureMode === 'regions' ? config.regions : [{ id: randomUUID(), x: 0, y: 0, width: 1, height: 1 }]
+      if (config.captureMode === 'cursor') this.updateCursorRegion()
       await this.openCapture(lifecycle)
       if (lifecycle !== this.lifecycle || this.disposed) return
       this.resetPipeline()
+      if (config.captureMode === 'cursor') this.cursorTimer = setInterval(() => this.updateCursorRegion(), 100)
       this.state.status = this.canRun() ? 'running' : 'waiting'
       this.lease?.running()
       this.publish()
@@ -327,6 +508,7 @@ export class ScreenTranslation {
     if (!this.capture || !this.lease && this.options.activity) { await this.stop(); await this.start(); return }
     if (this.editor) return
     this.userPaused = false
+    this.singleRead = false
     this.state.error = undefined
     this.resetPipeline()
     this.state.status = this.canRun() ? 'running' : 'waiting'
@@ -336,10 +518,15 @@ export class ScreenTranslation {
   stop(): Promise<void> {
     if (this.stopping) return this.stopping
     ++this.lifecycle
+    if (this.cursorTimer) clearInterval(this.cursorTimer)
+    this.cursorTimer = undefined
+    this.toolbar?.destroy(); this.toolbar = undefined
     this.hideRegions()
     this.lease?.stopping(); this.invalidate()
     const editor = this.editor; this.editor = undefined
     this.state.status = 'ready'; editor?.destroy()
+    if (this.savedScreenConfig) this.state.config = this.savedScreenConfig
+    this.savedScreenConfig = undefined; this.state.gameId = undefined
     this.restoreMainWindow()
     const task = (async () => {
       await this.closeCapture()
@@ -359,7 +546,9 @@ export class ScreenTranslation {
     if (this.disposed || this.editor) return
     this.editReturn = this.state.status === 'running' || this.state.status === 'waiting' ? 'running' : this.state.status === 'paused' ? 'paused' : 'ready'
     this.hideRegions()
+    const toolbar = this.toolbar; this.toolbar = undefined
     await this.pause()
+    this.toolbar = toolbar
     const lifecycle = ++this.lifecycle
     await this.desktopSource()
     if (lifecycle !== this.lifecycle || this.disposed) return
@@ -384,54 +573,123 @@ export class ScreenTranslation {
   }
 
   private async frame(frame: ScreenFrame): Promise<void> {
-    if (frame.sessionId !== this.state.sessionId || frame.epoch !== this.state.epoch || this.processing) return
+    if (frame.sessionId !== this.state.sessionId || frame.epoch !== this.state.epoch) return
     if (this.state.status !== 'running' && this.state.status !== 'editing') return
     const dimensions = this.captureDimensions
-    if (dimensions && Math.abs(dimensions.width / dimensions.height - frame.width / frame.height) > 0.03) { this.fail('targetChanged'); return }
+    if (dimensions && Math.abs(dimensions.width / dimensions.height - frame.width / frame.height) > 0.03) {
+      if (this.state.config.captureMode === 'window') {
+        this.captureDimensions = { width: frame.width, height: frame.height }; this.resetPipeline(); this.publish()
+      } else this.fail('targetChanged')
+      return
+    }
     this.captureDimensions = { width: frame.width, height: frame.height }
     if (this.state.status !== 'running' || !this.pipeline) return
+    const knownProbes = new Set(this.visualProbes.keys())
+    for (const region of frame.observed ?? frame.regions) {
+      if (!this.captureRegions.some(item => item.id === region.regionId)) continue
+      if (this.observedHashes.get(region.regionId) !== region.hash) this.pipeline.observeRegion(region.regionId, knownProbes)
+      this.observedHashes.set(region.regionId, region.hash)
+    }
+    for (const check of frame.checked ?? []) {
+      const probe = this.visualProbes.get(check.id)
+      if (probe) this.pipeline.verifyVisual(check.id, check.matches, probe.sourceHash === this.observedHashes.get(probe.regionId))
+    }
+    if (!frame.regions.length) return
+    if (this.processing) {
+      const pending = new Map((this.pendingFrame?.regions ?? []).map(region => [region.regionId, region]))
+      for (const region of frame.regions) pending.set(region.regionId, region)
+      let bytes = [...pending.values()].reduce((total, region) => total + region.image.length, 0)
+      while (bytes > 48 * 1024 * 1024 && pending.size) {
+        const [id, oldest] = pending.entries().next().value!
+        pending.delete(id); bytes -= oldest.image.length
+      }
+      // Pixel checks describe their own observation, never replay them after a newer frame.
+      this.pendingFrame = { ...frame, observed: [], checked: [], regions: [...pending.values()] }
+      return
+    }
     this.processing = true
     const epoch = this.state.epoch, abort = this.workAbort, pipeline = this.pipeline
     this.state.frames++
     try {
+      await this.refreshGlossary()
+      if (epoch !== this.state.epoch || abort.signal.aborted) return
       // Every capture is bounded to one frame; regions rotate to avoid a permanently preferred first region.
       const offset = this.state.frames % Math.max(1, frame.regions.length)
       const regions = [...frame.regions.slice(offset), ...frame.regions.slice(0, offset)]
       for (const region of regions) {
         if (epoch !== this.state.epoch || abort.signal.aborted) break
-        if (!this.state.config.regions.some(item => item.id === region.regionId)) continue
+        if (!this.captureRegions.some(item => item.id === region.regionId)) continue
+        if (this.singleRead && !this.requestedRegions.has(region.regionId)) continue
+        if (this.observedHashes.get(region.regionId) !== region.hash) continue
         let result = this.ocrResults.get(region.regionId)
         if (this.hashes.get(region.regionId) !== region.hash || !result) {
           const started = Date.now()
-          pipeline.hideRegion(region.regionId)
-          result = await this.options.inferOcr({ image: region.image, appearance: true, language: this.state.config.sourceLanguage === 'zh-Hant' ? 'zh' : this.state.config.sourceLanguage }, abort.signal)
+          result = await this.options.inferOcr({ image: region.image, appearance: this.state.config.strategy !== 'speed', language: this.state.config.sourceLanguage === 'zh-Hant' ? 'zh' : this.state.config.sourceLanguage }, abort.signal)
           if (epoch !== this.state.epoch || abort.signal.aborted) break
+          const blocks = this.probeBlocks(region.regionId, region.hash, region.image, result)
+          if (this.observedHashes.get(region.regionId) !== region.hash && !blocks.some(block => block.visualId)) continue
+          result = { ...result, blocks }
           this.state.ocrMs = Date.now() - started
           this.hashes.set(region.regionId, region.hash)
           this.ocrResults.set(region.regionId, result)
         }
-        pipeline.update(region.regionId, mergeScreenLines(result.blocks, result.width), result.width, result.height)
+        const verified = this.observedHashes.get(region.regionId) === region.hash
+        pipeline.update(region.regionId, result.blocks, result.width, result.height, Date.now(), verified)
+        if (this.singleRead) {
+          pipeline.update(region.regionId, result.blocks, result.width, result.height, Date.now(), verified)
+          this.requestedRegions.delete(region.regionId)
+        }
       }
     } catch (error) {
       if (epoch === this.state.epoch && !abort.signal.aborted && !(error instanceof Error && error.message === 'resourceBusy')) {
         const known = ['ocrMissing', 'ocrNotReady', 'ocrCorrupt', 'ocrRuntimeUnavailable', 'backendUnavailable'] as const
         this.fail(known.find(code => error instanceof Error && error.message === code) ?? 'ocrFailed')
       }
-    } finally { this.processing = false }
+    } finally {
+      this.processing = false
+      const pending = this.pendingFrame; this.pendingFrame = undefined
+      if (pending) void this.frame(pending)
+    }
+  }
+
+  private probeBlocks(regionId: string, hash: string, image: string, result: { blocks: OcrBlock[]; width: number; height: number }): OcrBlock[] {
+    const blocks = mergeScreenLines(result.blocks, result.width)
+    const source = nativeImage.createFromDataURL(image)
+    if (source.isEmpty()) return blocks
+    const { width, height } = source.getSize()
+    if (width !== result.width || height !== result.height) return blocks
+    const pixels = source.toBitmap()
+    for (let index = 0; index < pixels.length; index += 4) { const blue = pixels[index]; pixels[index] = pixels[index + 2]; pixels[index + 2] = blue }
+    const previous = [...this.visualProbes.values()].filter(probe => probe.regionId === regionId)
+    const next: ScreenTextProbe[] = []
+    for (const block of blocks) {
+      const visual = createScreenTextProbe({ data: pixels, width, height }, block.quad)
+      if (!visual) continue
+      const same = previous.find(probe => probe.x === visual.x && probe.y === visual.y && probe.width === visual.width && probe.height === visual.height
+        && matchesScreenTextProbe({ data: pixels, width, height }, probe))
+      const id = same?.id ?? randomUUID()
+      next.push({ ...(same ?? visual), id, regionId, sourceHash: hash })
+      block.visualId = id
+    }
+    if (next.length || this.observedHashes.get(regionId) === hash) {
+      for (const probe of previous) this.visualProbes.delete(probe.id)
+      for (const probe of next) this.visualProbes.set(probe.id, probe)
+    }
+    return blocks
   }
 
   private resetPipeline(): void {
     this.invalidate()
     const epoch = this.state.epoch
     const model = screenTranslationModel(this.state.config, this.options.settings())
-    this.pipeline = new ScreenPipeline({ ...this.state.config, model }, async (text, signal) => {
+    this.pipeline = new ScreenPipeline({ ...this.state.config, regions: this.captureRegions, model }, async (text, signal) => {
       const started = Date.now()
       const result = await this.options.inferModel({ id: randomUUID(), kind: 'mt', model, taskMode: 'realtime',
-        text, source: this.state.config.sourceLanguage, target: this.state.config.targetLanguage }, AbortSignal.any([signal, AbortSignal.timeout(25000)]))
+        text, source: this.state.config.sourceLanguage, target: this.state.config.targetLanguage, glossary: this.glossaryMatch(text).terms }, AbortSignal.any([signal, AbortSignal.timeout(25000)]))
       if (epoch === this.state.epoch) this.state.translationMs = Date.now() - started
       return result.text
     }, () => { if (epoch === this.state.epoch) { this.state.blocks = this.pipeline?.blocks() ?? []; this.publish() } },
-    () => { if (epoch === this.state.epoch) { if (this.state.error !== 'translationFailed') this.state.errorId = randomUUID(); this.state.error = 'translationFailed'; this.publish() } })
+    () => { if (epoch === this.state.epoch) { if (this.state.error !== 'translationFailed') this.state.errorId = randomUUID(); this.state.error = 'translationFailed'; this.publish() } }, text => this.glossaryMatch(text).signature)
   }
 
   private invalidate(): void {
@@ -439,13 +697,17 @@ export class ScreenTranslation {
     this.workAbort.abort(); this.workAbort = new AbortController()
     this.pipeline?.stop(); this.pipeline = undefined
     this.hashes.clear(); this.ocrResults.clear()
+    this.observedHashes.clear(); this.pendingFrame = undefined
+    this.visualProbes.clear()
     this.state.blocks = []
     this.overlay?.hide()
   }
 
   private canRun(): boolean { return this.sourceAvailable && this.targetForeground && !this.userPaused }
   private fail(error: ScreenSnapshot['error']): void {
+    const toolbar = this.toolbar; this.toolbar = undefined
     const cleanup = this.stop()
+    this.toolbar = toolbar
     const lifecycle = this.lifecycle
     this.state.status = 'error'; this.state.error = error; this.state.errorId = randomUUID(); this.publish()
     void cleanup.then(() => {
@@ -457,10 +719,14 @@ export class ScreenTranslation {
   private async openCapture(lifecycle: number): Promise<void> {
     if (this.capture && !this.capture.isDestroyed()) return
     if (await this.desktopSource()) throw new Error('targetChanged')
-    const selected = (await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } })).find(source => source.id === this.state.config.sourceId)
+    if (lifecycle !== this.lifecycle || this.disposed) return
+    const selected = (await desktopCapturer.getSources({ types: [this.state.config.captureMode === 'window' ? 'window' : 'screen'], thumbnailSize: { width: 0, height: 0 } })).find(source => source.id === this.state.config.sourceId)
     if (lifecycle !== this.lifecycle || this.disposed) return
     if (!selected) throw new Error('targetUnavailable')
-    this.sourceAvailable = true; this.targetForeground = true; this.captureDimensions = undefined
+    if (this.state.config.captureMode === 'regions') this.sourceAvailable = true
+    if (this.state.config.captureMode !== 'window') this.targetForeground = true
+    this.captureDimensions = undefined
+    if (this.state.config.captureMode !== 'window') {
     const original = this.state.config.display!
     const update = () => {
       const display = screen.getAllDisplays().find(item => String(item.id) === original.id)
@@ -469,6 +735,7 @@ export class ScreenTranslation {
     }
     screen.on('display-removed', update); screen.on('display-metrics-changed', update)
     this.stopObserver = () => { screen.removeListener('display-removed', update); screen.removeListener('display-metrics-changed', update) }
+    }
     const captureSession = session.fromPartition('screen-translation-capture')
     captureSession.setPermissionRequestHandler((contents, permission, callback) => callback(contents === this.capture?.webContents && permission === 'media'))
     captureSession.setPermissionCheckHandler((contents, permission) => contents === this.capture?.webContents && permission === 'media')
@@ -477,32 +744,35 @@ export class ScreenTranslation {
       callback({ video: selected })
     })
     this.capture = this.openWindow('capture', { x: 0, y: 0, width: 320, height: 240 })
-    this.capture.webContents.once('render-process-gone', () => { if (!this.disposed && this.capture) this.fail('captureFailed') })
+    const capture = this.capture
+    capture.webContents.once('render-process-gone', () => { if (!this.disposed && this.capture === capture) this.fail('captureFailed') })
     if (this.bounds) this.overlay = this.openWindow('overlay', this.bounds)
   }
 
   private async closeCapture(): Promise<void> {
     this.stopObserver?.(); this.stopObserver = undefined
+    this.observedSourceId = undefined
     this.capture?.destroy(); this.capture = undefined
     this.overlay?.destroy(); this.overlay = undefined
     this.bounds = undefined
   }
 
-  private openWindow(role: 'capture' | 'editor' | 'overlay' | 'regions', bounds: Rectangle): BrowserWindow {
+  private openWindow(role: 'capture' | 'editor' | 'overlay' | 'regions' | 'toolbar', bounds: Rectangle): BrowserWindow {
     const window = new BrowserWindow({ ...bounds, show: false, frame: false, transparent: role !== 'capture', backgroundColor: '#00000000',
-      focusable: role === 'editor', skipTaskbar: true, resizable: false, movable: false, hasShadow: false,
+      focusable: role === 'editor' || role === 'toolbar', skipTaskbar: true, resizable: false, movable: role === 'toolbar', hasShadow: false,
       webPreferences: { preload: resolvePreloadPath(this.options.mainDir), contextIsolation: true, sandbox: true, nodeIntegration: false,
         backgroundThrottling: false, ...(role === 'capture' ? { partition: 'screen-translation-capture' } : {}) },
     })
     window.setContentProtection(true)
     // Windows constrains initial bounds to the work area; OCR coordinates cover the entire display.
-    if (role !== 'capture') {
+    if (role !== 'capture' && role !== 'toolbar') {
       window.setBounds(bounds)
       window.on('show', () => { if (!window.isDestroyed()) window.setBounds(this.bounds ?? bounds) })
     }
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
     if (role === 'overlay' || role === 'regions') { window.setIgnoreMouseEvents(true); window.setFocusable(false); window.setAlwaysOnTop(true, 'screen-saver') }
     if (role === 'editor') { window.setAlwaysOnTop(true, 'screen-saver'); window.once('ready-to-show', () => { window.show(); window.focus() }) }
+    if (role === 'toolbar') window.setAlwaysOnTop(true, 'screen-saver')
     const query = { role, theme: this.options.settings().theme }
     const rendererUrl = process.env.ELECTRON_RENDERER_URL
     const load = rendererUrl ? window.loadURL(new URL(`screen.html?${new URLSearchParams(query)}`, rendererUrl).href)
@@ -536,11 +806,12 @@ export class ScreenTranslation {
     if (this.disposed) return
     const value = this.snapshot()
     this.options.publish(value)
-    for (const window of [this.capture, this.overlay, this.editor, this.highlights]) {
+    for (const listener of this.listeners) listener(value)
+    for (const window of [this.capture, this.overlay, this.editor, this.highlights, this.toolbar]) {
       if (window && !window.isDestroyed() && !window.webContents.isDestroyed() && !window.webContents.isLoadingMainFrame()) window.webContents.send('screen:changed', value)
     }
     if (this.overlay && !this.overlay.isDestroyed()) {
-      if (this.state.status === 'running' && this.canRun() && this.state.blocks.some(block => block.status === 'ready')) this.overlay.showInactive()
+      if (this.overlayVisible && this.state.status === 'running' && this.canRun() && this.state.blocks.some(block => block.status === 'ready' && !block.hidden)) this.overlay.showInactive()
       else this.overlay.hide()
     }
   }
@@ -566,7 +837,7 @@ export class ScreenTranslation {
   }
 
   private save(): Promise<void> {
-    const data = JSON.stringify({ version: 2, config: this.state.config, presets: this.presets, draft: this.draft })
+    const data = JSON.stringify({ version: 2, config: this.savedScreenConfig ?? this.state.config, presets: this.presets, draft: this.draft })
     const path = this.options.configPath
     this.writeQueue = this.writeQueue.catch(() => {}).then(async () => {
       await mkdir(dirname(path), { recursive: true })

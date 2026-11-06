@@ -108,7 +108,7 @@ async function streamGatewayLanguageModel(services: LanguageModelServices, sende
   }
   const frontend = frontendTools(request.body.tools as Parameters<typeof frontendTools>[0])
   const artifacts: string[] = []
-  const tools = await nativeAgentTools({ services, ownerId: sender.id, project, messages, signal, model, maxOutputTokens: Math.min(profile.maxOutputTokens, profile.contextWindow),
+  const tools = await nativeAgentTools({ services, ownerId: sender.id, project, comicProjectId: request.comicProjectId, comicImages: services.supportsComicImages?.(profile.id) === true, messages, signal, model, maxOutputTokens: Math.min(profile.maxOutputTokens, profile.contextWindow),
     providerOptions, approvedTerminalCallIds, artifact: audio => artifacts.push(audio),
     prepareAudio: media => prepareLanguageModelAudio(sender, request.id, media, signal) })
   const reserved = new Set(Object.keys(tools))

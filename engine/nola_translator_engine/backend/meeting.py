@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import ctypes
 import re
+from contextlib import suppress
 from time import monotonic, time
 from traceback import extract_tb
 from typing import Literal
@@ -143,7 +144,14 @@ class _Route:
             self.capture = _desktop_backend(self.session.config.input)
             if self.capture is None:
                 raise ValueError("Meeting requires native input")
-            await self.capture.start()
+            startup = asyncio.create_task(self.capture.start())
+            try:
+                await asyncio.shield(startup)
+            except BaseException:
+                # Native activation must finish before meeting cleanup releases its handles.
+                with suppress(Exception):
+                    await startup
+                raise
         except (OSError, RuntimeError, ValueError) as exc:
             raise SessionError(self.error("AUDIO_SOURCE_UNAVAILABLE", "capture", "audioInputUnavailable")) from exc
         self.capture_task = asyncio.create_task(self._capture())

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import type { LatencySnapshot, LatencyWavePoint } from '../../../shared/latency'
 
@@ -27,7 +28,9 @@ export function LatencyWindow() {
   const { t, language } = useI18n()
   useNolaTheme()
   const [snapshot, setSnapshot] = useState<LatencySnapshot | null>(null)
-  useEffect(() => subscribeLatency(setSnapshot), [])
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => subscribeLatency(value => { setSnapshot(value); setFailed(false) }, () => setFailed(true)), [attempt])
   useEffect(() => {
     // The window title follows this feature after the shared provider sets the app title.
     queueMicrotask(() => { document.title = t('latency.title') })
@@ -42,7 +45,7 @@ export function LatencyWindow() {
       {snapshot ? <>
         <LatencyTrend snapshot={snapshot} />
         {snapshot.speech && snapshot.available !== false && <AudioTimeline snapshot={snapshot} />}
-      </> : <Card size="sm"><Empty><EmptyHeader><EmptyTitle>{t('latency.loading')}</EmptyTitle></EmptyHeader></Empty></Card>}
+      </> : <Card size="sm"><Empty><EmptyHeader><EmptyTitle>{t(failed ? 'latency.connectionFailed' : 'latency.loading')}</EmptyTitle></EmptyHeader>{failed && <Button variant="outline" onClick={() => { setFailed(false); setAttempt(value => value + 1) }}>{t('common.retry')}</Button>}</Empty></Card>}
     </div>
   </main>
 }

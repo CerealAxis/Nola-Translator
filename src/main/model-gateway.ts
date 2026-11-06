@@ -107,6 +107,7 @@ export class ModelGateway {
   private readonly sockets = new Set<Socket>()
   private readonly clients = new Set<WebSocket>()
   private readonly controllers = new Set<AbortController>()
+  private readonly externalMt = new Map<string, { binding: string; cancel(): Promise<void>; done: Promise<void> }>()
   private readonly slots = new Map<string, WorkerSlot>()
   private readonly retiring = new Set<WorkerSlot>()
   private readonly eager = new Map<WorkerKind, string>()
@@ -133,6 +134,7 @@ export class ModelGateway {
   private host = DEFAULT_MODEL_GATEWAY.host
   private port = DEFAULT_MODEL_GATEWAY.port
   private stopping = false
+  private externalStopping = 0
   private stopVersion = 0
 
   constructor(private readonly options: ModelGatewayOptions) {}
@@ -222,6 +224,32 @@ export class ModelGateway {
     return { worker: slot.worker, model: slot.binding, release: error => {
       if (released) return
       released = true; this.finish(entry, error); this.unhold(slot)
+    } }
+  }
+
+  /** Python owns inference; this lease pins admission and teardown until its job drains. */
+  async acquireExternalMt(binding: string, onStop: () => Promise<void>): Promise<{ release(error?: unknown): void }> {
+    const version = this.stopVersion
+    const stored = this.options.getSettings()
+    const configuration = JSON.stringify(stored)
+    const wanted = normalizeModelBinding('mt', binding)
+    const local = bindingIsLocal(wanted)
+    if (this.externalStopping || this.stopping && this.state !== 'stopped') throw new GatewayError(503, 'Model Gateway is stopping.', 'gateway_not_running')
+    if (local) this.requireLocalBinding('mt', wanted, stored)
+    else if (!backendCloudMt(wanted)) throw new GatewayError(503, 'Select a text translation model.', 'model_unavailable')
+    await this.plan('mt', wanted, local ? await this.options.listResources() : [], stored, stored.modelGateway)
+    if (version !== this.stopVersion) throw new GatewayError(503, 'Model Gateway stopped while preparing the request.', 'gateway_not_running')
+    if (configuration !== JSON.stringify(this.options.getSettings())) throw new GatewayError(409, 'Model configuration changed. Retry the request.', 'configuration_changed')
+    if (local) this.requireLocalBinding('mt', wanted, stored)
+    const request = this.begin('mt', wanted)
+    let resolve!: () => void
+    let cancelling: Promise<void> | undefined
+    const done = new Promise<void>(complete => { resolve = complete })
+    this.externalMt.set(request.id, { binding: wanted, done, cancel: () => cancelling ??= Promise.resolve().then(onStop) })
+    return { release: error => {
+      if (!this.externalMt.delete(request.id)) return
+      this.finish(request, error ?? (cancelling ? new Error('Cancelled') : undefined), !!cancelling)
+      resolve()
     } }
   }
 
@@ -351,12 +379,13 @@ export class ModelGateway {
   stop(): Promise<ModelGatewaySnapshot> {
     // Abort immediately even if startup is waiting on a cold model load.
     this.stopping = true
+    this.externalStopping++
     this.stopVersion++
     this.loadingLanguageModel?.abort()
     for (const controller of this.onDemandLocalLanguageControllers) controller.abort()
     for (const release of this.onDemandLocalLanguageLeases) release()
-    for (const slot of this.slots.values()) if (bindingIsLocal(slot.binding)) void slot.worker.close()
-    return this.serialize(() => this.stopInternal())
+    for (const slot of this.slots.values()) if (bindingIsLocal(slot.binding) && ![...this.externalMt.values()].some(lease => lease.binding === slot.binding)) void slot.worker.close()
+    return this.serialize(() => this.stopInternal()).finally(() => { this.externalStopping-- })
   }
   async dispose(): Promise<void> {
     for (const controller of this.cloudLanguageControllers) controller.abort()
@@ -852,6 +881,9 @@ export class ModelGateway {
   }
   private async stopInternal(): Promise<ModelGatewaySnapshot> {
     this.stopping = true; this.state = 'stopping'; this.changed()
+    const external = [...this.externalMt.values()]
+    await Promise.all(external.map(lease => lease.cancel()))
+    await Promise.all(external.map(lease => lease.done))
     for (const controller of this.controllers) controller.abort()
     this.loadingLanguageModel?.abort()
     for (const controller of this.onDemandLocalLanguageControllers) controller.abort()

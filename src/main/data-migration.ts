@@ -13,6 +13,9 @@ import { dirname, join, resolve, sep } from 'node:path'
 export const DATA_ROOT_ENTRIES: readonly string[] = [
   'settings.json',
   'screen-translation.json',
+  'glossary.json',
+  'game-translation.json',
+  'comics',
   'workspace-window.json',
   'settings.json.migration-v3.json',
   'settings.json.migration-v3.bak',

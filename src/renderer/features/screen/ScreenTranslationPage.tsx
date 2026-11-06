@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, Crop, Keyboard, Languages, Play, Save, Scan, Square, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Copy, Crop, Keyboard, Play, Save, Square, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { getBridge, stores, updateSettings, useStore } from '@/store'
 import { useAvailableModels } from '@/available-models'
@@ -11,19 +11,22 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogCloseButton } from '@/components/ui/dialog'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Spinner } from '@/components/ui/spinner'
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
+import { DualColumnView } from '@/components/reading/DualColumnView'
+import { GlossarySelectionField } from '../settings/glossary/GlossarySelectionField'
 import { ModelAvailabilityLabel } from '../workspace/ModelAvailabilityLabel'
 import { normalizeLanguage } from '../../../shared/languages'
 import { configurationOf, translationLanguages } from '../../../shared/model-capabilities'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { defaultModelBinding, isModelEnabled } from '../../../shared/model-policy'
-import { screenConfigSchema, screenProcessingMode, screenTranslationModel, type ScreenCommand, type ScreenConfig, type ScreenSnapshot } from '../../../shared/screen-translation'
+import { screenConfigSchema, screenProcessingMode, screenTranslationModel, type ScreenCommand, type ScreenConfig, type ScreenSource, type ScreenSnapshot } from '../../../shared/screen-translation'
 import { layoutScreenOverlay } from './overlay-layout'
 import './screen.css'
 
@@ -61,6 +64,13 @@ export function ScreenTranslationPage() {
   const [presetDialog, setPresetDialog] = useState<'save' | 'rename' | 'delete'>()
   const [presetName, setPresetName] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sources, setSources] = useState<ScreenSource[]>([])
+  useEffect(() => {
+    if (!api || config.captureMode !== 'window') return
+    let live = true
+    void api.sources().then(value => { if (live) setSources(value.filter(source => source.kind === 'window')) }).catch(error => notifyError(t('suite.actionFailed'), { cause: error }))
+    return () => { live = false }
+  }, [api, config.captureMode])
   const savedConfig = useRef('')
   const lastIssue = useRef<string | undefined>(undefined)
   const commandPending = useRef(false)
@@ -158,46 +168,24 @@ export function ScreenTranslationPage() {
     </Select></Field>
   )
   return <div className="screen-page" data-slot="screen-page">
-    <PageHeader title={t('screen.title')} subtitle={t('screen.description')} actions={
+    <PageHeader title={t('screen.title')} actions={<div className="screen-page__actions">
+      {canStop && <Button variant="outline" disabled={busy || !api} onClick={() => void run({ action: 'showToolbar' })}>{t('suite.showToolbar')}</Button>}
       <Button variant={canStop ? 'destructive' : 'default'}
         disabled={busy || !api || !canStop && incompatible}
         onClick={() => void run({ action: canStop ? 'stop' : 'start' }, !canStop)}>
         {busy ? <Spinner data-icon="inline-start" /> : canStop ? <Square data-icon="inline-start" /> : <Play data-icon="inline-start" />}
         {t(canStop ? 'screen.stop' : 'screen.start')}
-      </Button>
+      </Button></div>
     } />
-    <Card className="screen-scene-card" role="region" aria-label={t('screen.sceneTitle')}>
-      <CardContent>
-        <div className="nola-overlay-stage screen-scene" role="img" aria-label={t('screen.sceneDescription')}>
-          <div className="screen-scene__art" aria-hidden="true">
-            <span className="screen-scene__endpoint"><Scan /></span><span className="screen-scene__link" />
-            <div className="screen-scene__monitor">
-              <div className="screen-scene__window">
-                <div className="screen-scene__toolbar" />
-                <div className="screen-scene__document">
-                  <div className="screen-scene__copy"><span /><span /><span />
-                    <div className="screen-scene__picture"><svg viewBox="0 0 160 64" fill="none"><path d="M18 46 50 22 78 42 110 16 140 44" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" /></svg></div>
-                  </div>
-                  <div className="screen-scene__selection">
-                    <span className="screen-scene__corner" data-corner="tl" /><span className="screen-scene__corner" data-corner="tr" />
-                    <span className="screen-scene__corner" data-corner="bl" /><span className="screen-scene__corner" data-corner="br" />
-                    <span className="screen-scene__source">{t('screen.sceneSource')}</span>
-                    <ArrowDown />
-                    <span className="screen-scene__translation">{t('screen.sceneTranslation')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <span className="screen-scene__link" /><span className="screen-scene__endpoint"><Languages /></span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
     {textOverflow && <Alert><AlertDescription>{t('screen.layoutHint')}</AlertDescription></Alert>}
     <Card className="screen-settings nola-settings-card"><CardContent className="nola-settings-content">
       <section className="nola-settings-section" aria-label={t('screen.regions')}>
         <FieldGroup>
-          <Field className="nola-settings-field screen-regions-field"><FieldLabel htmlFor="screen-preset">{t('screen.regions')}</FieldLabel>
+          {select('screen-capture-mode', t('suite.captureMode'), config.captureMode, ['cursor', 'regions', 'window'].map(value => ({ value, label: t(`suite.${value as 'cursor' | 'regions' | 'window'}`) })), value => patch('captureMode', value as ScreenConfig['captureMode']))}
+          {config.captureMode === 'window' && select('screen-target-window', t('suite.selectWindow'), config.sourceId, sources.map(source => ({ value: source.id, label: source.name })), value => setConfig(previous => ({ ...previous, sourceId: value, sourceName: sources.find(source => source.id === value)?.name ?? '' })))}
+          {select('screen-strategy', t('suite.strategy'), config.strategy, ['auto', 'speed', 'quality'].map(value => ({ value, label: t(`suite.${value as 'auto' | 'speed' | 'quality'}`) })), value => patch('strategy', value as ScreenConfig['strategy']))}
+          <GlossarySelectionField className="nola-settings-field" value={config.glossarySelection} disabled={active || busy} onChange={value => patch('glossarySelection', value)} />
+          {config.captureMode === 'regions' && <Field className="nola-settings-field screen-regions-field"><FieldLabel htmlFor="screen-preset">{t('screen.regions')}</FieldLabel>
             <div className="screen-region-controls">
               <Select value={config.presetId || 'draft'} disabled={busy || snapshot?.status === 'editing' || !api} onValueChange={id => { if (id) void run({ action: 'loadPreset', id }, !canStop) }}>
                 <SelectTrigger id="screen-preset"><SelectValue>{selectedPreset ? `${selectedPreset.name}${presetDirty ? ` · ${t('screen.presetModified')}` : ''}` : t('screen.presetDraft')}</SelectValue></SelectTrigger>
@@ -210,7 +198,7 @@ export function ScreenTranslationPage() {
                 <Button variant="destructive" size="sm" onClick={() => openPresetDialog('delete')}><Trash2 data-icon="inline-start" />{t('screen.presetDelete')}</Button>
               </PopoverContent></Popover>}
             </div>
-          </Field>
+          </Field>}
         </FieldGroup>
       </section>
       <section className="nola-settings-section" aria-labelledby="screen-translation-heading">
@@ -239,7 +227,17 @@ export function ScreenTranslationPage() {
         <Field className="nola-settings-field"><FieldLabel htmlFor="screen-show-source">{t('screen.showSource')}</FieldLabel><Switch id="screen-show-source" checked={config.showSource} disabled={active || busy} onCheckedChange={value => patch('showSource', value)}><SwitchThumb /></Switch></Field>
         </FieldGroup>
       </section>
-      <div className="screen-settings__footer screen-page__actions"><Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/shortcuts" />}><Keyboard data-icon="inline-start" />{t('shortcuts.title')}</Button><Button variant="outline" size="sm" disabled={active || busy || !api} onClick={() => void save()}><Save data-icon="inline-start" />{t('screen.save')}</Button></div>
+      <div className="screen-settings__footer screen-page__actions"><Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/glossary" />}>{t('suite.manageGlossary')}</Button><Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/shortcuts" />}><Keyboard data-icon="inline-start" />{t('shortcuts.title')}</Button><Button variant="outline" size="sm" disabled={active || busy || !api} onClick={() => void save()}><Save data-icon="inline-start" />{t('screen.save')}</Button></div>
+    </CardContent></Card>
+    <Card data-slot="screen-results"><CardHeader><CardTitle>{t('suite.currentResult')}</CardTitle>
+      <div className="screen-page__actions">{(['source', 'translation'] as const).map(kind => <Button key={kind} variant="outline" size="sm" disabled={!snapshot?.blocks.some(block => !block.hidden && (kind === 'source' ? block.text : block.translation))} onClick={() => {
+        const text = snapshot!.blocks.filter(block => !block.hidden).map(block => kind === 'source' ? block.text : block.translation ?? '').filter(Boolean).join('\n')
+        void navigator.clipboard.writeText(text).then(() => notifySuccess(t('suite.copied'))).catch(error => notifyError(t('suite.copyFailed'), { cause: error }))
+      }}><Copy data-icon="inline-start" />{t(kind === 'source' ? 'suite.copySource' : 'suite.copyTranslation')}</Button>)}</div>
+    </CardHeader><CardContent>
+      <DualColumnView sourceLabel={t('suite.source')} targetLabel={t('suite.translation')}
+        segments={(snapshot?.blocks ?? []).filter(block => !block.hidden).map(block => ({ id: block.id, source: block.text, target: block.translation ?? (block.status === 'error' ? t('screen.errors.translationFailed') : block.status === 'translating' ? t('screen.states.running') : ''), interim: block.status !== 'ready' }))}
+        empty={<Empty><EmptyHeader><EmptyTitle>{t('suite.resultEmpty')}</EmptyTitle>{!canStop && <EmptyDescription>{t('suite.resultReady')}</EmptyDescription>}</EmptyHeader></Empty>} />
     </CardContent></Card>
     <Dialog open={!!presetDialog} onOpenChange={open => { if (!open && !busy) setPresetDialog(undefined) }}>
       <DialogContent><DialogHeader><DialogTitle>{t(presetDialog === 'rename' ? 'screen.presetRename' : presetDialog === 'delete' ? 'screen.presetDelete' : 'screen.presetSave')}</DialogTitle><DialogCloseButton disabled={busy} />

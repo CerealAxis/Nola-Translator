@@ -43,13 +43,21 @@ function dropSecrets(values: StoredSecrets, key: string): void {
  */
 export class StaleCredentialError extends Error {
   constructor(public readonly provider: string) {
-    super('已保存的 API 密钥无法解密，它可能是在其他用户、其他电脑或更早的版本中保存的。请在“翻译”页面重新输入密钥。')
+    super('CREDENTIAL_DECRYPT_FAILED')
     this.name = 'StaleCredentialError'
   }
 }
 
 export class SecureCredentialStore {
+  private pending: Promise<unknown> = Promise.resolve()
+
   constructor(private readonly path: string, private readonly encryption: EncryptionAdapter) {}
+
+  private serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.pending.then(operation)
+    this.pending = result.catch(() => undefined)
+    return result
+  }
 
   async has(key: string): Promise<boolean> {
     try {
@@ -61,35 +69,42 @@ export class SecureCredentialStore {
   }
 
   async get(key: string): Promise<string> {
-    const values = await this.read()
-    const stored = values[key]
-    if (!stored) return ''
-    if (!this.encryption.isEncryptionAvailable()) throw new Error('Windows 凭据加密当前不可用')
-    try {
-      const value = this.encryption.decryptString(Buffer.from(stored, 'base64'))
-      registerLogSecret(value)
-      return value
-    } catch {
-      // The ciphertext is unrecoverable, so it is deleted rather than left to fail every read.
-      await this.remove(key)
-      throw new StaleCredentialError(key)
-    }
+    return this.serialize(async () => {
+      const values = await this.read()
+      const stored = values[key]
+      if (!stored) return ''
+      if (!this.encryption.isEncryptionAvailable()) throw new Error('CREDENTIAL_ENCRYPTION_UNAVAILABLE')
+      try {
+        const value = this.encryption.decryptString(Buffer.from(stored, 'base64'))
+        registerLogSecret(value)
+        return value
+      } catch {
+        // The ciphertext is unrecoverable, so it is deleted rather than left to fail every read.
+        dropSecrets(values, key)
+        await this.write(values)
+        throw new StaleCredentialError(key)
+      }
+    })
   }
 
   async set(key: string, value: string): Promise<void> {
-    registerLogSecret(value)
-    if (!this.encryption.isEncryptionAvailable()) throw new Error('Windows 凭据加密当前不可用')
-    const values = await this.read()
-    if (value) values[key] = this.encryption.encryptString(value).toString('base64')
-    else dropSecrets(values, key)
-    await this.write(values)
+    return this.serialize(async () => {
+      registerLogSecret(value)
+      if (!this.encryption.isEncryptionAvailable()) throw new Error('CREDENTIAL_ENCRYPTION_UNAVAILABLE')
+      const values = await this.read()
+      if (value) values[key] = this.encryption.encryptString(value).toString('base64')
+      else dropSecrets(values, key)
+      await this.write(values)
+    })
   }
 
   async remove(key: string): Promise<void> {
-    const values = await this.read()
-    if (!secretKeyCluster(key).some((name) => name in values)) return
-    dropSecrets(values, key)
-    await this.write(values)
+    return this.serialize(async () => {
+      const values = await this.read()
+      if (!secretKeyCluster(key).some((name) => name in values)) return
+      dropSecrets(values, key)
+      await this.write(values)
+    })
   }
 
   private async write(values: StoredSecrets): Promise<void> {

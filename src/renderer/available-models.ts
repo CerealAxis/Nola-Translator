@@ -156,6 +156,7 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
   const llmClouds = clouds.filter(model => model.profile).map(model => {
     const profile = model.profile!
     return { binding: `custom:${profile.id}`, name: displayName(`custom:${profile.id}`, profile.name), kind: 'llm' as const, origin: 'cloud' as const, free: false,
+      images: profile.images === true,
       sourceLanguages: profile.sourceLanguages, targetLanguages: profile.languages }
   })
   const merge = (kind: GatewayCapability, ...lists: AvailableModel[][]): AvailableModel[] => {

@@ -9,7 +9,7 @@ export interface FeatureCardProps {
   variant: 'primary' | 'secondary' | 'tertiary' | 'quaternary'
   icon: ReactNode
   title: string
-  description: string
+  description?: string
   buttonText: string
   onButtonClick: () => void
 }
@@ -19,7 +19,7 @@ export function FeatureCard({ variant, className, icon, title, description, butt
       <div className="nola-entry__top"><span className="nola-entry__icon">{icon}</span><ChevronRight aria-hidden="true" /></div>
       <CardHeader className="card__header p-0">
         <CardTitle className="card__title">{title}</CardTitle>
-        <CardDescription className="card__description">{description}</CardDescription>
+        {description ? <CardDescription className="card__description">{description}</CardDescription> : null}
       </CardHeader>
       <CardFooter className="card__footer border-0 bg-transparent p-0">
         <Button variant={variant === 'primary' ? 'default' : 'secondary'} onClick={onButtonClick} className="nola-entry__action">{buttonText}<ArrowRight aria-hidden="true" size={16} /></Button>

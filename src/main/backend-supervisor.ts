@@ -143,32 +143,33 @@ export class BackendSupervisor extends EventEmitter {
       let stdoutBuffer = ''
       const onData = (chunk: Buffer) => {
         stdoutBuffer += chunk.toString('utf8')
-        const newline = stdoutBuffer.indexOf('\n')
-        if (newline < 0) return
-        const line = stdoutBuffer.slice(0, newline).trim()
-        stdoutBuffer = stdoutBuffer.slice(newline + 1)
-        if (!line) return
-        let frame: BackendReadyFrame
-        try {
-          frame = JSON.parse(line) as BackendReadyFrame
-        } catch {
-          logDiagnostic('backend.ready.unparsable', { line: line.slice(0, 256) })
-          return
+        while (!settled) {
+          const newline = stdoutBuffer.indexOf('\n')
+          if (newline < 0) return
+          const line = stdoutBuffer.slice(0, newline).trim()
+          stdoutBuffer = stdoutBuffer.slice(newline + 1)
+          if (!line) continue
+          let frame: BackendReadyFrame
+          try {
+            frame = JSON.parse(line) as BackendReadyFrame
+          } catch {
+            logDiagnostic('backend.ready.unparsable', { line: line.slice(0, 256) })
+            continue
+          }
+          if (frame?.type !== 'ready') continue
+          if (frame.instance_id !== instanceId) {
+            // A stale process from a previous boot must never be adopted.
+            logDiagnostic('backend.ready.instanceMismatch')
+            continue
+          }
+          settled = true
+          clearTimeout(timer)
+          child.stdout.off('data', onData)
+          this.readyFrame = frame
+          this.state = 'ready'
+          logActivity('backend.ready', { address: frame.address, instance: frame.instance_id })
+          resolve(frame)
         }
-        if (frame?.type !== 'ready') return
-        if (frame.instance_id !== instanceId) {
-          // A stale process from a previous boot must never be adopted.
-          logDiagnostic('backend.ready.instanceMismatch')
-          return
-        }
-        if (settled) return
-        settled = true
-        clearTimeout(timer)
-        child.stdout.off('data', onData)
-        this.readyFrame = frame
-        this.state = 'ready'
-        logActivity('backend.ready', { address: frame.address, instance: frame.instance_id })
-        resolve(frame)
       }
 
       const onError = (error: Error) => {

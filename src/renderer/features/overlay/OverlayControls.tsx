@@ -209,6 +209,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
   const outputMode = translationDisabled ? 'source' : settings.realtime?.outputMode === 'speech' ? 'speech' : 'translation'
   const devices = useStore(stores.models, (state) => state.devices)
   const status = useStore(sessionStore, (state) => state.status)
+  const pausePending = useStore(sessionStore, state => state.pausePending)
   const playbackJob = useStore(sessionStore, state => state.playbackJob)
   const errorCode = useStore(sessionStore, (state) => state.errorCode)
   const runtimeComponent = errorCode === 'RUNTIME_TORCH' ? 'engine' : errorCode === 'RUNTIME_LLAMA' ? 'llama' : null
@@ -269,11 +270,11 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
    */
   const toggleMic = async (): Promise<void> => {
     if (status === 'running') {
-      actions.session.pauseSession()
+      await actions.session.pauseSession().catch(error => notifyError(t('session.pauseFailed'), { cause: error }))
       return
     }
     if (status === 'paused') {
-      actions.session.resumeSession()
+      await actions.session.resumeSession().catch(error => notifyError(t('session.pauseFailed'), { cause: error }))
       return
     }
     if (status === 'idle' || status === 'error') {
@@ -354,7 +355,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               variant="secondary"
               size="icon"
               onClick={toggleMic}
-              disabled={status === 'starting' || status === 'stopping'}
+              disabled={pausePending || status === 'starting' || status === 'stopping'}
               aria-label={micLabel}
               aria-busy={starting || undefined}
               // `.nola-caption-mic` in `caption-card.css` paints the recording

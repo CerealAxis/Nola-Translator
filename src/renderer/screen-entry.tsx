@@ -10,4 +10,4 @@ document.documentElement.dataset.screenWindow = 'true'
 const bridge = createIpcBridge()
 attachSettingsStore(bridge, false)
 void loadSettings().catch(() => {})
-if (bridge.screenTranslation) createRoot(document.getElementById('root')!).render(<I18nProvider><ScreenWindowRoot api={bridge.screenTranslation} /></I18nProvider>)
+if (bridge.screenTranslation) createRoot(document.getElementById('root')!).render(<I18nProvider><ScreenWindowRoot api={bridge.screenTranslation} gameApi={bridge.gameTranslation} /></I18nProvider>)

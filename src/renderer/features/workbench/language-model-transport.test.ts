@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import type { LanguageModelStreamEvent } from '../../../shared/language-model'
-import { createPlaygroundFetch } from './language-model-transport'
+import { cancelComicReads, createPlaygroundFetch } from './language-model-transport'
 import { extractVideoAudio, pcmWavData } from './audio-attachment'
 
 const bridge = vi.hoisted(() => ({ app: { streamLanguageModel: vi.fn(), cancelLanguageModel: vi.fn(), onLanguageModelStream: vi.fn(), directModel: vi.fn(), resolveLanguageModelAudio: vi.fn() } }))
@@ -19,6 +19,18 @@ beforeEach(() => {
 })
 const fetchModel = createPlaygroundFetch(() => ({ model: 'custom:saved', kind: 'llm', effort: 'auto', source: 'auto', target: 'zh', voice: '' }), key => key, () => [])
 const body = JSON.stringify({ messages: [{ id: 'user', role: 'user', parts: [{ type: 'text', text: 'Hello' }] }] })
+
+it('passes only the selected comic scope and cancels its outstanding read on revocation', async () => {
+  const comicProjectId = '22222222-2222-4222-8222-222222222222'
+  const scopedFetch = createPlaygroundFetch(() => ({ model: 'custom:saved', kind: 'llm', effort: 'auto', source: 'auto', target: 'zh', voice: '', comicProjectId }), key => key, () => [])
+  const response = await scopedFetch('/chat', { method: 'POST', body })
+  expect(bridge.app.streamLanguageModel.mock.calls[0][0].comicProjectId).toBe(comicProjectId)
+  const consumed = response.text()
+  cancelComicReads()
+  await expect(consumed).rejects.toThrow('Aborted')
+  expect(bridge.app.cancelLanguageModel).toHaveBeenCalledWith(bridge.app.streamLanguageModel.mock.calls[0][0].id)
+  expect(unsubscribe).toHaveBeenCalledOnce()
+})
 
 it('keeps the stream open until its ordered end event even when IPC invoke resolves first', async () => {
   const response = await fetchModel('/chat', { method: 'POST', body })

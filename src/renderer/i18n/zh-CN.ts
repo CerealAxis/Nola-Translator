@@ -1,3 +1,4 @@
+import { suiteLocales } from './translation-suite-ui'
 import { modelPolicyZh } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
@@ -30,6 +31,7 @@ export const zhCN = {
   gateway: gatewayZh,
   meeting: meetingZh,
   modelsPolicy: modelPolicyZh,
+  suite: suiteLocales['zh-CN'],
   screen: screenLocales['zh-CN'],
   shortcuts: shortcutLocales['zh-CN'],
   workbench: workbenchZh,
@@ -207,6 +209,7 @@ export const zhCN = {
     playbackFailed: '语音播报失败',
     retryPlayback: '重试播报',
     skipPlayback: '跳过句子',
+    'pauseFailed': '无法暂停或继续同传，请重试。',
     playbackActionFailed: '无法更新语音播报',
     keepAudio: '保存录音',
     keepAudioHint: '关闭后不保存音频，无法回放与导出。录音会随这场会议保存在本机，结束后可以在记录详情里回放。',
@@ -782,6 +785,8 @@ export const zhCN = {
     "invalidArgument": "操作请求无效，请重新尝试。",
     "meetingNameEmpty": "会议名称不能为空。",
     "meetingNotFound": "会议记录不存在，请刷新列表。",
+    'credentialDecryptFailed': '已保存的密钥无法在当前 Windows 用户下解密，请在对应 API 配置中重新输入。',
+    'credentialEncryptionUnavailable': 'Windows 凭据加密不可用，无法读取或保存密钥。请重启应用后重试。',
     "invalidCredential": "接口密钥无效，请重新填写。",
 
     errorCodeLabel: '错误码 {code}',

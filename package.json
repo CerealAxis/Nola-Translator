@@ -17,7 +17,7 @@
     "build": "npm run typecheck && electron-vite build",
     "build:python": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-python-base.ps1",
     "fetch:llama-vulkan": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-llama-vulkan.ps1",
-    "dist:win": "npm run fetch:llama-vulkan && npm run build && npm run build:browser && npm run package:browser && npm run build:browser-host && npm run build:python && electron-builder --win nsis --x64",
+    "dist:win": "npm run fetch:llama-vulkan && npm run build && npm run build:browser && npm run package:browser && npm run build:browser-host && npm run build:game-hook && npm run build:python && electron-builder --win nsis --x64",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
@@ -33,6 +33,7 @@
     "typecheck": "tsc --noEmit",
     "build:browser": "node browser/extension/build.mjs && node browser/extension/build.mjs --firefox",
     "build:browser-host": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-browser-host.ps1",
+    "build:game-hook": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-game-hook.ps1",
     "package:browser": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-browser-extension.ps1"
   },
   "dependencies": {
@@ -122,6 +123,14 @@
       "package.json"
     ],
     "extraResources": [
+      {
+        "from": "build/game-hook",
+        "to": "game-hook"
+      },
+      {
+        "from": "src/renderer/assets/fonts/NotoSansCJK-SC-VF.otf",
+        "to": "fonts/NotoSansCJK-SC-VF.otf"
+      },
       {
         "from": "build/tray.png",
         "to": "tray.png"

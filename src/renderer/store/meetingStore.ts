@@ -218,7 +218,6 @@ export async function removeMeetings(ids: readonly string[]): Promise<BatchRemov
 
   const records: Array<{ id: string; patch: MeetingMeta | null }> = ids.map((id) => ({ id, patch: null }))
   const batch = new Set(records)
-  const requested = new Set(ids)
   inFlight = [...inFlight, ...records]
   publish()
   meetingsStore.setState({ error: null })
@@ -244,7 +243,7 @@ export async function removeMeetings(ids: readonly string[]): Promise<BatchRemov
       }
       const detailId = meetingsStore.getState().detail?.meta.meetingId
       // The user can be sitting on a record this batch removed, and a detail page for a gone row offers actions on nothing.
-      if (detailId !== undefined && requested.has(detailId)) {
+      if (detailId !== undefined && removed.includes(detailId)) {
         meetingsStore.setState({ detail: null })
       }
       if (failed.length > 0) {

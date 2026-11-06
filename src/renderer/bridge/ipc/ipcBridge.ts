@@ -99,6 +99,9 @@ function subscribe<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTrans
 export function createIpcBridge(): NolaBridge {
   return {
     screenTranslation: injectedApi()?.screenTranslation,
+    glossary: injectedApi()?.glossary,
+    comic: injectedApi()?.comic,
+    gameTranslation: injectedApi()?.gameTranslation,
     workspaceView: injectedApi()?.workspaceView,
     requestQuit: () => call('requestQuit', api => api.requestQuit?.() ?? Promise.reject(new MissingIpcApiError('requestQuit'))),
     confirmQuit: () => call('confirmQuit', api => api.confirmQuit?.() ?? Promise.reject(new MissingIpcApiError('confirmQuit'))),
@@ -173,20 +176,7 @@ export function createIpcBridge(): NolaBridge {
       ensureEngineReady: () => call('ensureEngineReady', (injected) => injected.ensureEngineReady()),
       stopSession: (sessionId) => call('stopSession', (injected) => injected.stopSession(sessionId)),
       resolvePlayback: (sessionId, jobId, action) => call('resolvePlayback', injected => injected.resolvePlayback(sessionId, jobId, action)),
-      /**
-       * Pause/resume goes through preload's `setSessionPaused` and returns a
-       * synchronous void: the UI's pause means "stop the clock now", and waiting
-       * for the engine makes the button look dead. A refusal arrives as an
-       * `error` event.
-       */
-      setPaused: (sessionId, paused) => {
-        const injected = injectedApi()
-        if (!injected) {
-          reportMissingIpcApi('setSessionPaused')
-          return
-        }
-        void injected.setSessionPaused(sessionId, paused).catch(() => undefined)
-      },
+      setPaused: (sessionId, paused) => call('setSessionPaused', injected => injected.setSessionPaused(sessionId, paused)),
       /*
        * Read-only current state; name and semantics already match the main
        * process, so the adapter translates nothing. With no bridge this takes
@@ -244,6 +234,10 @@ export function createIpcBridge(): NolaBridge {
       openLogs: () => call('openLogs', (injected) => injected.openLogs()),
     },
     app: {
+      listComics: () => call('listComics', injected => {
+        if (!injected.listComics) throw new Error('Comic library unavailable')
+        return injected.listComics()
+      }),
         agentWorkspace: action => call('agentWorkspace', injected => {
           if (!injected.agentWorkspace) throw new Error('Agent workspace unavailable')
           return injected.agentWorkspace(action)

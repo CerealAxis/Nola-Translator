@@ -2,7 +2,27 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { createProvider } from './providers'
 import { openAliyunSpeech } from './speech-socket'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
+
+it('cancels a pending credential rule before opening the speech socket', async () => {
+  vi.useFakeTimers()
+  let finish!: () => void
+  const rules = vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve })).mockResolvedValue(undefined)
+  vi.stubGlobal('chrome', { permissions: { contains: vi.fn().mockResolvedValue(true) }, runtime: { getURL: () => 'chrome-extension://testextension/' }, declarativeNetRequest: { updateSessionRules: rules } })
+  const Socket = vi.fn(function () { return { close: vi.fn() } })
+  vi.stubGlobal('WebSocket', Socket)
+  const controller = new AbortController()
+  const provider = { ...createProvider('alibaba'), apiKey: 'fixture-key', options: { workspaceId: 'workspace' } }
+  const pending = openAliyunSpeech(provider, 'asr', 'auto', 'en', vi.fn(), controller.signal)
+  const failure = pending.catch(error => error)
+  await vi.waitFor(() => expect(rules).toHaveBeenCalledOnce())
+  controller.abort()
+  finish()
+  await vi.advanceTimersByTimeAsync(20001)
+  expect(await failure).toMatchObject({ name: 'AbortError' })
+  expect(Socket).not.toHaveBeenCalled()
+  expect(rules.mock.calls[1][0]).toEqual({ removeRuleIds: [rules.mock.calls[0][0].addRules[0].id] })
+})
 
 it('restricts the credential rule to an extension-owned handshake and removes it after connecting', async () => {
   const rules = vi.fn().mockResolvedValue(undefined)
@@ -22,7 +42,8 @@ it('restricts the credential rule to an extension-owned handshake and removes it
   }
   vi.stubGlobal('WebSocket', FakeSocket)
   const provider = { ...createProvider('alibaba'), apiKey: 'private-test-key', options: { workspaceId: 'workspace', region: 'cn-beijing' } }
-  const pending = openAliyunSpeech(provider, 's2s', 'auto', 'ja', vi.fn(), new AbortController().signal)
+  const emit = vi.fn()
+  const pending = openAliyunSpeech(provider, 's2s', 'auto', 'ja', emit, new AbortController().signal)
   await expect.poll(() => Boolean(socket)).toBe(true)
   const rule = rules.mock.calls[0][0].addRules[0]
   expect(rule.condition.initiatorDomains).toEqual(['testextension'])
@@ -39,6 +60,8 @@ it('restricts the credential rule to an extension-owned handshake and removes it
   const stream = await pending
   await stream.append('AAA=')
   expect(JSON.parse(socket.send.mock.calls[1][0])).toMatchObject({ type: 'input_audio_buffer.append', audio: 'AAA=' })
-  stream.close()
+  expect(() => socket.onmessage?.({ data: 'null' })).not.toThrow()
+  expect(emit).toHaveBeenCalledWith({ type: 'error', code: 'providerInvalid' })
   expect(socket.close).toHaveBeenCalled()
+  await expect(stream.append('AAA=')).rejects.toThrow('providerDisconnected')
 })

@@ -153,7 +153,7 @@ export function RecordsPage(): ReactNode {
     <ErrorBoundary resetKey={path}>
       <div className="nola-record-page">
         <header className="nola-record-page__header">
-          <div><h1>{t('records.title')}</h1><p>{t('records.subtitle')}</p></div>
+          <div><h1>{t('records.title')}</h1></div>
           <Button variant="default" className="nola-record-page__start" onClick={startSession}><Mic aria-hidden="true" size={22} />{t('workspace.start')}</Button>
         </header>
         <div className="nola-record-page__search">

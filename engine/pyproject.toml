@@ -18,6 +18,7 @@ dependencies = [
   "numpy==1.26.4",
   "onnxruntime==1.23.2",
   "opencv-python-headless==4.11.0.86",
+  "Pillow==12.3.0",
   "pydantic==2.13.4",
   "PyAudioWPatch==0.2.12.8",
   "scipy==1.15.3",

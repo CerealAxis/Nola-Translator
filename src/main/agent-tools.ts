@@ -7,11 +7,14 @@ import type { LanguageModelServices } from './language-model'
 import { runDirectModel } from './direct-model'
 import type { AgentProject } from '../shared/agent-workspace'
 import { defaultModelBinding, isModelEnabled } from '../shared/model-policy'
+import { comicReadTools } from './comic-reader'
 
 export interface AgentToolContext {
   services: LanguageModelServices
   ownerId: number
   project?: AgentProject
+  comicProjectId?: string | null
+  comicImages?: boolean
   messages: UIMessage[]
   signal: AbortSignal
   model: LanguageModel
@@ -98,6 +101,9 @@ export async function nativeAgentTools(context: AgentToolContext): Promise<ToolS
         return { ...await runDirectModel(services, { id: randomUUID(), model, kind: 'tts' }, context.signal, true, context.ownerId), model }
       } }),
   }
+  if (context.comicProjectId && services.comicReader) Object.assign(tools, comicReadTools(services.comicReader, {
+    projectId: context.comicProjectId, ownerId: context.ownerId, signal: context.signal, images: context.comicImages === true,
+  }))
   if (project && workspace) {
     tools.list_project_files = tool({ description: 'List up to 200 entries in a directory within the selected project. Use dot for the project root.', inputSchema: z.object({ path: z.string() }),
       execute: async args => { await checkProject(); return workspace.listProjectFiles(args.path, project.id) } })

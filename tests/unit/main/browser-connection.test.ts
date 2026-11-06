@@ -35,6 +35,35 @@ vi.mock('electron', () => ({ app: { isPackaged: false, getPath: () => tmpdir(), 
 const disposers: Array<() => Promise<void>> = []
 afterEach(async () => { for (const dispose of disposers.splice(0)) await dispose(); vi.unstubAllEnvs() })
 
+it('negotiates matched glossary v4 and forwards only extension terms unchanged', async () => {
+  const translate = vi.fn<NonNullable<BrowserConnectionOptions['translateText']>>(async () => '固定译文')
+  const f = await fixture(undefined, undefined, translate)
+  const socket = await connect(f.descriptor.pipe)
+  const values = responses(socket)
+  send(socket, f.descriptor)
+  send(socket, { id: 'hello', type: 'hello', protocolVersion: 4 })
+  await expect.poll(() => values.find(value => value.type === 'result' && value.id === 'hello')).toMatchObject({ value: { protocolVersion: 4, features: { matchedGlossaryV1: true } } })
+  const glossary = [{ source: 'Nola', target: '', mode: 'keep', caseSensitive: true }]
+  send(socket, { id: 'terms', type: 'translate', text: 'Nola works', sourceLanguage: 'en', targetLanguage: 'zh', glossary })
+  await expect.poll(() => translate.mock.calls.length).toBe(1)
+  expect(translate.mock.calls[0][0]).toMatchObject({ glossary })
+  socket.destroy()
+})
+
+it('rejects glossary input on pre-v4 connections before invoking a model', async () => {
+  const translate = vi.fn<NonNullable<BrowserConnectionOptions['translateText']>>(async () => 'unused')
+  const f = await fixture(undefined, undefined, translate)
+  const socket = await connect(f.descriptor.pipe)
+  const values = responses(socket)
+  send(socket, f.descriptor)
+  send(socket, { id: 'hello', type: 'hello', protocolVersion: 3 })
+  await expect.poll(() => values.some(value => value.type === 'result' && value.id === 'hello')).toBe(true)
+  send(socket, { id: 'terms', type: 'translate', text: 'Nola', sourceLanguage: 'en', targetLanguage: 'zh', glossary: [{ source: 'Nola', target: '', mode: 'keep', caseSensitive: true }] })
+  await expect.poll(() => values.find(value => value.type === 'error' && value.id === 'terms')).toMatchObject({ code: 'browserProtocolMismatch' })
+  expect(translate).not.toHaveBeenCalled()
+  socket.destroy()
+})
+
 class TestEngine extends EventEmitter {
   currentState = 'ready'
   supports = () => true
@@ -419,6 +448,63 @@ it('owns and closes a streaming ASR session independently from caption activatio
   expect(openAsrStream.mock.calls[0][1].aborted).toBe(true)
 })
 
+
+it.each(['same-client', 'duplicate-id', 'other-client'])('reserves native ASR startup against %s conflicts', async conflict => {
+  const stream = { request: vi.fn().mockResolvedValue(undefined), close: vi.fn() }
+  let opened!: (value: typeof stream) => void
+  const openAsrStream = vi.fn<NonNullable<BrowserConnectionOptions['openAsrStream']>>()
+    .mockImplementation(() => new Promise(resolve => { opened = resolve }))
+  const f = await fixture(undefined, undefined, undefined, { openAsrStream, useGateway: true })
+  const owner = await connect(f.descriptor.pipe)
+  const ownerValues = responses(owner)
+  const contender = conflict === 'other-client' ? await connect(f.descriptor.pipe) : owner
+  const values = contender === owner ? ownerValues : responses(contender)
+  send(owner, f.descriptor)
+  if (contender !== owner) send(contender, f.descriptor)
+  send(owner, { id: 'stream', type: 'streamStart', sourceLanguage: 'en' })
+  await expect.poll(() => openAsrStream.mock.calls.length).toBe(1)
+  const id = conflict === 'same-client' ? 'second-stream' : 'stream'
+  try {
+    send(contender, { id, type: 'streamStart', sourceLanguage: 'en' })
+    await expect.poll(() => values.find(value => value.type === 'error' && value.id === id)).toMatchObject({ code: 'resourceBusy' })
+    expect(openAsrStream).toHaveBeenCalledTimes(1)
+    opened(stream)
+    await expect.poll(() => ownerValues.some(value => value.type === 'result' && value.id === 'stream')).toBe(true)
+    if (contender !== owner) {
+      values.length = 0
+      send(contender, { id, type: 'streamStart', sourceLanguage: 'en' })
+      await expect.poll(() => values.find(value => value.type === 'error' && value.id === id)).toMatchObject({ code: 'resourceBusy' })
+      expect(openAsrStream).toHaveBeenCalledTimes(1)
+    }
+  } finally {
+    opened(stream)
+    owner.destroy()
+    contender.destroy()
+  }
+})
+
+it('cancels disconnected ASR startup and releases its reservation after the late stream closes', async () => {
+  const stream = { request: vi.fn().mockResolvedValue(undefined), close: vi.fn() }
+  let opened!: (value: typeof stream) => void
+  const openAsrStream = vi.fn<NonNullable<BrowserConnectionOptions['openAsrStream']>>()
+    .mockImplementationOnce(() => new Promise(resolve => { opened = resolve }))
+    .mockResolvedValue(stream)
+  const f = await fixture(undefined, undefined, undefined, { openAsrStream, useGateway: true })
+  const owner = await connect(f.descriptor.pipe)
+  send(owner, f.descriptor)
+  send(owner, { id: 'stream', type: 'streamStart', sourceLanguage: 'en' })
+  await expect.poll(() => openAsrStream.mock.calls.length).toBe(1)
+  owner.destroy()
+  await expect.poll(() => openAsrStream.mock.calls[0][1].aborted).toBe(true)
+  opened(stream)
+  await expect.poll(() => stream.close.mock.calls.length).toBe(1)
+  const replacement = await connect(f.descriptor.pipe)
+  const values = responses(replacement)
+  send(replacement, f.descriptor)
+  send(replacement, { id: 'stream', type: 'streamStart', sourceLanguage: 'en' })
+  await expect.poll(() => values.find(value => value.type === 'result' && value.id === 'stream')).toMatchObject({ value: { streamId: 'stream' } })
+  replacement.destroy()
+})
 
 it('enforces the per-browser connection switch for gateway capabilities too', async () => {
   const integrations = new BrowserIntegrations({ localAppData: tmpdir(), userData: tmpdir() })

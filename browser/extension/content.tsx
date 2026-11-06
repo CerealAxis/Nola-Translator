@@ -503,6 +503,15 @@ function install(): void {
     previousAuto = auto
     refresh()
   })
+  let glossaryMatchingRevision: number | undefined
+  const glossaryChanged = (changes: Record<string, { newValue?: unknown }>, area: string) => {
+    const value = changes.glossaryRevision?.newValue
+    if (area !== 'local' || !value || typeof value !== 'object' || !('matchingRevision' in value) || typeof value.matchingRevision !== 'number') return
+    const changed = glossaryMatchingRevision !== value.matchingRevision
+    glossaryMatchingRevision = value.matchingRevision
+    if (changed && page.state().pageActive) { page.stop(); page.start() }
+  }
+  chrome.storage.onChanged.addListener(glossaryChanged)
   page.configure(preferences); subtitles.configure(preferences)
   colorScheme.addEventListener('change', refresh)
   const onCommand = (message: unknown, sender: ChromeSender, reply: (response: unknown) => void) => {
@@ -538,7 +547,7 @@ function install(): void {
     // Each release must run even if another one can no longer reach the old context.
     for (const release of [
       () => { mutation.disconnect(); resize.disconnect(); actionsResize.disconnect(); panelResize.disconnect(); clearInterval(interval); nativeTrack.restore(); unsubscribe() },
-      () => unobservePreferences(),
+      () => { unobservePreferences(); chrome.storage.onChanged.removeListener(glossaryChanged) },
       () => { colorScheme.removeEventListener('change', refresh); chrome.runtime.onMessage.removeListener(onCommand) },
       () => { for (const name of playerEvents) window.removeEventListener(name, refresh, true) },
       () => { window.removeEventListener('pointerdown', onOutsidePress); window.removeEventListener('pointerover', hoverPage); window.removeEventListener('pointerup', onSelection); window.removeEventListener('keydown', onKey); window.removeEventListener('pagehide', destroy) },

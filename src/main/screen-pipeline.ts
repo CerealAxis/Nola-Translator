@@ -1,7 +1,7 @@
 import type { ScreenAppearance, ScreenConfig, ScreenTextBlock } from '../shared/screen-translation'
 
-export interface OcrBlock { id: string; text: string; confidence: number; quad: number[][]; appearance?: ScreenAppearance }
-type Candidate = { block: ScreenTextBlock; first: number; lastText: string; seen: number; failures: number }
+export interface OcrBlock { id: string; text: string; confidence: number; quad: number[][]; appearance?: ScreenAppearance; visualId?: string }
+type Candidate = { block: ScreenTextBlock; first: number; lastText: string; seen: number; failures: number; signature: string; abort: AbortController }
 
 /** Keep text revisions independent of video frames so animation cannot starve translations. */
 export class ScreenPipeline {
@@ -17,16 +17,46 @@ export class ScreenPipeline {
   constructor(private readonly config: ScreenConfig,
     private readonly translate: (text: string, signal: AbortSignal) => Promise<string>,
     private readonly changed: () => void,
-    private readonly failed: () => void) {}
+    private readonly failed: () => void,
+    private readonly signature: (text: string) => string = () => '') {}
 
   blocks(): ScreenTextBlock[] { return [...this.regions.values()].flatMap(region => [...region.values()].map(item => ({ ...item.block }))) }
 
   hideRegion(regionId: string): void {
-    for (const item of this.regions.get(regionId)?.values() ?? []) item.block.appearancePending = true
+    for (const item of this.regions.get(regionId)?.values() ?? []) {
+      item.block.hidden = true
+      item.block.appearancePending = true
+      if (this.pending.delete(item.block.id)) item.block.status = 'stabilizing'
+    }
     this.changed()
   }
 
-  update(regionId: string, input: OcrBlock[], width: number, height: number, now = Date.now()): void {
+  observeRegion(regionId: string, probes: ReadonlySet<string>): void {
+    let changed = false
+    for (const item of this.regions.get(regionId)?.values() ?? []) {
+      if (!item.block.appearancePending) { item.block.appearancePending = true; changed = true }
+      if (!item.block.visualId || !probes.has(item.block.visualId)) {
+        if (!item.block.hidden) { item.block.hidden = true; changed = true }
+        if (this.pending.delete(item.block.id)) item.block.status = 'stabilizing'
+      }
+    }
+    if (changed) this.changed()
+  }
+
+  verifyVisual(id: string, matches: boolean, appearanceCurrent: boolean, now = Date.now()): void {
+    for (const region of this.regions.values()) for (const item of region.values()) {
+      if (item.block.visualId !== id) continue
+      const previous = `${item.block.hidden}:${item.block.appearancePending}:${item.block.status}`
+      item.block.hidden = !matches
+      item.block.appearancePending = !matches || !appearanceCurrent
+      if (matches) { item.seen++; this.schedule(item, now) }
+      else if (this.pending.delete(item.block.id)) item.block.status = 'stabilizing'
+      if (previous !== `${item.block.hidden}:${item.block.appearancePending}:${item.block.status}`) this.changed()
+    }
+    this.drain()
+  }
+
+  update(regionId: string, input: OcrBlock[], width: number, height: number, now = Date.now(), verified = true): void {
     if (this.stopped) return
     const region = this.config.regions.find(item => item.id === regionId)
     if (!region) return
@@ -40,6 +70,7 @@ export class ScreenPipeline {
       const h = Math.min(1 - y, (Math.max(...ys) - Math.min(...ys)) / height)
       if (!(w > 0 && h > 0)) continue
       const text = item.text.trim()
+      const signature = this.signature(text)
       const old = [...previous.values()].find(value => !used.has(value)
         && Math.abs(value.block.x - (region.x + x * region.width)) < region.width * 0.035
         && Math.abs(value.block.y - (region.y + y * region.height)) < region.height * 0.035)
@@ -54,26 +85,26 @@ export class ScreenPipeline {
         appearance: item.appearance ? { ...item.appearance, patches: item.appearance.patches.map(patch => ({ ...patch,
           x: region.x + patch.x * region.width, y: region.y + patch.y * region.height,
           width: patch.width * region.width, height: patch.height * region.height })) } : undefined,
-        status: 'stabilizing',
+        status: 'stabilizing', visualId: item.visualId, hidden: !verified, appearancePending: !verified,
       }
       let candidate: Candidate
-      if (old?.block.text === text) {
+      if (old?.block.text === text && old.signature === signature) {
         candidate = old
         candidate.seen++
-        candidate.block = { ...candidate.block, x: block.x, y: block.y, width: block.width, height: block.height, angle, quad: block.quad, appearance: block.appearance, hidden: false, appearancePending: false }
+        const sameProbe = !!block.visualId && block.visualId === candidate.block.visualId
+        candidate.block = { ...candidate.block, x: block.x, y: block.y, width: block.width, height: block.height, angle, quad: block.quad, appearance: block.appearance,
+          visualId: block.visualId, hidden: verified ? false : sameProbe ? candidate.block.hidden : true, appearancePending: !verified }
       } else {
-        if (old) this.pending.delete(old.block.id)
-        candidate = { block, first: old && (old.block.status === 'stabilizing' || old.block.status === 'translating') ? old.first : now, lastText: text, seen: 1, failures: 0 }
+        if (old) { this.pending.delete(old.block.id); old.abort.abort() }
+        candidate = { block, first: old && (old.block.status === 'stabilizing' || old.block.status === 'translating') ? old.first : now, lastText: text, seen: old?.block.text === text ? 2 : 1, failures: 0, signature, abort: new AbortController() }
       }
       next.set(candidate.block.id, candidate)
-      if (candidate.block.status === 'stabilizing' && (candidate.seen >= 2 || now - candidate.first >= 1200)) {
-        const key = `${this.config.model}\0${this.config.sourceLanguage}\0${this.config.targetLanguage}\0${text}`
-        const cached = this.cache.get(key)
-        if (cached !== undefined) { candidate.block.translation = cached; candidate.block.status = 'ready' }
-        else { candidate.block.status = 'translating'; this.pending.set(candidate.block.id, candidate) }
-      }
+      this.schedule(candidate, now)
     }
-    for (const [id, item] of previous) if (!next.has(id) || this.pending.get(id) === item && next.get(id) !== item) this.pending.delete(id)
+    for (const [id, item] of previous) if (next.get(id) !== item) {
+      item.abort.abort()
+      if (this.pending.get(id) === item) this.pending.delete(id)
+    }
     this.regions.set(regionId, next)
     this.changed()
     this.drain()
@@ -86,6 +117,14 @@ export class ScreenPipeline {
     this.regions.clear()
   }
 
+  private schedule(candidate: Candidate, now: number): void {
+    if (candidate.block.hidden || candidate.block.status !== 'stabilizing' || candidate.seen < 2 && now - candidate.first < 1200) return
+    const key = `${this.config.model}\0${this.config.sourceLanguage}\0${this.config.targetLanguage}\0${candidate.signature}\0${candidate.block.text}`
+    const cached = this.cache.get(key)
+    if (cached !== undefined) { candidate.block.translation = cached; candidate.block.status = 'ready' }
+    else { candidate.block.status = 'translating'; this.pending.set(candidate.block.id, candidate) }
+  }
+
   private drain(): void {
     while (!this.stopped && this.active.size < 2 && this.pending.size) {
       const [id, candidate] = [...this.pending].find(([, item]) => item.block.regionId !== this.lastRegion) ?? this.pending.entries().next().value!
@@ -94,10 +133,10 @@ export class ScreenPipeline {
       if (this.regions.get(candidate.block.regionId)?.get(id) !== candidate) continue
       this.active.add(candidate)
       const revision = candidate.block.revision
-      void this.translate(candidate.block.text, this.abort.signal).then(translation => {
+      void this.translate(candidate.block.text, AbortSignal.any([this.abort.signal, candidate.abort.signal])).then(translation => {
         if (!translation.trim()) throw new Error('Empty screen translation')
-        if (this.stopped || this.regions.get(candidate.block.regionId)?.get(id) !== candidate || candidate.block.revision !== revision) return
-        const key = `${this.config.model}\0${this.config.sourceLanguage}\0${this.config.targetLanguage}\0${candidate.block.text}`
+        if (this.stopped || this.regions.get(candidate.block.regionId)?.get(id) !== candidate || candidate.block.revision !== revision || candidate.signature !== this.signature(candidate.block.text)) return
+        const key = `${this.config.model}\0${this.config.sourceLanguage}\0${this.config.targetLanguage}\0${candidate.signature}\0${candidate.block.text}`
         this.cache.set(key, translation)
         if (this.cache.size > 256) this.cache.delete(this.cache.keys().next().value!)
         candidate.block.translation = translation

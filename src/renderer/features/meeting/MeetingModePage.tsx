@@ -58,6 +58,7 @@ export function MeetingModePage() {
   const speechLanguages = catalog.tts.find(model => model.binding === ttsBinding)?.targetLanguages ?? []
   const [draft, setDraft] = useState<MeetingModeSettings>()
   const [snapshot, setSnapshot] = useState(IDLE)
+  const [statusLoading, setStatusLoading] = useState(true)
   const [testOpen, setTestOpen] = useState(false)
   const [testRecordingId, setTestRecordingId] = useState('')
   const [testPlaybackId, setTestPlaybackId] = useState('')
@@ -68,7 +69,7 @@ export function MeetingModePage() {
   const [heard, setHeard] = useState(false)
   const generation = useRef(0)
   const mode = draft ?? saved ?? DEFAULT_MEETING_MODE
-  const pending = snapshot.state === 'starting' || snapshot.state === 'stopping'
+  const pending = statusLoading || snapshot.state === 'starting' || snapshot.state === 'stopping'
   const running = snapshot.state === 'running'
   const canStop = running || snapshot.state === 'unknown'
   const locked = pending || canStop || !!testing || !api
@@ -80,14 +81,21 @@ export function MeetingModePage() {
     catch (error) { console.error('meeting device list failed', error); setDeviceState('failed') }
   }, [])
   useEffect(() => {
-    if (!api) return
+    if (!api) {
+      setStatusLoading(false)
+      setSnapshot({ state: 'unknown', passthroughActive: false, error: { key: 'meeting.statusFailed' } })
+      return
+    }
     let alive = true
     let changed = false
-    const off = api.onChanged(value => { changed = true; setSnapshot(value) })
+    const off = api.onChanged(value => { changed = true; setStatusLoading(false); setSnapshot(value) })
     void api.snapshot().then(value => { if (alive && !changed) { setSnapshot(value) } })
-      .catch(error => console.error('meeting status failed', error))
+      .catch(error => {
+        console.error('meeting status failed', error)
+        if (alive && !changed) setSnapshot({ state: 'unknown', passthroughActive: false, error: { key: 'meeting.statusFailed' } })
+      }).finally(() => { if (alive) setStatusLoading(false) })
     void refresh()
-    return () => { alive = false; generation.current++; off(); void api.cancelAudioTest?.() }
+    return () => { alive = false; generation.current++; off(); void api.cancelAudioTest?.().catch(error => console.error('meeting audio cancellation failed', error)) }
   }, [api, refresh])
   // A changed device catalog or configuration invalidates earlier physical checks.
   const deviceFingerprint = devices.map(device => `${device.deviceId}:${device.name}`).sort().join('|')
@@ -243,8 +251,14 @@ export function MeetingModePage() {
     setTestOpen(open)
     if (!open) {
       generation.current++
-      void api?.cancelAudioTest?.()
-      if (trialStarted) { setTrialStarted(false); void api?.stop() }
+      void api?.cancelAudioTest?.().catch(error => notifyError(t('meeting.audioTestFailed'), { cause: error }))
+      if (trialStarted) {
+        setTrialStarted(false)
+        void api?.stop().then(setSnapshot).catch(error => {
+          console.error('meeting trial stop failed', error)
+          setSnapshot(current => ({ ...current, error: { key: 'meeting.stopFailed' } }))
+        })
+      }
     }
   }
   const activeFields = deviceFields.filter(field => field === 'microphoneId' || field === 'uplinkOutputId' ? mode.uplinkEnabled : mode.downlinkEnabled)

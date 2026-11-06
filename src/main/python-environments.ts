@@ -134,11 +134,17 @@ export class PythonEnvironments {
       await mkdir(staging, { recursive: true })
       this.operation.phase = 'prepare'
       if (offline) {
-        await new Promise<void>((resolveInstall, reject) => {
-          execFile(join(this.baseDirectory, 'python.exe'), offlinePipArguments('install', offline.wheelhouse, offline.requirements, staging),
-            { windowsHide: true, signal: controller.signal, timeout: 30 * 60_000, maxBuffer: 4 * 1024 * 1024,
-              env: { ...process.env, PYTHONUTF8: '1', PIP_CONFIG_FILE: 'nul' } }, error => error ? reject(error) : resolveInstall())
-        })
+        let childClosed: Promise<void> | undefined
+        try {
+          await new Promise<void>((resolveInstall, reject) => {
+            const child = execFile(join(this.baseDirectory, 'python.exe'), offlinePipArguments('install', offline.wheelhouse, offline.requirements, staging),
+              { windowsHide: true, signal: controller.signal, timeout: 30 * 60_000, maxBuffer: 4 * 1024 * 1024,
+                env: { ...process.env, PYTHONUTF8: '1', PIP_CONFIG_FILE: 'nul' } }, error => error ? reject(error) : resolveInstall())
+            childClosed = new Promise<void>(resolveClosed => { child.once('close', () => resolveClosed()) })
+          })
+        } finally {
+          if (controller.signal.aborted) await childClosed
+        }
       } else await this.installLibraries(state, artifacts, staging, controller.signal)
       this.operation.phase = 'check'
       const actual = await probeLocalEngine(join(this.baseDirectory, 'python.exe'), staging)

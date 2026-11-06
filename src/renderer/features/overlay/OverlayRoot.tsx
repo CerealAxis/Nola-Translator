@@ -455,7 +455,7 @@ export function OverlayRoot() {
           </GhostButton>
         </div>
 
-        {!meetingActive ? <OverlayControls active={active} locked={locked} /> : !locked ? <div className="nola-caption-controls"><Button variant="secondary" size="sm" onClick={() => void getBridge()?.meetingMode?.setPaused(!meeting?.paused).catch(error => notifyError(t('meeting.pipelineFailed'), { cause: error }))}>{t(meeting?.paused ? 'workspace.resume' : 'workspace.pause')}</Button></div> : null}
+        {!meetingActive ? <OverlayControls active={active} locked={locked} /> : !locked ? <div className="nola-caption-controls"><Button variant="secondary" size="sm" onClick={() => void getBridge()?.meetingMode?.setPaused(!meeting?.paused).catch(error => notifyError(t('meeting.pauseFailed'), { cause: error }))}>{t(meeting?.paused ? 'workspace.resume' : 'workspace.pause')}</Button></div> : null}
 
       </section>
     </main>

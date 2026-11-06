@@ -8,4 +8,5 @@ export interface PlaygroundConfig {
   voice: string
   images?: boolean
   projectId?: string | null
+  comicProjectId?: string | null
 }

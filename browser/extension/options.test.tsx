@@ -7,15 +7,37 @@ import { Options } from './options'
 import { testProvider, translate } from './provider-client'
 import { createProvider, DEFAULT_PROVIDERS, requestProviderAccess, saveProviders } from './providers'
 import { LiveServiceField } from './settings-fields'
+import { extensionGlossary, restoreExtensionConfiguration } from './glossary-store'
+import { applyGlossaryMutation } from '../../src/shared/glossary-mutation'
+import type { GlossaryDocument } from '../../src/shared/glossary'
 
 let settings = { ...DEFAULT_PREFERENCES }
+let glossaryDocument: GlossaryDocument | undefined
 
 vi.mock('./preferences', async original => ({ ...await original<typeof import('./preferences')>(), savePreferences: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('./settings-fields', async original => ({ ...await original<typeof import('./settings-fields')>(), usePreferences: () => [settings, 'en', browserText('en')], ConnectionStatus: () => null }))
 vi.mock('./provider-client', () => ({ translate: vi.fn().mockResolvedValue('Translated text'), synthesize: vi.fn(), testProvider: vi.fn().mockResolvedValue('OK'), clearTranslationCache: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('./providers', async original => { const actual = await original<typeof import('./providers')>(); return { ...actual, loadProviders: vi.fn().mockResolvedValue(actual.DEFAULT_PROVIDERS), saveProviders: vi.fn().mockResolvedValue(undefined), requestProviderAccess: vi.fn().mockResolvedValue(true) } })
-beforeEach(() => { vi.clearAllMocks(); settings = { ...DEFAULT_PREFERENCES }; window.history.replaceState(null, '', '#general'); window.scrollTo = vi.fn(); vi.mocked(requestProviderAccess).mockResolvedValue(true); vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } } }) })
+vi.mock('./glossary-store', async original => {
+  const actual = await original<typeof import('./glossary-store')>()
+  return { ...actual, extensionGlossary: {
+    snapshot: vi.fn(async () => glossaryDocument ??= actual.migrateLegacyGlossary(settings.glossary, 'Terminology')),
+    command: vi.fn(async request => { glossaryDocument = applyGlossaryMutation(glossaryDocument!, request); return glossaryDocument }),
+    onChanged: vi.fn(() => () => {}),
+  }, restoreExtensionConfiguration: vi.fn(async () => {}) }
+})
+beforeEach(() => { vi.clearAllMocks(); glossaryDocument = undefined; settings = { ...DEFAULT_PREFERENCES }; window.history.replaceState(null, '', '#general'); window.scrollTo = vi.fn(); vi.mocked(requestProviderAccess).mockResolvedValue(true); vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } } }) })
 describe('extension settings', () => {
+  it('keeps a failed glossary save visible inside its open editor', async () => {
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'Terminology' }))
+    await user.click(await screen.findByRole('button', { name: 'New glossary library' }))
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Names')
+    vi.mocked(extensionGlossary.command).mockRejectedValueOnce(new Error('conflict'))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }))
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(browserText('en')('suite.revisionConflict'))
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Names')
+  })
   it('chooses a live service without showing pipeline implementation terms', async () => {
     const user = userEvent.setup(); const cloud = { ...createProvider('alibaba'), id: 'cloud' }; const t = browserText('en')
     render(<LiveServiceField settings={settings} providers={[...DEFAULT_PROVIDERS, cloud]} t={t} />)
@@ -108,13 +130,15 @@ describe('extension settings', () => {
     settings = { ...settings, glossary: [{ source: 'API', target: '接口', sites: '' }], siteRules: [{ host: 'example.com', includeSelectors: '', excludeSelectors: '' }] }
     const user = userEvent.setup(); render(<Options />)
     await user.click(screen.getByRole('button', { name: 'Terminology' }))
-    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    await user.click(await screen.findByRole('button', { name: 'Delete API' }))
     expect(savePreferences).not.toHaveBeenCalled()
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
-    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ glossary: [] }))
+    expect(extensionGlossary.command).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(extensionGlossary.command).toHaveBeenCalledWith(expect.objectContaining({ command: expect.objectContaining({ action: 'deleteTerms' }) })))
     await user.click(screen.getByRole('button', { name: browserText('en')('web') }))
     await user.click(screen.getByRole('button', { name: 'Remove' }))
-    expect(savePreferences).toHaveBeenCalledTimes(1)
+    expect(savePreferences).not.toHaveBeenCalled()
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
     await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ siteRules: [] }))
   })
@@ -124,7 +148,7 @@ describe('extension settings', () => {
     await user.click(screen.getByRole('button', { name: browserText('en')('resetSettings') }))
     expect(savePreferences).not.toHaveBeenCalled()
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: browserText('en')('resetSettings') }))
-    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith(DEFAULT_PREFERENCES))
+    await waitFor(() => expect(restoreExtensionConfiguration).toHaveBeenCalledWith(expect.objectContaining({ preferences: DEFAULT_PREFERENCES, glossary: expect.objectContaining({ enabled: true, libraries: [] }) }), 0))
   })
   it('cancels an in-flight result when its provider card is closed', async () => {
     let finish!: (value: string) => void
@@ -187,7 +211,7 @@ describe('extension settings', () => {
   it('searches settings without hiding the matching controls', async () => {
     const user = userEvent.setup(); render(<Options />)
     await user.type(screen.getByRole('textbox', { name: 'Search settings' }), 'terminology')
-    expect(screen.getByRole('textbox', { name: 'Source term' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'New glossary library' })).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Theme' })).not.toBeInTheDocument()
   })
   it('finds a setting by its control label, not only by the page title', async () => {
@@ -216,9 +240,14 @@ describe('extension settings', () => {
     await waitFor(() => expect(translate).toHaveBeenCalledWith('Hello', 'auto', 'zh', 'selection', expect.any(AbortSignal), 'desktop'))
     expect(await screen.findByText('Translated text')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Terminology' }))
-    await user.type(screen.getByRole('textbox', { name: 'Source term' }), 'API')
-    await user.type(screen.getByRole('textbox', { name: 'Translation' }), '接口')
-    await user.click(screen.getByRole('button', { name: 'Add' }))
-    expect(savePreferences).toHaveBeenCalledWith({ glossary: [{ source: 'API', target: '接口', sites: '' }] })
+    await user.click(await screen.findByRole('button', { name: 'New glossary library' }))
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Names')
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    await user.click(await screen.findByRole('button', { name: 'Add term' }))
+    await user.type(within(screen.getByRole('dialog')).getByRole('textbox', { name: 'Source' }), 'API')
+    await user.type(within(screen.getByRole('dialog')).getByRole('textbox', { name: 'Translation' }), '接口')
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }))
+    expect(extensionGlossary.command).toHaveBeenCalledWith(expect.objectContaining({ command: expect.objectContaining({ action: 'saveTerm', entry: expect.objectContaining({ source: 'API', target: '接口' }) }) }))
   })
 })

@@ -109,6 +109,7 @@ export const DEMO_BULK_COUNT = 3
  * error codes are avoided because their primary button navigates to the settings page.
  */
 export const DEMO_ERROR_SESSION: SessionState = {
+  pausePending: false,
   status: 'error',
   sessionId: null,
   meetingId: DEMO_MEETING_ID,

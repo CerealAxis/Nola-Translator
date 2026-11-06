@@ -27,7 +27,7 @@ const output = resolve('artifacts/layout')
 app.setPath('userData', resolve(output, `electron-cache-${process.pid}`))
 const delay = (ms) => new Promise((done) => setTimeout(done, ms))
 
-const SETTINGS_TABS = ['general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'help']
+const SETTINGS_TABS = ['general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'help']
 
 /** Each entry names the `data-page` its route root renders, which is what the run asserts; the settings tabs all collapse to `settings`. */
 const PAGES = [
@@ -62,7 +62,7 @@ const SHELL_OVERFLOW = [
   { name: 'sidebar', selector: '.nola-sidebar', min: 1 },
   { name: 'titlebar', selector: '.nola-titlebar', min: 1 },
   { name: 'nav-button', selector: '.nola-nav-button', min: 6 },
-  { name: 'nav-label', selector: '.nola-nav-label', min: 6 },
+  { name: 'nav-label', selector: '.nola-nav-label', min: 6, ellipsis: true },
   { name: 'route-content', selector: '.nola-route-content', min: 1 },
 ]
 
@@ -79,7 +79,9 @@ const PAGE_GROUPS = {
     { name: 'quick-settings', selector: '.nola-overlay-page', min: 1 },
     { name: 'preview-card', selector: '.nola-overlay-preview', min: 1 },
     { name: 'caption-preview', selector: '.nola-caption-preview', min: 1 },
-    { name: 'session-fields', selector: '.nola-overlay-fields .nola-overlay-field', min: 6 },
+    { name: 'session-controls', selector: '[data-onboarding="quick-settings"] [role="combobox"], [data-onboarding="quick-settings"] [role="group"], [data-onboarding="quick-settings"] [role="switch"]', min: 6 },
+    { name: 'audio-source', selector: '[data-onboarding="quick-audio"] [role="combobox"]', min: 1 },
+    { name: 'language-direction', selector: '[data-onboarding="quick-language"] [role="combobox"]', min: 2 },
   ],
   overlay: [
     { name: 'overlay-page', selector: '.nola-overlay-page', min: 1 },
@@ -87,7 +89,9 @@ const PAGE_GROUPS = {
     { name: 'caption-preview', selector: '.nola-caption-preview', min: 1 },
     { name: 'preview-source', selector: '.nola-caption-preview__source', min: 1 },
     { name: 'preview-translation', selector: '.nola-caption-preview__translation', min: 1 },
-    { name: 'overlay-field', selector: '.nola-overlay-fields .nola-overlay-field', min: 4 },
+    { name: 'overlay-controls', selector: '[data-onboarding="quick-settings"] [role="combobox"], [data-onboarding="quick-settings"] [role="group"], [data-onboarding="quick-settings"] [role="switch"]', min: 6 },
+    { name: 'audio-source', selector: '[data-onboarding="quick-audio"] [role="combobox"]', min: 1 },
+    { name: 'language-direction', selector: '[data-onboarding="quick-language"] [role="combobox"]', min: 2 },
   ],
   meeting: [
     { name: 'meeting-stage', selector: '[data-slot="meeting-stage"]', min: 1 },
@@ -120,9 +124,10 @@ const PAGE_GROUPS = {
   ],
   models: [
     { name: 'models-page', selector: '.models-page', min: 1 },
-    { name: 'overview', selector: '.models-overview', min: 1 },
-    { name: 'current-model', selector: '.models-current', min: 2 },
+    { name: 'heading', selector: '[data-onboarding="models-page-heading"] h1', min: 1 },
+    { name: 'model-management-actions', selector: '[data-onboarding="models-page-heading"] button', min: 2 },
     { name: 'tabs', selector: '.models-tabs', min: 1 },
+    { name: 'catalog-tab', selector: '.models-tabs [role="tab"]', min: 4 },
     { name: 'models-grid', selector: '.models-grid', min: 1 },
     { name: 'model-card', selector: '.models-grid .models-card', min: 3 },
   ],
@@ -133,7 +138,7 @@ const PAGE_GROUPS = {
     // Every tab stays mounted, so the count is the same whichever one is active.
     { name: 'settings-tab', selector: '.settings-nav [role="tab"]', min: 7 },
     { name: 'settings-panels', selector: '.settings-panels', min: 1 },
-    { name: 'settings-group', selector: '.settings-panels .settings-group, .settings-panels .shortcuts-page__table', min: 1 },
+    { name: 'settings-group', selector: '.settings-panels .settings-group, .settings-panels .shortcuts-page__table, .settings-panels .browser-settings__card', min: 1 },
   ],
 }
 
@@ -179,6 +184,14 @@ fixtureWav.writeUInt16LE(16, 34)
 fixtureWav.write('data', 36)
 fixtureWav.writeUInt32LE(audioSamples * 2, 40)
 const fixtureAudioUrl = 'nola-audio://local/layout/audio.wav'
+const suiteId = '7a643bd5-d87b-4ec8-a80f-31cdb4e292f3'
+const suitePageId = 'e0344cb6-a6dd-4c67-bba1-c533de38236b'
+const suiteProject = { id: suiteId, title: '夜航 · 第一卷', revision: 1, updatedAt: '2026-11-06T00:00:00.000Z', pageCount: 1, chapterCount: 1,
+  config: { sourceLanguage: 'ja', targetLanguage: 'zh', model: '', readingDirection: 'rtl', glossary: { mode: 'auto' } },
+  chapters: [{ id: suiteId, title: '第一章' }], pages: [{ id: suitePageId, chapterId: suiteId, name: '001.png', width: 600, height: 800,
+    regions: [{ id: suiteId, sourceText: '灯台へ行こう。', targetText: '去灯塔吧。', x: 310, y: 65, width: 180, height: 180, confidence: 0.98, locked: false, ignored: false,
+      style: { fontSize: 24, color: '#000000', direction: 'vertical-rl', align: 'center' }, qa: [] }], status: 'translated', hasClean: false, hasRendered: false }], jobs: [], canUndo: true, canRedo: false }
+const suiteImage = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800"><rect width="600" height="800" fill="white"/><g fill="#f0f0f0" stroke="#222" stroke-width="4"><rect x="25" y="25" width="550" height="350"/><rect x="25" y="400" width="550" height="375"/><path d="M25 375L180 150L300 375M25 775L310 480L575 775"/></g><ellipse cx="400" cy="155" rx="95" ry="110" fill="white" stroke="#222" stroke-width="3"/><text x="355" y="155" font-size="24">灯台へ</text><text x="355" y="190" font-size="24">行こう。</text></svg>').toString('base64')
 
 const preloadSource = `
 const {contextBridge} = require('electron');
@@ -237,6 +250,17 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
     command: async command => { if (command.action === 'shortcuts') { Object.assign(screenState.config, command.shortcuts); screenListeners.forEach(fn => fn(screenState)) } return screenState },
     onChanged: callback => { screenListeners.add(callback); return () => screenListeners.delete(callback) },
   },
+  gameTranslation: {
+    snapshot: async () => ({ version: 1, revision: 0, status: 'idle', lines: [], hookAvailable: true,
+      profiles: [{ id: '${suiteId}', name: '夜航', sourceLanguage: 'ja', targetLanguage: 'zh', source: 'auto', strategy: 'auto', glossarySelection: { mode: 'auto' } }] }),
+    sources: async () => [{ kind: 'window', id: 'window:42:0', name: '夜航', thumbnail: '', width: 1280, height: 720 }],
+    onChanged: () => () => {},
+  },
+  comic: { listProjects: async () => [${JSON.stringify(suiteProject)}], openProject: async () => (${JSON.stringify(suiteProject)}),
+    image: async () => ${JSON.stringify(suiteImage)}, onChanged: () => () => {} },
+  glossary: { snapshot: async () => ({ schemaVersion: 1, revision: 0, matchingRevision: 0, enabled: true,
+    libraries: [{ id: '${suiteId}', name: '游戏专名', description: '', enabled: true, scope: { mode: 'global' },
+      entries: [{ id: '${suiteId}', source: 'A小', target: 'A Short', targetLanguage: 'en', caseSensitive: true, enabled: true }] }] }), onChanged: () => () => {} },
   listResources: async () => resources,
   manageResource: async (id) => resources.resources.find(r => r.resourceId === id),
   getModelStorage: async () => ({ activePath: 'D:/Models/Nola Translator', configuredPath: 'E:/Downloads/models-and-translation-packages/another-long-directory', restartRequired: true }),
@@ -279,7 +303,7 @@ contextBridge.exposeInMainWorld('layoutFixture', { emit,
 
 // Two rAFs only cover paint; the stub's async bridge calls need wall-clock time on top.
 async function settle(window) {
-  if (process.argv.includes('--settings-navigation') || process.argv.includes('--meeting-stage') || process.argv.includes('--meeting-settings') || process.argv.includes('--screen-page')) {
+  if (process.argv.includes('--translation-suite') || process.argv.includes('--settings-navigation') || process.argv.includes('--meeting-stage') || process.argv.includes('--meeting-settings') || process.argv.includes('--screen-page')) {
     // Hidden windows throttle animation frames; state and computed layout are asserted below.
     await window.webContents.executeJavaScript('document.fonts.ready.then(() => true)')
     if (process.argv.includes('--meeting-settings') || process.argv.includes('--screen-page')) await window.webContents.executeJavaScript('new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))')
@@ -351,7 +375,8 @@ async function main() {
   let scenarios = 0
   const fail = (context, reason, extra) => failures.push({ ...context, reason, ...(extra ?? {}) })
 
-  const window = new BrowserWindow({ width: 1180, height: HEIGHT, show: false, webPreferences: { preload, contextIsolation: true, sandbox: true, offscreen: process.argv.includes('--settings-navigation') || process.argv.includes('--shortcuts') || process.argv.includes('--screen-page'), backgroundThrottling: !(process.argv.includes('--settings-navigation') || process.argv.includes('--meeting-stage') || process.argv.includes('--meeting-settings') || process.argv.includes('--screen-page') || process.argv.includes('--shortcuts')) } })
+  // Hidden layout probes still need compositor frames to settle and receive test input.
+  const window = new BrowserWindow({ width: 1180, height: HEIGHT, show: false, webPreferences: { preload, contextIsolation: true, sandbox: true, offscreen: true, backgroundThrottling: false } })
   window.webContents.on('console-message', details => {
     if (details.level === 'error') console.log(`[renderer] ${details.message}`)
   })
@@ -366,17 +391,64 @@ async function main() {
     const groups = ${JSON.stringify(groups)}
     return groups.map((group) => {
       const elements = [...document.querySelectorAll(group.selector)]
+      const clipped = (el) => {
+        if (!group.ellipsis) return false
+        const style = getComputedStyle(el), rect = el.getBoundingClientRect()
+        const button = el.closest('.nola-nav-button'), bounds = button?.getBoundingClientRect()
+        return style.overflowX === 'hidden' && style.textOverflow === 'ellipsis' && style.whiteSpace === 'nowrap'
+          && rect.width > 0 && bounds && rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1
+          && rect.top >= bounds.top - 1 && rect.bottom <= bounds.bottom + 1
+          && button.getAttribute('aria-label') === el.textContent.trim()
+      }
       return {
         name: group.name,
         selector: group.selector,
         min: group.min,
         found: elements.length,
         overflows: elements
-          .filter((el) => !el.classList.contains('sr-only') && el.scrollWidth > el.clientWidth + 2)
+          .filter((el) => !el.classList.contains('sr-only') && el.scrollWidth > el.clientWidth + 2 && !clipped(el))
           .map((el) => ({ className: String(el.className).slice(0, 90), text: el.textContent?.trim().slice(0, 100), clientWidth: el.clientWidth, scrollWidth: el.scrollWidth })),
       }
     })
   })()`)
+
+  if (process.argv.includes('--translation-suite')) {
+    const pages = [
+      ['screen', '#/screen-translation', 'screen-translation'],
+      ['games', '#/game-translation', 'game-translation'],
+      ['game', `#/game-translation/${suiteId}`, 'game-translation'],
+      ['bookshelf', '#/comic-translation', 'comic-translation'],
+      ['editor', `#/comic-translation/${suiteId}`, 'comic-translation'],
+      ['reader', `#/comic-translation/${suiteId}/reader`, 'comic-translation'],
+      ['glossary', '#/settings/glossary', 'settings'],
+      ['terms', `#/settings/glossary/${suiteId}`, 'settings'],
+    ].filter(([name]) => !process.argv.includes('--comic-editor') || name === 'editor')
+    for (const language of ['zh-CN', 'en', 'ja', 'ko', 'zh-TW', 'zh-HK']) for (const theme of ['light', 'dark']) for (const width of [1180, 760]) {
+      window.setContentSize(width, 900)
+      await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings(${JSON.stringify({ uiLanguage: language, theme, appearance: { reduceMotion: true } })})`)
+      for (const [name, hash, page] of pages) {
+        await goto(window, hash, page)
+        await delay(180)
+        const required = { screen: '.screen-page', games: '.game-library', game: '#game-name', bookshelf: '.comic-bookshelf', editor: '.comic-inspector', reader: '.comic-editor--reader', glossary: '.settings-panels', terms: '.settings-panels table' }[name]
+        const state = await window.webContents.executeJavaScript(`(() => {
+          const main = document.querySelector('.nola-main');
+          return { text: main?.innerText, overflow: document.documentElement.scrollWidth > innerWidth + 2,
+            crashed: !!main?.querySelector('pre'), heading: main?.querySelector('h1')?.innerText,
+            required: !!document.querySelector(${JSON.stringify(required)}),
+            imagesReady: [...document.querySelectorAll('.comic-canvas img')].every(img => img.complete && img.naturalWidth > 0),
+            contentOverflow: [...document.querySelectorAll('.game-page, .comic-page, .screen-page, .settings-panels, .comic-inspector, .comic-canvas__tools')].some(el => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2) };
+        })()`)
+        scenarios++
+        if (!state.text || !state.required || !state.imagesReady || state.crashed || state.overflow || state.contentOverflow || /数据仅留|不捕获屏幕/.test(state.text)) fail({ language, theme, width, page: name }, 'Translation suite layout failed', { state })
+        if (language === 'zh-CN') await writeFile(resolve(output, `suite-${name}-${theme}-${width}.png`), (await window.webContents.capturePage()).toPNG())
+      }
+    }
+    await writeFile(resolve(output, process.argv.includes('--comic-editor') ? 'translation-suite-editor-results.json' : 'translation-suite-results.json'), JSON.stringify({ scenarios, failures }, null, 2))
+    console.log(JSON.stringify({ scenarios, failures }, null, 2))
+    window.destroy()
+    app.exit(failures.length ? 1 : 0)
+    return
+  }
 
   if (process.argv.includes('--settings-navigation')) {
     for (const language of ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko']) for (const theme of ['light', 'dark']) for (const [width, height] of [[760, 560], [1180, 780], [1920, 1140]]) {
@@ -402,7 +474,7 @@ async function main() {
             collapsed: panel.querySelectorAll('[data-slot="accordion-trigger"]').length,
             cards: [...panel.querySelectorAll('.settings-group.card')].map(el => { const r = el.getBoundingClientRect(); const h = el.querySelector('[data-slot="card-header"]')?.getBoundingClientRect(); return { left:r.left, width:r.width, headingLeft:h?.left }; }) };
         })()`)
-        if (state.lang !== language || state.selected !== `settings-${tab}` || state.count !== 8 || JSON.stringify(state.order) !== JSON.stringify(SETTINGS_TABS) || new Set(state.icons).size !== 8 || state.crashed || !state.groups || state.overflow.length || state.collapsed || (tab === 'audio' && state.sourceLanguageGroup) || state.cards.some(card => Math.abs(card.left - state.cards[0].left) > 2 || Math.abs(card.width - state.cards[0].width) > 2 || (card.headingLeft !== undefined && Math.abs(card.headingLeft - state.cards[0].headingLeft) > 2))) fail(context, 'Settings categories or layout failed', { state })
+        if (state.lang !== language || state.selected !== `settings-${tab}` || state.count !== SETTINGS_TABS.length || JSON.stringify(state.order) !== JSON.stringify(SETTINGS_TABS) || new Set(state.icons).size !== SETTINGS_TABS.length || state.crashed || !state.groups || state.overflow.length || state.collapsed || (tab === 'audio' && state.sourceLanguageGroup) || state.cards.some(card => Math.abs(card.left - state.cards[0].left) > 2 || Math.abs(card.width - state.cards[0].width) > 2 || (card.headingLeft !== undefined && Math.abs(card.headingLeft - state.cards[0].headingLeft) > 2))) fail(context, 'Settings categories or layout failed', { state })
         if (language === 'zh-CN' && ((theme === 'light' && width === 1180) || (theme === 'dark' && width === 760))) {
           await window.webContents.executeJavaScript(`document.querySelector('.nola-main').scrollTop = 0`)
           await settle(window)
@@ -694,7 +766,7 @@ async function main() {
       { segmentId: 'down:1', direction: 'downlink', revision: 3, startedAtMs: 2000, sourceLanguage: 'en', sourceText: 'The updated total is 2026. We will review the details after the call.', isFinal: true, speakerId: 'remote', speakerNumber: 1, translations: [{ targetLanguage: 'zh', text: '更新后的总数是 2026。我们将在通话结束后核对详细信息。', provider: 'meeting', state: 'complete' }] },
     ]
     const meeting = { state: 'running', paused: false, passthroughActive: false, meetingId: 'visual-meeting', segments: conversation }
-    const reader = new BrowserWindow({ width: 1180, height: HEIGHT, show: false, webPreferences: { preload, contextIsolation: true, sandbox: true } })
+    const reader = new BrowserWindow({ width: 1180, height: HEIGHT, show: false, webPreferences: { preload, contextIsolation: true, sandbox: true, offscreen: true, backgroundThrottling: false } })
     await reader.loadFile(resolve('out/renderer/index.html'), { query: { workspace: '1' } })
     await settle(reader)
     for (const theme of ['light', 'dark']) {
@@ -770,6 +842,22 @@ async function main() {
         scenarios += 1
         if (pageOverflow.html !== language) {
           fail(context, `documentElement.lang is "${pageOverflow.html}", expected "${language}"`, { pageOverflow })
+        }
+
+        if (target.name === 'home') {
+          const clippedLabels = await window.webContents.executeJavaScript(`(() => [...document.querySelectorAll('.nola-nav-label')]
+            .filter(el => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2)
+            .map(el => { const button = el.closest('.nola-nav-button'), rect = button.getBoundingClientRect(); return { label: el.textContent.trim(), x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) }; }))()`)
+          for (const item of clippedLabels) {
+            scenarios += 1
+            await window.webContents.sendInputEvent({ type: 'mouseMove', x: item.x, y: item.y })
+            await delay(500)
+            const readable = await window.webContents.executeJavaScript(`(() => [...document.querySelectorAll('[data-slot="tooltip-content"]')].some(el => {
+              const rect = el.getBoundingClientRect(); return el.textContent.trim() === ${JSON.stringify(item.label)} && rect.width > 0 && rect.left >= 0 && rect.right <= innerWidth + 1 && rect.top >= 0 && rect.bottom <= innerHeight + 1;
+            }))()`)
+            if (!readable) fail(context, 'truncated navigation label has no readable tooltip', { label: item.label })
+            await window.webContents.sendInputEvent({ type: 'mouseMove', x: width - 10, y: 10 })
+          }
         }
 
         if (width === 901 || (width === 1100 && target.name === 'settings/appearance')) {

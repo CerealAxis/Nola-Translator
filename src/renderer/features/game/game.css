@@ -1,0 +1,6 @@
+.game-page { display: flex; min-width: 0; flex-direction: column; gap: var(--space-3); }
+.game-library { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-8) * 3), 1fr)); gap: var(--space-2); }
+.game-page .nola-dual__scroll { max-height: calc(var(--space-8) * 5); }
+.game-overlay { display: flex; align-items: end; width: 100%; height: 100%; min-height: 0; padding: var(--space-1); pointer-events: none; }
+.game-overlay__caption { display: flex; flex-direction: column; flex: 1; gap: var(--space-1); min-width: 0; min-height: 0; max-height: 100%; padding: var(--space-1) var(--space-2); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--overlay-background-color) var(--overlay-background-alpha), transparent); overflow: hidden; }
+.game-overlay__caption > .nola-caption-track { flex: 0 1 auto; }

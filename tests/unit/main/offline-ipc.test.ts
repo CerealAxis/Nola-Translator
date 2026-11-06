@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { OfflineManager } from '../../../src/main/offline-manager'
 import { registerOfflineIpc } from '../../../src/main/offline-ipc'
 
@@ -74,4 +74,16 @@ it('returns the complete folder path from the picker and unregisters its handler
   await expect(invoke('offline:select-destination')).resolves.toMatchObject({ label: root })
   await disposers.pop()!()
   expect(ipcMain.removeHandler).toHaveBeenCalledWith('offline:select-destination')
+})
+
+it('reports an output folder that the operating system cannot open', async () => {
+  const { root, manager, invoke } = await setup()
+  vi.spyOn(manager, 'snapshot').mockReturnValue({
+    state: 'completed', phase: 'pack', current: 1, total: 1, outputPath: join(root, 'model'),
+  })
+  vi.mocked(shell.openPath).mockResolvedValueOnce('The system cannot find the path specified.')
+  await expect(invoke('offline:open-output')).rejects.toThrow('FILE_NOT_ACCESSIBLE')
+  expect(shell.openPath).toHaveBeenCalledWith(join(root, 'model'))
+  vi.mocked(shell.openPath).mockResolvedValueOnce('')
+  await expect(invoke('offline:open-output')).resolves.toBeUndefined()
 })

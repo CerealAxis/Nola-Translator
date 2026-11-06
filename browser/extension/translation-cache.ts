@@ -7,8 +7,8 @@ const MAX_CHARACTERS = 2_000_000
 interface Entry { key: string; text: string; createdAt: number }
 const range = () => IDBKeyRange.bound(PREFIX, PREFIX + '\uffff')
 
-export async function translationCacheKey(provider: ProviderConnection, source: string, target: string, prompt: string): Promise<string> {
-  const input = JSON.stringify([provider.id, provider.preset, provider.baseUrl, provider.model, provider.apiKey, provider.headers, provider.options, source, target, prompt])
+export async function translationCacheKey(provider: ProviderConnection, source: string, target: string, prompt: string, glossarySignature = ''): Promise<string> {
+  const input = JSON.stringify([provider.id, provider.preset, provider.baseUrl, provider.model, provider.apiKey, provider.headers, provider.options, source, target, prompt, glossarySignature])
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }

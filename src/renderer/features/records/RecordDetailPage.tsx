@@ -43,7 +43,6 @@ export function RecordDetailPage(): ReactNode {
   const { id, navigate, path } = useRoute()
   const detail = useStore(stores.meetings, (state) => state.detail)
   const detailLoading = useStore(stores.meetings, (state) => state.detailLoading)
-  const sourceLanguage = useStore(stores.settings, state => state.settings?.recognition.sourceLanguage ?? 'auto')
 
   const [fontScale, setFontScale] = useState(1)
   const [currentIndex, setCurrentIndex] = useState<number | undefined>(undefined)
@@ -95,12 +94,12 @@ export function RecordDetailPage(): ReactNode {
         segment.translations[0]
       return {
         id: segment.segmentId,
-        source: formatChineseCaption(segment.sourceText, sourceLanguage),
+        source: formatChineseCaption(segment.sourceText, segment.sourceLanguage ?? detail.meta.sourceLanguage),
         target: target?.text ?? '',
         interim: !segment.isFinal,
       }
     })
-  }, [detail, sourceLanguage])
+  }, [detail])
 
   const back = useCallback(() => navigate(pathOf('records')), [navigate])
 

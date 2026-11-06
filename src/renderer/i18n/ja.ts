@@ -1,3 +1,4 @@
+import { suiteEntries, suiteLocales } from './translation-suite-ui'
 import { modelPolicyJa, modelPolicyEntries } from './model-policy-ui'
 import { screenEntries, screenLocales } from './screen-ui'
 import { shortcutEntries, shortcutLocales } from './shortcuts-ui'
@@ -11,6 +12,7 @@ import { onboardingEntries, onboardingJa } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const jaMessages: Record<DictionaryKey, string> = {
+  ...suiteEntries(suiteLocales.ja),
   ...screenEntries(screenLocales.ja),
   ...shortcutEntries(shortcutLocales.ja),
   ...latencyEntries(latencyJa),
@@ -642,6 +644,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'session.playbackFailed': '音声再生に失敗',
   'session.retryPlayback': '再試行',
   'session.skipPlayback': 'この文をスキップ',
+  'session.pauseFailed': '通訳を一時停止または再開できませんでした。再試行してください。',
   'session.playbackActionFailed': '音声再生を更新できませんでした',
   'session.keepAudio': '録音を保存',
   'session.keepAudioHint': 'オフにすると音声は保存されず、再生やエクスポートができません。録音はこのデバイスに保存され、終了後に記録から再生できます。',
@@ -900,6 +903,8 @@ const jaMessages: Record<DictionaryKey, string> = {
   "errors.invalidArgument": "パラメーターが無効です。入力を確認してください。",
   "errors.meetingNameEmpty": "会議名を入力してください。",
   "errors.meetingNotFound": "会議の記録が見つかりません。一覧を更新してください。",
+  'errors.credentialDecryptFailed': '保存済みキーを現在の Windows ユーザーで復号できません。該当する API 設定でキーを再入力してください。',
+  'errors.credentialEncryptionUnavailable': 'Windows の資格情報暗号化を利用できず、キーを読み取り・保存できません。アプリを再起動して再試行してください。',
   "errors.invalidCredential": "認証情報の種類または値が無効です。再入力してください。",
   'errors.unknownFailure': '操作を完了できませんでした。診断情報をコピーして問題を報告してください。',
   'errors.torchRuntimeUnavailable': 'PyTorch ランタイムを利用できません。設定で確認または修復してください。',

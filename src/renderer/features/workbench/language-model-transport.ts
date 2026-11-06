@@ -6,6 +6,11 @@ import type { PlaygroundModel } from './installed-models'
 import type { PlaygroundConfig } from './demo-runtime'
 import { extractVideoAudio, pcmWavData } from './audio-attachment'
 
+const comicRequests = new Map<string, () => void>()
+export function cancelComicReads(): void {
+  for (const cancel of [...comicRequests.values()]) cancel()
+}
+
 function fallbackErrorKey(config: PlaygroundConfig): TranslationKey {
   if (config.kind === 'tts') return 'workbench.localTtsError'
   if (config.kind === 'asr') return config.model.startsWith('cloud:') ? 'workbench.serviceError' : 'workbench.localAsrError'
@@ -103,6 +108,7 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
         const finish = (error?: Error) => {
           if (closed) return
           closed = true
+          comicRequests.delete(id)
           unsubscribe?.()
           signal?.removeEventListener('abort', abort)
           if (error) controller.error(error)
@@ -132,11 +138,13 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
           else controller.enqueue(encoder.encode(event.chunk))
         })
         signal?.addEventListener('abort', abort, { once: true })
+        if (config.comicProjectId) comicRequests.set(id, abort)
         void app.streamLanguageModel!({ id, source: local ? 'local' : 'custom', modelId: config.model.slice(local ? 9 : 7), body, projectId: config.projectId ?? null,
+          comicProjectId: config.comicProjectId ?? null,
           effort: ['low', 'medium', 'high'].includes(config.effort) ? config.effort as 'low' | 'medium' | 'high' : 'auto',
         }).catch(error => finish(inferenceError(error)))
       },
-      cancel() { closed = true; unsubscribe?.(); cancel() },
+      cancel() { closed = true; comicRequests.delete(id); unsubscribe?.(); cancel() },
     })
     return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' } })
   }

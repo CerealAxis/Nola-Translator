@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Eye, EyeOff, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { Dialog, DialogCloseButton, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
@@ -24,7 +25,7 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
     const saved = settings && customModelsOf(settings.translation).find(model => model.id === modelId)
     return saved ? { ...saved, sourceLanguages: saved.sourceLanguages ?? [...SOURCE_LANGUAGE_OPTIONS] } : { id: crypto.randomUUID(), name: '', endpoint: DEFAULT_SETTINGS.translation.cloudEndpoint,
       model: '', apiFormat: 'chat-completions', contextWindow: DEFAULT_SETTINGS.translation.cloudContextWindow,
-      maxOutputTokens: DEFAULT_SETTINGS.translation.cloudMaxOutputTokens, languages: [...LANGUAGE_CODES], sourceLanguages: [...SOURCE_LANGUAGE_OPTIONS] }
+      maxOutputTokens: DEFAULT_SETTINGS.translation.cloudMaxOutputTokens, images: false, languages: [...LANGUAGE_CODES], sourceLanguages: [...SOURCE_LANGUAGE_OPTIONS] }
   })
   const [key, setKey] = useState('')
   const [keyVisible, setKeyVisible] = useState(false)
@@ -90,6 +91,7 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
           patch({ apiFormat, ...(draft.endpoint === from.cloudEndpoint ? { endpoint: to.cloudEndpoint } : {}), ...(draft.model === from.cloudModel ? { model: to.cloudModel } : {}) })
         }} /></SettingsRow>
         <SettingsRow label={t('settings.modelId')}><Input aria-label={t('settings.modelId')} className="settings-control-field" value={draft.model} onValueChange={model => patch({ model })} /></SettingsRow>
+        <SettingsRow label={t('suite.supportsImages')}><Switch aria-label={t('suite.supportsImages')} checked={draft.images === true} disabled={saving} onCheckedChange={images => patch({ images })}><SwitchThumb /></Switch></SettingsRow>
         <NumberRow label={t('settings.contextWindow')} value={draft.contextWindow} onCommit={contextWindow => patch({ contextWindow })} />
         <NumberRow label={t('settings.maxOutputTokens')} value={draft.maxOutputTokens} onCommit={maxOutputTokens => patch({ maxOutputTokens })} />
         <details><summary className="cursor-pointer py-2 text-sm">{t('workbench.translationCapabilities')}</summary>

@@ -13,6 +13,7 @@ export const customModelSchema = z.object({
   apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']),
   contextWindow: z.number().int().min(256).max(10_000_000),
   maxOutputTokens: z.number().int().min(1).max(10_000_000),
+  images: z.boolean().optional(),
   languages: z.array(z.string().refine(code => LANGUAGE_CODES.includes(code))).min(1).max(LANGUAGE_CODES.length),
   sourceLanguages: z.array(z.string().refine(code => SOURCE_LANGUAGE_OPTIONS.includes(code))).min(1).max(SOURCE_LANGUAGE_OPTIONS.length).optional(),
 }).strict()

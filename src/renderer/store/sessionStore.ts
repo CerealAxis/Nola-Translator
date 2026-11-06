@@ -71,6 +71,7 @@ const ENGINE_PROCESS_STATE_TO_UI: Record<EngineProcessState, EngineStatus> = {
 export interface SessionState {
   meeting?: MeetingModeSnapshot
   status: SessionStatus
+  pausePending: boolean
   playbackPhase?: 'waiting' | 'synthesizing' | 'playing' | 'idle' | 'failed'
   waitingSpeechCount?: number
   playbackJob?: { jobId: string; state: 'failed' | 'unknown' }
@@ -103,6 +104,7 @@ export interface SessionState {
 
 const initialState: SessionState = {
   status: 'idle',
+  pausePending: false,
   sessionId: null,
   meetingId: null,
   startedAtMs: null,
@@ -137,23 +139,6 @@ let interimTimer: ReturnType<typeof setTimeout> | null = null
 /** Ticker pause ledger. */
 let pausedAtMs: number | null = null
 let pausedTotalMs = 0
-
-/**
- * Pause/resume needs no capability probe: the protocol carries it
- * (`EngineCommand.setSessionPaused`, preload `setSessionPaused`). The bridge
- * call is a synchronous void, so the clock stops on the press and a refusal
- * arrives later as an `error` event.
- */
-function pauseControl(): { pause: () => void; resume: () => void } | undefined {
-  if (!bridge) return undefined
-  const { sessionId } = sessionStore.getState()
-  if (sessionId === null) return undefined
-  return {
-    pause: () => bridge?.engine.setPaused(sessionId, true),
-    resume: () => bridge?.engine.setPaused(sessionId, false),
-  }
-}
-
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -350,7 +335,7 @@ export async function startSession(config: SessionConfig): Promise<void> {
   // Another press can arrive while the read-only reservation query is in flight.
   if (!['idle', 'error'].includes(sessionStore.getState().status)) throw new Error('上一次会话还没收尾')
 
-  sessionStore.setState({ status: 'starting', error: null, errorCode: null, errorRequestId: null, missing: null })
+  sessionStore.setState({ status: 'starting', pausePending: false, error: null, errorCode: null, errorRequestId: null, missing: null })
 
   // Preflight stays outside the try: its failure means no session started, not an engine fault.
   let missing: MissingResource | null
@@ -440,18 +425,16 @@ export async function stopSession(): Promise<void> {
     return
   }
   if (status === 'stopping') throw new Error('正在结束中')
-  if (status === 'paused') {
-    // A paused session may still look live to the engine; resume so `stopSession` finds it.
-    resumeSession()
-  }
-
+  const version = attachmentVersion
+  const current = () => version === attachmentVersion && sessionStore.getState().sessionId === sessionId
   sessionStore.setState({ status: 'stopping', error: null, errorCode: null, errorRequestId: null })
   let ended = false
   try {
     await bridge.engine.stopSession(sessionId)
     ended = true
-    sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
+    if (current()) sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
   } catch (error) {
+    if (!current()) throw error
     // Keep `ENGINE_LOST`: that edge told the truth, and a code guessed from the text inverts it.
     const engineLost = sessionStore.getState().errorCode === ENGINE_LOST_CODE
     const errorCode = engineLost ? ENGINE_LOST_CODE : errorCodeOf(error)
@@ -466,13 +449,14 @@ export async function stopSession(): Promise<void> {
     })
     throw error
   } finally {
-    // Unconditional, failure included.
-    stopTicker()
-    pausedAtMs = null
-    pausedTotalMs = 0
-    if (ended) {
-      clearSessionTranscript()
-      sessionStore.setState({ sessionId: null, meetingId: null, startedAtMs: null })
+    if (current()) {
+      stopTicker()
+      pausedAtMs = null
+      pausedTotalMs = 0
+      if (ended) {
+        clearSessionTranscript()
+        sessionStore.setState({ sessionId: null, meetingId: null, startedAtMs: null })
+      }
     }
   }
 }
@@ -486,25 +470,35 @@ export async function resolvePlayback(jobId: string, action: 'retry' | 'skip'): 
   await bridge.engine.resolvePlayback(sessionId, jobId, action)
 }
 
-export function pauseSession(): void {
-  const { status, sessionId } = sessionStore.getState()
-  if (status !== 'running' || sessionId === null) return
-  pauseControl()?.pause()
-  pausedAtMs = Date.now()
-  sessionStore.setState({ status: 'paused', elapsedMs: elapsedNow() })
-  // Stop the ticker; a live interval would make the pause cosmetic.
-  stopTicker()
+async function setSessionPaused(paused: boolean): Promise<void> {
+  const { status, sessionId, pausePending } = sessionStore.getState()
+  const expected = paused ? 'running' : 'paused'
+  if (status !== expected || sessionId === null || pausePending) return
+  if (!bridge) throw new Error('bridgeNotReady')
+  const version = attachmentVersion
+  sessionStore.setState({ pausePending: true })
+  try {
+    await bridge.engine.setPaused(sessionId, paused)
+    const current = sessionStore.getState()
+    // A stop or authoritative status event may overtake the IPC acknowledgement.
+    if (version !== attachmentVersion || current.sessionId !== sessionId || current.status !== expected) return
+    if (paused) {
+      pausedAtMs = Date.now()
+      sessionStore.setState({ status: 'paused', elapsedMs: elapsedNow() })
+      stopTicker()
+    } else {
+      if (pausedAtMs !== null) pausedTotalMs += Date.now() - pausedAtMs
+      pausedAtMs = null
+      sessionStore.setState({ status: 'running' })
+      startTicker()
+    }
+  } finally {
+    if (version === attachmentVersion && sessionStore.getState().sessionId === sessionId) sessionStore.setState({ pausePending: false })
+  }
 }
 
-export function resumeSession(): void {
-  const { status, sessionId } = sessionStore.getState()
-  if (status !== 'paused' || sessionId === null) return
-  pauseControl()?.resume()
-  if (pausedAtMs !== null) pausedTotalMs += Date.now() - pausedAtMs
-  pausedAtMs = null
-  sessionStore.setState({ status: 'running' })
-  startTicker()
-}
+export function pauseSession(): Promise<void> { return setSessionPaused(true) }
+export function resumeSession(): Promise<void> { return setSessionPaused(false) }
 
 export function resetSessionError(): void {
   if (sessionStore.getState().status !== 'error') return
@@ -528,7 +522,7 @@ export function clearSessionTranscript(): void {
     clearTimeout(interimTimer)
     interimTimer = null
   }
-  sessionStore.setState({ segments: [], interim: null })
+  sessionStore.setState({ segments: [], interim: null, pausePending: false })
 }
 export function attachSessionStore(next: NolaBridge): void {
   const version = ++attachmentVersion
@@ -639,7 +633,8 @@ export function attachSessionStore(next: NolaBridge): void {
         if (next === undefined) break
         const current = sessionStore.getState()
         if (current.sessionId === null) break
-        // Already painted by `pauseSession`; moving the ledger again counts the pause twice.
+        if (current.status === 'stopping') break
+        // A matching acknowledgement must not count the same pause twice.
         if (current.status === next) break
 
         if (next === 'paused') {

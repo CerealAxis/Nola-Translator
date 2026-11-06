@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { subscribeLatency } from '@/bridge/latency'
 import type { LatencySnapshot } from '../../../shared/latency'
@@ -40,6 +40,16 @@ function renderSnapshot(snapshot: LatencySnapshot) {
   })
   return render(<LatencyWindow />)
 }
+
+it('shows a retry after a connection failure and recovers when the next snapshot arrives', () => {
+  vi.mocked(subscribeLatency).mockImplementationOnce((_listener, onFailure) => { onFailure(); return () => {} })
+    .mockImplementationOnce(listener => { listener({ ...cascade, samples: [] }); return () => {} })
+  render(<LatencyWindow />)
+  expect(screen.getByText('无法读取同传会话的延迟数据，请重试。')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '重试' }))
+  expect(screen.queryByText('无法读取同传会话的延迟数据，请重试。')).not.toBeInTheDocument()
+  expect(screen.getByText('检测中')).toBeInTheDocument()
+})
 
 it('uses visible translation latency and excludes unfinished samples from the two metrics', () => {
   renderSnapshot(cascade)

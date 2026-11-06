@@ -1,12 +1,42 @@
 import { expect, it, vi } from 'vitest'
 import { ScreenPipeline, mergeScreenLines, type OcrBlock } from '../../../src/main/screen-pipeline'
 import { screenConfigSchema } from '../../../src/shared/screen-translation'
+import { visibleScreenBlocks } from '../../../src/renderer/features/screen/overlay-layout'
 
 const region = '8ddba01d-f7dd-4ea2-b24e-0a3220212420'
 const other = '8ddba01d-f7dd-4ea2-b24e-0a3220212421'
 const config = () => screenConfigSchema.parse({ model: 'cloud:google', sourceLanguage: 'en', targetLanguage: 'zh', regions: [{ id: region, x: 0, y: 0, width: 1, height: 1 }, { id: other, x: 0, y: 0, width: 1, height: 1 }] })
 const block = (text: string, x = 0, y = 0): OcrBlock => ({ id: '0', text, confidence: 0.99, quad: [[x, y], [x + 100, y], [x + 100, y + 20], [x, y + 20]] })
 const settle = () => new Promise(resolve => setTimeout(resolve, 0))
+
+it('publishes slow OCR after current glyph verification despite continuous background changes', async () => {
+  const pipeline = new ScreenPipeline(config(), async () => 'translated', () => {}, () => {})
+  const candidate = { ...block('Price 100'), visualId: 'glyph-a' }
+  pipeline.update(region, [candidate], 1000, 1000, 0, false)
+  expect(visibleScreenBlocks(pipeline.blocks())).toHaveLength(0)
+  for (let frame = 0; frame < 20; frame++) {
+    pipeline.observeRegion(region, new Set(['glyph-a']))
+    pipeline.verifyVisual('glyph-a', true, false, frame * 100)
+  }
+  await settle()
+  expect(visibleScreenBlocks(pipeline.blocks())).toHaveLength(1)
+  expect(pipeline.blocks()[0].appearancePending).toBe(true)
+  pipeline.update(region, [candidate], 1000, 1000, 2200, false)
+  expect(visibleScreenBlocks(pipeline.blocks())).toHaveLength(1)
+})
+
+it('withdraws changed glyphs before OCR and never lets late MT or obsolete probes reveal them', async () => {
+  let finish!: (value: string) => void
+  const pipeline = new ScreenPipeline(config(), () => new Promise(resolve => { finish = resolve }), () => {}, () => {})
+  pipeline.update(region, [{ ...block('100'), visualId: 'old' }], 1000, 1000, 0, false)
+  pipeline.verifyVisual('old', true, false, 100)
+  pipeline.verifyVisual('old', false, false, 200)
+  finish('late'); await settle()
+  expect(visibleScreenBlocks(pipeline.blocks())).toHaveLength(0)
+  pipeline.update(region, [{ ...block('101'), visualId: 'new' }], 1000, 1000, 300, false)
+  pipeline.verifyVisual('old', true, false, 400)
+  expect(pipeline.blocks()[0]).toMatchObject({ text: '101', hidden: true })
+})
 
 it('waits for text stability, translates once and retains a result across animated frames', async () => {
   const translate = vi.fn(async () => '译文')
@@ -71,7 +101,7 @@ it('merges aligned dialogue lines while preserving columns and separated buttons
 })
 
 
-it('hides outdated patches immediately and restores cached text with fresh appearance', async () => {
+it('hides outdated text and patches immediately and restores cached text with fresh appearance', async () => {
   const patch = { image: 'data:image/png;base64,test', x: .1, y: .2, width: .2, height: .1 }
   const appearance = { color: '#ffffff', background: '#000000', patches: [patch] }
   const translate = vi.fn(async () => '译文')
@@ -81,9 +111,38 @@ it('hides outdated patches immediately and restores cached text with fresh appea
   pipeline.update(region, [input], 1000, 1000, 600)
   await vi.waitFor(() => expect(pipeline.blocks()[0].status).toBe('ready'))
   pipeline.hideRegion(region)
-  expect(pipeline.blocks()[0]).toMatchObject({ appearancePending: true, translation: '译文' })
+  expect(pipeline.blocks()[0]).toMatchObject({ hidden: true, appearancePending: true, translation: '译文' })
+  expect(visibleScreenBlocks(pipeline.blocks())).toEqual([])
   pipeline.update(region, [{ ...input, appearance: { ...appearance, color: '#ff0000' } }], 1000, 1000, 1200)
   expect(pipeline.blocks()[0]).toMatchObject({ hidden: false, appearancePending: false, translation: '译文', appearance: { color: '#ff0000' } })
   expect(translate).toHaveBeenCalledOnce()
+  pipeline.stop()
+})
+
+it('keeps a late translation invisible until its source is revalidated', async () => {
+  let finish!: (text: string) => void
+  const pipeline = new ScreenPipeline(config(), () => new Promise(resolve => { finish = resolve }), vi.fn(), vi.fn())
+  pipeline.update(region, [block('Old tooltip')], 1000, 1000, 0)
+  pipeline.update(region, [block('Old tooltip')], 1000, 1000, 100)
+  pipeline.hideRegion(region)
+  finish('旧提示'); await settle()
+  expect(visibleScreenBlocks(pipeline.blocks())).toEqual([])
+  pipeline.update(region, [block('New tooltip')], 1000, 1000, 200)
+  expect(visibleScreenBlocks(pipeline.blocks())).toEqual([])
+  pipeline.stop()
+})
+
+it('retranslates only text whose effective glossary signature changed', async () => {
+  let signature = 'first'
+  const translate = vi.fn(async text => `${signature}:${text}`)
+  const pipeline = new ScreenPipeline(config(), translate, vi.fn(), vi.fn(), text => text === 'Name' ? signature : '')
+  pipeline.update(region, [block('Name'), block('Other', 300)], 1000, 1000, 0)
+  pipeline.update(region, [block('Name'), block('Other', 300)], 1000, 1000, 100)
+  await settle()
+  signature = 'second'
+  pipeline.update(region, [block('Name'), block('Other', 300)], 1000, 1000, 200)
+  await settle()
+  expect(translate.mock.calls.map(([text]) => text)).toEqual(['Name', 'Other', 'Name'])
+  expect(pipeline.blocks().find(item => item.text === 'Name')?.translation).toBe('second:Name')
   pipeline.stop()
 })

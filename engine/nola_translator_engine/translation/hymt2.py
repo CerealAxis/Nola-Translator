@@ -7,6 +7,7 @@ import asyncio
 from ..hub import HYMT2_LANGUAGES
 from .base import ProviderTranslation
 from .llama_server import LlamaServerManager
+from ..backend.glossary import active_glossary
 
 # Keep prompt names aligned with the adapter's official model capability table.
 SUPPORTED_LANGUAGES: dict[str, str] = HYMT2_LANGUAGES
@@ -104,7 +105,7 @@ class HyMt2TranslationProvider:
                 f"without any additional explanation:\n{text}"
             )
         )
-        return [{"role": "user", "content": prompt}]
+        return [{"role": "user", "content": active_glossary.get() + '\n' + prompt if active_glossary.get() else prompt}]
 
     async def translate_batch(self, texts: list[str], source: str, target: str) -> list[ProviderTranslation]:
         results = await asyncio.to_thread(self.manager.chat_batch_sync, [self._messages(text, source, target) for text in texts])

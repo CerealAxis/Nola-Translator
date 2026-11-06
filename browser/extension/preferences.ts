@@ -103,7 +103,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autoSubtitleSites: [], subtitleFont: 'system-ui', subtitleColor: '#ffffff', subtitleBackground: '#000000', subtitleBackgroundOpacity: 0.72, subtitleFollow: true, subtitlePositionX: 50, subtitlePositionY: 95,
   videoLanguage: 'zh', videoDisplay: 'bilingual', pipeline: 'cascade', subtitleSize: 16, subtitleOffset: 5,
 }
-const keys = Object.keys(DEFAULT_PREFERENCES) as (keyof Preferences)[]
+const keys = (Object.keys(DEFAULT_PREFERENCES) as (keyof Preferences)[]).filter(key => key !== 'glossary')
 const numberIn = (value: unknown, min: number, max: number, fallback: number) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.round(Math.min(max, Math.max(min, value))) : fallback
 const subtitleColor = (value: unknown, fallback: string) => typeof value === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value) ? value : fallback

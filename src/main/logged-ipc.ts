@@ -16,7 +16,8 @@ export function loggedHandle(channel: string, listener: Parameters<typeof ipcMai
   ipcMain.handle(channel, async (event, ...args: unknown[]) => {
     const operationId = randomUUID()
     const started = performance.now()
-    const privateArguments = /credential|meeting:(rename|set-notes)|hub:(search|model-card)|app:(agent-workspace|update-settings)|offline:select-model/.test(channel)
+    const privatePayload = /^(glossary|game):/.test(channel)
+    const privateArguments = privatePayload || /credential|meeting:(rename|set-notes)|hub:(search|model-card)|app:(agent-workspace|update-settings)|offline:select-model/.test(channel)
     logDiagnostic('ipc.request', { operationId, channel, windowId: event.sender?.id,
       arguments: privateArguments ? { count: args.length, contents: '[omitted]' } : args })
     try {
@@ -24,7 +25,7 @@ export function loggedHandle(channel: string, listener: Parameters<typeof ipcMai
       const result: unknown = await listener(event, ...args)
       logDiagnostic('ipc.complete', { operationId, channel, durationMs: Math.round(performance.now() - started),
         resultType: result === null ? 'null' : Array.isArray(result) ? 'array' : typeof result,
-        resultCount: Array.isArray(result) ? result.length : undefined, result })
+        resultCount: Array.isArray(result) ? result.length : undefined, result: privatePayload ? '[omitted]' : result })
       return result
     } catch (error) {
       const correlationId = randomUUID()

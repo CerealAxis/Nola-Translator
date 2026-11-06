@@ -3,6 +3,11 @@ import { FeatureActivity, type FeatureLease } from './feature-activity'
 import { ModelGateway } from './model-gateway'
 import { NolaTray } from './tray'
 import { ScreenTranslation } from './screen-translation'
+import { GlossaryStore } from './glossary-store'
+import { ComicTranslation } from './comic'
+import { GameTranslation } from './game-translation'
+import { glossaryMutationSchema, glossaryTestSchema } from '../shared/glossary'
+import { resolveGlossaryTerms } from '../shared/glossary-match'
 import { rememberWorkspaceWindow, registerWorkspaceView } from './workspace-view'
 import { configureIpcSenderValidation, loggedHandle } from './logged-ipc'
 import { modelEngines, supportsSelectedEngine } from '../shared/model-engines'
@@ -36,7 +41,7 @@ import { BackendSupervisor, backendLaunchSpec } from './backend-supervisor'
 import { BackendSession, mapBrowserSessionConfig, mapSessionConfig } from './backend-session'
 import { captionPaint, latencyMeta, LatencySession, latencyWavePoint } from './latency-session'
 import { LatencyWindow } from './latency-window'
-import { BackendScreenOcr, backendAsrHeaders, backendCloudAsr, backendCloudMt, inferBackendModel, openBackendAsrStream, openBackendLanguageModel } from './backend-direct-model'
+import { BackendScreenOcr, backendAsrHeaders, backendMtHeaders, backendCloudAsr, backendCloudMt, inferBackendModel, openBackendAsrStream, openBackendLanguageModel } from './backend-direct-model'
 import { createGatewayLanguageModel } from './gateway-language-model'
 import { supportsRealtimeCompute } from '../shared/compute'
 import { ALIYUN_S2S_SPEECH_LANGUAGES, fallbackTranslationFieldsOf, recognitionFieldsOf, remoteSourceLanguages, translationOptionsFor } from '../shared/cloud-config'
@@ -89,6 +94,8 @@ let stopWorkbench: (() => Promise<void>) | null = null
 let stopOnboardingCard: (() => void) | null = null
 let stopSessions: (() => Promise<void>) | null = null
 let screenTranslation: ScreenTranslation | null = null
+let comicTranslation: ComicTranslation | null = null
+let gameTranslation: GameTranslation | null = null
 let screenOcr: BackendScreenOcr | undefined
 let closeBehavior: () => AppSettings['closeBehavior'] = () => 'tray'
 let requestQuit: () => void = () => app.quit()
@@ -581,7 +588,11 @@ if (!hasSingleInstanceLock) {
           isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
           managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp,
         }),
-        env: { ...resourceEnvironment, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? bundledLlamaDirectory },
+        env: { ...resourceEnvironment, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? bundledLlamaDirectory,
+          NOLA_COMIC_DIR: join(dataRoot, 'comics'),
+          NOLA_COMIC_FONT_PATH: app.isPackaged ? join(process.resourcesPath, 'fonts', 'NotoSansCJK-SC-VF.otf')
+            : join(app.getAppPath(), 'src', 'renderer', 'assets', 'fonts', 'NotoSansCJK-SC-VF.otf'),
+        },
         journalDir: join(dataRoot, 'session-journal'),
       })
       backend.on('exit', info => logDiagnostic('backend.exit', info))
@@ -1184,10 +1195,10 @@ if (!hasSingleInstanceLock) {
         return stream
       },
       textTranslationAvailable: () => browserMtBinding() ? true : browserMtUnavailable(),
-      translateText: async ({ text, sourceLanguage, targetLanguage }, signal) => {
+      translateText: async ({ text, sourceLanguage, targetLanguage, glossary }, signal) => {
         const model = browserMtBinding()
         if (!model || !gateway) throw new Error(browserMtUnavailable())
-        return (await gateway.infer({ kind: 'mt', id: randomUUID(), model, text, source: sourceLanguage, target: targetLanguage }, signal)).text
+        return (await gateway.infer({ kind: 'mt', id: randomUUID(), model, text, source: sourceLanguage, target: targetLanguage, glossary }, signal)).text
       },
       prepareS2s: async model => {
         const current = settings.current()
@@ -1245,7 +1256,9 @@ if (!hasSingleInstanceLock) {
     let gatewayLease: FeatureLease | null = null
     let gatewayStarting: Promise<unknown> | null = null
     const stopGateway = async () => {
+      await gameTranslation?.stop()
       await screenTranslation?.stop()
+      await comicTranslation?.stop()
       const pending = gatewayStarting
       if (browserSessions.usesLocalModels) await browserConnection?.stopCaptionService()
       await Promise.all([sessions, browserSessions].filter(controller => controller.usesLocalModels).map(controller => controller.stopCurrent()))
@@ -1343,8 +1356,61 @@ if (!hasSingleInstanceLock) {
     loggedHandle('model-gateway:stop', async event => { assertFeatureSender(event, true); await stopGateway(); return gateway!.snapshot() })
     loggedHandle('model-gateway:reveal-key', event => { assertFeatureSender(event, true); return gateway!.revealKey() })
     loggedHandle('model-gateway:rotate-key', event => { assertFeatureSender(event, true); return gateway!.rotateKey() })
+    const glossary = new GlossaryStore(join(dataRoot, 'glossary.json'), event => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('glossary:changed', event)
+      void screenTranslation?.refreshGlossary().catch(error => console.error('[screen.glossary]', error))
+      void gameTranslation?.refreshGlossary().catch(error => console.error('[game.glossary]', error))
+    })
+    loggedHandle('glossary:snapshot', event => { assertFeatureSender(event, true); return glossary.snapshot() })
+    loggedHandle('glossary:command', (event, request: unknown) => {
+      assertFeatureSender(event, true)
+      return glossary.command(glossaryMutationSchema.parse(request))
+    })
+    loggedHandle('glossary:test', async (event, request: unknown) => {
+      assertFeatureSender(event, true)
+      return resolveGlossaryTerms(await glossary.snapshot(), glossaryTestSchema.parse(request))
+    })
     let lastScreenStatus = ''
+    comicTranslation = new ComicTranslation({
+      activity,
+      mainDir: __dirname, getMainWindow: () => mainWindow,
+      backend: async () => {
+        await ensureRealtimeBackend()
+        if (!backend?.ready) throw new Error('backendUnavailable')
+        return backend
+      },
+      glossary: () => glossary.snapshot(),
+      prepareRun: async (request, project) => {
+        const current = settings.current()
+        const binding = project.config.model || sceneModelBinding(current, 'mt')
+        const needsMt = request.stage === 'full' || request.stage === 'translate'
+        const provider = needsMt ? backendCloudMt(binding) : undefined
+        const model = needsMt ? provider ?? (binding.startsWith('resource:') ? binding.slice('resource:'.length) : '') : ''
+        if (needsMt) {
+          if (!model || !isModelEnabled(current, 'mt', binding)) throw new Error('modelUnavailable')
+          const catalog = await gateway!.snapshotWithCatalog()
+          if (!catalog.availableModels?.mt?.some(item => item.binding === binding)) throw new Error('modelUnavailable')
+        }
+        let headers: Record<string, string> = {}
+        if (provider === 'custom-mt') {
+          const id = binding.slice('mt-custom:'.length)
+          if (!customModelsOf(current.translation).some(profile => profile.id === id)) throw new Error('modelUnavailable')
+          const translation = translationOptionsFor(current.translation, 'cloud', id)
+          if (!translation) throw new Error('modelUnavailable')
+          headers = backendMtHeaders({ ...translation, apiKey: await credentials.get(customCredentialSlot(id)) })
+        } else if (provider) headers = backendMtHeaders(translationOptionsFor(current.translation, provider))
+        const needsOcr = request.stage === 'full' || request.stage === 'ocr'
+        const mtLease = needsMt ? await gateway!.acquireExternalMt(binding, () => comicTranslation!.stop()) : undefined
+        try {
+          const releaseOcr = needsOcr ? gateway!.acquireOcr(project.config.sourceLanguage) : undefined
+          return { model, headers, release: () => { releaseOcr?.(); mtLease?.release() },
+            ...(needsOcr ? { ocrResourceId: gateway!.snapshot().services.ocr?.model.replace(/^resource:/, '') } : {}) }
+        } catch (error) { mtLease?.release(error); throw error }
+      },
+      publish: event => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('comic:changed', event) },
+    })
     screenTranslation = new ScreenTranslation({
+      glossary: () => glossary.snapshot(),
       mainDir: __dirname, configPath: join(dataRoot, 'screen-translation.json'),
       gatewaySnapshot: () => gateway!.snapshot(),
       getMainWindow: () => mainWindow,
@@ -1357,6 +1423,23 @@ if (!hasSingleInstanceLock) {
         if (lastScreenStatus !== snapshot.status) { lastScreenStatus = snapshot.status; tray?.refresh() }
       },
     })
+    gameTranslation = new GameTranslation({
+      mainDir: __dirname,
+      hookRoot: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'build'), 'game-hook'),
+      configPath: join(dataRoot, 'game-translation.json'), screen: screenTranslation,
+      settings: () => settings.current(), gatewaySnapshot: () => gateway!.snapshot(),
+      inferModel: (request, signal) => gateway!.infer(request, signal),
+      glossary: () => glossary.snapshot(), getMainWindow: () => mainWindow, activity,
+      publish: snapshot => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('game:changed', snapshot) },
+    })
+    loggedHandle('game:snapshot', event => {
+      if (gameTranslation?.ownsOverlay(event.sender.id)) {
+        if (event.senderFrame !== event.sender.mainFrame || !isTrustedRendererUrl(event.sender.getURL(), __dirname)) throw new Error('Access denied')
+      } else assertFeatureSender(event, true)
+      return gameTranslation!.snapshot()
+    })
+    loggedHandle('game:sources', event => { assertFeatureSender(event, true); return gameTranslation!.sources() })
+    loggedHandle('game:command', (event, command: unknown) => { assertFeatureSender(event, true); return gameTranslation!.command(command) })
     createMainWindow(initialSettings.theme)
     disposeAppIpc = registerAppIpc({
       isDevelopmentWindow: isWorkbenchWindow,
@@ -1428,13 +1511,24 @@ if (!hasSingleInstanceLock) {
     })
     createWorkspaceWindow(initialSettings.theme)
     const workbench = registerWorkbench(() => settings.current().theme, __dirname, undefined, {
+      comicReader: comicTranslation,
+      supportsComicImages: profileId => settings.current().translation.customModels?.some(profile => profile.id === profileId && profile.images === true) === true,
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
       workspace: new AgentWorkspace(join(dataRoot, 'local-call')),
       listDirectModels: async () => {
         const snapshot = await gateway!.snapshotWithCatalog()
         return Object.values(snapshot.availableModels ?? {}).flat().map(model => ({ model: model.binding, name: model.name, kind: model.kind }))
       },
-      inferModel: (request, signal, inspect) => gateway!.infer(request, signal, inspect),
+      inferModel: async (request, signal, inspect) => {
+        if (request.kind === 'mt' && !request.image && request.glossary === undefined) {
+          const { terms } = resolveGlossaryTerms(await glossary.snapshot(), {
+            text: request.text ?? '', targetLanguage: request.target ?? 'zh',
+            context: { scenario: 'tool' }, selection: { mode: 'auto' },
+          })
+          request = { ...request, glossary: terms }
+        }
+        return gateway!.infer(request, signal, inspect)
+      },
       acquireLanguageModel: binding => gateway!.acquireLanguageModel(binding),
       releaseDirectModel: async () => {},
     }, activity)
@@ -1489,10 +1583,11 @@ app.on('before-quit', (event) => {
   disposeAppIpc?.()
   disposeRuntimeIpc?.()
   tray?.dispose()
-  screenOcr?.dispose()
   stopOnboardingCard?.()
-  void Promise.allSettled([screenTranslation?.dispose(), gateway?.dispose(), stopWorkbench?.(), stopSessions?.(), browserConnection?.dispose(), disposeOfflineIpc?.()])
-    .then(() => backendInitialization?.then(() => backend?.stop()))
+  void Promise.allSettled([gameTranslation?.dispose(), screenTranslation?.dispose(), comicTranslation?.dispose(), stopWorkbench?.(), stopSessions?.(), browserConnection?.dispose(), disposeOfflineIpc?.()])
+    .then(() => gateway?.dispose())
+    .finally(() => screenOcr?.dispose())
+    .finally(async () => { await backendInitialization?.catch(() => {}); await backend?.stop() })
     .finally(() => engine!.stop())
     .catch((error) => console.error('engine shutdown failed', error))
     .finally(() => app.quit())

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { screenConfigSchema, screenProcessingMode, screenTranslationModel, type ScreenFrame } from '../../../src/shared/screen-translation'
+import { screenConfigSchema, screenProcessingMode, screenTranslationModel, type ScreenFrame, type ScreenOcrResult } from '../../../src/shared/screen-translation'
 import { DEFAULT_SETTINGS, type AppSettings } from '../../../src/shared/settings'
 import type { ModelGatewaySnapshot } from '../../../src/shared/model-gateway'
 import { readFile as readConfig, writeFile as writeConfig } from 'node:fs/promises'
-import { BrowserWindow, globalShortcut } from 'electron'
+import { BrowserWindow, globalShortcut, screen, nativeImage } from 'electron'
 import { EventEmitter } from 'node:events'
 import { FeatureActivity } from '../../../src/main/feature-activity'
 
@@ -12,9 +12,11 @@ vi.mock('electron', () => ({
   app: { on: vi.fn(), removeListener: vi.fn() },
   BrowserWindow: Object.assign(vi.fn(), { getAllWindows: () => [] }),
   desktopCapturer: { getSources: fixture.sources },
+  nativeImage: { createFromDataURL: vi.fn(() => ({ isEmpty: () => true })) },
   globalShortcut: { register: vi.fn(() => true), unregister: vi.fn(), isRegistered: vi.fn(() => false) },
   ipcMain: { handle: (name: string, handler: (...args: unknown[]) => unknown) => fixture.handlers.set(name, handler), removeHandler: (name: string) => fixture.handlers.delete(name) },
-  screen: { getAllDisplays: () => [{ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 }], getDisplayNearestPoint: () => ({ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 }), getCursorScreenPoint: () => ({ x: 10, y: 10 }) }, session: {},
+  screen: { on: vi.fn(), removeListener: vi.fn(), getAllDisplays: () => [{ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 }], getDisplayNearestPoint: () => ({ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 }), getCursorScreenPoint: () => ({ x: 10, y: 10 }) },
+  session: { fromPartition: () => ({ setPermissionRequestHandler: vi.fn(), setPermissionCheckHandler: vi.fn(), setDisplayMediaRequestHandler: vi.fn() }) },
 }))
 vi.mock('node:fs/promises', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
@@ -25,7 +27,10 @@ vi.mock('node:fs/promises', async importOriginal => {
 import { ScreenTranslation } from '../../../src/main/screen-translation'
 
 let services: ScreenTranslation[] = []
-beforeEach(() => { fixture.sources.mockClear(); fixture.handlers.clear() })
+beforeEach(() => {
+  fixture.sources.mockClear(); fixture.handlers.clear()
+  vi.spyOn(ScreenTranslation.prototype, 'showToolbar').mockResolvedValue()
+})
 afterEach(async () => { for (const service of services) await service.dispose(); services = []; vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 function create(prepare = async () => {}, _connected = false, settings: AppSettings = DEFAULT_SETTINGS, getMainWindow?: () => BrowserWindow | null) {
   const activity = new FeatureActivity(), publish = vi.fn()
@@ -66,11 +71,11 @@ it.each(['start', 'resume'] as const)('refuses S2S inherited from the gateway be
   expect(activity.has('screen-translation')).toBe(false)
 })
 
-it('discovers only desktop displays without requesting previews', async () => {
+it('discovers desktop displays and windows without requesting previews', async () => {
   const { service } = create()
   fixture.sources.mockResolvedValueOnce([{ id: 'screen:1:0', name: 'Display', display_id: '1', thumbnail: { toDataURL: () => '' } }])
   expect((await service.sources()).map(source => source.id)).toEqual(['screen:1:0'])
-  expect(fixture.sources).toHaveBeenCalledWith({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } })
+  expect(fixture.sources).toHaveBeenCalledWith({ types: ['screen', 'window'], thumbnailSize: { width: 0, height: 0 } })
 })
 
 it('does not apply screenshot protection to unrelated application windows during startup', async () => {
@@ -107,6 +112,17 @@ it('restores previous shortcuts when the new key cannot be registered', async ()
   expect(service.snapshot().config).toEqual(previous)
   expect(service.snapshot().shortcutError).toBe(true)
   expect(globalShortcut.register).toHaveBeenLastCalledWith(previous.stopShortcut, expect.any(Function))
+})
+
+it('restores the active configuration and shortcuts when saving settings fails', async () => {
+  const { service, publish } = create()
+  await service.configure(screenConfigSchema.parse({ sourceId: 'screen:1:0', fontSize: 26 }))
+  const previous = structuredClone(service.snapshot().config)
+  vi.mocked(writeConfig).mockRejectedValueOnce(new Error('diskFull'))
+  await expect(service.configure({ ...previous, targetLanguage: 'ja', toggleShortcut: 'Control+Shift+F7' })).rejects.toThrow('diskFull')
+  expect(service.snapshot().config).toEqual(previous)
+  expect(publish).toHaveBeenLastCalledWith(expect.objectContaining({ config: previous }))
+  expect(globalShortcut.register).toHaveBeenCalledWith(previous.toggleShortcut, expect.any(Function))
 })
 
 it('suspends shortcuts while recording and restores them if the renderer crashes', async () => {
@@ -217,14 +233,16 @@ it('keeps one error identity through cleanup and assigns a new one on retry', as
   expect(service.snapshot().errorId).not.toBe(first)
 })
 
-it('reports missing regions after OCR is ready and releases the OCR lease', async () => {
+it('opens region editing instead of failing when fixed capture has no regions', async () => {
   const release = vi.fn()
   const { service, activity } = create()
   const options = service as unknown as { options: { prepareOcr: () => Promise<() => void> } }
   options.options.prepareOcr = vi.fn(async () => release)
-  await service.configure(screenConfigSchema.parse({ regions: [], model: 'cloud:google' }))
+  const edit = vi.spyOn(service, 'edit').mockImplementation(async () => { await service.pause() })
+  await service.configure(screenConfigSchema.parse({ captureMode: 'regions', regions: [], model: 'cloud:google' }))
   await service.start()
-  expect(service.snapshot()).toMatchObject({ status: 'error', error: 'regionsMissing' })
+  expect(edit).toHaveBeenCalledOnce()
+  expect(service.snapshot().error).toBeUndefined()
   await vi.waitFor(() => expect(release).toHaveBeenCalledOnce())
   expect(activity.has('screen-translation')).toBe(false)
 })
@@ -234,9 +252,10 @@ it('skips transient native OCR busy responses instead of failing the recovered s
   const { service } = create(undefined, true)
   await Promise.resolve(); await Promise.resolve()
   const snapshot = service.snapshot(), config = screenConfigSchema.parse(snapshot.config)
-  const internal = service as unknown as { state: typeof snapshot; pipeline: { update: () => void; stop: () => void; hideRegion: () => void }; frame(frame: ScreenFrame): Promise<void> }
+  const internal = service as unknown as { state: typeof snapshot; captureRegions: typeof config.regions; pipeline: { update: () => void; stop: () => void; observeRegion: () => void; verifyVisual: () => void }; frame(frame: ScreenFrame): Promise<void> }
+  internal.captureRegions = config.regions
   internal.state.status = 'running'
-  internal.pipeline = { update: vi.fn(), stop: vi.fn(), hideRegion: vi.fn() }
+  internal.pipeline = { update: vi.fn(), stop: vi.fn(), observeRegion: vi.fn(), verifyVisual: vi.fn() }
   await internal.frame({ sessionId: snapshot.sessionId, epoch: snapshot.epoch, width: 800, height: 600,
     regions: [{ regionId: config.regions[0].id, image: 'data:image/png;base64,abcd', hash: 'new-frame' }] })
   expect(service.snapshot().status).toBe('running')
@@ -395,4 +414,139 @@ it('requires confirmation before using rectangles migrated from a legacy window 
   expect(edit).toHaveBeenCalledOnce()
   expect(service.snapshot().config.reviewRequired).toBe(true)
   await expect(service.savePreset('Unchecked')).rejects.toThrow('invalidConfig')
+})
+
+it('invalidates visible text during slow OCR and processes only the latest pending region image', async () => {
+  const { service } = create()
+  await (service as unknown as { ready: Promise<void> }).ready
+  const snapshot = service.snapshot()
+  const pipeline = { update: vi.fn(), stop: vi.fn(), observeRegion: vi.fn(), verifyVisual: vi.fn() }
+  const results: Array<(value: { blocks: []; width: number; height: number }) => void> = []
+  const inferOcr = vi.fn(() => new Promise<{ blocks: []; width: number; height: number }>(resolve => results.push(resolve)))
+  const internal = service as unknown as { state: typeof snapshot; captureRegions: typeof snapshot.config.regions; pipeline: typeof pipeline; options: { inferOcr: typeof inferOcr }; frame(frame: ScreenFrame): Promise<void> }
+  internal.state.status = 'running'; internal.captureRegions = snapshot.config.regions; internal.pipeline = pipeline; internal.options.inferOcr = inferOcr
+  const regionId = snapshot.config.regions[0].id
+  const frame = (hash: string, image = true): ScreenFrame => ({ sessionId: snapshot.sessionId, epoch: snapshot.epoch, width: 800, height: 600,
+    observed: [{ regionId, hash }], regions: image ? [{ regionId, hash, image: `data:image/png;base64,${hash}` }] : [] })
+  const first = internal.frame(frame('old'))
+  await vi.waitFor(() => expect(inferOcr).toHaveBeenCalledOnce())
+  await internal.frame(frame('middle'))
+  await internal.frame(frame('latest', false))
+  expect(pipeline.observeRegion).toHaveBeenCalledWith(regionId, expect.any(Set))
+  results[0]({ blocks: [], width: 800, height: 600 }); await first
+  await Promise.resolve()
+  expect(pipeline.update).not.toHaveBeenCalled()
+  expect(inferOcr).toHaveBeenCalledOnce()
+  const latest = internal.frame(frame('latest'))
+  await vi.waitFor(() => expect(inferOcr).toHaveBeenCalledTimes(2))
+  results[1]({ blocks: [], width: 800, height: 600 }); await latest
+  expect(pipeline.update).toHaveBeenCalledOnce()
+})
+
+it('requires current glyph verification before publishing OCR completed over an animated background', async () => {
+  const { service } = create()
+  await (service as unknown as { ready: Promise<void> }).ready
+  const initial = service.snapshot(), regionId = initial.config.regions[0].id
+  let finish!: (value: ScreenOcrResult) => void
+  const inferOcr = vi.fn(() => new Promise<ScreenOcrResult>(resolve => { finish = resolve }))
+  const internal = service as unknown as { state: typeof initial; captureRegions: typeof initial.config.regions; resetPipeline(): void; options: { inferOcr: typeof inferOcr }; frame(frame: ScreenFrame): Promise<void> }
+  internal.state.status = 'running'; internal.captureRegions = initial.config.regions; internal.options.inferOcr = inferOcr; internal.resetPipeline()
+  const bitmap = Buffer.alloc(160 * 80 * 4)
+  for (let y = 0; y < 80; y++) for (let x = 0; x < 160; x++) bitmap.set(y >= 20 && y < 40 && x >= 20 && x < 24 ? [255, 255, 255, 255] : [20, 20, 100, 255], (y * 160 + x) * 4)
+  vi.mocked(nativeImage.createFromDataURL).mockReturnValueOnce({ isEmpty: () => false, getSize: () => ({ width: 160, height: 80 }), toBitmap: () => bitmap } as unknown as ReturnType<typeof nativeImage.createFromDataURL>)
+  const snapshot = service.snapshot()
+  const frame = (hash: string, image = false, checked: ScreenFrame['checked'] = []): ScreenFrame => ({ sessionId: snapshot.sessionId, epoch: snapshot.epoch, width: 800, height: 600,
+    observed: [{ regionId, hash }], checked, regions: image ? [{ regionId, hash, image: `data:image/png;base64,${hash}` }] : [] })
+  const work = internal.frame(frame('first', true))
+  await vi.waitFor(() => expect(inferOcr).toHaveBeenCalledOnce())
+  for (let index = 0; index < 12; index++) await internal.frame(frame(`background-${index}`))
+  finish({ width: 160, height: 80, blocks: [{ id: 'text', text: '100', confidence: 1, quad: [[20, 20], [40, 20], [40, 40], [20, 40]] }] })
+  await work
+  expect(service.snapshot().blocks[0].hidden).toBe(true)
+  const probe = service.snapshot().visualProbes![0]
+  expect(probe).toBeDefined()
+  await internal.frame(frame('background-13', false, [{ id: probe.id, matches: true }]))
+  await vi.waitFor(() => expect(service.snapshot().blocks[0]).toMatchObject({ status: 'ready', hidden: false, translation: 'translated', appearancePending: true }))
+  await internal.frame(frame('changed-glyph', false, [{ id: probe.id, matches: false }]))
+  expect(service.snapshot().blocks[0].hidden).toBe(true)
+  await service.stop()
+  await internal.frame(frame('late', false, [{ id: probe.id, matches: true }]))
+  expect(service.snapshot().blocks).toEqual([])
+})
+
+it('starts with cursor capture for new installs while migrating existing rectangles to fixed mode', async () => {
+  expect(screenConfigSchema.parse({}).captureMode).toBe('cursor')
+  const { service } = create()
+  await (service as unknown as { ready: Promise<void> }).ready
+  expect(service.snapshot().config.captureMode).toBe('regions')
+})
+
+it('switches cursor capture across different-DPI displays, fences old frames and retains the OCR reservation', async () => {
+  const firstDisplay = screen.getAllDisplays()[0]
+  const secondDisplay = { ...firstDisplay, id: 2, bounds: { x: -1280, y: -100, width: 1280, height: 720 }, scaleFactor: 1.5 }
+  let point = { x: 600, y: 400 }
+  vi.spyOn(screen, 'getAllDisplays').mockReturnValue([firstDisplay, secondDisplay])
+  vi.spyOn(screen, 'getDisplayNearestPoint').mockImplementation(() => point.x < 0 ? secondDisplay : firstDisplay)
+  vi.spyOn(screen, 'getCursorScreenPoint').mockImplementation(() => point)
+  const sources = [firstDisplay, secondDisplay].map(display => ({ id: `screen:${display.id}:0`, name: `Display ${display.id}`, display_id: String(display.id), thumbnail: { toDataURL: () => '' } }))
+  fixture.sources.mockResolvedValue(sources)
+  const prepare = vi.fn(async () => {})
+  const { service, activity } = create(prepare)
+  const internal = service as unknown as { openWindow(): BrowserWindow; updateCursorRegion(): void; frame(frame: ScreenFrame): Promise<void>; capture?: BrowserWindow; bounds: typeof firstDisplay.bounds }
+  vi.spyOn(internal, 'openWindow').mockImplementation(() => {
+    let destroyed = false
+    return { destroy: () => { destroyed = true }, isDestroyed: () => destroyed, hide: vi.fn(), showInactive: vi.fn(),
+      webContents: Object.assign(new EventEmitter(), { isDestroyed: () => destroyed, isLoadingMainFrame: () => true }) } as unknown as BrowserWindow
+  })
+  await service.configure(screenConfigSchema.parse({ captureMode: 'cursor' }))
+  await service.start()
+  const before = service.snapshot(), previousCapture = internal.capture
+  expect(before.config.display).toMatchObject({ id: '1', scale: 1 })
+  expect(before.captureRegions![0].width * firstDisplay.bounds.width).toBe(480)
+  point = { x: -900, y: 300 }; internal.updateCursorRegion()
+  await vi.waitFor(() => expect(service.snapshot().status).toBe('running'))
+  const after = service.snapshot()
+  expect(after.config).toMatchObject({ sourceId: 'screen:2:0', display: { id: '2', width: 1280, height: 720, scale: 1.5 } })
+  expect(internal.bounds).toEqual(secondDisplay.bounds)
+  expect(after.captureRegions![0].width * secondDisplay.bounds.width).toBe(480)
+  expect(after.captureRegions![0].height * secondDisplay.bounds.height).toBeCloseTo(220)
+  expect(after.epoch).toBeGreaterThan(before.epoch)
+  expect(previousCapture?.isDestroyed()).toBe(true)
+  expect(internal.capture).not.toBe(previousCapture)
+  expect(prepare).toHaveBeenCalledOnce()
+  expect(activity.has('screen-translation')).toBe(true)
+  await internal.frame({ sessionId: before.sessionId, epoch: before.epoch, width: 1920, height: 1080, regions: [] })
+  expect(service.snapshot().epoch).toBe(after.epoch)
+  expect(service.snapshot().status).toBe('running')
+  let finishSources!: (value: typeof sources) => void
+  fixture.sources.mockImplementationOnce(() => new Promise(resolve => { finishSources = resolve }))
+  point = { x: 600, y: 400 }; internal.updateCursorRegion()
+  await vi.waitFor(() => expect(finishSources).toBeTypeOf('function'))
+  await service.stop()
+  finishSources(sources)
+  await vi.waitFor(() => expect((internal as unknown as { switchingDisplay: boolean }).switchingDisplay).toBe(false))
+  expect(service.snapshot().status).toBe('ready')
+  expect(internal.capture).toBeUndefined()
+  expect(service.snapshot().config.sourceId).toBe('screen:2:0')
+  expect(activity.has('screen-translation')).toBe(false)
+  fixture.sources.mockResolvedValue(sources.slice(0, 1))
+})
+
+it('does not reuse persisted live window handles after restarting', async () => {
+  vi.mocked(readConfig).mockResolvedValueOnce(JSON.stringify({ version: 2, config: { captureMode: 'window', sourceId: 'window:123:0', windowIdentity: 'old-process' } }))
+  const { service } = create()
+  await (service as unknown as { ready: Promise<void> }).ready
+  expect(service.snapshot().config).toMatchObject({ captureMode: 'window', sourceId: '', windowIdentity: '' })
+})
+
+it('keeps the toolbar IPC sender alive while changing capture settings', async () => {
+  const { service } = create()
+  await (service as unknown as { ready: Promise<void> }).ready
+  const toolbar = { destroy: vi.fn(), isDestroyed: () => false, webContents: { isDestroyed: () => false, isLoadingMainFrame: () => true } }
+  const internal = service as unknown as { toolbar: typeof toolbar }
+  internal.toolbar = toolbar
+  await service.configure({ ...service.snapshot().config, strategy: 'speed' })
+  expect(toolbar.destroy).not.toHaveBeenCalled()
+  expect(internal.toolbar).toBe(toolbar)
+  expect(service.snapshot().config.strategy).toBe('speed')
 })

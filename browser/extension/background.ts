@@ -4,6 +4,8 @@ import { setupProviderRuntime } from './provider-runtime'
 import { setupContextMenus } from './context-menus'
 import { setupSpeechRuntime } from './speech-runtime'
 import { setupTabAudioRuntime } from './tab-audio-runtime'
+import { extensionGlossary, hasApplicableGlossary } from './glossary-store'
+import { loadPreferences } from './preferences'
 
 setupProviderRuntime()
 setupContextMenus()
@@ -74,19 +76,40 @@ chrome.runtime.onConnect.addListener(content => {
     : Promise.resolve(true)
   let native: ChromePort | null = null
   let closed = false
+  let directActive = false, directTarget = ''
+  const glossaryChanged = page ? extensionGlossary.onChanged(() => {
+    if (!directActive || !content.sender?.url) return
+    void extensionGlossary.snapshot().then(document => {
+      if (directActive && hasApplicableGlossary(document, directTarget, content.sender!.url!)) {
+        directActive = false
+        content.postMessage({ type: 'error', id: '*', code: 'browserGlossaryModeUnsupported', message: '' })
+        const previous = native; native = null; previous?.disconnect()
+      }
+    }).catch(() => {})
+  }) : () => {}
   content.onMessage.addListener(message => {
-    void allowed.then(permitted => {
+    void allowed.then(async permitted => {
       if (!permitted) { content.disconnect(); return }
       const request = browserRequestSchema.safeParse(message)
       if (!request.success || closed) return
       if (popup && request.data.type !== 'hello') return
       try {
+        if (request.data.type === 'start' && content.sender?.url) {
+          directTarget = request.data.targetLanguage ?? (await loadPreferences()).videoLanguage
+          if (hasApplicableGlossary(await extensionGlossary.snapshot(), directTarget, content.sender.url)) {
+            content.postMessage({ type: 'error', id: request.data.id, code: 'browserGlossaryModeUnsupported', message: '' }); return
+          }
+          if (closed) return
+          directActive = true
+        } else if (request.data.type === 'stop') directActive = false
         if (!native) {
-          native = chrome.runtime.connectNative(BROWSER_HOST_NAME)
-          native.onMessage.addListener(response => { if (!closed) content.postMessage(response) })
-          native.onDisconnect.addListener(() => {
+          const connected = chrome.runtime.connectNative(BROWSER_HOST_NAME)
+          native = connected
+          connected.onMessage.addListener(response => { if (!closed && native === connected) content.postMessage(response) })
+          connected.onDisconnect.addListener(() => {
             // Reading lastError consumes Chrome's asynchronous diagnostic.
             const diagnostic = chrome.runtime.lastError?.message
+            if (native !== connected) return
             native = null
             if (!closed) content.postMessage({ type: 'error', id: '*', code: 'appUnavailable', message: diagnostic ?? '' })
           })
@@ -97,5 +120,5 @@ chrome.runtime.onConnect.addListener(content => {
       }
     })
   })
-  content.onDisconnect.addListener(() => { pages.delete(content); closed = true; native?.disconnect(); native = null })
+  content.onDisconnect.addListener(() => { pages.delete(content); closed = true; directActive = false; glossaryChanged(); native?.disconnect(); native = null })
 })

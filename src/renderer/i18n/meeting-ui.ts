@@ -1,4 +1,6 @@
 export const meetingZh = {
+  statusFailed: '无法确认会议口译状态，请停止后重试。',
+  pauseFailed: '无法暂停或继续会议口译，请重试。',
   languageDirectionHint: '双方语言也用于译音输出，因此需要明确指定；清单由当前识别、翻译及语音合成模型共同决定。',
   navTitle: '会议口译',
   singlePageHint: "持续翻译双方发言，按需要开启一个或两个方向。",
@@ -95,6 +97,8 @@ export const meetingZh = {
 type MeetingCopy = typeof meetingZh
 
 export const meetingEn: MeetingCopy = {
+  statusFailed: 'Could not confirm the interpretation status. Stop interpretation and try again.',
+  pauseFailed: 'Could not pause or resume interpretation. Try again.',
   languageDirectionHint: 'Both languages are also speech output targets, so choose explicit languages. Choices follow the current recognition, translation and speech models.',
   navTitle: 'Meeting',
   singlePageHint: "Interpret either or both directions as you need.",
@@ -189,6 +193,8 @@ export const meetingEn: MeetingCopy = {
 }
 
 export const meetingTw: MeetingCopy = {
+  statusFailed: '無法確認會議口譯狀態，請停止後再試一次。',
+  pauseFailed: '無法暫停或繼續會議口譯，請再試一次。',
   languageDirectionHint: '雙方語言也用於譯音輸出，因此需要明確指定；清單由目前辨識、翻譯及語音合成模型共同決定。',
   navTitle: '會議口譯',
   singlePageHint: "依需要開啟單向或雙向即時口譯。",
@@ -284,6 +290,8 @@ export const meetingTw: MeetingCopy = {
 
 export const meetingHk: MeetingCopy = {
   ...meetingTw,
+  statusFailed: '未能確認會議傳譯狀態，請停止後重試。',
+  pauseFailed: '未能暫停或繼續會議傳譯，請重試。',
   singlePageHint: "按需要開啟單向或雙向即時傳譯。",
   testAudio: "測試音訊",
   conversation: "即時對話",
@@ -343,6 +351,8 @@ export const meetingHk: MeetingCopy = {
 }
 
 export const meetingJa: MeetingCopy = {
+  statusFailed: '会議通訳の状態を確認できませんでした。停止して再試行してください。',
+  pauseFailed: '会議通訳を一時停止または再開できませんでした。再試行してください。',
   languageDirectionHint: '双方の言語は翻訳音声の出力先にもなるため、明示的に選択してください。選択肢は現在の認識・翻訳・音声合成モデルに応じて変わります。',
   navTitle: '会議通訳',
   singlePageHint: "必要に応じて片方向または双方向の通訳を有効にします。",
@@ -437,6 +447,8 @@ export const meetingJa: MeetingCopy = {
 }
 
 export const meetingKo: MeetingCopy = {
+  statusFailed: '회의 통역 상태를 확인하지 못했습니다. 중지한 후 다시 시도하세요.',
+  pauseFailed: '회의 통역을 일시 중지하거나 재개하지 못했습니다. 다시 시도하세요.',
   languageDirectionHint: '양쪽 언어는 번역 음성의 출력 언어로도 사용되므로 명확히 선택해야 합니다. 목록은 현재 인식, 번역 및 음성 합성 모델에 따라 달라집니다.',
   navTitle: '회의 통역',
   singlePageHint: "필요에 따라 한 방향 또는 양방향 통역을 켜세요.",

@@ -16,6 +16,7 @@ from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, getproxies, proxy_bypass, urlopen
 
 from .base import ProviderTranslation, revision_context
+from ..backend.glossary import active_glossary
 
 
 JsonRequester = Callable[[str, object, dict[str, str]], object]
@@ -354,6 +355,9 @@ class _BudgetedChatProvider(_NetworkTransport):
 
     def _plan_chunks(self, text: str, system: str) -> list[str]:
         """Split the source text so each request fits the window."""
+        glossary = getattr(self, "glossary_instructions", "") + active_glossary.get()
+        if glossary and _estimate_tokens(glossary) > self.context_window // 5:
+            raise ValueError("glossaryBudgetExceeded")
         budget = self._input_token_budget(system)
         context = revision_context(text)
         if context and _estimate_tokens(text) > budget:
@@ -387,7 +391,7 @@ class _BudgetedChatProvider(_NetworkTransport):
         return min(max(chunks, 1), MAX_CHUNKS) * HTTP_REQUEST_TIMEOUT_SECONDS
 
     async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
-        system = self._system_prompt(source, target)
+        system = self._system_prompt(source, target) + getattr(self, "glossary_instructions", "") + active_glossary.get()
         chunks = self._plan_chunks(text, system)
         if len(chunks) > MAX_CHUNKS:
             raise RuntimeError(
@@ -410,7 +414,7 @@ class _BudgetedChatProvider(_NetworkTransport):
                                on_text: Callable[[str], None]) -> ProviderTranslation:
         if not self.supports_streaming or self.requester is not _post_json:
             return await self.translate(text, source, target)
-        system = self._system_prompt(source, target)
+        system = self._system_prompt(source, target) + getattr(self, "glossary_instructions", "") + active_glossary.get()
         chunks = self._plan_chunks(text, system)
         if len(chunks) > MAX_CHUNKS:
             raise RuntimeError(f"{self.label}的原文过长，超过上限 {MAX_CHUNKS} 段")

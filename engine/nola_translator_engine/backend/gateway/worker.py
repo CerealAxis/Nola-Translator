@@ -200,6 +200,8 @@ class LocalModelWorker:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            # PCM/base64 responses share the desktop worker's 40 MiB line budget.
+            limit=40 * 1024 * 1024,
             cwd=str(Path(sys.executable).resolve().parent),
             env=_child_env(self._model_dir),
             creationflags=creationflags,

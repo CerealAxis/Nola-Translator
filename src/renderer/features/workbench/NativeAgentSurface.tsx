@@ -5,6 +5,8 @@ import { Archive, BrainCircuit, ChevronLeft, ChevronRight, Ellipsis, Minus, Pane
 import { Composer, ComposerActions, ComposerAttachButton, ComposerAttachments, ComposerBar, ComposerContext, ComposerInput, ComposerMenu, ComposerMenuItem, ComposerModelItem, ComposerModelTrigger, ComposerSend, ComposerToolbar, ComposerVoice, ComposerVoiceButton } from '@/components/assistant-ui/native/composer'
 import { ThreadList } from '@/components/assistant-ui/native/thread-list'
 import { NativeAgentSettings } from './NativeAgentSettings'
+import { NativeComicSelector } from './NativeComicSelector'
+import { cancelComicReads } from './language-model-transport'
 import { DaySeparator } from '@/components/assistant-ui/native/day-separator'
 import { ContextBreakdown } from '@/components/assistant-ui/native/context-breakdown'
 import { ReasoningEffort } from '@/components/assistant-ui/native/reasoning-effort'
@@ -74,6 +76,14 @@ export function NativeAgentSurface(props: NativeAgentSurfaceProps) {
   const aui = useAui()
   const items = useAuiState(s => s.threads.threadItems)
   const activeId = useAuiState(s => s.threads.mainThreadId)
+  const previousThread = useRef(activeId)
+  useEffect(() => {
+    if (previousThread.current === activeId) return
+    previousThread.current = activeId
+    cancelComicReads()
+    if (props.config.comicProjectId) props.onChange({ ...props.config, comicProjectId: null })
+  }, [activeId, props.config.comicProjectId])
+  useEffect(() => () => cancelComicReads(), [])
   const title = useAuiState(s => s.threadListItem.title)
   const first = useAuiState(s => s.thread.messages.find(message => message.role === 'user'))
   const remoteId = useAuiState(s => s.threadListItem.remoteId)
@@ -494,6 +504,7 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
         <ComposerAttachButton aria-label={t('workbench.addAttachment')} disabled={props.config.kind === 'tts' || props.config.kind === 'mt' && !props.config.images} onClick={() => inputRef.current?.click()} />
         <ComposerModelTrigger data-menu-anchor="models" model={selected?.name ?? t('workbench.noModels')} open={menu === 'models'} onClick={() => setMenu(menu === 'models' ? '' : 'models')} />
         {props.config.kind === 'llm' && <ComposerModelTrigger data-menu-anchor="effort" model={t(props.config.effort === 'auto' ? 'modelsSettingsUi.default' : `workbench.${props.config.effort as 'low' | 'medium' | 'high'}`)} open={menu === 'effort'} onClick={() => setMenu(menu === 'effort' ? '' : 'effort')} />}
+        {props.config.kind === 'llm' && <NativeComicSelector value={props.config.comicProjectId ?? null} disabled={preparing || running} onChange={comicProjectId => { cancelComicReads(); if (comicProjectId === null) props.onChange({ ...props.config, comicProjectId }); else pick({ comicProjectId }) }} />}
         {props.config.kind === 'mt' && <ComposerModelTrigger data-menu-anchor="source" model={props.config.source === 'auto' ? t('workbench.auto') : languageName(props.config.source, language)} open={menu === 'source'} onClick={() => setMenu(menu === 'source' ? '' : 'source')} />}
         {(props.config.kind === 'asr' || props.config.kind === 'mt') && <ComposerModelTrigger data-menu-anchor="language" model={languageName(props.config.kind === 'mt' ? props.config.target : props.config.source, language)} open={menu === 'language'} onClick={() => setMenu(menu === 'language' ? '' : 'language')} />}
         {props.config.kind === 'tts' && <ComposerModelTrigger data-menu-anchor="voice" model={props.config.voice || t('workbench.voice')} open={menu === 'voice'} onClick={chooseVoices} />}

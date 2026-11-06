@@ -91,7 +91,7 @@ describe('provider execution', () => {
   it('interpolates language prompts and adds matching terminology', () => {
     const prompt = buildTranslationPrompt('API', 'en', 'zh', '{{sourceLanguage}} -> {{targetLanguage}}: {{text}}', [{ source: 'API', target: '接口' }])
     expect(prompt).toContain('en -> zh: API')
-    expect(prompt).toContain('["API","接口"]')
+    expect(prompt).toContain('"source":"API","target":"接口","mode":"fixed"')
   })
   it('normalizes permission and authentication errors without echoing credentials', async () => {
     vi.mocked(chrome.permissions.contains).mockResolvedValueOnce(false)

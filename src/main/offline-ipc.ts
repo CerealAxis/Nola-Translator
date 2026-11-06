@@ -101,7 +101,10 @@ export function registerOfflineIpc(manager: OfflineManager, getWindow: () => Bro
   handle(channels[5], () => manager.cancel())
   handle(channels[6], async () => {
     const task = manager.snapshot()
-    if (task.state === 'completed' && task.outputPath) await shell.openPath(extname(task.outputPath).toLowerCase() === '.zip' ? dirname(task.outputPath) : task.outputPath)
+    if (task.state === 'completed' && task.outputPath) {
+      const error = await shell.openPath(extname(task.outputPath).toLowerCase() === '.zip' ? dirname(task.outputPath) : task.outputPath)
+      if (error) throw new Error('FILE_NOT_ACCESSIBLE')
+    }
   })
   return async () => { for (const channel of channels) ipcMain.removeHandler(channel); await manager.dispose() }
 }

@@ -1,9 +1,11 @@
 import { expect, it, vi } from 'vitest'
+import { migrateLegacyGlossary } from './glossary-store'
 
 vi.mock('./provider-runtime', () => ({ setupProviderRuntime: vi.fn() }))
 vi.mock('./context-menus', () => ({ setupContextMenus: vi.fn() }))
 vi.mock('./speech-runtime', () => ({ setupSpeechRuntime: vi.fn() }))
 vi.mock('./tab-audio-runtime', () => ({ setupTabAudioRuntime: vi.fn() }))
+vi.mock('./glossary-store', async original => ({ ...await original<typeof import('./glossary-store')>(), extensionGlossary: { snapshot: vi.fn(), onChanged: vi.fn(() => () => {}) } }))
 
 it('allows diagnostics from a settings section without trusting another extension page', async () => {
   const event = () => ({ addListener: vi.fn() })
@@ -91,4 +93,19 @@ it('broadcasts permission changes without relying on revoked URL metadata and ch
   contains.mockResolvedValue(true)
   message({ type: 'checkSiteAccess' }, { id: 'nola', frameId: 0, tab: { id: 2 }, url: 'https://other.test/' }, reply)
   await vi.waitFor(() => expect(reply).toHaveBeenCalledWith({ allowed: true }))
+})
+
+it('keeps private extension terms out of a direct desktop audio session and provides an actionable mode error', async () => {
+  vi.resetModules()
+  const glossary = await import('./glossary-store')
+  vi.mocked(glossary.extensionGlossary.snapshot).mockResolvedValue(migrateLegacyGlossary([{ source: 'Nola', target: '诺拉', sites: 'video.test' }], 'Terms'))
+  const event = () => ({ addListener: vi.fn() })
+  const runtime = { onInstalled: event(), onStartup: event(), onMessage: event(), onConnect: event(), getURL: (path: string) => `chrome-extension://nola/${path}`, connectNative: vi.fn() }
+  vi.stubGlobal('chrome', { runtime, permissions: { onRemoved: event(), contains: vi.fn(async () => true) } })
+  await import('./background')
+  const port = { name: 'nola-captions', sender: { url: 'https://video.test/watch', frameId: 0, tab: { id: 1 } }, onMessage: event(), onDisconnect: event(), disconnect: vi.fn(), postMessage: vi.fn() }
+  runtime.onConnect.addListener.mock.calls[0][0](port)
+  port.onMessage.addListener.mock.calls[0][0]({ type: 'start', id: 'start', source: 'tab', streamId: 'stream', epoch: 0, videoTimeMs: 0, playbackRate: 1, targetLanguage: 'zh' })
+  await vi.waitFor(() => expect(port.postMessage).toHaveBeenCalledWith({ type: 'error', id: 'start', code: 'browserGlossaryModeUnsupported', message: '' }))
+  expect(runtime.connectNative).not.toHaveBeenCalled()
 })

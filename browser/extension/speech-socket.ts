@@ -33,8 +33,15 @@ export async function openAliyunSpeech(provider: ProviderConnection, capability:
     action: { type: 'modifyHeaders', requestHeaders: [{ header: 'Authorization', operation: 'set', value: `Bearer ${provider.apiKey}` }] },
     condition: { regexFilter: `^${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, resourceTypes: ['websocket'], initiatorDomains: [new URL(chrome.runtime.getURL('')).hostname] },
   }] }) } catch { unlock(); throw new ProviderError('providerPermission') }
+  if (signal.aborted) {
+    try { await dnr.updateSessionRules({ removeRuleIds: [ruleId] }) } finally { unlock() }
+    signal.throwIfAborted()
+  }
   let socket: WebSocket
-  try { socket = new WebSocket(url) } catch { await dnr.updateSessionRules({ removeRuleIds: [ruleId] }); unlock(); throw new ProviderError('providerNetwork') }
+  try { socket = new WebSocket(url) } catch {
+    try { await dnr.updateSessionRules({ removeRuleIds: [ruleId] }) } finally { unlock() }
+    throw new ProviderError('providerNetwork')
+  }
   let closed = false, ready = false
   let finishResolve: (() => void) | undefined, finishReject: ((error: Error) => void) | undefined
   const removeRule = () => dnr.updateSessionRules({ removeRuleIds: [ruleId] }).catch(() => {}).finally(unlock)
@@ -43,13 +50,17 @@ export async function openAliyunSpeech(provider: ProviderConnection, capability:
   signal.addEventListener('abort', abort, { once: true })
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => { reject(new ProviderError('providerTimeout')); close() }, 20000)
-    const fail = () => { clearTimeout(timeout); reject(new ProviderError('providerNetwork')); if (ready) emit({ type: 'error', code: 'providerNetwork' }); close() }
-    socket.onerror = fail
+    const fail = (code = 'providerNetwork') => { clearTimeout(timeout); reject(new ProviderError(code)); if (ready) emit({ type: 'error', code }); close() }
+    socket.onerror = () => fail()
     socket.onopen = () => { void removeRule() }
     socket.onclose = () => { if (!closed) fail() }
     socket.onmessage = event => {
       let value: Record<string, unknown>
-      try { if (typeof event.data !== 'string' || event.data.length > 1024 * 1024) throw new Error(); value = JSON.parse(event.data) } catch { fail(); return }
+      try {
+        if (typeof event.data !== 'string' || event.data.length > 1024 * 1024) throw new Error()
+        value = JSON.parse(event.data)
+        if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error()
+      } catch { fail('providerInvalid'); return }
       if (value.type === 'error' || value.type === 'conversation.item.input_audio_transcription.failed') { clearTimeout(timeout); reject(new ProviderError('providerRequestFailed')); emit({ type: 'error', code: 'providerRequestFailed' }); close(); return }
       if (value.type === 'session.created') {
         const session = capability === 'asr'

@@ -3,9 +3,11 @@ import { browserJa, browserKo, browserZhHK, browserZhTW } from './locale-regions
 import { resolveUiLanguage } from '../../src/shared/languages'
 import type { UiLanguage, UiLanguagePreference } from '../../src/shared/languages'
 import { extensionCopy, extensionLocales } from './extension-copy'
+import { suiteLocales } from '../../src/renderer/i18n/translation-suite-ui'
 type SharedBrowserKey = keyof typeof browserZh
 type ExtensionKey = keyof typeof extensionCopy
-export type BrowserKey = SharedBrowserKey | ExtensionKey
+type SuiteKey = `suite.${keyof typeof suiteLocales.en}`
+export type BrowserKey = SharedBrowserKey | ExtensionKey | SuiteKey
 /**
  * An unrecognised code remains in store diagnostics while the UI uses actionable fallback copy.
  */
@@ -13,6 +15,12 @@ export type BrowserTextKey = BrowserKey | `unknown:${string}`
 const UNKNOWN_PREFIX = 'unknown:'
 // Codes that are not dictionary keys of their own resolve to the closest existing message.
 const ERROR_ALIASES: Record<string, BrowserKey> = {
+  glossaryChanged: 'suite.glossaryChanged',
+  glossaryPlaceholderFailed: 'suite.placeholderFailed',
+  glossaryBudgetExceeded: 'suite.glossaryBudget',
+  browserGlossaryUnsupported: 'updateRequired',
+  nativePromptUnsupported: 'suite.nativePromptUnsupported',
+  browserGlossaryModeUnsupported: 'suite.speechGlossaryUnsupported',
   sessionAlreadyRunning: 'busy',
   busy: 'busy',
   browserConnectionDisabled: 'appUnavailable',
@@ -56,8 +64,9 @@ const dictionaries: Record<UiLanguage, Record<SharedBrowserKey, string>> = {
 export function browserText(language: BrowserUiLanguage = 'en') {
   const locale = resolveUiLanguage(language, navigator.language)
   const dictionary = dictionaries[locale]
-  return (key: BrowserTextKey): string => {
+  return (key: BrowserTextKey, values: Readonly<Record<string, string | number>> = {}): string => {
     if (isDictionaryKey(key)) {
+      if (key.startsWith('suite.')) return suiteLocales[locale][key.slice(6) as keyof typeof suiteLocales.en].replace(/\{(\w+)\}/g, (match, name: string) => values[name] === undefined ? match : String(values[name]))
       if (Object.hasOwn(extensionCopy, key)) return extensionCopy[key as ExtensionKey][extensionLocales.indexOf(locale)]
       if (Object.hasOwn(dictionary, key)) return dictionary[key as SharedBrowserKey]
     }

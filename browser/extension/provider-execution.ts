@@ -1,6 +1,8 @@
 import { PROVIDER_PRESETS, type ProviderConnection } from './providers'
 import { encodeBase64, nativeRequest } from './native-provider'
 import type { SpeechAudio } from './provider-client'
+import type { GlossaryMatch, GlossaryTerm } from '../../src/shared/glossary'
+import { protectGlossary } from './glossary-translation'
 
 export class ProviderError extends Error { constructor(public code: string) { super(code) } }
 const SAFE_ERRORS = new Set([
@@ -13,6 +15,9 @@ const SAFE_ERRORS = new Set([
   'modelUnavailable', 'modelMissing', 'invalidCredential', 'invalidConfiguration', 'resourceBusy', 'torchUnavailable',
   'llamaUnavailable', 'modelOutOfMemory', 'modelDependencyMissing', 'modelWeightsInvalid', 'translationTimeout',
   'translationNetworkUnavailable', 's2sConfigurationMissing', 's2sConnectionLost', 'lineTooLarge',
+  'glossaryChanged', 'glossaryPlaceholderFailed', 'glossaryBudgetExceeded', 'browserGlossaryUnsupported',
+  'nativePromptUnsupported',
+  'browserGlossaryModeUnsupported',
 ])
 export function safeProviderError(error: unknown): string {
   const code = error instanceof ProviderError ? error.code : error instanceof Error ? error.message : ''
@@ -136,10 +141,10 @@ export async function generateWith(provider: ProviderConnection, prompt: string,
   const result = await jsonRequest(provider, '/chat/completions', { model: provider.model, messages, temperature, stream: false }, signal)
   return output(result.choices?.[0]?.message?.content)
 }
-export async function translateWith(provider: ProviderConnection, text: string, source: string, target: string, prompt: string, signal: AbortSignal): Promise<string> {
+async function translateRaw(provider: ProviderConnection, text: string, source: string, target: string, prompt: string, signal: AbortSignal, terms: readonly GlossaryTerm[] = []): Promise<string> {
   const protocol = PROVIDER_PRESETS.find(p => p.id === provider.preset)!.protocol
   if (source === target) return text
-  if (protocol === 'native') return output((await nativeRequest({ type: 'translate', text, sourceLanguage: source, targetLanguage: target }, signal)).text)
+  if (protocol === 'native') return output((await nativeRequest({ type: 'translate', text, sourceLanguage: source, targetLanguage: target, ...(terms.length ? { glossary: terms } : {}) }, signal)).text)
   if (protocol === 'google-free') {
     const query = new URLSearchParams({ client: 'gtx', sl: source, tl: target, dt: 't', q: text })
     const response = await providerFetch(endpoint(provider, '/translate_a/single?') + query, {}, signal)
@@ -160,6 +165,15 @@ export async function translateWith(provider: ProviderConnection, text: string, 
     return output(result.data)
   }
   return generateWith(provider, prompt, signal)
+}
+export async function translateWith(provider: ProviderConnection, text: string, source: string, target: string, prompt: string, signal: AbortSignal, match?: GlossaryMatch): Promise<string> {
+  const protocol = PROVIDER_PRESETS.find(p => p.id === provider.preset)!.protocol
+  if (!match?.terms.length || protocol === 'native') return translateRaw(provider, text, source, target, prompt, signal, match?.terms)
+  if (['google-free', 'microsoft-free', 'deepl', 'deeplx'].includes(protocol)) {
+    const protectedText = protectGlossary(text, match)
+    return protectedText.restore(await translateRaw(provider, protectedText.text, source, target, prompt, signal))
+  }
+  return translateRaw(provider, text, source, target, prompt, signal)
 }
 export async function synthesizeWith(provider: ProviderConnection, text: string, language: string, voice: string, speed: number, signal: AbortSignal, pitch = 1, volume = 1): Promise<SpeechAudio> {
   const protocol = PROVIDER_PRESETS.find(p => p.id === provider.preset)!.protocol

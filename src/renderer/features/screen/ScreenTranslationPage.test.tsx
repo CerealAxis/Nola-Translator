@@ -16,7 +16,7 @@ vi.mock('@/available-models', () => ({ useAvailableModels: () => ({
 }) }))
 const initial = store.stores.settings.getState()
 const initialModels = store.stores.models.getState()
-const snapshot: ScreenSnapshot = { status: 'ready', config: screenConfigSchema.parse({ sourceId: 'screen:1:0', sourceName: 'Display', model: 'cloud:mymemory', processingMode: 'cascade',
+const snapshot: ScreenSnapshot = { status: 'ready', config: screenConfigSchema.parse({ sourceId: 'screen:1:0', sourceName: 'Display', model: 'cloud:mymemory', processingMode: 'cascade', captureMode: 'regions',
   regions: [{ id: '8ddba01d-f7dd-4ea2-b24e-0a3220212420', x: 0, y: 0, width: 1, height: 1 }] }),
   sessionId: 'session', epoch: 0, shortcutError: false, frames: 0, ocrMs: 0, translationMs: 0,
   blocks: [{ id: 'block', regionId: 'region', text: 'Foreign screen text', translation: 'Translated screen text', revision: 1,
@@ -76,7 +76,7 @@ it('updates source choices from the selected OCR resource and targets from the s
   await user.click(screen.getByRole('combobox', { name: '译文语言' }))
   expect(within(await screen.findByRole('listbox')).getAllByRole('option').map(option => option.textContent)).toEqual(['简体中文', '韩语 (한국어)'])
 })
-it('uses the shared page header and an empty OCR selector without setup links or a result list', async () => {
+it('uses the shared page header and renders actual source and translated results', async () => {
   render(<ScreenTranslationPage />)
   await screen.findByRole('button', { name: '选择区域' })
   expect(screen.getByRole('button', { name: '开始翻译' })).toBeEnabled()
@@ -89,9 +89,10 @@ it('uses the shared page header and an empty OCR selector without setup links or
   expect(screen.queryByRole('button', { name: '停止' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '下载识别模型' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '删除识别模型' })).not.toBeInTheDocument()
-  expect(document.querySelector('[data-slot="screen-results"]')).toBeNull()
-  expect(screen.queryByText('Foreign screen text')).not.toBeInTheDocument()
-  expect(screen.queryByText('Translated screen text')).not.toBeInTheDocument()
+  expect(document.querySelector('[data-slot="screen-results"]')).not.toBeNull()
+  expect(screen.getByText('Foreign screen text')).toBeInTheDocument()
+  expect(screen.getByText('Translated screen text')).toBeInTheDocument()
+  expect(document.querySelector('.screen-scene-card')).toBeNull()
   expect(command).not.toHaveBeenCalled()
   expect(screen.getByRole('button', { name: '快捷键设置' })).toHaveAttribute('href', '#/settings/shortcuts')
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument()

@@ -49,7 +49,7 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
     return unsubscribe
   }, [t])
   const toggleMaximize = () => {
-    void window.nolaTranslator?.toggleMainWindowMaximize().then(setMaximized).catch(() => undefined)
+    void window.nolaTranslator?.toggleMainWindowMaximize().then(setMaximized).catch((error: unknown) => notifyError(t('errors.windowStateFailed'), { cause: error }))
   }
   const options = [
     { id: 'auto' as const, label: t('language.auto') },

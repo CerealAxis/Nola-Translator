@@ -198,7 +198,7 @@ export async function inferBackendModel(
   const parameters = inspect ? {} : kind === 'asr'
     ? { audio, source: request.source, batch: options?.batchAsr }
     : kind === 'mt'
-      ? { text: request.text, source: request.source, target: request.target }
+      ? { text: request.text, source: request.source, target: request.target, ...(request.glossary?.length ? { glossary: request.glossary } : {}) }
       : { text: request.text, voice: request.voice, response_format: options?.mp3 ? 'mp3' : undefined }
   const response = await fetch(new URL('/api/v2/gateway/infer', backend.baseUrl), {
     method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', ...(mimo && ttsApiKey ? { 'x-nola-tts-key': ttsApiKey } : {}),

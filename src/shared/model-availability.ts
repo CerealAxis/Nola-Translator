@@ -20,6 +20,7 @@ export function buildConfiguredCloudModels(settings: AppSettings, credentials: R
     if (model.profile) {
       const profile = model.profile
       add({ binding: `custom:${profile.id}`, name: profile.name, kind: 'llm', origin: 'cloud', free: false,
+        images: profile.images === true,
         sourceLanguages: profile.sourceLanguages, targetLanguages: profile.languages })
       add({ binding: `mt-custom:${profile.id}`, name: profile.name, kind: 'mt', origin: 'cloud', free: false,
         sourceLanguages: profile.sourceLanguages ?? ['auto', ...profile.languages], targetLanguages: profile.languages })

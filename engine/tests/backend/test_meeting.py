@@ -246,6 +246,49 @@ async def test_native_mix_ducks_during_speech_and_restores_afterwards(audio):
         output.close()
 
 
+async def test_cancelled_capture_start_finishes_before_route_cleanup(audio, monkeypatch):
+    started, finish = Event(), Event()
+    lifecycle = []
+
+    class DelayedCapture(Capture):
+        async def start(self):
+            def activate():
+                started.set()
+                assert finish.wait(5)
+                lifecycle.append("started")
+            await asyncio.to_thread(activate)
+
+        def stop(self):
+            lifecycle.append("stopped")
+            super().stop()
+
+    capture = DelayedCapture()
+    monkeypatch.setattr(meeting, "_desktop_backend", lambda _: capture)
+    session = SimpleNamespace(config=SimpleNamespace(input=SimpleNamespace(kind="microphone")))
+    route = meeting._Route(session, None, "uplink", config()["uplink_output_id"])
+
+    async def open_and_cleanup():
+        try:
+            await route.open(0.25)
+        finally:
+            await route.close()
+
+    task = asyncio.create_task(open_and_cleanup())
+    try:
+        assert await asyncio.to_thread(started.wait, 5)
+        output_stream = route.output.stream
+        task.cancel()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert lifecycle == []
+    finally:
+        finish.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    assert lifecycle == ["started", "stopped"]
+    assert capture.closed and output_stream.closed
+
+
 @pytest.mark.parametrize("last_source,translation,expected", [
     ({"segment_id": "next", "source_revision": 1}, {}, None),
     ({"segment_id": "first", "source_revision": 2}, {}, None),

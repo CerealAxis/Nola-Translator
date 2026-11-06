@@ -95,7 +95,7 @@ it('cleans interrupted install artifacts on startup and preserves user directori
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-it('waits for pip to close before cleaning a cancelled installation', async () => {
+it.each([false, true])('waits for pip to close before cleaning a cancelled installation (offline: %s)', async offline => {
   const root = await mkdtemp(join(tmpdir(), 'nola-pip-cancel-'))
   const recipe = JSON.parse(await readFile(resolve('build/runtime-recipes.json'), 'utf8')).recipes.find((r: { id: string }) => r.id === 'torch-2-14-1-cpu')
   await writeFile(join(root, 'recipes.json'), JSON.stringify({ version: 1, recipes: [recipe] }))
@@ -105,13 +105,17 @@ it('waits for pip to close before cleaning a cancelled installation', async () =
   const manager = new PythonEnvironments(root, root, join(root, 'recipes.json'), async (_item, path) => { await writeFile(path, 'wheel') }, async () => recipe.wheel.sha256)
   try {
     await manager.initialize()
-    const task = manager.install(recipe.id, false).catch(error => error as Error)
+    const task = manager.install(recipe.id, false, offline ? {
+      wheelhouse: join(root, 'offline-wheels'), requirements: join(root, 'requirements.lock'), signal: new AbortController().signal,
+    } : undefined).catch(error => error as Error)
     await vi.waitFor(() => expect(mocks.execFile).toHaveBeenCalled())
     manager.cancel()
     finish(new Error('aborted'))
-    await Promise.resolve()
+    await expect(Promise.race([
+      task.then(() => 'finished'), new Promise(resolve => setTimeout(() => resolve('waiting'), 50)),
+    ])).resolves.toBe('waiting')
     expect(manager.operation).not.toBeNull()
-    expect(await readdir(root)).toContain('pip-temp')
+    expect((await readdir(root)).some(name => name.startsWith(`staging-${recipe.id}-`))).toBe(true)
     child.emit('close')
     expect(await task).toBeInstanceOf(Error)
     expect(await readdir(root)).not.toContain('wheel-cache')

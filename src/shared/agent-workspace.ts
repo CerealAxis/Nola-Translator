@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { glossaryTermsSchema } from './glossary'
+
+export const translationGlossarySchema = glossaryTermsSchema
 
 export const directModelRequestSchema = z.object({
   id: z.string().uuid(), model: z.string().min(1).max(512),
@@ -7,6 +10,7 @@ export const directModelRequestSchema = z.object({
   source: z.string().max(32).default('auto'), target: z.string().max(32).default('zh'),
   voice: z.string().max(256).default(''), audio: z.string().max(32 * 1024 * 1024 + 64).optional(),
   image: z.string().max(16000000).optional(),
+  glossary: translationGlossarySchema.optional(),
 })
 export type DirectModelRequest = z.input<typeof directModelRequestSchema>
 export interface DirectModelResult { text: string; audio?: string; voices?: string[] }

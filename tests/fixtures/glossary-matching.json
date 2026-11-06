@@ -1,0 +1,5 @@
+[
+  { "text": "XA小 A小到了 category cat café café C++ nOLA Straße ς", "entries": [["A小", "A Short", false], ["cat", "猫", false], ["caf", "短词", false], ["café", "咖啡", false], ["C++", "C加加", false], ["Nola", "", false], ["STRASSE", "街道", false], ["σ", "西格玛", false]], "expected": [["A小", "A Short"], ["cat", "猫"], ["café", "咖啡"], ["C++", "C加加"], ["nOLA", ""], ["STRASSE", "街道"], ["σ", "西格玛"]] },
+  { "text": "Chort bayonet Chort Bay", "entries": [["Chort Bay", "海湾", false], ["Chort", "楚特", false]], "expected": [["Chort", "楚特"], ["Chort Bay", "海湾"]] },
+  { "text": "我用AI工作 GPU/CPU .NET 𠮷 café 가 가", "entries": [["AI", "人工智能", false], ["GPU", "显卡", false], [".NET", ".NET", false], ["𠮷", "𠮷", false], ["café", "咖啡", false], ["가", "韩字", false]], "expected": [["AI", "人工智能"], ["GPU", "显卡"], [".NET", ".NET"], ["𠮷", "𠮷"], ["café", "咖啡"], ["가", "韩字"]] }
+]

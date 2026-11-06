@@ -1,3 +1,4 @@
+import { suiteLocales } from './translation-suite-ui'
 import { modelPolicyTw } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
@@ -15,6 +16,7 @@ export const zhTW: Dictionary = {
   gateway: gatewayTw,
   meeting: meetingTw,
   modelsPolicy: modelPolicyTw,
+  suite: suiteLocales['zh-TW'],
   screen: screenLocales['zh-TW'],
   shortcuts: shortcutLocales['zh-TW'],
   workbench: workbenchTw,
@@ -667,6 +669,7 @@ export const zhTW: Dictionary = {
     "playbackFailed": "語音播報失敗",
     "retryPlayback": "重試播報",
     "skipPlayback": "略過句子",
+    'pauseFailed': '無法暫停或繼續口譯，請再試一次。',
     "playbackActionFailed": "無法更新語音播報",
     "keepAudio": "儲存錄音",
     "keepAudioHint": "關閉後不儲存音訊，無法回放與匯出。錄音會隨這場會議儲存在本機，結束後可以在記錄詳情裡回放。",
@@ -1186,6 +1189,8 @@ export const zhTW: Dictionary = {
     "invalidArgument": "操作參數無效，請檢查輸入。",
     "meetingNameEmpty": "會議名稱不能為空。",
     "meetingNotFound": "會議記錄不存在，請重新整理清單。",
+    'credentialDecryptFailed': '無法以目前的 Windows 使用者解密已儲存的金鑰，請在對應的 API 設定中重新輸入。',
+    'credentialEncryptionUnavailable': 'Windows 憑證加密無法使用，無法讀取或儲存金鑰。請重新啟動應用程式後再試一次。',
     "invalidCredential": "憑證內容或類型無效，請重新輸入。",
 
     "errorCodeLabel": "錯誤碼 {code}",

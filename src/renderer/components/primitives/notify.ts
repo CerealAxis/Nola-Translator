@@ -3,9 +3,11 @@ import type { ToastPayload, ToastType } from '../ui/toast'
 import { getBridge } from '@/store'
 import type { MainErrorNotification } from '@/bridge'
 import type { I18nContextValue, TranslationKey } from '@/i18n'
+import { resolveUiLanguage, translate } from '@/i18n'
 import { bindingIsLocal, type GatewayCapability } from '../../../shared/model-gateway'
 import { SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
 import { featureConflictOwner } from '../../../shared/feature-activity'
+import { normalizeThrownError, stripIpcErrorMessage } from '../../../shared/ipc-error'
 
 export const NOTIFY_DURATION = {
   error: 10000,
@@ -34,10 +36,22 @@ export function describeError(cause: unknown): string | undefined {
   return cause instanceof Error ? cause.message : String(cause)
 }
 
+function failureOptions(message: string, options: NotifyOptions): NotifyOptions {
+  if (options.cause === undefined) return options
+  const source = options.cause && typeof options.cause === 'object' ? options.cause : {}
+  const normalized = normalizeThrownError({ ...source, message: stripIpcErrorMessage(describeError(options.cause) ?? '') })
+  const explicitCode = 'supportCode' in source && typeof source.supportCode === 'string' ? source.supportCode : undefined
+  const code = explicitCode && Object.hasOwn(SUPPORT_ERROR_CATALOG, explicitCode) ? explicitCode : normalized.supportCode
+  if (options.description !== undefined || !code || code === 'ERR-999' || !Object.hasOwn(SUPPORT_ERROR_CATALOG, code)) return options
+  const language = resolveUiLanguage('auto', document.documentElement.lang || navigator.language)
+  const description = translate(SUPPORT_ERROR_CATALOG[code as keyof typeof SUPPORT_ERROR_CATALOG].messageKey, language)
+  return description === message || /\{\w+\}/.test(description) ? options : { ...options, description }
+}
+
 export function sessionConflictMessage(t: I18nContextValue['t'], cause: unknown): string {
   const owner = featureConflictOwner(cause)
   if (!owner) return t('gateway.realtimeSessionBusy')
-  const name = t(owner === 'meeting' ? 'meeting.title' : owner === 'screen-translation' ? 'screen.title' : `gateway.${owner}`)
+  const name = t(owner === 'meeting' ? 'meeting.title' : owner === 'screen-translation' ? 'screen.title' : owner === 'game-translation' ? 'suite.gameTitle' : owner === 'comic-translation' ? 'suite.comicTitle' : `gateway.${owner}`)
   return t('errors.serviceConflict', { running: name })
 }
 
@@ -74,6 +88,7 @@ function sendOverlayToast(notification: MainErrorNotification): string {
 
 /** A failure notice that dismisses automatically. */
 export function notifyError(message: string, options: NotifyOptions = {}): string {
+  options = failureOptions(message, options)
   const duration = options.duration ?? NOTIFY_DURATION.error
   if (overlayDocument()) return sendOverlayToast({ message, description: options.description, type: 'error', duration,
     ...(options.action ? { actionLabel: options.action.label, actionId: options.action.actionId } : {}) })
@@ -133,6 +148,7 @@ export async function notifyGatewayStartIssue(t: I18nContextValue['t'], missing?
 }
 
 export function notifyRetryableFailure(message: string, options: NotifyOptions = {}): string {
+  options = failureOptions(message, options)
   if (overlayDocument()) return sendOverlayToast({ message, description: options.description, type: 'error', duration: options.duration ?? NOTIFY_DURATION.retryable })
   return showToast(payload(message, 'error', { ...options, duration: options.duration ?? NOTIFY_DURATION.retryable }))
 }
@@ -159,6 +175,7 @@ export function notifyWarning(message: string, options: NotifyOptions = {}): str
 
 /** Toasts raised while configuring the floating captions use the same independent surface. */
 export function notifyOverlayError(message: string, options: NotifyOptions = {}): string {
+  options = failureOptions(message, options)
   return sendOverlayToast({ message, description: options.description, type: 'error', duration: options.duration ?? NOTIFY_DURATION.error,
     ...(options.action ? { actionLabel: options.action.label, actionId: options.action.actionId } : {}) })
 }

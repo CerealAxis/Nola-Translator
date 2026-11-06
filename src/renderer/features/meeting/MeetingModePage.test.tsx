@@ -55,6 +55,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); store.stores.settings.setState(initialSettings); store.stores.models.setState(initialModels) })
 const ready = async (testDialog = true) => { render(<MeetingModePage />); await waitFor(() => expect(screen.getByRole('button', { name: '刷新设备' })).toBeEnabled()); if(testDialog) fireEvent.click(screen.getByTestId('meeting-audio-test')) }
 
+it('keeps start disabled until the current meeting state is known and offers stop after a read failure', async () => {
+  const api = store.getBridge()!.meetingMode!
+  let reject!: (error: Error) => void
+  vi.spyOn(api, 'snapshot').mockReturnValue(new Promise((_, fail) => { reject = fail }))
+  render(<MeetingModePage />)
+  expect(screen.getByRole('button', { name: '开始会议口译' })).toBeDisabled()
+  await act(async () => { reject(new Error('network unavailable')) })
+  expect(await screen.findByRole('alert')).toHaveTextContent('无法确认会议口译状态')
+  expect(screen.getByRole('button', { name: '停止会议口译' })).toBeEnabled()
+  expect(start).not.toHaveBeenCalled()
+})
+
 it('rejects a saved meeting source unsupported by its custom translator', async () => {
   models.catalog.mt = [{ binding: 'mt-custom:limited', name: 'Limited', kind: 'mt', origin: 'cloud', free: false, sourceLanguages: ['en'], targetLanguages: ['zh'] }]
   const settings = store.stores.settings.getState().settings!

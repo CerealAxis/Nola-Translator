@@ -247,7 +247,7 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
       }}
       voices={ttsVoices.model === config.model ? ttsVoices.names : []} onVoices={names => setTtsVoices({ model: config.model, names })}
       snapshot={snapshot} onAction={onAction} busy={busy} placeholder={config.model ? placeholder : t('workbench.noModels')}
-      memories={memories} onMemories={next => { setMemories(next); try { localStorage.setItem('nola.playground.memories', JSON.stringify(next)) } catch (error) { notifyError(t('workbench.actionFailed'), { cause: error }) } }} />
+      memories={memories} onMemories={next => { try { localStorage.setItem('nola.playground.memories', JSON.stringify(next)); setMemories(next) } catch (error) { notifyError(t('workbench.actionFailed'), { cause: error }) } }} />
     </div>
   </AssistantRuntimeProvider>
 }

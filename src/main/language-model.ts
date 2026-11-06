@@ -6,11 +6,14 @@ import { directModelRequestSchema, workspaceActionSchema } from '../shared/agent
 import { closeAllDirectModelWorkers, closeDirectModelWorker, runDirectModel, type DirectModelServices } from './direct-model'
 import type { AgentWorkspace } from './agent-workspace'
 import type { GatewayLanguageModel } from './gateway-language-model'
+import type { ComicReaderService } from './comic-reader'
 
 export interface LanguageModelServices extends DirectModelServices {
   getSettings: () => AppSettings
   getCredential: (provider: CredentialProvider) => Promise<string>
   workspace?: AgentWorkspace
+  comicReader?: ComicReaderService
+  supportsComicImages?: (profileId: string) => boolean
   listDirectModels?: () => Promise<Array<{ model: string; kind: string; name: string }>>
   releaseDirectModel?: (ownerId: number) => Promise<void>
   acquireLanguageModel?: (binding?: string) => Promise<GatewayLanguageModel & { signal: AbortSignal; release(error?: unknown): void }>
@@ -18,6 +21,11 @@ export interface LanguageModelServices extends DirectModelServices {
 
 /** The official AI SDK stream crosses IPC; provider secrets remain in the main process. */
 export function registerLanguageModelIpc(services: LanguageModelServices, allowed: (sender: WebContents) => boolean) {
+  const trusted = (event: Electron.IpcMainInvokeEvent) => allowed(event.sender) && event.senderFrame === event.sender.mainFrame
+  ipcMain.handle('language-model:comics', async event => {
+    if (!trusted(event) || !services.comicReader) throw new Error('Comic reader unavailable')
+    return services.comicReader.listProjects()
+  })
   const pending = new Map<string, AbortController>()
   const settled = new Map<string, { promise: Promise<void>; resolve: () => void }>()
   const track = (id: string) => {
@@ -27,15 +35,15 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
   }
   const finish = (id: string) => { pending.delete(id); settled.get(id)?.resolve(); settled.delete(id) }
   ipcMain.handle('app:language-model:audio-result', (event, raw: unknown) => {
-    if (!allowed(event.sender)) throw new Error('Audio preparation access denied')
+    if (!trusted(event)) throw new Error('Audio preparation access denied')
     resolveLanguageModelAudio(event.sender.id, raw)
   })
   ipcMain.handle('app:agent-workspace', async (event, raw: unknown) => {
-    if (!allowed(event.sender) || !services.workspace) throw new Error('Agent workspace unavailable')
+    if (!trusted(event) || !services.workspace) throw new Error('Agent workspace unavailable')
     return services.workspace.action(workspaceActionSchema.parse(raw), BrowserWindow.fromWebContents(event.sender) ?? undefined)
   })
   ipcMain.handle('app:direct-model', async (event, raw: unknown, inspect: unknown) => {
-    if (!allowed(event.sender)) throw new Error('Direct model access denied')
+    if (!trusted(event)) throw new Error('Direct model access denied')
     const request = directModelRequestSchema.parse(raw)
     const id = event.sender.id + ':' + request.id
     if (pending.has(id)) throw new Error('Duplicate model request')
@@ -48,15 +56,15 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
     finally { finish(id); if (!event.sender.isDestroyed()) event.sender.removeListener('destroyed', stop) }
   })
   ipcMain.handle('app:language-model:cancel', (event, id: unknown) => {
-    if (allowed(event.sender) && typeof id === 'string') pending.get(event.sender.id + ':' + id)?.abort()
+    if (trusted(event) && typeof id === 'string') pending.get(event.sender.id + ':' + id)?.abort()
   })
   ipcMain.handle('app:direct-model:release', async event => {
-    if (!allowed(event.sender)) throw new Error('Direct model access denied')
+    if (!trusted(event)) throw new Error('Direct model access denied')
     if (services.releaseDirectModel) await services.releaseDirectModel(event.sender.id)
       else if (!services.inferModel) await closeDirectModelWorker(event.sender.id)
   })
   ipcMain.handle('app:language-model:stream', async (event, raw: unknown) => {
-    if (!allowed(event.sender)) throw new Error('Language model access denied')
+    if (!trusted(event)) throw new Error('Language model access denied')
     const request = languageModelStreamRequestSchema.parse(raw)
     if (JSON.stringify(request.body).length > 16 * 1024 * 1024) throw new Error('Request too large')
     const id = event.sender.id + ':' + request.id

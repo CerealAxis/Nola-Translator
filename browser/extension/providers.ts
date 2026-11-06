@@ -73,9 +73,12 @@ export const DEFAULT_PROVIDERS = ['nola', 'google-translate', 'microsoft-transla
 // Extension-page IndexedDB is not shared with isolated content scripts on website origins.
 export function providerDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('nola-extension-providers', 1)
-    request.onupgradeneeded = () => request.result.createObjectStore('settings')
-    request.onsuccess = () => resolve(request.result)
+    const request = indexedDB.open('nola-extension-providers', 2)
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains('settings')) request.result.createObjectStore('settings')
+      if (!request.result.objectStoreNames.contains('glossary')) request.result.createObjectStore('glossary')
+    }
+    request.onsuccess = () => { request.result.onversionchange = () => request.result.close(); resolve(request.result) }
     request.onerror = () => reject(request.error)
   })
 }

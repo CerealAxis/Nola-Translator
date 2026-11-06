@@ -72,7 +72,8 @@ class CausalTranslationRuntime(M2M100Runtime):
         self.load()
         bundle = self._bundle
         target_name = HYMT2_LANGUAGES.get(normalize(target)) or LANGUAGE_NAMES.get(normalize(target), target)
-        prompts = [f"Translate the following text into {target_name}. Only output the translation:\n{text}" for text in texts]
+        from ..backend.glossary import active_glossary
+        prompts = [f"Translate the following text into {target_name}. Only output the translation:{active_glossary.get()}\n{text}" for text in texts]
         rendered = [bundle.tokenizer.apply_chat_template([{"role": "user", "content": prompt}], tokenize=False,
             add_generation_prompt=True, enable_thinking=False) if bundle.tokenizer.chat_template else prompt + '\n' for prompt in prompts]
         previous_padding = bundle.tokenizer.padding_side
@@ -105,7 +106,8 @@ class CausalTranslationRuntime(M2M100Runtime):
         self.load()
         bundle = self._bundle
         target_name = HYMT2_LANGUAGES.get(normalize(target)) or LANGUAGE_NAMES.get(normalize(target), target)
-        prompt = f"Translate the following text into {target_name}. Only output the translation:\n{text}"
+        from ..backend.glossary import active_glossary
+        prompt = f"Translate the following text into {target_name}. Only output the translation:{active_glossary.get()}\n{text}"
         rendered = (bundle.tokenizer.apply_chat_template([{"role": "user", "content": prompt}],
             tokenize=False, add_generation_prompt=True, enable_thinking=False)
             if bundle.tokenizer.chat_template else prompt + '\n')

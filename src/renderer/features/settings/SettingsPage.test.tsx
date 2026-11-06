@@ -114,9 +114,9 @@ it('confirms copying diagnostics only after the store action succeeds', async ()
 })
 
 
-it('lists the eight user settings in the approved order and removes retired routes', () => {
+it('lists user settings including glossary and removes retired routes', () => {
   expect(SETTINGS_TABS.filter(tab => tab !== 'developer')).toEqual([
-    'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'help',
+    'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'help',
   ])
   for (const tab of ['translation', 'compute', 'performance', 'advanced', 'more']) {
     expect(parseRoute(`#/settings/${tab}`).tab).toBe('general')
@@ -125,8 +125,8 @@ it('lists the eight user settings in the approved order and removes retired rout
   window.history.replaceState(null, '', '#/settings/general')
   render(<SettingsPage />)
   const tabs = screen.getAllByRole('tab').filter(tab => tab.closest('.settings-nav'))
-  expect(tabs.slice(0, 8).map(tab => tab.textContent)).toEqual([
-    '常规', '音频与翻译', '悬浮字幕', '浏览器插件', '快捷键', '引擎与性能', '数据与存储', '帮助与关于',
+  expect(tabs.slice(0, 9).map(tab => tab.textContent)).toEqual([
+    '常规', '音频与翻译', '悬浮字幕', '浏览器插件', '快捷键', '引擎与性能', '数据与存储', '术语表', '帮助与关于',
   ])
 })
 

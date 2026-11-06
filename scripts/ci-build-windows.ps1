@@ -66,6 +66,8 @@ if (-not $pyInstallerRequirement) { throw 'PyInstaller requirement is missing' }
 & $hostPython -m pip install $pyInstallerRequirement
 Assert-NativeSuccess 'Install browser host build tool'
 & "$PSScriptRoot/build-browser-host.ps1" -Python $hostPython
+& npm run build:game-hook
+Assert-NativeSuccess 'Game hook build'
 & "$PSScriptRoot/build-python-base.ps1" -BasePython $basePython
 # Build the x64 EXE installer.
 & node "$PSScriptRoot/ci-package-config.cjs"

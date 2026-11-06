@@ -33,6 +33,7 @@ export function speechError(code: unknown): BrowserWireErrorCode {
     providerDisconnected: 'browserConnectionLost', modelDisabled: 'modelDisabled', modelUnavailable: 'modelUnavailable',
     gatewayNotRunning: 'gatewayNotRunning', invalidCredential: 'invalidCredential',
     browserConnectionUnavailable: 'browserConnectionUnavailable',
+    browserGlossaryModeUnsupported: 'browserGlossaryModeUnsupported',
   }
   return typeof code === 'string' ? errors[code] ?? 'translationNetworkUnavailable' : 'translationNetworkUnavailable'
 }

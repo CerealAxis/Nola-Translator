@@ -32,6 +32,10 @@ export async function nativeRequest(payload: Record<string, unknown>, signal: Ab
         if (message.type !== 'result') return
         if (message.id === hello) {
           if (payload.type === 'hello') { close(); resolve(message.value as unknown as Record<string, unknown>); return }
+          if (Array.isArray(payload.glossary) && payload.glossary.length) {
+            const summary = message.value as { protocolVersion?: number; features?: { matchedGlossaryV1?: boolean } } | undefined
+            if (!summary || (summary.protocolVersion ?? 0) < 4 || !summary.features?.matchedGlossaryV1) { fail(new Error('browserProtocolMismatch')); return }
+          }
           port.postMessage({ ...payload, id })
         } else if (message.id === id) {
           const value = (message.value ?? {}) as Record<string, unknown>

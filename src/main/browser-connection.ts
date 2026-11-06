@@ -85,7 +85,7 @@ export interface BrowserConnectionOptions {
   inferCapability?(request: BrowserCapabilityRequest, signal: AbortSignal): Promise<BrowserCapabilityResult>
   openAsrStream?(request: Extract<BrowserRequest, { type: 'streamStart' }>, signal: AbortSignal, emit: (data: Record<string, unknown>) => void): Promise<{ request(data: Record<string, unknown>): Promise<unknown>; close(): void }>
 
-  translateText?(request: { text: string; sourceLanguage: string; targetLanguage: string }, signal: AbortSignal): Promise<string>
+  translateText?(request: Extract<BrowserRequest, { type: 'translate' }>, signal: AbortSignal): Promise<string>
   textTranslationAvailable?(): true | 'gatewayNotRunning' | 'browserTextModelUnavailable'
   prepareS2s?: (model: string) => Promise<PrewarmResult>
   engine: EngineProcess
@@ -167,6 +167,7 @@ export class BrowserConnection {
   private error: string | undefined
   private devices: AudioDevice[] = []
   private readonly streams = new Map<string, { client: Client; controller: AbortController; stream: { request(data: Record<string, unknown>): Promise<unknown>; close(): void } }>()
+  private readonly streamOpenings = new Map<string, Client>()
   private readonly audioRequestPrefix = `browser-audio-${randomUUID()}-`
   constructor(private readonly options: BrowserConnectionOptions) {
     options.engine.on('event', this.onEvent)
@@ -539,7 +540,8 @@ export class BrowserConnection {
         const settings = this.options.getSettings()
         const textTranslation = this.options.textTranslationAvailable?.() ?? (this.options.translateText ? true : 'browserTextModelUnavailable')
         this.send(client, { type: 'result', id: request.id, value: {
-          protocolVersion: compatible ? Math.min(client.protocolVersion ?? 2, BROWSER_PROTOCOL_VERSION) as 2 | typeof BROWSER_PROTOCOL_VERSION : 1,
+          protocolVersion: compatible ? Math.min(client.protocolVersion ?? 2, BROWSER_PROTOCOL_VERSION) as 2 | 3 | typeof BROWSER_PROTOCOL_VERSION : 1,
+          features: { matchedGlossaryV1: compatible && (client.protocolVersion ?? 2) >= 4 },
           capabilities: { mt: textTranslation === true, asr: Boolean(this.options.inferCapability), tts: Boolean(this.options.inferCapability), llm: Boolean(this.options.inferCapability), s2s: Boolean(this.options.useGateway) },
           extensionVersion: BROWSER_EXTENSION_VERSION, extensionCompatible: compatible,
           textTranslation: textTranslation === true,
@@ -558,8 +560,11 @@ export class BrowserConnection {
       }
       if (request.type === 'streamStart') {
         if (!this.options.openAsrStream) throw new Error('modelUnavailable')
-        if ([...this.streams.values()].some(value => value.client === client)) throw new Error('resourceBusy')
+        if (this.streams.has(request.id) || this.streamOpenings.has(request.id) || client.translations.has(request.id)
+            || [...this.streams.values()].some(value => value.client === client)
+            || [...this.streamOpenings.values()].includes(client)) throw new Error('resourceBusy')
         const controller = new AbortController()
+        this.streamOpenings.set(request.id, client)
         client.translations.set(request.id, controller)
         try {
           const stream = await this.options.openAsrStream(request, controller.signal, data => this.send(client, { type: 'capabilityEvent', id: request.id, event: { type: 'asr', data } }))
@@ -567,6 +572,7 @@ export class BrowserConnection {
           this.streams.set(request.id, { client, controller, stream })
           this.send(client, { type: 'result', id: request.id, value: { streamId: request.id } })
         } catch (error) { client.translations.delete(request.id); controller.abort(); throw error }
+        finally { this.streamOpenings.delete(request.id) }
         return
       }
       if (request.type === 'streamAudio' || request.type === 'streamFinish' || request.type === 'streamStop') {
@@ -609,6 +615,7 @@ export class BrowserConnection {
         return
       }
       if (request.type === 'translate' || request.type === 'cancelTranslation') {
+        if (request.type === 'translate' && request.glossary?.length && (client.protocolVersion ?? 2) < 4) throw new Error('browserProtocolMismatch')
         if (((client.protocolVersion ?? 2) < 2 || (client.protocolVersion ?? 2) > BROWSER_PROTOCOL_VERSION)) throw new Error('browserExtensionVersionMismatch')
         if (request.type === 'cancelTranslation') {
           client.translations.get(request.requestId)?.abort()

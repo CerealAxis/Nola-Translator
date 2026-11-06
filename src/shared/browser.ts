@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { glossaryTermsSchema } from './glossary'
 import extensionRelease from '../../browser/version.json'
 import type { AudioDevice, EngineErrorCode, EngineEvent } from './contracts'
 import type { SupportErrorCode } from './error-catalog'
@@ -9,7 +10,7 @@ export const FIREFOX_EXTENSION_ID = 'captions@nola-translator.app'
 export const BROWSER_HOST_NAME = 'com.nola.captions'
 export const BROWSER_EXTENSION_ID = 'cgbjfdpkcoapeiefeflikdolennbdcbe'
 export const BROWSER_EXTENSION_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoiJ7hfz9nPxIe4Iax2PF+o4Dtq8w1y2X/HGa6aPZRTZWBOYzr13mdqzCC+UfJKpAzeGIPL2V0xNvkCXoxCjUBCOduL36uaXwmSSUpNcg1wcob05ZTDod6XIxAOXViMcJKd+wLronqx9gy6bDigQm7J1c5f6Z7Iw9xmOdPS7n01LTqCQINrpEzU/DzAzFTTv9JUKd6Oy/PyzQg6BHzhIAhyBYhYJOsuhGIMQTE+pd/1xL/NKYAmrbNWOOYvrUxlcgk7TwORkdx/NpeA4E5R8dB4CtX14GL/Ktc7R9gAVptQH524j2ZUszKA/WrQU1CmRneS2bIyjOE0idJt1Xd3O9iQIDAQAB'
-export const BROWSER_PROTOCOL_VERSION = 3
+export const BROWSER_PROTOCOL_VERSION = 4
 /** Extension releases are independent; compatibility is negotiated by protocol version. */
 export const BROWSER_EXTENSION_VERSION = extensionRelease.version
 
@@ -32,7 +33,7 @@ export const browserRequestSchema = z.discriminatedUnion('type', [
   z.object({ ...identity, type: z.literal('streamFinish'), streamId: identity.id }).strict(),
   z.object({ ...identity, type: z.literal('streamStop'), streamId: identity.id }).strict(),
   z.object({ ...identity, type: z.literal('runtimeSettings'), component: z.enum(['engine', 'llama']) }).strict(),
-  z.object({ ...identity, type: z.literal('translate'), text: z.string().trim().min(1).max(4000), sourceLanguage: language, targetLanguage: language }).strict(),
+  z.object({ ...identity, type: z.literal('translate'), text: z.string().trim().min(1).max(4000), sourceLanguage: language, targetLanguage: language, glossary: glossaryTermsSchema.optional() }).strict(),
   z.object({ ...identity, type: z.literal('cancelTranslation'), requestId: identity.id }).strict(),
   z.object({ ...identity, type: z.literal('start'), ...timeline, source: z.enum(['tab', 'system']), streamId: z.string().min(1).max(128), deviceId: z.string().min(1).max(512).optional(), ...languages, pipeline: z.enum(['desktop', 'cascade', 's2s']).optional(), model: z.enum(REALTIME_S2S_MODELS).optional() }).strict(),
   z.object({ ...session, type: z.literal('stop') }).strict(),
@@ -54,6 +55,7 @@ export type BrowserWireErrorCode =
   | 'browserPermissionDenied'
   | 'browserExtensionVersionMismatch'
   | 'browserProtocolMismatch'
+  | 'browserGlossaryModeUnsupported'
   | 'browserCaptureUnsupported'
   | 'browserCaptureTargetMismatch'
   | 'browserCaptureCancelled'
@@ -103,7 +105,8 @@ export interface BrowserCaptionConfig {
   targetLanguage: string
 }
 export interface BrowserSummary {
-  protocolVersion: 1 | 2 | typeof BROWSER_PROTOCOL_VERSION
+  protocolVersion: 1 | 2 | 3 | typeof BROWSER_PROTOCOL_VERSION
+  features?: { matchedGlossaryV1: boolean }
   capabilities?: Record<'asr' | 'mt' | 'tts' | 's2s' | 'llm', boolean>
   textTranslation?: boolean
   textTranslationError?: 'gatewayNotRunning' | 'browserTextModelUnavailable'

@@ -406,7 +406,7 @@ async def infer(request, runtime, *, prepare_only=False):
                 max_output_tokens=512,
                 history=request['history'],
             )) as provider:
-                translated = await provider.translate(request['text'], request['source'], request['target'])
+                translated = await translate_with_glossary(provider, request)
             return {'text': translated.text}
     await runtime._configure_device_plan(command)
     if request['kind'] == 'mt':
@@ -417,8 +417,10 @@ async def infer(request, runtime, *, prepare_only=False):
         await runtime._ensure_translation_server(command)
         if prepare_only:
             return None
+        if request.get('image') and request.get('glossary'):
+            raise ValueError('glossaryUnsupported')
         text = await translate_image(runtime, request) if request.get('image') else (
-            await runtime.translation_provider.translate(request['text'], request['source'], request['target'])).text
+            await translate_with_glossary(runtime.translation_provider, request)).text
         return {'text': text}
     samples = decode_audio(request['audio'])
     if config.recognitionProvider == 'local':
@@ -454,6 +456,29 @@ async def infer(request, runtime, *, prepare_only=False):
         await recognizer.close()
 
 
+async def translate_with_glossary(provider, request):
+    from .backend.glossary import GlossaryTerm, active_glossary, glossary_prompt
+    from .translation.network import _BudgetedChatProvider
+
+    terms = [GlossaryTerm.model_validate(term) for term in request.get('glossary', [])]
+    if terms and not isinstance(provider, _BudgetedChatProvider) and getattr(provider, 'name', '') not in (
+        'hymt2', 'index-translate-local', 'index-translate-transformers', 'transformers-causal',
+    ):
+        raise ValueError('glossaryUnsupported')
+    instructions = glossary_prompt(terms)
+    if instructions:
+        from .translation.network import _estimate_tokens
+        manager = getattr(provider, 'manager', None)
+        context_size = getattr(provider, 'context_window', None) or getattr(getattr(provider, 'runtime', None), 'context_size', None) or getattr(getattr(manager, '_compute', None), 'contextSize', None)
+        if context_size and _estimate_tokens(instructions) > context_size // 5:
+            raise ValueError('glossaryBudgetExceeded')
+    token = active_glossary.set(instructions)
+    try:
+        return await provider.translate(request['text'], request['source'], request['target'])
+    finally:
+        active_glossary.reset(token)
+
+
 async def infer_batch(requests, runtime):
     if not isinstance(requests, list) or not 1 <= len(requests) <= 5 or not all(isinstance(item, dict) for item in requests):
         raise ValueError('Invalid inference batch')
@@ -483,7 +508,7 @@ async def infer_batch(requests, runtime):
             if len(results) != len(requests):
                 raise ValueError('ASR batch result count mismatch')
             return [{'text': text, 'language': language} for text, language in results]
-    elif not any(item.get('image') or 'history' in item for item in requests):
+    elif not any(item.get('image') or 'history' in item or item.get('glossary') for item in requests):
         batch = getattr(runtime.translation_provider, 'translate_batch', None)
         if batch is not None:
             results = await batch([item['text'] for item in requests], first['source'], first['target'])

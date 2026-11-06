@@ -7,7 +7,18 @@ import { notifyError, notifyGatewayModelUnavailable, notifyGatewayStartIssue, no
 
 const t = (key: TranslationKey, variables?: Parameters<typeof translate>[2]) => translate(key, 'zh-CN', variables)
 
-afterEach(() => { vi.restoreAllMocks(); window.history.replaceState({}, '', '/') })
+afterEach(() => { vi.restoreAllMocks(); window.history.replaceState({}, '', '/'); document.documentElement.lang = '' })
+
+it('describes known IPC failures in the current interface language without exposing raw details', () => {
+  document.documentElement.lang = 'ja'
+  const showToast = vi.spyOn(toast, 'showToast')
+  notifyError('Export failed', { cause: new Error("Error invoking remote method 'comic:export': Error: modelOutOfMemory") })
+  expect(showToast).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Export failed', description: translate('errors.modelOutOfMemory', 'ja') }))
+  notifyError('Export failed', { cause: new Error('secret path or provider response') })
+  expect(showToast).toHaveBeenLastCalledWith({ type: 'error', description: 'Export failed', duration: 10000 })
+  notifyError('Export failed', { cause: { code: 'ENOSPC', supportCode: 'STO-022' }, description: 'Choose another disk.' })
+  expect(showToast).toHaveBeenLastCalledWith(expect.objectContaining({ description: 'Choose another disk.' }))
+})
 
 it('routes caption-window errors to the dedicated overlay notification', () => {
   window.history.replaceState({}, '', '/?overlay=1')

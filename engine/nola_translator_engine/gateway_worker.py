@@ -398,13 +398,18 @@ class GatewayWorker:
                 if not supports_translation(capability, request.get('source', 'auto'), request['target']):
                     raise ValueError('The active translation model does not support this language pair')
             if request.get('image'):
+                if request.get('glossary'):
+                    raise ValueError('glossaryUnsupported')
                 from .local_call import translate_image
                 image_request = {**request, 'source': request.get('source', 'auto'),
                                  'resourceId': getattr(config, 'translationModelId', None)}
                 return {'text': await translate_image(runtime, image_request)}
             provider = runtime.translation_provider
             stream = getattr(provider, 'translate_stream', None)
-            if request.get('stream') and stream is not None:
+            if request.get('glossary'):
+                from .local_call import translate_with_glossary
+                translated = await translate_with_glossary(provider, {**request, 'source': request.get('source', 'auto')})
+            elif request.get('stream') and stream is not None:
                 def progress(value):
                     self.emit({'id': request.get('id'), 'event': {'type': 'translation.delta', 'text': value}})
                 translated = await stream(text, request.get('source', 'auto'), request['target'], progress)

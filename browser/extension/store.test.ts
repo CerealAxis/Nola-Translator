@@ -42,6 +42,16 @@ function deferRequest(fixture: ReturnType<typeof setup>, matches: (request: Requ
   return { get captured() { return captured }, resolve: () => resolve(), reject: () => reject(new BrowserFailure('appUnavailable')) }
 }
 describe('extension session lifecycle', () => {
+  it('keeps basic captions compatible with a v3 desktop when matched glossary is not requested', async () => {
+    const fixture = setup()
+    const original = vi.mocked(fixture.bridge.request).getMockImplementation()!
+    vi.mocked(fixture.bridge.request).mockImplementation(request => request.type === 'hello' ? Promise.resolve({ ...summary, protocolVersion: 3 }) : original(request))
+    await fixture.store.init()
+    expect(fixture.store.getSnapshot().connected).toBe(true)
+    fixture.store.pressStart()
+    await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
+    await fixture.store.destroy()
+  })
   it('keeps tab capture alive when audio from before a seek fails after the new epoch starts', async () => {
     const fixture = setup(); await fixture.store.init(); fixture.store.pressStart()
     await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))

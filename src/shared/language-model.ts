@@ -9,6 +9,7 @@ export const languageModelStreamRequestSchema = z.object({
   source: z.enum(['custom', 'local']).default('custom'),
   effort: z.enum(['auto', 'low', 'medium', 'high']).default('auto'),
   projectId: z.string().uuid().nullable().optional(),
+  comicProjectId: z.string().uuid().nullable().optional(),
   body: z.object({ messages: z.array(z.unknown()).min(1).max(200) }).passthrough(),
 })
 export type LanguageModelStreamRequest = z.input<typeof languageModelStreamRequestSchema>

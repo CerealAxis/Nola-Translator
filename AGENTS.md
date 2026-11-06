@@ -70,6 +70,12 @@ src/
     backend-direct-model.ts   单次推理及本地 LLM 租约
     model-gateway.ts          v1 协议及旧 Worker 兼容
     screen-translation.ts     屏幕翻译与捕获
+    game-translation.ts       游戏档案、OCR / Hook / 剪贴板翻译
+    game-hook.ts              双位数 Hook 辅助进程与文本线程
+    game-overlay.ts           游戏独立浮动字幕
+    comic.ts                  漫画 IPC、工程及任务生命周期
+    comic-reader.ts           工作台漫画只读工具
+    glossary-store.ts         桌面术语库与原子保存
     workbench.ts              独立工作台窗口
     latency-window.ts         延迟检测窗口
     latency-session.ts        延迟采集点与会话汇总
@@ -107,6 +113,9 @@ src/
       meeting/
         MeetingModePage.tsx  会议口译与音频路由
       screen/                屏幕翻译
+      game/                  游戏库、文本来源与浮动字幕
+      comic/                 漫画书架、编辑器与阅读器
+      settings/glossary/     术语库配置与场景选库控件
       latency/               延迟检测 UI
 
     workbench.html           工作台独立入口
@@ -125,6 +134,8 @@ engine/
     backend/
       gateway/               Provider、资源与 Worker
       screen_ocr.py          PP-OCRv5 mobile
+      comic.py               漫画工程、任务、修图与排版
+      glossary.py            后端术语匹配与请求上下文
       latency.py             延迟检测采集
       meeting.py             会议会话组
       meeting_audio.py       原声音频混合
@@ -139,6 +150,8 @@ browser/
     providers.ts             Provider 配置
     provider-runtime.ts      请求调度
     translation-cache.ts     持久翻译缓存
+    glossary-store.ts        扩展私有术语库、迁移及恢复
+    glossary-translation.ts  命中术语与翻译能力适配
     speech-runtime.ts        ASR / S2S 与字幕翻译
     offscreen.ts             独立音频采集与回放
     tab-audio-runtime.ts     PCM 与播放生命周期
@@ -164,7 +177,9 @@ docs/
   PRD/                       内部需求与架构文档
 
 assets/brand/                品牌资源
+native/game-hook/            Windows Hook 辅助进程源码
 scripts/                     构建与运行时管理
+  build-game-hook.ps1        双位数 Hook 构建及对应源码归档
 skills/                      项目 Skills
 ```
 

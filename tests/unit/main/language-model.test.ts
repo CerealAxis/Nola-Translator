@@ -66,6 +66,19 @@ it('rejects requests from documents outside the development window', async () =>
   expect(getCredential).not.toHaveBeenCalled()
 })
 
+it('does not grant embedded frames the model and project access of their parent window', async () => {
+  const getCredential = vi.fn(), action = vi.fn(), listProjects = vi.fn(), releaseDirectModel = vi.fn()
+  registerLanguageModelIpc({ getSettings: () => DEFAULT_SETTINGS, getCredential,
+    workspace: { action } as unknown as AgentWorkspace,
+    comicReader: { listProjects } as any, releaseDirectModel }, () => true)
+  const event = { sender: { id: 401, mainFrame: {} }, senderFrame: {} }
+  for (const channel of ['app:language-model:stream', 'app:direct-model', 'app:direct-model:release', 'app:agent-workspace', 'language-model:comics']) {
+    await expect(handlers.get(channel)!(event, {})).rejects.toThrow()
+  }
+  expect(() => handlers.get('app:language-model:audio-result')!(event, {})).toThrow('access denied')
+  for (const operation of [getCredential, action, listProjects, releaseDirectModel]) expect(operation).not.toHaveBeenCalled()
+})
+
 it.each([true, false])('executes a terminal tool only after an SDK approval response (approved=%s)', async approved => {
   const profile = { id: 'approval-model', name: 'Fixture', endpoint: 'https://fixture.invalid', model: 'fixture', apiFormat: 'anthropic' as const, contextWindow: 4096, maxOutputTokens: 512, languages: ['en'] }
   const project = { id: crypto.randomUUID(), name: 'Project', path: 'C:/fixture' }

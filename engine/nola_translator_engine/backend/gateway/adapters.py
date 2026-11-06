@@ -261,6 +261,8 @@ class LocalWorkerAdapter(Adapter):
         self, instance: ModelInstance, ctx: CallContext, *, text: str, source: str, target: str
     ) -> TranslationResult:
         payload: dict[str, Any] = {"text": text, "source": source, "target": target}
+        if ctx.translation_context.get("glossary"):
+            payload["glossary"] = [term.model_dump() for term in ctx.translation_context["glossary"]]
         if instance.definition.capabilities.context.mode == "request_context":
             payload["history"] = bounded_translation_history(ctx.translation_context.get("history"))
         request = WorkerRequest(
@@ -361,6 +363,14 @@ class _NetworkMtAdapter(Adapter):
             raise GatewayError(GatewayErrorCode.TIMEOUT, stage="mt", message="translation deadline expired")
         try:
             async with asyncio.timeout(timeout), aclosing(self._provider(instance, ctx.provider_options)) as provider:
+                terms = ctx.translation_context.get("glossary")
+                if terms:
+                    from ...translation.network import _BudgetedChatProvider
+                    from ..glossary import glossary_prompt
+
+                    if not isinstance(provider, _BudgetedChatProvider):
+                        raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="mt", message="glossaryUnsupported")
+                    provider.glossary_instructions = glossary_prompt(terms)
                 result = await provider.translate(text, source, target)
         except (TimeoutError, httpx.TimeoutException):
             raise GatewayError(GatewayErrorCode.TIMEOUT, stage="mt", message="translation provider timed out") from None

@@ -82,7 +82,6 @@ function SidebarMenuButton({ render, isActive = false, tooltip, ...props }: useR
   isActive?: boolean
   tooltip: string
 }) {
-  const { open } = useSidebar()
   const button = useRender({
     defaultTagName: 'button',
     props: mergeProps<'button'>({ type: 'button' }, props),
@@ -91,7 +90,7 @@ function SidebarMenuButton({ render, isActive = false, tooltip, ...props }: useR
   })
 
   return (
-    <Tooltip disabled={open}>
+    <Tooltip>
       {button}
       <TooltipContent side="right" sideOffset={8}>{tooltip}</TooltipContent>
     </Tooltip>

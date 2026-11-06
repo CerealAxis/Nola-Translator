@@ -5,6 +5,11 @@ import { generateWith, ProviderError, safeProviderError, synthesizeWith, transla
 import { nativeRequest } from './native-provider'
 import { createTranslationCache, translationCacheKey } from './translation-cache'
 import { batchTranslation } from './provider-batch'
+import { extensionGlossary, recoverExtensionConfiguration } from './glossary-store'
+import { glossaryPrompt, resolveGlossaryTerms } from '../../src/shared/glossary-match'
+import type { GlossaryTerm } from '../../src/shared/glossary'
+import { glossaryChunkMatch, glossaryChunks } from './glossary-translation'
+import { normalizeLanguage } from '../../src/shared/languages'
 
 const text = z.string().trim().min(1).max(16000)
 const language = z.string().min(1).max(32).regex(/^[a-z0-9-]+$/i)
@@ -39,10 +44,10 @@ async function throttle(id: string, rate: number, signal: AbortSignal): Promise<
     })
   } finally { waiting.set(id, (waiting.get(id) ?? 1) - 1) }
 }
-export function buildTranslationPrompt(text: string, source: string, target: string, template: string, terms: Array<{ source: string; target: string }>): string {
+export function buildTranslationPrompt(text: string, source: string, target: string, template: string, terms: ReadonlyArray<Pick<GlossaryTerm, 'source' | 'target'> & Partial<Pick<GlossaryTerm, 'caseSensitive' | 'mode'>>>): string {
   const instruction = template.trim() || 'Translate the text from {{sourceLanguage}} to {{targetLanguage}}. Preserve formatting. Return only the translation, with no explanation.'
   const expanded = instruction.replaceAll('{{sourceLanguage}}', source).replaceAll('{{targetLanguage}}', target).replaceAll('{{text}}', text)
-  return `${expanded}\n${terms.length ? 'Use these terminology mappings:\n' + terms.map(term => JSON.stringify([term.source, term.target])).join('\n') + '\n' : ''}${instruction.includes('{{text}}') ? '' : '\nText to translate:\n' + text}`
+  return `${expanded}\n${glossaryPrompt(terms.map(term => ({ ...term, mode: term.mode ?? (term.target === '' ? 'keep' : 'fixed'), caseSensitive: term.caseSensitive ?? false })))}${instruction.includes('{{text}}') ? '' : '\nText to translate:\n' + text}`
 }
 export function setupProviderRuntime(): void {
   chrome.runtime.onConnect.addListener(port => {
@@ -68,6 +73,7 @@ export function setupProviderRuntime(): void {
       void (async () => {
         const signal = controller.signal
         if (page && !await chrome.permissions.contains({ origins: [`${new URL(url!).origin}/*`] })) throw new ProviderError('providerPermission')
+        if (request.type === 'translate') await recoverExtensionConfiguration()
         const preferences = await loadPreferences()
         if (request.type === 'test') {
           const provider = request.connection
@@ -107,26 +113,36 @@ export function setupProviderRuntime(): void {
         const binding = { web: preferences.pageProvider, subtitle: preferences.subtitleProvider, selection: preferences.selectionProvider, input: preferences.inputProvider }
         const provider = await getProvider(request.providerId ?? binding[request.purpose], 'mt')
         const template = request.purpose === 'subtitle' ? preferences.subtitlePrompt : preferences.pagePrompt
+        if (provider.preset === 'nola' && (template.trim() || preferences.contextAware)) throw new ProviderError('nativePromptUnsupported')
         const host = page ? new URL(url!).hostname : ''
-        const terms = preferences.glossary.filter(term => term.source && request.text.includes(term.source) && (!term.sites.trim() || term.sites.split(/[\s,]+/).some(site => host === site || host.endsWith('.' + site))))
+        const glossary = await extensionGlossary.snapshot()
+        const glossaryRequest = { text: request.text, targetLanguage: normalizeLanguage(request.targetLanguage), context: { scenario: 'tool' as const, ...(page ? { pageUrl: url } : {}) }, selection: { mode: 'auto' as const } }
+        const matched = resolveGlossaryTerms(glossary, glossaryRequest)
+        const terms = matched.terms
         const context = preferences.contextAware && url ? contexts.get(url) ?? '' : ''
         const contextPrompt = context ? '\nDocument context (reference only):\n' + context : ''
         const prompt = buildTranslationPrompt(request.text, request.sourceLanguage, request.targetLanguage, template, terms) + contextPrompt
-        const key = await translationCacheKey(provider, request.sourceLanguage, request.targetLanguage, prompt)
+        const key = await translationCacheKey(provider, request.sourceLanguage, request.targetLanguage, prompt, matched.signature)
         const cached = await cache.get(key)
-        if (cached !== undefined) return { text: cached }
+        const stillCurrent = async () => {
+          if (resolveGlossaryTerms(await extensionGlossary.snapshot(), glossaryRequest).signature !== matched.signature) throw new ProviderError('glossaryChanged')
+        }
+        if (cached !== undefined) { await stillCurrent(); return { text: cached } }
         let result = ''
         // Native framing and free translation services impose smaller per-request limits.
-        const chunks = request.text.match(/[\s\S]{1,3500}/g) ?? []
+        const chunks = glossaryChunks(request.text, matched.hits)
+        let offset = 0
         for (const chunk of chunks) {
-          const chunkPrompt = buildTranslationPrompt(chunk, request.sourceLanguage, request.targetLanguage, template, terms) + contextPrompt
+          const chunkMatch = glossaryChunkMatch(matched, offset, offset + chunk.length)
+          offset += chunk.length
+          const chunkPrompt = buildTranslationPrompt(chunk, request.sourceLanguage, request.targetLanguage, template, chunkMatch.terms) + contextPrompt
           const before = (signal: AbortSignal) => throttle(provider.id, preferences.requestRate, signal)
-          result += await batchTranslation(JSON.stringify([provider.id, request.sourceLanguage, request.targetLanguage, template, host, context]), provider, chunk, chunkPrompt, preferences.batchSize, signal, async item => {
+          result += await batchTranslation(JSON.stringify([provider.id, request.sourceLanguage, request.targetLanguage, template, host, context, chunkMatch.signature]), provider, chunk, chunkPrompt, preferences.batchSize, signal, async item => {
             await before(item.signal)
-            if (provider.preset === 'nola' && (template || terms.length || context)) return generateWith(provider, item.prompt, item.signal)
-            return translateWith(provider, item.text, request.sourceLanguage, request.targetLanguage, item.prompt, item.signal)
+            return translateWith(provider, item.text, request.sourceLanguage, request.targetLanguage, item.prompt, item.signal, chunkMatch)
           }, before)
         }
+        await stillCurrent()
         await cache.set(key, result)
         return { text: result }
       })().then(result => reply({ id: request.id, result }), error => reply({ id: request.id, error: safeProviderError(error) })).finally(() => { clearTimeout(timeout); jobs.delete(request.id) })

@@ -715,6 +715,49 @@ describe('independent cloud consumers', () => {
   })
 })
 
+it('pins external MT admission and drains cancellation before unloading its model', async () => {
+  const test = await fixture()
+  test.settings.modelGateway.concurrency = { mt: 1 }
+  await test.gateway.start()
+  const drained = deferred<void>(), stopping = deferred<void>()
+  const worker = test.workers.find(item => item.kind === 'mt')!
+  const lease = await test.gateway.acquireExternalMt('resource:mt-test', async () => {
+    stopping.resolve(undefined)
+    expect(worker.close).not.toHaveBeenCalled()
+    await drained.promise
+    lease.release()
+  })
+  expect(test.gateway.resourceInUse('mt-test')).toBe(true)
+  expect(() => test.gateway.assertSettingsChange({ compute: { translationDevice: 'cpu' } })).toThrow('RESOURCE_IN_USE')
+  await expect(test.gateway.leaseCapability('mt')).rejects.toMatchObject({ code: 'rate_limited' })
+  const stop = test.gateway.stop()
+  await stopping.promise
+  expect(test.gateway.snapshot().activeRequests).toBe(1)
+  expect(worker.close).not.toHaveBeenCalled()
+  await expect(test.gateway.acquireExternalMt('cloud:mymemory', async () => {})).rejects.toMatchObject({ code: 'gateway_not_running' })
+  drained.resolve(undefined)
+  await stop
+  lease.release()
+  expect(worker.close).toHaveBeenCalledOnce()
+  expect(test.gateway.snapshot().requests[0].status).toBe('cancelled')
+  expect(test.gateway.snapshot().activeRequests).toBe(0)
+})
+
+it('validates external cloud MT without spawning workers and rejects late admission after stop', async () => {
+  const credentials = deferred<string>()
+  const test = await fixture(undefined, undefined, () => credentials.promise)
+  const pending = test.gateway.acquireExternalMt('cloud:mymemory', async () => {})
+  const rejected = expect(pending).rejects.toMatchObject({ code: 'gateway_not_running' })
+  await test.gateway.stop()
+  credentials.resolve('')
+  await rejected
+  const lease = await test.gateway.acquireExternalMt('cloud:mymemory', async () => { lease.release() })
+  expect(test.workers).toHaveLength(0)
+  lease.release()
+  await expect(test.gateway.acquireExternalMt('mt-custom:deleted', async () => {})).rejects.toMatchObject({ code: 'invalid_configuration' })
+  await expect(test.gateway.acquireExternalMt('resource:mt-test', async () => {})).rejects.toMatchObject({ code: 'gateway_not_running' })
+})
+
 it('rejects changes that unload or replace an in-use local model before settings are persisted', async () => {
   const test = await fixture()
   await test.gateway.start()

@@ -2,11 +2,13 @@ import { z } from 'zod'
 import { getProvider, type ProviderConnection } from './providers'
 import { loadPreferences, type Preferences } from './preferences'
 import { buildTranslationPrompt } from './provider-runtime'
-import { ProviderError, safeProviderError, translateWith, generateWith } from './provider-execution'
+import { ProviderError, safeProviderError, translateWith } from './provider-execution'
 import { encodeBase64 } from './native-provider'
 import { pcmWav, transcribeWith } from './provider-speech'
 import { openAliyunSpeech, type SpeechSocket } from './speech-socket'
 import { BROWSER_HOST_NAME, BROWSER_PROTOCOL_VERSION, type BrowserResponse } from '../../src/shared/browser'
+import { extensionGlossary, hasApplicableGlossary, recoverExtensionConfiguration } from './glossary-store'
+import { resolveGlossaryTerms } from '../../src/shared/glossary-match'
 
 const message = z.discriminatedUnion('type', [
   z.object({ type: z.literal('start'), sourceLanguage: z.string().max(32), targetLanguage: z.string().max(32), capability: z.enum(['asr', 's2s']) }).strict(),
@@ -16,6 +18,7 @@ const message = z.discriminatedUnion('type', [
 ])
 
 async function nativeStream(provider: ProviderConnection, source: string, signal: AbortSignal, emit: (event: Record<string, unknown>) => void): Promise<SpeechSocket> {
+  signal.throwIfAborted()
   const port = chrome.runtime.connectNative(BROWSER_HOST_NAME)
   const streamId = crypto.randomUUID()
   let readyResolve: () => void, readyReject: (error: Error) => void
@@ -55,13 +58,20 @@ export function setupSpeechRuntime(): void {
     if (port.sender?.tab?.id === undefined || port.sender.frameId !== 0 || !url || !/^https?:\/\//.test(url)) { port.disconnect(); return }
     const controller = new AbortController()
     let stream: SpeechSocket | undefined, started = false, ended = false
+    let disposeGlossary = () => {}
     let queue = Promise.resolve(), queued = 0, revision = 0, samples: number[] = [], silent = 0
     const reply = (value: unknown) => { if (!ended) { try { port.postMessage(value) } catch { /* A closed page owns no output. */ } } }
-    const close = () => { ended = true; controller.abort(); stream?.close(); samples = [] }
+    const close = () => { ended = true; controller.abort(); stream?.close(); samples = []; disposeGlossary() }
     port.onDisconnect.addListener(close)
     let source = 'auto', target = 'en', capability: 'asr' | 's2s' = 'asr', provider: ProviderConnection, mtProvider: ProviderConnection
     let sentMs = 0, segmentStartMs = 0, finalMs = 0
     let preferences: Preferences
+    disposeGlossary = extensionGlossary.onChanged(() => {
+      if (!started || ended || capability !== 's2s') return
+      void extensionGlossary.snapshot().then(document => {
+        if (!ended && hasApplicableGlossary(document, target, url)) { reply({ type: 'error', code: 'browserGlossaryModeUnsupported' }); close() }
+      }).catch(() => { if (!ended) { reply({ type: 'error', code: 'providerRequestFailed' }); close() } })
+    })
     const itemTimes = new Map<string, { start: number; end?: number }>()
     const sourceLinks = new Map<string, string>()
     const items = new Map<string, string>()
@@ -76,14 +86,15 @@ export function setupSpeechRuntime(): void {
     const translateFinal = (id: string, text: string) => {
       if (!text.trim()) return
       translations = translations.then(async () => {
-        const host = new URL(url).hostname
-        const terms = preferences.glossary.filter(term => term.source && text.includes(term.source) && (!term.sites.trim() || term.sites.split(/[\s,]+/).some(site => host === site || host.endsWith('.' + site))))
+        if (mtProvider.preset === 'nola' && preferences.subtitlePrompt.trim()) throw new ProviderError('nativePromptUnsupported')
+        const request = { text, targetLanguage: target, context: { scenario: 'tool' as const, pageUrl: url }, selection: { mode: 'auto' as const } }
+        const matched = resolveGlossaryTerms(await extensionGlossary.snapshot(), request)
+        const terms = matched.terms
         const prompt = buildTranslationPrompt(text, source, target, preferences.subtitlePrompt, terms)
-        const translated = mtProvider.preset === 'nola' && (preferences.subtitlePrompt.trim() || terms.length)
-          ? await generateWith(mtProvider, prompt, controller.signal)
-          : await translateWith(mtProvider, text, source, target, prompt, controller.signal)
+        const translated = await translateWith(mtProvider, text, source, target, prompt, controller.signal, matched)
+        if (resolveGlossaryTerms(await extensionGlossary.snapshot(), request).signature !== matched.signature) throw new ProviderError('glossaryChanged')
         publish(id, text, true, translated)
-      }).catch(() => { if (!ended) reply({ type: 'error', code: 'providerRequestFailed' }) })
+      }).catch(error => { if (!ended) reply({ type: 'error', code: safeProviderError(error) }) })
     }
     const onEvent = (event: Record<string, unknown>) => {
       const type = String(event.type ?? '')
@@ -97,11 +108,11 @@ export function setupSpeechRuntime(): void {
       if (typeof event.audio_end_ms === 'number') { const time = itemTimes.get(id) ?? { start: finalMs }; time.end = Math.max(time.start, event.audio_end_ms); itemTimes.set(id, time) }
       if (itemTimes.size > 128) itemTimes.delete(itemTimes.keys().next().value!)
       if (sourceLinks.size > 128) sourceLinks.delete(sourceLinks.keys().next().value!)
-      if (type === 'error') { reply({ type: 'error', code: 'providerRequestFailed' }); close(); return }
+      if (type === 'error') { reply({ type: 'error', code: safeProviderError(new ProviderError(typeof event.code === 'string' ? event.code : 'providerRequestFailed')) }); close(); return }
       if (type.includes('input_audio_transcription') || type === 'transcript') {
         const previous = items.get(id) ?? ''
         const text = String(event.transcript ?? event.text ?? (previous + String(event.delta ?? '')))
-        if (text.length > 16000) { close(); return }
+        if (text.length > 16000) { reply({ type: 'error', code: 'providerResponseSize' }); close(); return }
         items.set(id, text)
         if (items.size > 128) items.delete(items.keys().next().value!)
         const final = type.endsWith('completed') || event.final === true || event.is_final === true
@@ -133,7 +144,9 @@ export function setupSpeechRuntime(): void {
           if (started) throw new ProviderError('providerInvalid')
           if (!await chrome.permissions.contains({ origins: [`${new URL(url).origin}/*`] })) throw new ProviderError('providerPermission')
           started = true; source = request.sourceLanguage; target = request.targetLanguage; capability = request.capability
+          await recoverExtensionConfiguration()
           preferences = await loadPreferences()
+          if (capability === 's2s' && hasApplicableGlossary(await extensionGlossary.snapshot(), target, url)) throw new ProviderError('browserGlossaryModeUnsupported')
           if (capability === 'asr') mtProvider = await getProvider(preferences.subtitleProvider, 'mt')
           provider = await getProvider(capability === 's2s' ? preferences.s2sProvider : preferences.asrProvider, capability)
           if (provider.preset === 'nola') stream = await nativeStream(provider, source, controller.signal, onEvent)

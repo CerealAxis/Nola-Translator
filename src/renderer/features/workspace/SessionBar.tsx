@@ -14,6 +14,7 @@ import { CircleStop, Mic, Pause, Play } from 'lucide-react'
 
 import type { SessionStatus } from '@/bridge'
 import { useI18n } from '@/i18n'
+import { Spinner } from '@/components/ui/spinner'
 
 /**
  * Milliseconds to the timer reading.
@@ -42,6 +43,7 @@ export function isoDuration(ms: number): string {
 
 export interface SessionBarProps {
   status: SessionStatus
+  pausePending?: boolean
   elapsedMs: number
   onPause: () => void
   onResume: () => void
@@ -54,7 +56,7 @@ export interface SessionBarProps {
   onResolvePlayback?: (jobId: string, action: 'retry' | 'skip') => void
 }
 
-export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, className, audioLabel, playbackPhase, waitingSpeechCount, playbackJob, onResolvePlayback }: SessionBarProps) {
+export function SessionBar({ status, pausePending, elapsedMs, onPause, onResume, onStop, className, audioLabel, playbackPhase, waitingSpeechCount, playbackJob, onResolvePlayback }: SessionBarProps) {
   const { t } = useI18n()
   const playbackCopy = playbackPhase === 'waiting' ? 'session.playbackWaiting'
     : playbackPhase === 'synthesizing' ? 'session.playbackSynthesizing'
@@ -62,7 +64,7 @@ export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, class
         : playbackPhase === 'failed' ? 'session.playbackFailed' : null
   const running = status === 'running'
   const paused = status === 'paused'
-  const busy = status === 'starting' || status === 'stopping'
+  const busy = pausePending || status === 'starting' || status === 'stopping'
 
   return (
     <footer
@@ -77,9 +79,6 @@ export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, class
         {playbackJob.state === 'failed' ? <Button variant="secondary" size="sm" className="rounded-xl" disabled={busy} onClick={() => onResolvePlayback(playbackJob.jobId, 'retry')}>{t('session.retryPlayback')}</Button> : null}
         <Button variant="outline" size="sm" className="rounded-xl" disabled={busy} onClick={() => onResolvePlayback(playbackJob.jobId, 'skip')}>{t('session.skipPlayback')}</Button>
       </div> : null}
-      <div className="nola-workspace-wave" title={t('workspaceUi.noLevel')} aria-hidden="true">
-        {[8, 12, 8, 16, 24, 16, 30, 38, 24, 18, 30, 20, 34, 42, 32, 20, 24, 36, 28, 16, 24, 18, 26, 32, 16, 12, 18, 24, 12, 16, 8, 12].map((height, index) => <span key={index} style={{ height }} />)}
-      </div>
       <time
         dateTime={isoDuration(elapsedMs)}
         data-slot="session-timer"
@@ -103,7 +102,7 @@ export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, class
       <div className="flex shrink-0 items-center gap-2">
         {paused ? (
           <Button variant="outline" size="sm" className="rounded-xl" onClick={onResume} disabled={busy} title={t('workspace.resume')}>
-            <Play aria-hidden="true" />
+            {pausePending ? <Spinner /> : <Play aria-hidden="true" />}
             {t('workspace.resume')}
           </Button>
         ) : (
@@ -115,7 +114,7 @@ export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, class
             disabled={!running || busy}
             title={t('workspace.pause')}
           >
-            <Pause aria-hidden="true" />
+            {pausePending ? <Spinner /> : <Pause aria-hidden="true" />}
             {t('workspace.pause')}
           </Button>
         )}

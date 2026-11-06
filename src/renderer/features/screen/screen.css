@@ -1,39 +1,18 @@
 .screen-page { display: flex; min-width: 0; flex-direction: column; gap: var(--space-3); container-type: inline-size; }
 .screen-page > .card:not(.nola-settings-card) { --card-spacing: calc(var(--space-2) + var(--space-1) / 2); }
-.screen-scene-card.card { gap: var(--space-1); }
-.screen-scene.nola-overlay-stage { place-items: center; margin-inline: 0; }
-.screen-scene__art { display: grid; grid-template-columns: var(--space-5) minmax(var(--space-2), 1fr) minmax(0, min(60%, calc(var(--space-8) * 5))) minmax(var(--space-2), 1fr) var(--space-5); align-items: center; width: min(100%, calc(var(--space-8) * 12)); padding-bottom: var(--space-2); }
-.screen-scene__endpoint { display: grid; place-items: center; width: var(--space-5); height: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--accent); }
-.screen-scene__endpoint svg { width: var(--space-3); height: var(--space-3); stroke-width: 1.5; }
-.screen-scene__link { border-top: 2px dashed color-mix(in oklch, var(--accent) 30%, transparent); }
-.screen-scene__monitor { position: relative; min-width: 0; padding: var(--space-1); border: calc(var(--space-1) / 2) solid color-mix(in oklch, var(--accent) 25%, var(--surface)); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--surface-shadow); }
-.screen-scene__monitor::before, .screen-scene__monitor::after { content: ''; position: absolute; background: color-mix(in oklch, var(--accent) 30%, var(--surface-secondary)); }
-.screen-scene__monitor::before { top: 100%; left: 45%; width: 10%; height: var(--space-2); }
-.screen-scene__monitor::after { top: calc(100% + var(--space-2)); left: 35%; width: 30%; height: calc(var(--space-1) / 2); border-radius: var(--radius-sm); }
-.screen-scene__window { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2); border-radius: var(--radius-md); background: var(--surface-secondary); }
-.screen-scene__toolbar { border-top: 1px solid var(--border); }
-.screen-scene__document { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: var(--space-2); }
-.screen-scene__copy { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); }
-.screen-scene__copy > span { height: calc(var(--space-1) / 2); border-radius: var(--radius-sm); background: color-mix(in oklch, var(--accent) 13%, transparent); }
-.screen-scene__copy > span:first-child { width: 65%; height: var(--space-1); }
-.screen-scene__copy > span:nth-child(3) { width: 85%; }
-.screen-scene__picture { display: grid; place-items: center; margin-top: calc(var(--space-1) / 2); border-radius: var(--radius-sm); background: color-mix(in oklch, var(--accent) 10%, transparent); color: color-mix(in oklch, var(--accent) 35%, transparent); }
-.screen-scene__picture svg { width: 100%; height: auto; }
-.screen-scene__selection { position: relative; display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--space-1) / 2); padding: var(--space-2) var(--space-1); border: 2px dashed color-mix(in oklch, var(--accent) 65%, transparent); background: var(--surface); text-align: center; font: var(--font-caption); }
-.screen-scene__source { color: var(--muted); }
-.screen-scene__selection > svg { width: var(--space-3); height: var(--space-3); color: var(--accent); stroke-width: 1.5; }
-.screen-scene__translation { max-width: 100%; padding: calc(var(--space-1) / 2) var(--space-1); border-radius: var(--radius-md); background: color-mix(in oklch, var(--accent) 12%, transparent); color: var(--accent); font-weight: 600; overflow-wrap: anywhere; }
-.screen-scene__corner { position: absolute; width: var(--space-2); height: var(--space-2); border: calc(var(--space-1) / 2) solid var(--accent); }
-.screen-scene__corner[data-corner=tl] { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
-.screen-scene__corner[data-corner=tr] { top: -2px; right: -2px; border-left: 0; border-bottom: 0; }
-.screen-scene__corner[data-corner=bl] { bottom: -2px; left: -2px; border-right: 0; border-top: 0; }
-.screen-scene__corner[data-corner=br] { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
-@container (max-width: 600px) {
-  .screen-scene__art { grid-template-columns: var(--space-5) var(--space-2) minmax(0, 1fr) var(--space-2) var(--space-5); }
-  .screen-scene__window { padding: var(--space-1); }
-  .screen-scene__document { gap: var(--space-1); }
-}
 .screen-page__actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); }
+.screen-toolbar { display: flex; flex: none; width: max-content; height: max-content; flex-direction: column; gap: var(--space-1); padding: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); color: var(--foreground); }
+.screen-toolbar__main { display: flex; align-items: center; gap: calc(var(--space-1) / 2); }
+.screen-toolbar__main > button { flex-shrink: 0; }
+.screen-toolbar__drag { display: grid; place-items: center; align-self: stretch; min-width: var(--space-3); color: var(--muted); -webkit-app-region: drag; }
+.screen-toolbar__drag svg { width: var(--space-2); height: var(--space-3); }
+.screen-toolbar__status { display: flex; align-items: center; gap: var(--space-1); max-width: calc(var(--space-8) * 7); min-height: var(--space-3); padding-inline: var(--space-1); font: var(--nola-text-caption); color: var(--muted); }
+.screen-toolbar__status > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen-toolbar__settings { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2); border-top: 1px solid var(--separator); }
+.screen-toolbar__switch[data-slot="field"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+.screen-toolbar__settings > [data-slot="field"] { min-width: 0; }
+@media (max-width: 500px) { .screen-toolbar__main [data-icon] { display: none; } }
+.screen-page [data-slot="screen-results"] .nola-dual__scroll { max-height: calc(var(--space-8) * 5); }
 .screen-settings__footer { justify-content: flex-end; padding-top: var(--space-3); border-top: 1px solid var(--separator); }
 html[data-screen-window] body, html[data-screen-window] #root { background: transparent; }
 .screen-editor { position: relative; width: 100%; height: 100%; overflow: hidden; touch-action: none; user-select: none; cursor: crosshair; }

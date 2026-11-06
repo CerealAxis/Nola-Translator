@@ -75,7 +75,7 @@ while ($true) {
   $started = ''; try { $started = [System.Diagnostics.Process]::GetProcessById($targetPid).StartTime.ToUniversalTime().Ticks.ToString() } catch {}
   $identity = "$targetPid|$started|$class|$([NolaScreenTarget]::Destroyed)"
   @{ available=($valid -and [NolaScreenTarget]::Watching); foreground=([NolaScreenTarget]::GetForegroundWindow() -eq $targetHandle); identity=$identity; x=$rect.Left; y=$rect.Top; width=($rect.Right-$rect.Left); height=($rect.Bottom-$rect.Top); clientX=$origin.X; clientY=$origin.Y; clientWidth=$client.Right; clientHeight=$client.Bottom } | ConvertTo-Json -Compress
-  Start-Sleep -Milliseconds 300
+  Start-Sleep -Milliseconds 100
 }`
   const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
   let buffer = '', disposed = false
