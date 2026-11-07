@@ -1,7 +1,8 @@
 @import "./demo.css";
 
 .nola-component-demo.foundation-demo,
-.foundation-palette {
+.foundation-palette,
+:where(body:has(.shadcn-preview)) :is(.shadcn-preview-float, .shadcn-preview-menu, .shadcn-preview-dialog, .nola-dialog-content, .nola-toast, .select__popover, .dropdown__popover, [data-slot="popover-content"], [data-slot="tooltip-content"], [data-slot="combobox-content"]) {
   --background: #fafafa;
   --window: #fafafa;
   --surface: #fff;
@@ -52,7 +53,8 @@
 }
 .dark .nola-component-demo.foundation-demo:not([data-appearance="light"]),
 .nola-component-demo.foundation-demo[data-appearance="dark"],
-.foundation-palette[data-appearance="dark"] {
+.foundation-palette[data-appearance="dark"],
+.dark :where(body:has(.shadcn-preview)) :is(.shadcn-preview-float, .shadcn-preview-menu, .shadcn-preview-dialog, .nola-dialog-content, .nola-toast, .select__popover, .dropdown__popover, [data-slot="popover-content"], [data-slot="tooltip-content"], [data-slot="combobox-content"]) {
   --background: #171717;
   --window: #171717;
   --surface: #1f1f1f;

@@ -58,7 +58,7 @@ const refreshImageZoom = async () => {
   const { default: mediumZoom } = await import('medium-zoom')
   zoom ??= mediumZoom({ background: 'var(--vp-c-bg)', margin: 24 })
   zoom.detach()
-  zoom.attach('.vp-doc img:not([src*="shields.io"]):not([src$="badge.svg"]):not(.linkcard img)')
+  zoom.attach('.vp-doc img:not([src*="shields.io"]):not([src$="badge.svg"]):not(.linkcard img, .component-catalog img)')
 }
 onMounted(() => { void refreshImageZoom() })
 watch(() => page.value.relativePath, () => { void refreshImageZoom() }, { flush: 'post' })

@@ -13,8 +13,12 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { copy, docsNav, localeNames, localePath, downloadUrl, repositoryUrl, siteUrl, license, type Locale } from './theme/content'
 import { normalizeEmptyIsCss } from '../scripts/normalize-empty-is-css.mjs'
+import { shadcnDemoEntry } from './shadcn-demo-entry'
 
 const base = process.env.DOCS_BASE ?? '/'
+const shadcnPreview = fileURLToPath(new URL('../media-src/vis/shadcn-base/', import.meta.url)).replace(/\\/g, '/')
+const shadcnPortal = 'body:has(.shadcn-base-doc) :is([data-base-ui-portal], [data-assistant-preview-portal])'
+const shadcnScope = `:is(.shadcn-base-doc .vitepress-demo-plugin-preview > div, ${shadcnPortal})`
 
 // Search engines and social previews need a per-page URL, which the static head array cannot provide.
 const localeSegments: Record<Locale, string> = { 'zh-CN': 'zh-CN', 'zh-TW': 'zh-TW', 'zh-HK': 'zh-HK', en: 'en', ja: 'ja', ko: 'ko' }
@@ -168,8 +172,11 @@ export default withMermaid(defineConfig({
   transformHead,
   transformPageData(page) {
     if (page.relativePath.startsWith('vis/')) {
-      page.frontmatter.pageClass = page.relativePath.startsWith('vis/principles/')
-        ? 'nola-vis-doc nola-vis-principles' : 'nola-vis-doc'
+      const classes = page.frontmatter.pageClass
+      if (typeof classes !== 'string' || !classes.split(/\s+/).includes('shadcn-base-doc')) {
+        page.frontmatter.pageClass = page.relativePath.startsWith('vis/principles/')
+          ? 'nola-vis-doc nola-vis-principles' : 'nola-vis-doc'
+      }
       page.frontmatter.comments = false
     }
   },
@@ -196,16 +203,51 @@ export default withMermaid(defineConfig({
   head: [['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}nola-logo.svg` }], ['meta', { name: 'theme-color', content: '#f6f9ff' }]],
   locales,
   vite: {
-    plugins: [react({ exclude: /node_modules|\.vitepress\/cache/ }), tailwindcss(), groupIconVitePlugin()],
-    css: { postcss: { plugins: [postcssIsolateStyles({ includeFiles: [/vp-doc\.css/, /base\.css/] }), normalizeEmptyIsCss()] } },
-    resolve: { alias: { '@': resolve(workspace, 'src/renderer'), '@renderer': resolve(workspace, 'src/renderer') }, dedupe: ['react', 'react-dom'] },
+    plugins: [shadcnDemoEntry(), react({ exclude: /node_modules|\.vitepress\/cache/ }), tailwindcss(), groupIconVitePlugin()],
+    css: { postcss: { plugins: [
+      postcssIsolateStyles({
+        includeFiles: [/vp-doc\.css/, /base\.css/],
+        prefix: `:not(:where(.vp-raw, .vp-raw *, ${shadcnPortal}, ${shadcnPortal} *))`,
+      }),
+      postcssIsolateStyles({
+        includeFiles: [/shadcn-base[/\\]preview\.css(?:\?|$)/],
+        prefix: shadcnScope,
+        transform(scope, selector, scopedSelector, _file, rule) {
+          for (let parent = rule.parent; parent; parent = parent.parent) {
+            if (parent.type === 'rule') return selector
+          }
+          if (selector === '.dark') return `.dark ${scope}`
+          if ([':root', ':host', 'html', 'body'].includes(selector)) return scope
+          return scopedSelector
+        },
+      }),
+      normalizeEmptyIsCss(),
+    ] } },
+    resolve: {
+      dedupe: ['@assistant-ui/react', '@assistant-ui/core', '@assistant-ui/store', '@assistant-ui/tap'],
+      alias: [
+        { find: /^@\/(?:styles\/(?:base-(?:nova|rhea)|radix-rhea)\/ui(?:-rtl)?|registry\/(?:base-nova|new-york-v4)\/ui)\//, replacement: shadcnPreview + 'ui/' },
+        { find: /^@\/(components\/(?:language-selector|markdown|message-animated)|hooks\/(?:use-copy-to-clipboard|use-media-query|use-mobile)|lib\/(?:ai|message-animations)|registry\/(?:bases\/base|icons)\/.*)$/, replacement: shadcnPreview + '$1' },
+        { find: '@/registry/base-nova/hooks/use-mobile', replacement: shadcnPreview + 'hooks/use-mobile.ts' },
+        { find: '@/app/(create)/components/icon-placeholder', replacement: shadcnPreview + 'icon-placeholder.jsx' },
+        { find: 'next/image', replacement: shadcnPreview + 'image.jsx' },
+        { find: 'next/link', replacement: shadcnPreview + 'link.jsx' },
+        { find: 'next/font/google', replacement: shadcnPreview + 'system-font.js' },
+        { find: /^cn$/, replacement: resolve(workspace, 'src/renderer/lib/utils.ts') },
+        { find: '@', replacement: resolve(workspace, 'src/renderer') },
+        { find: '@renderer', replacement: resolve(workspace, 'src/renderer') },
+        // Previews and desktop components must share React, including inside optimized dependencies.
+        { find: 'react', replacement: resolve(workspace, 'node_modules/react') },
+        { find: 'react-dom', replacement: resolve(workspace, 'node_modules/react-dom') },
+      ],
+    },
     publicDir: resolve(workspace, 'docs/public'),
-    server: { fs: { allow: [workspace] }, watch: { ignored: ['**/.electron-cache/**', '**/.vitepress/.temp/**', '**/.vitepress/cache/**', '**/dist/**', '**/public/screenshots/**'] } },
+    server: { fs: { allow: [workspace] }, watch: { ignored: ['**/.electron-cache/**', '**/.vitepress/.temp/**', '**/.vitepress/cache/**', '**/dist/**', '**/public/screenshots/**', '**/public/component-previews/**'] } },
     // The isolated desktop demo is built separately and never scanned as a VitePress entry.
     optimizeDeps: {
-      entries: ['.vitepress/theme/index.ts'],
+      entries: ['.vitepress/theme/index.ts', 'media-src/vis/demos/{shadcn-base,assistant-ui}/*.tsx'],
       // Mermaid's lazy layout chunks import this CommonJS package outside the entry scan.
-      include: ['fastdom', 'fastdom/extensions/fastdom-promised.js'],
+      include: ['react-dom/client', 'fastdom', 'fastdom/extensions/fastdom-promised.js'],
     },
   },
   themeConfig: {

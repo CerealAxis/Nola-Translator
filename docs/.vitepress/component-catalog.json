@@ -1,0 +1,435 @@
+{
+  "shadcn": [
+    {
+      "path": "alert-dialog",
+      "target": "[data-slot=alert-dialog-content]",
+      "trigger": "[data-slot=alert-dialog-trigger]",
+      "portal": true
+    },
+    {
+      "path": "button",
+      "target": ".vitepress-demo-plugin-preview > div > div"
+    },
+    {
+      "path": "carousel",
+      "target": ".vitepress-demo-plugin-preview > div"
+    },
+    {
+      "path": "chart",
+      "target": ".vitepress-demo-plugin-preview [data-slot=chart]:has(.recharts-xAxis)",
+      "settle": 1650
+    },
+    {
+      "path": "collapsible",
+      "trigger": "[data-slot=collapsible-trigger]",
+      "ready": "[data-slot=collapsible-content]:not([hidden])"
+    },
+    {
+      "path": "combobox",
+      "target": "[data-slot=combobox-content]",
+      "trigger": "[data-slot=input-group-button]",
+      "portal": true
+    },
+    {
+      "path": "context-menu",
+      "target": "[data-slot=context-menu-content]",
+      "contextmenu": "[data-slot=context-menu-trigger]",
+      "portal": true
+    },
+    {
+      "path": "date-picker",
+      "target": "[data-slot=popover-content]",
+      "trigger": "[data-slot=popover-trigger]",
+      "portal": true
+    },
+    {
+      "path": "dialog",
+      "trigger": "[data-slot=dialog-trigger]",
+      "target": "[data-slot=dialog-content]",
+      "portal": true
+    },
+    {
+      "path": "drawer",
+      "target": "[data-slot=drawer-popup]",
+      "trigger": "[data-slot=drawer-trigger]",
+      "ready": "[data-slot=drawer-popup]:not([data-starting-style])",
+      "portal": true
+    },
+    {
+      "path": "dropdown-menu",
+      "target": "[data-slot=dropdown-menu-content]",
+      "trigger": "[data-slot=dropdown-menu-trigger]",
+      "portal": true
+    },
+    {
+      "path": "field",
+      "target": ".vitepress-demo-plugin-preview [data-slot=field-set]"
+    },
+    {
+      "path": "hover-card",
+      "target": "[data-slot=hover-card-content]",
+      "hover": "[data-slot=hover-card-trigger]",
+      "include": ".vitepress-demo-plugin-preview [data-slot=hover-card-trigger]",
+      "portal": true
+    },
+    {
+      "path": "menubar",
+      "target": "[data-slot=menubar-content]",
+      "trigger": "[data-slot=menubar-trigger]",
+      "include": ".vitepress-demo-plugin-preview [data-slot=menubar]",
+      "portal": true
+    },
+    {
+      "path": "message",
+      "target": ".vitepress-demo-plugin-preview [data-slot=message]",
+      "include": ".vitepress-demo-plugin-preview [data-slot=message]:nth-child(3)"
+    },
+    {
+      "path": "navigation-menu",
+      "target": ".vitepress-demo-plugin-preview [data-slot=navigation-menu]"
+    },
+    {
+      "path": "popover",
+      "target": "[data-slot=popover-content]",
+      "trigger": "[data-slot=popover-trigger]",
+      "portal": true
+    },
+    {
+      "path": "progress",
+      "ready": "[data-slot=progress][aria-valuenow='66']"
+    },
+    {
+      "path": "select",
+      "target": "[data-slot=select-content]",
+      "trigger": "[data-slot=select-trigger]",
+      "portal": true
+    },
+    {
+      "path": "sheet",
+      "target": "[data-slot=sheet-content]",
+      "trigger": "[data-slot=sheet-trigger]",
+      "portal": true
+    },
+    {
+      "path": "sidebar",
+      "target": ".vitepress-demo-plugin-preview [data-slot=sidebar-container]",
+      "portal": true
+    },
+    {
+      "path": "toast",
+      "trigger": "button",
+      "target": "[data-slot=toast]",
+      "portal": true
+    },
+    {
+      "path": "tooltip",
+      "target": "[data-slot=tooltip-content]",
+      "hover": "[data-slot=tooltip-trigger]",
+      "include": ".vitepress-demo-plugin-preview [data-slot=tooltip-trigger]",
+      "portal": true
+    },
+    {
+      "path": "typography",
+      "target": ".vitepress-demo-plugin-preview h1",
+      "include": ".vitepress-demo-plugin-preview blockquote"
+    }
+  ],
+  "assistant-ui": [
+    {
+      "path": "assistant-ui/agent-status",
+      "target": "[data-slot=agent-status]"
+    },
+    {
+      "path": "assistant-ui/approval-card",
+      "target": "[data-slot=approval-card]"
+    },
+    {
+      "path": "assistant-ui/artifact-card",
+      "target": "[data-slot=artifact-card]",
+      "ready": "button[aria-label='重播演示']"
+    },
+    {
+      "path": "assistant-ui/assistant-modal",
+      "target": ".aui-modal-content",
+      "trigger": ".aui-modal-button",
+      "portal": true
+    },
+    {
+      "path": "assistant-ui/attachments",
+      "target": "[data-slot=composer-bar]"
+    },
+    {
+      "path": "assistant-ui/canvas",
+      "target": "[data-slot=canvas-split]",
+      "ready": "[data-slot=canvas-split-line]:nth-child(4)"
+    },
+    {
+      "path": "assistant-ui/chart",
+      "target": "[data-slot=chart]",
+      "ready": "button[aria-label='重播演示']"
+    },
+    {
+      "path": "assistant-ui/chat-panel",
+      "target": "[data-slot=chat-panel]",
+      "ready": "[data-slot=streaming-text] > span:nth-child(7)"
+    },
+    {
+      "path": "assistant-ui/composer",
+      "target": "[data-slot=composer]"
+    },
+    {
+      "path": "assistant-ui/composer-trigger-popover",
+      "target": "[data-slot=composer-trigger-popover]",
+      "input": "textarea",
+      "text": "@",
+      "portal": true
+    },
+    {
+      "path": "assistant-ui/confidence",
+      "target": "[data-slot=confidence-marker]",
+      "hover": "[data-slot=confidence-marker] button:first-child",
+      "ready": "[data-slot=confidence-marker] [role=status]"
+    },
+    {
+      "path": "assistant-ui/connection-state",
+      "target": "[data-slot=connection-state]"
+    },
+    {
+      "path": "assistant-ui/context",
+      "target": "[data-slot=composer-bar]"
+    },
+    {
+      "path": "assistant-ui/dictation",
+      "target": "[data-slot=composer-bar]",
+      "ready": "[data-slot=composer-voice][data-recording]"
+    },
+    {
+      "path": "assistant-ui/empty-state",
+      "target": "[data-slot=empty-state]"
+    },
+    {
+      "path": "assistant-ui/file-tree",
+      "target": "[data-slot=file-tree]",
+      "ready": "[data-slot=file-tree] > div:nth-child(2) > div:nth-child(4)"
+    },
+    {
+      "path": "assistant-ui/flow-graph",
+      "target": "[data-slot=flow-graph]",
+      "ready": "[data-slot=flow-graph] > div > div:nth-of-type(5)"
+    },
+    {
+      "path": "assistant-ui/image",
+      "target": "[data-slot=image-root]",
+      "ready": "[data-slot=image-preview]:not(:has([data-slot=image-preview-loading]))"
+    },
+    {
+      "path": "assistant-ui/image-generation",
+      "target": "[data-slot=image-generation]",
+      "ready": "[data-slot=image-generation] button:not(:disabled)"
+    },
+    {
+      "path": "assistant-ui/inline-citation",
+      "target": "[data-base-ui-portal] [data-open][class~='w-64']",
+      "include": "[data-slot=inline-citation]",
+      "hover": "[data-slot=inline-citation] button:first-of-type",
+      "portal": true
+    },
+    {
+      "path": "assistant-ui/launcher",
+      "target": "[data-slot=launcher-bubble]",
+      "ready": "[data-slot=launcher-bubble] [aria-expanded=true]"
+    },
+    {
+      "path": "assistant-ui/link-preview",
+      "target": "[data-slot=link-preview]"
+    },
+    {
+      "path": "assistant-ui/loader",
+      "target": "[data-slot=generation-loader]"
+    },
+    {
+      "path": "assistant-ui/math",
+      "target": "[data-slot=math-block]",
+      "ready": "[data-slot=math-block] > div:nth-of-type(3)"
+    },
+    {
+      "path": "assistant-ui/mcp-config-dialog",
+      "target": ".aui-mcp-config-content",
+      "trigger": "[data-slot=dialog-trigger]",
+      "portal": true
+    },
+    {
+      "path": "assistant-ui/media-player",
+      "target": "[data-slot=audio-player]"
+    },
+    {
+      "path": "assistant-ui/mentions",
+      "target": "[data-slot=composer-menu]",
+      "padding": 6
+    },
+    {
+      "path": "assistant-ui/mermaid-diagram",
+      "target": "[data-slot=mermaid-diagram]"
+    },
+    {
+      "path": "assistant-ui/message-actions",
+      "target": "[data-slot=message-actions]"
+    },
+    {
+      "path": "assistant-ui/message-branches",
+      "target": "[data-slot=message-branches]"
+    },
+    {
+      "path": "assistant-ui/message-pair",
+      "target": "[data-slot=message-pair]",
+      "ready": "[data-slot=message-pair] > div > p > span:nth-child(18)"
+    },
+    {
+      "path": "assistant-ui/mobile-composer",
+      "target": "[data-slot=mobile-composer]"
+    },
+    {
+      "path": "assistant-ui/model-selector",
+      "target": "[data-slot=model-selector-content]",
+      "trigger": "[data-slot=model-selector-trigger]",
+      "portal": true
+    },
+    {
+      "path": "assistant-ui/models",
+      "target": "[data-slot=composer-menu]",
+      "padding": 6
+    },
+    {
+      "path": "assistant-ui/number-ticker",
+      "target": "[data-slot=number-ticker]"
+    },
+    {
+      "path": "assistant-ui/option-list",
+      "target": "[data-slot=option-list]"
+    },
+    {
+      "path": "assistant-ui/orb",
+      "target": ".aui-voice-orb"
+    },
+    {
+      "path": "assistant-ui/regenerate-with",
+      "target": "[data-slot=regenerate-menu]"
+    },
+    {
+      "path": "assistant-ui/research-report",
+      "target": "[data-slot=research-report]",
+      "ready": "[data-slot=research-report] p"
+    },
+    {
+      "path": "assistant-ui/retrieval-chunks",
+      "target": "[data-slot=retrieval-chunks]",
+      "ready": "[data-slot=retrieval-chunks] > div:nth-child(3) > div:nth-child(2)"
+    },
+    {
+      "path": "assistant-ui/run-activity",
+      "target": "[data-slot=run-activity]",
+      "trigger": "[data-slot=run-activity] [data-slot=collapsible-trigger]",
+      "ready": "[data-slot=run-activity][data-status=complete] [data-activity-kind]"
+    },
+    {
+      "path": "assistant-ui/score-breakdown",
+      "target": "[data-slot=score-breakdown]",
+      "ready": "button[aria-label='重播演示']"
+    },
+    {
+      "path": "assistant-ui/scroll-anchor",
+      "target": "[data-slot=scroll-anchor]",
+      "ready": "[data-slot=scroll-anchor] button"
+    },
+    {
+      "path": "assistant-ui/shiki-highlighter",
+      "target": ".vitepress-demo-plugin-preview [data-assistant-preview] > div:first-child",
+      "ready": ".aui-shiki-base pre.shiki"
+    },
+    {
+      "path": "assistant-ui/slash-commands",
+      "target": "[data-slot=composer-menu]",
+      "padding": 6
+    },
+    {
+      "path": "assistant-ui/spec-sheet",
+      "target": "[data-slot=spec-sheet]",
+      "ready": "[data-slot=spec-sheet] > div:nth-child(2) > div:nth-child(4)"
+    },
+    {
+      "path": "assistant-ui/stopped-run",
+      "target": "[data-slot=stopped-run]",
+      "ready": "button[aria-label='重播演示']"
+    },
+    {
+      "path": "assistant-ui/streaming-text",
+      "target": "[data-slot=streaming-text]",
+      "ready": "[data-slot=streaming-text] > span:nth-child(24)"
+    },
+    {
+      "path": "assistant-ui/terminal-block",
+      "target": "[data-slot=terminal-block]",
+      "ready": "[data-slot=terminal-block][data-state=done]"
+    },
+    {
+      "path": "assistant-ui/thinking-indicator",
+      "target": "[data-slot=thinking-indicator]"
+    },
+    {
+      "path": "assistant-ui/thread-list",
+      "target": "[data-slot=aui_thread-list-root]"
+    },
+    {
+      "path": "assistant-ui/timeline",
+      "target": "[data-slot=timeline]",
+      "ready": "[data-slot=timeline] > div:nth-child(4)"
+    },
+    {
+      "path": "assistant-ui/tool-call",
+      "target": "[data-slot=tool-call]",
+      "trigger": "[data-slot=tool-call] [aria-expanded=false]",
+      "ready": "[data-slot=tool-call] [aria-expanded=true]"
+    },
+    {
+      "path": "assistant-ui/tool-group",
+      "target": "[data-slot=tool-group-root]",
+      "trigger": "[data-slot=tool-group-trigger]"
+    },
+    {
+      "path": "assistant-ui/tool-timeline",
+      "target": "[data-slot=tool-timeline]",
+      "trigger": "[data-slot=tool-timeline] [aria-expanded=false]",
+      "ready": "[data-slot=tool-timeline] [data-slot=collapsible-content] > div > div:nth-child(4)"
+    },
+    {
+      "path": "assistant-ui/tooltip-icon-button",
+      "target": "[data-slot=tooltip-content]",
+      "hover": "[data-slot=tooltip-trigger]",
+      "include": ".vitepress-demo-plugin-preview [data-slot=tooltip-trigger]"
+    },
+    {
+      "path": "assistant-ui/trace-waterfall",
+      "target": "[data-slot=trace-waterfall]",
+      "ready": "[data-slot=trace-waterfall] > div:nth-child(2) > div:nth-child(5)"
+    },
+    {
+      "path": "assistant-ui/typing-indicator",
+      "target": "[data-slot=typing-indicator]"
+    },
+    {
+      "path": "assistant-ui/voice-conversation",
+      "target": "[data-slot=voice-conversation]",
+      "ready": "[data-slot=voice-conversation] .break-words"
+    },
+    {
+      "path": "assistant-ui/web-preview",
+      "target": "[data-slot=web-preview]",
+      "ready": "[data-slot=web-preview] [aria-hidden=false]"
+    },
+    {
+      "path": "assistant-ui/web-search",
+      "target": "[data-slot=web-search]",
+      "ready": "[data-slot=web-search] > div:nth-child(3) > div:nth-child(3)"
+    }
+  ]
+}

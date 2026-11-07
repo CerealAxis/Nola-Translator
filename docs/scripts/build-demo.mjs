@@ -12,7 +12,14 @@ await build({
   base: './',
   publicDir: resolve(root, 'src/renderer/public'),
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { '@': resolve(root, 'src/renderer'), '@renderer': resolve(root, 'src/renderer') } },
+  resolve: {
+    alias: {
+      '@': resolve(root, 'src/renderer'),
+      '@renderer': resolve(root, 'src/renderer'),
+      react: resolve(root, 'node_modules/react'),
+      'react-dom': resolve(root, 'node_modules/react-dom'),
+    },
+  },
   build: {
     outDir, emptyOutDir: true,
     rollupOptions: { input: resolve(root, 'docs/media-src/index.html') },

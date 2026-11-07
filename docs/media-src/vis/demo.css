@@ -10,7 +10,7 @@
 @source "../../../src/renderer/components/ui";
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
+:root:where(:not(:has(.shadcn-base-doc, .component-catalog))) {
   color-scheme: light;
   --background: #fff;
   --window: #f5f5f7;
@@ -50,7 +50,7 @@
   --ease-nola: ease-out;
 }
 
-:root.dark {
+:root.dark:where(:not(:has(.shadcn-base-doc, .component-catalog))) {
   color-scheme: dark;
   --background: #252527;
   --window: #252527;
@@ -70,7 +70,7 @@
   --overlay: #2a2a2c;
 }
 
-:root {
+:root:where(:not(:has(.shadcn-base-doc, .component-catalog))) {
   --overlay: var(--surface);
   --overlay-foreground: var(--foreground);
   --field-background: var(--surface);

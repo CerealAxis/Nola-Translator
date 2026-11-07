@@ -1,0 +1,199 @@
+[data-preview-switch] {
+  @apply relative inline-flex h-[18.4px] w-[32px] shrink-0 items-center rounded-full border border-transparent bg-input outline-none transition-all dark:bg-input/80;
+}
+
+[data-preview-switch]:is([aria-checked="true"], [data-checked]) {
+  @apply bg-primary dark:bg-primary;
+}
+
+[data-preview-switch]:focus-visible,
+[role="switch"]:focus-visible > [data-preview-switch] {
+  @apply border-ring ring-[3px] ring-ring/50;
+}
+
+[data-preview-switch][aria-disabled="true"] {
+  @apply cursor-not-allowed opacity-50;
+}
+
+[data-preview-switch-thumb] {
+  @apply pointer-events-none absolute start-0 block size-4 rounded-full bg-background transition-[inset-inline-start] dark:bg-foreground;
+}
+
+[data-preview-switch]:is([aria-checked="true"], [data-checked]) > [data-preview-switch-thumb] {
+  inset-inline-start: calc(100% - 1rem);
+  @apply dark:bg-primary-foreground;
+}
+
+:is(
+  [data-preview-control="input"],
+  .aui-mcp-add-form :is(input:not([type="hidden"]), select),
+  .aui-generative-preview :is(input[data-aui="input"], [data-aui="select"], [data-aui="datepicker"])
+) {
+  @apply h-9 min-h-0 w-full min-w-0 rounded-4xl border border-input bg-input/30 px-3 py-1 text-base text-foreground transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm;
+}
+
+:is([data-preview-control="textarea"], .aui-generative-preview textarea[data-aui="input"]) {
+  @apply flex h-auto min-h-16 w-full resize-none rounded-xl border border-input bg-input/30 px-3 py-3 text-base text-foreground transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm;
+  field-sizing: content;
+}
+
+:is([data-preview-control="input"], [data-preview-control="textarea"], .aui-mcp-add-form :is(input, select))[aria-invalid="true"] {
+  @apply border-destructive ring-[3px] ring-destructive/20 dark:ring-destructive/40;
+}
+
+[data-assistant-preview] :has(> [data-preview-control="group-input"]) {
+  @apply h-9 min-w-0 rounded-4xl border border-input bg-input/30 px-3 py-0 transition-colors;
+}
+
+[data-assistant-preview] :has(> [data-preview-control="group-input"]:focus-visible) {
+  @apply border-ring ring-[3px] ring-ring/50;
+}
+
+[data-preview-control="group-input"] {
+  @apply h-full text-base text-foreground md:text-sm;
+}
+
+[data-preview-choice] {
+  @apply inline-flex h-8 min-w-8 items-center justify-center rounded-4xl border border-input bg-transparent px-3 py-0 text-sm font-medium text-foreground outline-none transition-colors hover:bg-muted focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50;
+}
+
+[data-preview-choice][aria-pressed="true"] {
+  @apply bg-muted;
+}
+
+[data-preview-slider] {
+  @apply h-4 w-full appearance-none bg-transparent;
+  --preview-slider-track: linear-gradient(
+    to right,
+    var(--primary) 0 var(--preview-slider-fill),
+    var(--muted) var(--preview-slider-fill) 100%
+  );
+}
+
+[data-preview-slider]:dir(rtl) {
+  --preview-slider-track: linear-gradient(
+    to left,
+    var(--primary) 0 var(--preview-slider-fill),
+    var(--muted) var(--preview-slider-fill) 100%
+  );
+}
+
+[data-preview-slider]::-webkit-slider-runnable-track {
+  @apply h-3 rounded-4xl;
+  background: var(--preview-slider-track);
+}
+
+[data-preview-slider]::-moz-range-track {
+  @apply h-3 rounded-4xl;
+  background: var(--preview-slider-track);
+}
+
+[data-preview-slider]::-webkit-slider-thumb {
+  @apply -mt-0.5 size-4 appearance-none rounded-4xl border border-primary bg-white shadow-sm;
+}
+
+[data-preview-slider]::-moz-range-thumb {
+  @apply box-border size-4 rounded-4xl border border-primary bg-white shadow-sm;
+}
+
+[data-preview-slider]:focus-visible {
+  @apply rounded-4xl outline-2 outline-ring;
+}
+
+[data-preview-slider]:disabled {
+  @apply opacity-50;
+}
+
+[data-assistant-preview] [role="progressbar"] {
+  @apply h-3 overflow-hidden rounded-4xl bg-muted shadow-none;
+}
+
+[data-assistant-preview] :where([role="progressbar"] > :not(.shimmer, [class*="bg-emerald"])) {
+  border-radius: 0;
+}
+
+[data-assistant-preview] :where([data-slot="job-progress"][data-state="running"], :not([data-slot="job-progress"])) > [role="progressbar"] > :where(:not(.shimmer, [class*="bg-emerald"])) {
+  @apply bg-primary dark:bg-primary;
+}
+
+[data-assistant-preview] :is(kbd:not([data-slot]), [data-preview-kbd]) {
+  @apply pointer-events-none inline-flex h-5 w-fit min-w-5 items-center justify-center gap-1 rounded-sm bg-muted px-1 py-0 font-sans text-xs font-medium text-muted-foreground select-none;
+}
+
+:is([data-slot="data-table"] table, .aui-md-table, .aui-generative-preview [data-aui="table"]) {
+  @apply w-full border-collapse caption-bottom text-sm;
+
+  tr {
+    @apply border-0 border-b border-border transition-colors hover:bg-muted/50;
+  }
+
+  tbody tr:last-child {
+    @apply border-b-0;
+  }
+
+  th {
+    @apply h-12 rounded-none bg-transparent px-3 py-0 align-middle font-sans text-sm font-medium text-foreground;
+  }
+
+  td {
+    @apply rounded-none border-0 p-3 align-middle text-sm text-foreground;
+  }
+}
+
+.aui-md-hr {
+  @apply h-px border-0 bg-border;
+}
+
+.aui-generative-preview [data-aui="card"] {
+  @apply rounded-2xl border-0 bg-card text-card-foreground ring-1 ring-foreground/10 forced-colors:border;
+}
+
+.aui-generative-preview [data-aui="badge"] {
+  @apply inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+}
+
+.aui-generative-preview [data-aui="badge"]:not([data-aui-variant]),
+.aui-generative-preview [data-aui="badge"][data-aui-variant="neutral"] {
+  @apply bg-secondary text-secondary-foreground;
+}
+
+.aui-generative-preview [data-aui="badge"][data-aui-variant="danger"] {
+  @apply bg-destructive/10 text-destructive dark:bg-destructive/20;
+}
+
+[data-assistant-preview] :is(.aui-md input[type="checkbox"], .aui-generative-preview input[type="checkbox"]:not([role="switch"]), .aui-generative-preview input[type="radio"]) {
+  @apply relative inline-grid size-4 shrink-0 appearance-none place-content-center border border-input outline-none transition-shadow focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30;
+
+  &:checked {
+    @apply border-primary bg-primary text-primary-foreground dark:bg-primary;
+  }
+
+  @media (forced-colors: active) {
+    appearance: auto;
+  }
+}
+
+[data-assistant-preview] :is(.aui-md input[type="checkbox"], .aui-generative-preview input[type="checkbox"]:not([role="switch"])) {
+  @apply rounded-[6px];
+
+  &:checked::before {
+    content: "";
+    @apply h-2 w-1 rotate-45 border-r-2 border-b-2 border-current;
+    margin-block-start: -0.125rem;
+  }
+}
+
+.aui-generative-preview input[type="radio"] {
+  @apply rounded-full;
+
+  &:checked::before {
+    content: "";
+    @apply size-2 rounded-full bg-primary-foreground;
+  }
+}
+
+@media (forced-colors: active) {
+  [data-assistant-preview] :is(.aui-md input, .aui-generative-preview input):is([type="checkbox"], [type="radio"])::before {
+    content: none;
+  }
+}

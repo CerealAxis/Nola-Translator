@@ -3,6 +3,7 @@ import type { Theme } from 'vitepress'
 import Landing from './Landing.vue'
 import DocLayout from './DocLayout.vue'
 import Linkcard from './Linkcard.vue'
+import ShadcnInstall from './ShadcnInstall.vue'
 import { NProgress } from 'nprogress-v2'
 import { VitepressDemoBox, VitepressDemoPlaceholder } from 'vitepress-demo-plugin/client'
 import 'nprogress-v2/dist/index.css'
@@ -20,6 +21,7 @@ export default {
   enhanceApp({ app, router, siteData }) {
     app.component('NolaLanding', Landing)
     app.component('Linkcard', Linkcard)
+    app.component('ShadcnInstall', ShadcnInstall)
     app.component('VitepressDemoBox', VitepressDemoBox)
     app.component('VitepressDemoPlaceholder', VitepressDemoPlaceholder)
     if (typeof window === 'undefined') return
