@@ -21,6 +21,7 @@
     "nprogress-v2": "^1.1.10",
     "vanilla-cookieconsent": "^3.1.0",
     "vitepress": "1.6.4",
+    "vitepress-demo-plugin": "^1.8.0",
     "vitepress-markdown-timeline": "^1.2.2",
     "vitepress-plugin-group-icons": "^1.7.7",
     "vitepress-plugin-mermaid": "^2.0.17",

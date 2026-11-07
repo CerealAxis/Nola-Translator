@@ -6,7 +6,10 @@
 
 相关资源：
 
-- 视觉规范：[DESIGN.MD](./DESIGN.MD)
+- 视觉与组件规范：[DESIGN.md](./docs/design-system/DESIGN.md)
+- 设计原则与文档目录：[设计文档](./docs/design-system/outline.md)
+- 工程规约：[编码与工程规约目录](./docs/design-system/engineering/index.md)
+- 产品帮助文档：[帮助文档](./docs/help-docs/zh-CN/docs.md)
 - shadcn/ui 文档：[llms.txt](./llms.txt)
 - assistant-ui 文档：https://www.assistant-ui.com/llms-full.txt
 - 项目 Skills：`./skills/`
@@ -177,7 +180,8 @@ browser/
   tests/                     扩展测试
 
 docs/
-  nola-docs/                 用户文档
+  help-docs/                 多语言帮助文档与产品首页
+  design-system/             设计系统规范与组件示例文档
   .vitepress/                站点配置
   media-src/                 演示及截图素材
   scripts/                   文档构建脚本
@@ -219,13 +223,16 @@ skills/                      项目 Skills
 
 ### 3.1 视觉规范
 
-修改 UI 前阅读 `DESIGN.MD`。
+修改界面、文档示例或截图前，完整阅读 `docs/design-system/DESIGN.md`，并查阅设计文档中对应的原则与组件章节。
 
-- 颜色、字号、间距、圆角等以 `src/renderer/theme/` 的设计 token 为准。
+- 颜色、字号、间距、尺寸和圆角遵循该规范，通过 `src/renderer/theme/` 中的现有设计 token 实现。
+- 现有实现与规范不一致时，指出具体差异；不沿用过时数值。
 - 不新增无依据的硬编码视觉值。
 - 按钮统一采用 `--radius-xl`，禁止 `ghost` 变体；图标按钮允许透明背景。
 - 非按钮元素按语义选择圆角 token；不存在 `rounded-pill` 档位。
-- 优先复用现有 shadcn/ui 和项目 primitives，不自行实现重复基础组件。
+- 优先复用项目现有 shadcn/ui（Base UI）组件和 primitives，参考官方对应组件的示例代码，不自行实现重复基础组件。
+- 排版示例采用静态展示；需要说明状态变化时，加入必要的简单交互。
+- 完成后检查实际页面，包括浅色、深色、窄屏和 200% 缩放。
 - 对受保护的视觉规范或设计系统变更，遵循第 6 节的授权要求。
 
 ### 3.2 前端设计原则
@@ -248,32 +255,26 @@ skills/                      项目 Skills
 
 `auto`、`zh-CN`、`zh-TW`、`zh-HK`、`ko`、`ja`、`en`
 
-- `auto` 根据系统区域解析。
-- 所有用户可见界面字符串使用 `t()`。
-- 六个具体区域语言各自拥有完整 `Dictionary`。
-- `t()` 的 key 类型为 `Leaves<Dictionary>`，错误 key 应触发编译错误。
-- 修改 key 时同步更新六个区域语言。
-- `zh-CN.ts` 由各 `*-ui.ts` 子字典组装，可以在对应子字典中定义新 key。
-- TS2741 可能仅报告第一个缺失字段，因此须执行**全语言 key 全量比对**，不可仅依靠 TypeScript 编译结果。
+## 4. 工程规约
 
-## 4. 代码与注释规范
+编码、注释、提交信息及工程文档统一遵循以下规约。修改前按技术栈和任务阅读对应章节。
 
-- 遵循项目既有命名、类型、模块拆分和错误处理方式。
-- 新增抽象前，先判断是否能复用现有实现。
-- 避免与任务无关的格式化、文件搬迁和依赖升级。
-- 不随意绕过已有类型、校验、权限及生命周期管理。
+### 4.1 编码规约
 
-**注释规范**
+- [通用编码规约](./docs/design-system/engineering/coding/common.md)
+- [HTML 编码规约](./docs/design-system/engineering/coding/html.md)
+- [CSS 编码规约](./docs/design-system/engineering/coding/css.md)
+- [JavaScript 编码规约](./docs/design-system/engineering/coding/javascript.md)
+- [React 编码规约](./docs/design-system/engineering/coding/react.md)
+- [TypeScript 编码规约](./docs/design-system/engineering/coding/typescript.md)
+- [Node.js 编码规约](./docs/design-system/engineering/coding/node.md)
 
-- 代码注释统一使用英文。
-- 解释原因、边界、特殊值和不明显的副作用，而非复述代码。
-- 仅在复杂函数、组件、类型或常量处添加有价值的注释。
-- 必要时记录参数限制、返回值、副作用、单位和范围。
-- 行内注释放在代码上方，避免行尾堆叠。
-- `TODO` 表示待办，`FIXME` 表示已知问题，应附带原因或下一步。
-- 问题解决后删除对应标记。
-- 不保留过期或与实现矛盾的注释。
-- 不添加无意义的作者、日期、修改历史，不强制每个函数都有注释。
+### 4.2 工程实践
+
+- [Git 规约](./docs/design-system/engineering/engineering/git.md)
+- [文档通用规约](./docs/design-system/engineering/engineering/writing.md)
+- [更新日志规约](./docs/design-system/engineering/engineering/changelog.md)
+- [HTTP JSON API 规范](./docs/design-system/engineering/engineering/http-json-api.md)
 
 ## 5. 构建与验证
 
@@ -357,22 +358,7 @@ git status --porcelain -uall
 
 ### 6.2 Git Commit
 
-采用 Conventional Commits：
-
-```text
-<type>[optional scope][!]: <description>
-```
-
-允许类型：
-
-`feat`、`fix`、`docs`、`style`、`refactor`、`perf`、`test`、`build`、`ci`、`chore`
-
-要求：
-
-- 描述使用英文祈使语气。
-- 首字母小写。
-- 末尾不添加句号。
-- 破坏性变更使用 `!`。
+提交信息、分支和标签命名遵循 [Git 规约](./docs/design-system/engineering/engineering/git.md)。
 
 **未经用户确认，不得执行 Git Commit。**
 
@@ -387,7 +373,7 @@ git status --porcelain -uall
 未经当前任务的明确授权，不修改：
 
 - `AGENTS.md` 中的既有规则
-- `DESIGN.MD`
+- `docs/design-system/DESIGN.md`
 - `README*`
 - `docs/` 下的用户文档、内部 PRD 与其他文档
 - 其他用户明确声明受保护的文件
@@ -407,8 +393,9 @@ git status --porcelain -uall
 
 ### 6.5 文档规范
 
-- 简体中文用户文档位于 `docs/nola-docs/zh-CN/`，使用 `/zh-CN/` URL 前缀。
-- `docs/nola-docs/index.md` 保留产品首页。
+- 简体中文用户文档位于 `docs/help-docs/zh-CN/`，使用 `/zh-CN/` URL 前缀。
+- `docs/help-docs/index.md` 保留产品首页。
+- 设计系统文档独立位于 `docs/design-system/`，使用 `/vis/` URL 前缀。
 - 用户文档沿用既有大纲，截图通过脚本生成。
 - 文档图片存放于：
 
@@ -419,7 +406,7 @@ docs/public/docs-image/{语言代码}/{文档分类}/{文章名}/
 - 图片采用有意义的文件名，通过 `/docs-image/` 引用。
 - 不同语言分别保存图片副本。
 - `docs/PRD/` 只存内部需求及架构文档。
-- `docs/nola-docs/` 只存终端用户指引。
+- `docs/help-docs/` 只存终端用户指引与产品首页，设计系统文档放在 `docs/design-system/`。
 - 不在用户文档与内部 PRD 之间混放内容。
 
 ## 7. 待确认补充

@@ -47,7 +47,7 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
     <a className="site-skip z-overlay" href="#main">{t.nav.skip}</a>
     <header className={['site-nav', 'z-sticky', scrolled && 'site-nav--scrolled'].filter(Boolean).join(' ')}>
       <a className="site-brand" href={`${base}${localePath(locale).slice(1)}`}><img src={`${base}nola-logo.svg`} alt="" /><span>Nola Translator</span></a>
-      <nav className="site-nav-links" aria-label={t.nav.menu}><a href="#product">{t.nav.product}</a><a href="#scenarios">{t.nav.scenarios}</a><a href="#download">{t.nav.download}</a><a href={docUrl}>{t.nav.docs}</a></nav>
+      <nav className="site-nav-links" aria-label={t.nav.menu}><a href="#product">{t.nav.product}</a><a href="#scenarios">{t.nav.scenarios}</a><a href="#download">{t.nav.download}</a><a href={docUrl}>{t.nav.docs}</a>{locale === 'zh-CN' ? <a href={`${base}vis/`}>设计系统</a> : null}</nav>
       <div className="site-nav-end">
         <Menu.Root>
           <Menu.Trigger render={<Button variant="secondary" size="sm" />} className="site-locale" aria-label={t.nav.language}><Globe2 aria-hidden="true" /><span>{languagePreference === 'auto' ? autoLocaleNames[locale] : localeNames[locale]}</span><ChevronDown aria-hidden="true" /></Menu.Trigger>

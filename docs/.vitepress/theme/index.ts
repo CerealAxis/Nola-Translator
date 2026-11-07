@@ -4,7 +4,9 @@ import Landing from './Landing.vue'
 import DocLayout from './DocLayout.vue'
 import Linkcard from './Linkcard.vue'
 import { NProgress } from 'nprogress-v2'
+import { VitepressDemoBox, VitepressDemoPlaceholder } from 'vitepress-demo-plugin/client'
 import 'nprogress-v2/dist/index.css'
+import 'vitepress-demo-plugin/style.css'
 import 'vitepress-markdown-timeline/dist/theme/index.css'
 import { localePath } from './content'
 import { detectSiteLocale, localizedSitePath, localeOfPath, readLocalePreference, saveLocalePreference } from './siteLocale'
@@ -18,6 +20,8 @@ export default {
   enhanceApp({ app, router, siteData }) {
     app.component('NolaLanding', Landing)
     app.component('Linkcard', Linkcard)
+    app.component('VitepressDemoBox', VitepressDemoBox)
+    app.component('VitepressDemoPlaceholder', VitepressDemoPlaceholder)
     if (typeof window === 'undefined') return
     const base = siteData.value.base
     NProgress.configure({ showSpinner: false })

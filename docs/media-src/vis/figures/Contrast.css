@@ -1,0 +1,50 @@
+.fig-contrast-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 24px;
+  width: 100%;
+}
+
+.fig-contrast-example {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+
+.fig-contrast-single, .fig-contrast-wide {
+  width: 100%;
+  min-width: 0;
+}
+
+.fig-contrast-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fig-contrast-metric, .fig-contrast-status {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fig-contrast-status svg {
+  width: 16px;
+  height: 16px;
+}
+
+.fig-contrast-status--success svg { color: var(--success); }
+.fig-contrast-status--danger svg { color: var(--danger); }
+
+.nola-component-demo .fig-contrast-flat :is(.card__title, .card__description, .card__content p) {
+  font: var(--font-body);
+  color: inherit;
+}
+
+@container (max-width: 600px) {
+  .fig-contrast-pair { grid-template-columns: minmax(0, 1fr); }
+}

@@ -1,4 +1,6 @@
-import { defineConfig, type DefaultTheme } from 'vitepress'
+import { visSidebar } from './vis-sidebar'
+import { defineConfig, postcssIsolateStyles, type DefaultTheme } from 'vitepress'
+import { vitepressDemoPlugin } from 'vitepress-demo-plugin/markdown'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
@@ -30,7 +32,10 @@ function transformHead({ pageData }: { pageData: { relativePath: string; title?:
   const leading = pageData.relativePath.split('/')[0]
   const locale = (Object.keys(localeSegments) as Locale[]).find(name => localeSegments[name] === leading) ?? 'zh-CN'
   const rest = dropLocaleSegment(pageData.relativePath, locale)
-  const canonical = pageData.relativePath === 'index.md' ? `${siteUrl}${base}` : `${siteUrl}${routeFor(locale, rest)}`
+  const isVis = pageData.relativePath.startsWith('vis/')
+  const canonical = pageData.relativePath === 'index.md' ? `${siteUrl}${base}` : isVis
+    ? `${siteUrl}${base}${rest.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')}`
+    : `${siteUrl}${routeFor(locale, rest)}`
   const title = pageData.title ? `${pageData.title} | Nola Translator` : 'Nola Translator'
   const description = pageData.description || copy[locale].hero.subtitle
   const image = `${siteUrl}${base}screenshots/${locale === 'zh-CN' ? 'zh-CN' : locale}/home.png`
@@ -49,10 +54,12 @@ function transformHead({ pageData }: { pageData: { relativePath: string; title?:
     ['meta', { name: 'twitter:description', content: description }],
     ['meta', { name: 'twitter:image', content: image }],
   ]
-  for (const alternate of Object.keys(localeSegments) as Locale[]) {
-    tags.push(['link', { rel: 'alternate', hreflang: alternate, href: `${siteUrl}${routeFor(alternate, rest)}` }])
+  if (!isVis) {
+    for (const alternate of Object.keys(localeSegments) as Locale[]) {
+      tags.push(['link', { rel: 'alternate', hreflang: alternate, href: `${siteUrl}${routeFor(alternate, rest)}` }])
+    }
+    tags.push(['link', { rel: 'alternate', hreflang: 'x-default', href: `${siteUrl}${routeFor('zh-CN', rest)}` }])
   }
-  tags.push(['link', { rel: 'alternate', hreflang: 'x-default', href: `${siteUrl}${routeFor('zh-CN', rest)}` }])
   return tags
 }
 const workspace = fileURLToPath(new URL('../..', import.meta.url))
@@ -71,7 +78,7 @@ const sidebarForLocale = (locale: Locale) => {
   const localeFolder = locale
   const label = docsNav[locale].root
   const sidebar = generateSidebar({
-    documentRootPath: './nola-docs',
+    documentRootPath: './help-docs',
     ...(localeFolder ? { scanStartPath: localeFolder } : {}),
     resolvePath: path,
     useTitleFromFileHeading: true,
@@ -112,6 +119,7 @@ const sidebarForLocale = (locale: Locale) => {
 const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(locale => {
   const text = copy[locale]
   const path = localePath(locale)
+  const tutorialSidebar = sidebarForLocale(locale)
   return [locale === 'zh-CN' ? 'root' : locale, {
     ...(locale === 'zh-CN' ? { link: path } : {}),
     label: localeNames[locale],
@@ -121,12 +129,17 @@ const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(lo
     themeConfig: {
       nav: [
         { text: text.nav.home, link: path },
+        ...(locale === 'zh-CN' ? [{ text: '设计原则', link: '/vis/principles/structure' }] : []),
+        { text: docsNav[locale].root.replace(/^Nola Translator\s+/, ''), link: path + 'docs' },
         { text: text.nav.download, link: downloadUrl },
       ],
-      sidebar: sidebarForLocale(locale),
+      sidebar: locale === 'zh-CN' ? {
+        '/vis/': visSidebar,
+        ...(Array.isArray(tutorialSidebar) ? { '/': tutorialSidebar } : tutorialSidebar),
+      } : tutorialSidebar,
       outline: { level: [2, 3], label: text.documentation.outline },
       docFooter: { prev: text.documentation.previous, next: text.documentation.next },
-      editLink: { pattern: `${repositoryUrl}/edit/main/docs/nola-docs/:path`, text: text.documentation.editPage },
+      editLink: { pattern: `${repositoryUrl}/edit/main/docs/:path`, text: text.documentation.editPage },
       lastUpdated: { text: text.documentation.lastUpdated, formatOptions: { dateStyle: 'medium', timeStyle: 'short' } },
       returnToTopLabel: text.documentation.backToTop,
       sidebarMenuLabel: text.nav.menu,
@@ -141,14 +154,25 @@ export default withMermaid(defineConfig({
   title: 'Nola Translator',
   description: copy['zh-CN'].hero.subtitle,
   lang: 'zh-CN',
-  srcDir: './nola-docs',
+  srcDir: '.',
+  rewrites: {
+    'help-docs/:path*': ':path*',
+    'design-system/:path*': 'vis/:path*',
+  },
   outDir: './dist',
-  srcExclude: ['**/README.md'],
+  srcExclude: ['**/README.md', 'PRD/**', 'media-src/**', 'scripts/**', 'public/**', 'dist/**', 'node_modules/**'],
   cleanUrls: true,
   appearance: true,
   lastUpdated: true,
   sitemap: { hostname: siteUrl },
   transformHead,
+  transformPageData(page) {
+    if (page.relativePath.startsWith('vis/')) {
+      page.frontmatter.pageClass = page.relativePath.startsWith('vis/principles/')
+        ? 'nola-vis-doc nola-vis-principles' : 'nola-vis-doc'
+      page.frontmatter.comments = false
+    }
+  },
   markdown: {
     lineNumbers: true,
     math: true,
@@ -159,6 +183,12 @@ export default withMermaid(defineConfig({
       md.use(markdownItTaskCheckbox)
       md.use(markdownItGithubAlerts)
       md.use(timeline)
+      md.use(vitepressDemoPlugin, {
+        demoDir: resolve(workspace, 'docs/media-src/vis/demos'),
+        locale: { 'zh-CN': 'zh-CN' },
+        stackblitz: { show: false },
+        codesandbox: { show: false },
+      })
       // Produces the .vp-code-block-title / .vp-code-group markup styled by vp-code-title.css and vp-code-group.css.
       md.use(groupIconMdPlugin)
     },
@@ -167,10 +197,10 @@ export default withMermaid(defineConfig({
   locales,
   vite: {
     plugins: [react({ exclude: /node_modules|\.vitepress\/cache/ }), tailwindcss(), groupIconVitePlugin()],
-    css: { postcss: { plugins: [normalizeEmptyIsCss()] } },
+    css: { postcss: { plugins: [postcssIsolateStyles({ includeFiles: [/vp-doc\.css/, /base\.css/] }), normalizeEmptyIsCss()] } },
     resolve: { alias: { '@': resolve(workspace, 'src/renderer'), '@renderer': resolve(workspace, 'src/renderer') }, dedupe: ['react', 'react-dom'] },
     publicDir: resolve(workspace, 'docs/public'),
-    server: { fs: { allow: [workspace] }, watch: { ignored: ['**/.electron-cache/**', '**/.vitepress/.temp/**', '**/.vitepress/cache/**', '**/dist/**', '**/public/demo/**', '**/public/screenshots/**'] } },
+    server: { fs: { allow: [workspace] }, watch: { ignored: ['**/.electron-cache/**', '**/.vitepress/.temp/**', '**/.vitepress/cache/**', '**/dist/**', '**/public/screenshots/**'] } },
     // The isolated desktop demo is built separately and never scanned as a VitePress entry.
     optimizeDeps: {
       entries: ['.vitepress/theme/index.ts'],

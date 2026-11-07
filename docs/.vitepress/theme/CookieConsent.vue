@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useData, withBase } from 'vitepress'
-import { cookieConsentCopy, cookieConsentTranslations } from './cookieConsent'
+import { cookieConsentTranslations } from './cookieConsent'
 import { localeOfPath } from './siteLocale'
 import 'vanilla-cookieconsent/dist/cookieconsent.css'
 
 const emit = defineEmits<{ analyticsChange: [enabled: boolean] }>()
 const { page } = useData()
 const locale = computed(() => localeOfPath(`/${page.value.relativePath}`, '/'))
-const ready = ref(false)
+let initialized = false
 let consent: typeof import('vanilla-cookieconsent') | undefined
 let disposed = false
 
@@ -31,15 +31,13 @@ onMounted(async () => {
   if (disposed) return
   await consent.setLanguage(locale.value)
   syncAnalytics()
-  ready.value = true
+  initialized = true
 })
 
-watch(locale, value => { if (ready.value) void consent?.setLanguage(value) })
+watch(locale, value => { if (initialized) void consent?.setLanguage(value) })
 onBeforeUnmount(() => { disposed = true; consent?.reset(false) })
 </script>
 
 <template>
-  <button v-if="ready" type="button" class="nola-cookie-settings z-dropdown" @click="consent?.showPreferences()">
-    {{ cookieConsentCopy[locale].preferences }}
-  </button>
+  <!-- The library mounts its dialogs on the document body. -->
 </template>

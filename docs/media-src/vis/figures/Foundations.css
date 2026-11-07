@@ -1,0 +1,242 @@
+.fig-foundations {
+  container-type: inline-size;
+}
+
+.fig-f-panel,
+.fig-f-tabbed {
+  width: min(100%, 26rem);
+  margin-inline: auto;
+}
+
+.fig-f-tabbed {
+  display: grid;
+  justify-items: start;
+  gap: .75rem;
+}
+
+.fig-f-tabbed > [data-slot="tabs-content"] {
+  width: 100%;
+}
+
+.fig-board.fig-foundations .fig-f-app-card { row-gap: 1.5rem; }
+
+.fig-f-app-content,
+.fig-f-profile,
+.fig-f-service {
+  display: grid;
+  gap: .875rem;
+}
+
+.fig-f-actions,
+.fig-f-choice,
+.fig-f-choices {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.fig-f-actions,
+.fig-f-choices {
+  flex-wrap: wrap;
+}
+
+.fig-f-choices {
+  gap: .5rem 1.5rem;
+  min-height: var(--field-control-height);
+}
+
+.fig-f-check {
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 1rem;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--field-border);
+  border-radius: .25rem;
+  color: var(--primary-foreground);
+  background: var(--surface);
+  vertical-align: middle;
+}
+
+.fig-f-check:is([data-checked], [data-indeterminate]) {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.fig-f-check svg { display: block; }
+
+.fig-f-detail-section,
+.fig-f-detail-section dl {
+  display: grid;
+  gap: .375rem;
+}
+
+.fig-f-detail-section dl,
+.fig-f-detail-section dd,
+.fig-f-comparison figure,
+.fig-f-reading p {
+  margin: 0;
+}
+
+.fig-f-detail-section dl > div {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: .75rem;
+}
+
+.fig-f-field-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 1.5rem;
+}
+
+.fig-f-choice-set {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.fig-f-choice-set legend {
+  padding: 0;
+  margin-bottom: .375rem;
+}
+
+.fig-f-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1rem;
+  max-width: 53rem;
+  margin-inline: auto;
+}
+
+.fig-f-comparison figure {
+  display: grid;
+  align-content: start;
+  gap: .5rem;
+  min-width: 0;
+}
+
+.fig-f-comparison figcaption { font: var(--font-caption); color: var(--muted); }
+
+.fig-f-reading { display: grid; gap: 1.5rem; }
+.fig-f-reading section { display: grid; gap: .375rem; }
+.fig-f-reading[data-aligned="false"] p { margin-inline-start: 1.5rem; }
+
+.fig-foundations .fig-f-profile [data-slot="field"] {
+  display: grid;
+  grid-template-columns: 3em minmax(0, 1fr);
+  align-items: baseline;
+  gap: .75rem;
+}
+
+.fig-f-profile label { text-align: end; }
+.fig-f-profile [data-slot="field-description"] { margin-block-start: .375rem; }
+.fig-f-ledger :is(th, td):last-child { white-space: nowrap; }
+.fig-f-ledger[data-aligned="true"] :is(th, td):last-child { text-align: end; font-variant-numeric: tabular-nums; }
+.fig-f-ledger[data-aligned="false"] :is(th, td):last-child { text-align: start; }
+
+@container (max-width: 20rem) {
+  .fig-f-field-columns,
+  .fig-foundations .fig-f-profile [data-slot="field"] { grid-template-columns: minmax(0, 1fr); }
+  .fig-foundations .fig-f-profile [data-slot="field"] { gap: .375rem; }
+  .fig-f-profile label { text-align: start; }
+}
+
+/* Guides occupy the gaps between existing components; captions stay outside the card. */
+.fig-foundations {
+  --fig-small-tint: rgb(126 203 255 / 70%);
+  --fig-medium-tint: rgb(191 154 255 / 70%);
+  --fig-large-tint: rgb(255 211 110 / 70%);
+  --fig-axis: rgb(0 113 227 / 70%);
+}
+
+.fig-f-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .25rem .875rem;
+  margin-block-start: .5rem;
+  color: var(--muted);
+  font: var(--font-caption);
+}
+
+.fig-f-key > span { display: inline-flex; align-items: center; gap: .375rem; }
+.fig-f-key [data-mark]::before { width: .75rem; height: .5rem; content: ''; }
+.fig-f-key [data-mark="small"]::before { background: var(--fig-small-tint); }
+.fig-f-key [data-mark="medium"]::before { background: var(--fig-medium-tint); }
+.fig-f-key [data-mark="large"]::before { background: var(--fig-large-tint); }
+.fig-f-key [data-mark="separator"]::before, .fig-f-key [data-mark="axis"]::before { height: 0; border-block-start: 1px solid var(--fig-axis); }
+.fig-f-key [data-mark="axis"]::before { border-block-start-style: dashed; }
+
+
+
+.fig-f-gap-label, .fig-f-gap-section, .fig-f-gap-tools, .fig-f-rule,
+.fig-f-field-columns > [data-slot="field"], .fig-f-choice-text, .fig-f-measured-pair > [data-slot="field"],
+.fig-f-reading section, .fig-f-reading p, .fig-f-profile, .fig-f-decimal { position: relative; }
+
+.fig-f-gap-label::after, .fig-f-gap-section::after, .fig-f-gap-tools::after,
+.fig-f-field-columns > [data-slot="field"]::after, .fig-f-measured-pair .fig-f-choice-text::before,
+.fig-f-measured-pair > [data-slot="field"]:first-child::after, .fig-f-rule::before {
+  position: absolute;
+  pointer-events: none;
+  content: '';
+}
+.fig-f-gap-label::after, .fig-f-gap-section::after, .fig-f-gap-tools::after {
+  inset-block-start: 100%;
+  inset-inline-start: 0;
+  width: 100%;
+}
+.fig-f-gap-label::after { height: .375rem; background: var(--fig-small-tint); }
+.fig-f-gap-section::after { inset-inline-start: var(--card-spacing); width: calc(100% - 2 * var(--card-spacing)); height: 1.5rem; background: var(--fig-large-tint); }
+.fig-f-gap-tools::after { height: .875rem; background: var(--fig-medium-tint); }
+.fig-f-rule::before { inset: 0 auto 0 0; width: 2rem; background: var(--fig-axis); }
+
+.fig-f-field-columns > [data-slot="field"]::after {
+  inset-block: 0;
+  inset-inline-start: 100%;
+  width: 1.5rem;
+  background: var(--fig-large-tint);
+}
+
+.fig-f-measured-pair { display: inline-flex; gap: 1.5rem; align-items: center; }
+.fig-f-measured-pair .fig-f-choice-text::before {
+  inset-block: 0;
+  inset-inline-end: 100%;
+  width: .5rem;
+  background: var(--fig-small-tint);
+}
+.fig-f-measured-pair > [data-slot="field"]:first-child::after {
+  inset-block: 0;
+  inset-inline-start: 100%;
+  width: 1.5rem;
+  background: var(--fig-large-tint);
+}
+
+.fig-f-reading section::before, .fig-f-reading[data-aligned="false"] p::before,
+.fig-f-profile::before, .fig-f-profile::after, .fig-f-decimal::before {
+  position: absolute;
+  inset-block: 0;
+  border-inline-start: 1px dashed var(--fig-axis);
+  content: '';
+  pointer-events: none;
+}
+.fig-f-reading section::before, .fig-f-reading[data-aligned="false"] p::before { inset-inline-start: -2px; }
+.fig-f-profile::before { inset-inline-start: calc(3em + 1px); }
+.fig-f-profile::after { inset-inline-start: calc(3em + .75rem - 2px); }
+.fig-f-decimal::before { inset-inline-start: 0; inset-block: -.3em; }
+.fig-f-key > .fig-f-narrow-note { display: none; }
+
+@container (max-width: 20rem) {
+  .fig-f-field-columns > [data-slot="field"]::after {
+    inset-inline-start: 0;
+    inset-block: 100% auto;
+    width: 100%;
+    height: 1.5rem;
+  }
+  .fig-f-profile::before { inset-inline-start: -2px; }
+  .fig-f-profile::after, .fig-f-key > .fig-f-wide-note { display: none; }
+  .fig-f-key > .fig-f-narrow-note { display: inline-flex; }
+}

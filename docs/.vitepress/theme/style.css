@@ -3,6 +3,40 @@
 @import '../../../src/renderer/theme/typography.css';
 @import '../../../src/renderer/theme/z-index.css';
 
+html:has(.VPDoc),
+.Layout:has(.VPDoc) * {
+  --doc-scrollbar-thumb: transparent;
+  --doc-scrollbar-visible: rgb(128 128 128 / 48%);
+  scrollbar-width: thin;
+  scrollbar-color: var(--doc-scrollbar-thumb) transparent;
+}
+
+html.nola-scrollbar-near:has(.VPDoc),
+.Layout:has(.VPDoc) .nola-scrollbar-near {
+  --doc-scrollbar-thumb: var(--doc-scrollbar-visible);
+}
+
+@media (hover: none), (forced-colors: active) {
+  html:has(.VPDoc), .Layout:has(.VPDoc) * { scrollbar-color: auto; }
+}
+
+@supports selector(::-webkit-scrollbar) {
+  html:has(.VPDoc), .Layout:has(.VPDoc) * { scrollbar-width: auto; scrollbar-color: auto; }
+  html:has(.VPDoc)::-webkit-scrollbar,
+  .Layout:has(.VPDoc) *::-webkit-scrollbar { width: 8px; height: 8px; }
+  html:has(.VPDoc)::-webkit-scrollbar-track,
+  .Layout:has(.VPDoc) *::-webkit-scrollbar-track,
+  html:has(.VPDoc)::-webkit-scrollbar-corner,
+  .Layout:has(.VPDoc) *::-webkit-scrollbar-corner { background: transparent; }
+  html:has(.VPDoc)::-webkit-scrollbar-thumb,
+  .Layout:has(.VPDoc) *::-webkit-scrollbar-thumb { background: var(--doc-scrollbar-thumb); border-radius: 8px; }
+  html:has(.VPDoc)::-webkit-scrollbar-button,
+  .Layout:has(.VPDoc) *::-webkit-scrollbar-button { display: none; }
+  @media (hover: none), (forced-colors: active) {
+    html:has(.VPDoc), .Layout:has(.VPDoc) * { --doc-scrollbar-thumb: var(--doc-scrollbar-visible); }
+  }
+}
+
 :root {
   --vp-font-family-base: var(--font-ui);
   --vp-c-brand-1: var(--accent);
@@ -147,16 +181,4 @@
   --cc-footer-border-color: var(--border);
   --cc-modal-border-radius: var(--radius-lg, 12px);
   --cc-btn-border-radius: var(--radius-xl, 16px);
-}
-.nola-cookie-settings {
-  position: fixed;
-  inset: auto auto var(--space-1, 8px) var(--space-1, 8px);
-  padding: var(--space-1, 8px) var(--space-2, 16px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl, 16px);
-  background: var(--surface-secondary);
-  color: var(--foreground);
-  font: inherit;
-  box-shadow: var(--surface-shadow);
-  cursor: pointer;
 }

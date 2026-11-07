@@ -1,6 +1,6 @@
 # Nola website
 
-VitePress reads Markdown pages and the six regional routes from `nola-docs/` (`srcDir`). The homepage is React + shadcn/ui (Base UI), mounted by `Landing.vue`. Its colors, spacing scale, and regional fonts come from the desktop theme.
+VitePress reads help pages and the six regional routes from `help-docs/`, and design system pages from `design-system/`. Route rewrites preserve the existing locale URLs and `/vis/` URLs. Internal PRDs, demo sources, scripts, and generated files are excluded from page discovery. The homepage is React + shadcn/ui (Base UI), mounted by `Landing.vue`. Its colors, spacing scale, and regional fonts come from the desktop theme.
 
 Run commands from the repository root after installing the root and `docs` dependencies:
 

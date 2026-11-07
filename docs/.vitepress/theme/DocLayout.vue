@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import DefaultTheme from 'vitepress/theme'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useData } from 'vitepress'
 import Giscus from '@giscus/vue'
 import CookieConsent from './CookieConsent.vue'
@@ -16,6 +16,40 @@ const pageViewsLabel = computed(() => ({
 } satisfies Record<Locale, string>)[lang.value as Locale])
 const showPageViews = ref(false)
 const analyticsAllowed = ref(false)
+const nearbyScrollbars = new Set<HTMLElement>()
+function hideScrollbars() {
+  nearbyScrollbars.forEach(element => element.classList.remove('nola-scrollbar-near'))
+  nearbyScrollbars.clear()
+}
+function revealNearbyScrollbars(event: PointerEvent) {
+  hideScrollbars()
+  if (event.pointerType !== 'mouse' || !document.querySelector('.VPDoc')) return
+  const root = document.documentElement
+  const candidates = new Set([...event.composedPath(), root])
+  for (const element of candidates) {
+    if (!(element instanceof HTMLElement)) continue
+    const isRoot = element === root
+    const style = getComputedStyle(element)
+    const rect = isRoot ? { left: 0, right: window.innerWidth, top: 0, bottom: window.innerHeight } : element.getBoundingClientRect()
+    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) continue
+    const vertical = element.scrollHeight > element.clientHeight && (isRoot || /auto|scroll/.test(style.overflowY))
+    const horizontal = element.scrollWidth > element.clientWidth && (isRoot || /auto|scroll/.test(style.overflowX))
+    const inlineEdge = style.direction === 'rtl' ? event.clientX - rect.left : rect.right - event.clientX
+    if ((vertical && inlineEdge <= 24) || (horizontal && rect.bottom - event.clientY <= 24)) {
+      element.classList.add('nola-scrollbar-near')
+      nearbyScrollbars.add(element)
+    }
+  }
+}
+onMounted(() => {
+  document.addEventListener('pointermove', revealNearbyScrollbars, { passive: true })
+  document.addEventListener('pointerleave', hideScrollbars)
+})
+onUnmounted(() => {
+  document.removeEventListener('pointermove', revealNearbyScrollbars)
+  document.removeEventListener('pointerleave', hideScrollbars)
+  hideScrollbars()
+})
 let counterLoaded = false
 let counterRequest = 0
 let zoom: ReturnType<typeof import('medium-zoom').default> | undefined

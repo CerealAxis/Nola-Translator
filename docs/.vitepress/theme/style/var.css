@@ -30,3 +30,23 @@
 .vp-doc a {
   text-decoration: none;
 }
+
+.nola-vis-doc .nola-doc-meta:empty,
+.nola-vis-doc .VPNavBarTranslations,
+.nola-vis-doc .VPNavScreenTranslations {
+  display: none;
+}
+
+.nola-vis-principles .vis-principle-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  margin-block: 24px 48px;
+  align-items: start;
+}
+.nola-vis-principles .vis-principle-copy > :first-child { margin-block-start: 0; }
+.nola-vis-principles .vis-principle-row figure { min-width: 0; margin: 0; }
+.nola-vis-principles .vis-principle-row img { display: block; width: auto; max-width: 100%; height: auto; }
+.nola-vis-principles .vis-principle-row figcaption {
+  margin-block: 8px 0;
+}
