@@ -61,7 +61,7 @@ export function ReadAloud({
               i < spokenIndex
                 ? "text-muted-foreground"
                 : i === spokenIndex
-                  ? "text-foreground/95 rounded bg-blue-500/12 dark:bg-blue-400/15"
+                  ? "text-foreground/95 rounded bg-primary/12 dark:bg-primary/15"
                   : "text-foreground/70",
             )}
           >
@@ -94,7 +94,7 @@ export function ReadAloud({
           className="bg-foreground/[0.08] inset-ring-border h-[3px] min-w-0 flex-1 overflow-hidden rounded-full inset-ring forced-colors:outline"
         >
           <span
-            className="block h-full rounded-full bg-blue-500 transition-[width] duration-200 ease-linear forced-color-adjust-none motion-reduce:transition-none dark:bg-blue-400"
+            className="block h-full rounded-full bg-primary transition-[width] duration-200 ease-linear forced-color-adjust-none motion-reduce:transition-none"
             style={{ width: `${progress}%` }}
           />
         </span>

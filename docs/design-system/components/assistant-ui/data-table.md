@@ -2,7 +2,6 @@
 title: Data table（数据表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Data table（数据表）

@@ -2,7 +2,6 @@
 title: Tool call（工具调用）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Tool call（工具调用）

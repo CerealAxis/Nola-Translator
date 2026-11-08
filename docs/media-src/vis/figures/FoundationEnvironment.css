@@ -2,7 +2,7 @@
 .foundation-demo .fe-focus { display: flex; flex-direction: column; gap: 24px; max-width: 28rem; margin-inline: auto; }
 .foundation-demo .fe-focus [data-slot="field"] { gap: 6px; }
 .foundation-demo .fe-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.foundation-demo .fe-feedback { min-height: 1.5em; margin: 0; color: var(--muted); font: var(--font-caption); overflow-wrap: anywhere; }
+.foundation-demo .fe-feedback { min-height: 1.5em; margin: 0; color: var(--muted-foreground); font: var(--font-caption); overflow-wrap: anywhere; }
 .foundation-demo .fe-direction-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 .foundation-demo .fe-direction-example { min-width: 0; }
 .foundation-demo .fe-example-label { margin: 0 0 12px; font: var(--font-label); }
@@ -11,7 +11,7 @@
 .foundation-demo .fe-short-list { display: flex; flex-direction: column; gap: 8px; padding: 16px 0; margin: 16px 0 24px; border-block: 1px solid var(--border); list-style: none; text-align: start; font: var(--font-body); }
 .foundation-demo .fe-short-list li { margin: 0; }
 .foundation-demo .fe-passage-pair { display: flex; flex-direction: column; gap: 24px; }
-.foundation-demo .fe-language { display: block; text-align: start; color: var(--muted); font: var(--font-caption); }
+.foundation-demo .fe-language { display: block; text-align: start; color: var(--muted-foreground); font: var(--font-caption); }
 .foundation-demo .fe-passage p { margin: 6px 0 0; text-align: start; font: var(--font-reading); }
 .foundation-demo .fe-status-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 .foundation-demo .fe-status-pair figure { display: grid; gap: 16px; margin: 0; }

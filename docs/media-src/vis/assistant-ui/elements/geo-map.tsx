@@ -59,7 +59,7 @@ function markerIcon(leaflet: LeafletModule, selected: boolean) {
   return leaflet.divIcon({
     className: "geo-map-marker",
     html: selected
-      ? '<span class="block size-4 rounded-full bg-blue-500 ring-2 ring-background"></span>'
+      ? '<span class="block size-4 rounded-full bg-primary ring-2 ring-background"></span>'
       : '<span class="block size-2.5 rounded-full bg-foreground/55 ring-2 ring-background"></span>',
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],

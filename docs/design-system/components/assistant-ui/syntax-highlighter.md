@@ -2,7 +2,6 @@
 title: Syntax highlighter（语法高亮）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Syntax highlighter（语法高亮）

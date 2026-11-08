@@ -2,7 +2,6 @@
 title: Message actions（消息操作）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Message actions（消息操作）

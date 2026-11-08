@@ -2,7 +2,6 @@
 title: Agent card（代理卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Agent card（代理卡片）

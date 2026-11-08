@@ -2,7 +2,6 @@
 title: Shopping cart（购物车）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Shopping cart（购物车）

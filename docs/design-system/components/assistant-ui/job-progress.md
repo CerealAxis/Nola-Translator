@@ -2,7 +2,6 @@
 title: Job progress（任务进度）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Job progress（任务进度）

@@ -2,7 +2,6 @@
 title: Prompt library（提示词库）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Prompt library（提示词库）

@@ -2,7 +2,6 @@
 title: Tool timeline（工具时间线）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Tool timeline（工具时间线）

@@ -1,6 +1,6 @@
-# Nola Translator 說明文件
+# 說明文件
 
-這裡存放 Nola Translator 的安裝設定、功能使用與疑難排解，協助你解決使用過程中可能遇到的問題。
+這裡存放 Nola Translator 的說明文件。
 
 ## 開始入門
 
@@ -37,6 +37,18 @@
 
 - [使用者條款](legal/user-agreement)
 - [隱私權政策](legal/privacy-policy)
+
+## 內容授權
+
+除非另有說明，本文檔發布的所有內容均採用「知識共享姓名標示—相同方式分享 4.0 國際公眾授權條款（Creative Commons Attribution-ShareAlike 4.0 International Public License，CC BY-SA 4.0）」散佈。
+
+<a href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh-hans" target="_blank" rel="noopener">
+    <img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg" alt="CC BY-SA">
+</a>
+
+參考專案：
+
+- [PCL CE 說明文件](https://github.com/PCL-Community/docs.pclc.cc)，依 CC BY-SA 4.0 授權引用及修改。
 
 ---
 

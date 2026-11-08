@@ -2,7 +2,6 @@
 title: Chart（图表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Chart（图表）

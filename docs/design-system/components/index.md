@@ -2,7 +2,6 @@
 title: 组件目录
 pageClass: nola-vis-doc
 editLink: false
-comments: false
 ---
 
 <script setup>
@@ -11,7 +10,7 @@ import ComponentCatalog from '../../.vitepress/theme/ComponentCatalog.vue'
 
 # 组件目录
 
-浏览组件预览，点击卡片进入文档和实时示例。
+浏览组件预览，点击卡片进入对应文档。
 
 ## shadcn 组件
 

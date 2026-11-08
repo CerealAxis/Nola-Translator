@@ -2,7 +2,6 @@
 title: Composer（消息编辑器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Composer（消息编辑器）

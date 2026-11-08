@@ -10,7 +10,7 @@ const catalog = require('../.vitepress/component-catalog.json')
 const { componentCatalog } = require('../.vitepress/component-catalog.ts')
 
 const origin = new URL(process.env.CATALOG_URL ?? process.argv[2] ?? 'http://localhost:5173/')
-const output = join(__dirname, '../public/component-previews')
+const output = process.env.CATALOG_OUTPUT ?? join(__dirname, '../public/component-previews')
 const preview = '.vitepress-demo-plugin-preview'
 const width = 1440
 const height = 1080
@@ -23,7 +23,7 @@ const pageColors = Object.fromEntries([['light', 'surface'], ['dark', 'backgroun
   return [mode, color]
 }))
 const viewportWidth = 1280
-const viewportHeight = 820
+const viewportHeight = 1080
 const jobs = Object.entries(componentCatalog).flatMap(([library, articles]) => {
   const overrides = new Map(catalog[library].map(entry => [entry.path, entry]))
   return articles.map(article => ({ library, ...article, ...overrides.get(article.path) }))
@@ -129,12 +129,16 @@ async function main() {
 
           if (!loaded) {
             captureStyle = await contents.insertCSS(`
-              html, body, [data-catalog-backdrop] { background: var(--vp-c-bg) !important; }
+              html, body, .nola-vis-doc .vitepress-demo-plugin-preview, [data-catalog-backdrop] {
+                background: var(--vp-c-bg) !important;
+              }
+              html { overflow-anchor: none; }
               #cc-main, [data-slot$="-overlay"] { display: none !important; }
               .VPNav, .VPSidebar, .VPLocalNav, .VPDocAside,
               .vitepress-demo-plugin-source, .vitepress-demo-plugin-description {
                 visibility: hidden !important;
               }
+              ${entry.portal ? '' : '.VPDoc .vp-doc { visibility: hidden; } .VPDoc .vitepress-demo-plugin-preview { visibility: visible; }'}
               * { animation: none !important; transition: none !important; }
               :is([class*="shadow-lg"], [class*="shadow-xl"], [class*="shadow-2xl"]) {
                 --tw-shadow: 0 0 #0000 !important;
@@ -171,11 +175,13 @@ async function main() {
             : `(${stage}.querySelector('[data-assistant-preview]')?.firstElementChild ?? (${stage}.childElementCount === 1 ? ${stage}.firstElementChild : ${stage}))`
           const readyTarget = entry.ready ? `document.querySelector(${JSON.stringify(entry.ready)})` : target
           await waitFor(() => js(`Boolean(${readyTarget}?.getClientRects().length)`), `${entry.path} preview`)
+          await delay(entry.settle ?? (entry.portal ? 350 : 120))
           loaded = true
           const crop = await js(`(async () => {
             const target = ${target};
             const include = ${entry.include ? `document.querySelector(${JSON.stringify(entry.include)})` : 'null'};
-            await document.fonts.ready;
+            const within = (promise, ms) => Promise.race([promise, new Promise(resolve => setTimeout(resolve, ms))]);
+            await within(document.fonts.ready, 1500);
             if (${Boolean(entry.portal)}) {
               ${root}.querySelector(${JSON.stringify(action ?? ':not(*)')})?.style.removeProperty('visibility');
               target.style.setProperty('visibility', 'visible', 'important');
@@ -192,10 +198,10 @@ async function main() {
               Promise.allSettled([...target.querySelectorAll('img')].map(img => img.decode())),
               new Promise(resolve => setTimeout(resolve, 1200)),
             ]);
-            await Promise.all(target.getAnimations({ subtree: true })
+            await within(Promise.all(target.getAnimations({ subtree: true })
               .filter(animation => animation.effect?.getTiming().iterations !== Infinity)
-              .map(animation => animation.finished.catch(() => {})));
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+              .map(animation => animation.finished.catch(() => {}))), 1500);
+            await within(new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))), 500);
             const rects = [target, include].filter(Boolean).map(element => element.getBoundingClientRect());
             const padding = ${entry.padding ?? 8};
             const x = Math.max(0, Math.floor(Math.min(...rects.map(rect => rect.left)) - padding));
@@ -208,7 +214,9 @@ async function main() {
             };
           })()`)
           assert.ok(crop.width > 12 && crop.height > 12, `Empty preview for ${entry.path}`)
-          await delay(entry.settle ?? (entry.portal ? 350 : 120))
+          const repaint = once(contents, 'paint', { signal: AbortSignal.timeout(1500) }).catch(() => {})
+          contents.invalidate()
+          await repaint
           const snapshot = entry.portal ? (await contents.capturePage()).crop(crop) : await contents.capturePage(crop)
           const sourceSize = snapshot.getSize()
           assert.equal(sourceSize.width, crop.width, 'Preview must be captured at native resolution')

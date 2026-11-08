@@ -2,7 +2,6 @@
 title: Background runs（后台运行）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Background runs（后台运行）

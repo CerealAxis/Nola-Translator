@@ -56,9 +56,9 @@ export function ToolGroup({
       {running > 0 ? (
         <Loader2Icon className="text-muted-foreground size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
       ) : failed > 0 ? (
-        <XIcon className="size-3.5 shrink-0 text-red-500" />
+        <XIcon className="size-3.5 shrink-0 text-destructive" />
       ) : (
-        <CheckIcon className="size-3.5 shrink-0 text-emerald-500" />
+        <CheckIcon className="size-3.5 shrink-0 text-chart-2" />
       )}
     </>
   );
@@ -98,9 +98,9 @@ export function ToolGroup({
                 {tool.state === "running" ? (
                   <Loader2Icon className="text-muted-foreground size-3 animate-spin motion-reduce:animate-none" />
                 ) : tool.state === "failed" ? (
-                  <XIcon className="size-3 text-red-500" />
+                  <XIcon className="size-3 text-destructive" />
                 ) : (
-                  <CheckIcon className="size-3 text-emerald-500" />
+                  <CheckIcon className="size-3 text-chart-2" />
                 )}
               </span>
               <span className={cn(mono, "text-muted-foreground shrink-0")}>

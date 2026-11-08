@@ -2,7 +2,6 @@
 title: Computer use（电脑操作）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Computer use（电脑操作）
@@ -55,7 +54,7 @@ type ComputerArgs = { action: string; target: string; x: number; y: number };
 
 const ComputerStepMarker: ToolCallMessagePartComponent<ComputerArgs> = ({ args, status }) => (
   <MousePointer2Icon
-    className="absolute size-4 fill-blue-500 text-blue-500 transition-[left,top] duration-500"
+    className="absolute size-4 fill-primary text-primary transition-[left,top] duration-500"
     style={{ left: `${args.x}%`, top: `${args.y}%`, opacity: status?.type === "running" ? 1 : 0.4 }}
   />
 );

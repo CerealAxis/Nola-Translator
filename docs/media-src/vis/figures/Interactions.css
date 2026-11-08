@@ -7,7 +7,7 @@
 .fig-upload-zone[data-active] { border-color: var(--focus); }
 .fig-upload-zone .card__content { display: grid; justify-items: center; gap: 8px; padding-block: 32px; text-align: center; }
 .fig-upload-zone svg { width: 24px; height: 24px; }
-.fig-upload-zone span { color: var(--muted); font: var(--font-caption); }
+.fig-upload-zone span { color: var(--muted-foreground); font: var(--font-caption); }
 .fig-upload-files { display: grid; gap: 8px; }
 .fig-upload-files > div { display: grid; gap: 4px; }
 .fig-upload-files [data-slot="progress"] { width: 100%; }

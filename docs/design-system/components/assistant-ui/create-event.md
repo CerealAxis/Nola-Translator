@@ -2,7 +2,6 @@
 title: Create event（创建日程）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Create event（创建日程）

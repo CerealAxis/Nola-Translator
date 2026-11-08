@@ -2,7 +2,6 @@
 title: MCP config dialog（MCP 配置对话框）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # MCP config dialog（MCP 配置对话框）

@@ -1,6 +1,6 @@
-# Nola Translator 도움말
+# 도움말 문서
 
-Nola Translator 설치부터 주요 기능, 문제가 생겼을 때의 대처 방법까지 정리했습니다.
+Nola Translator 도움말 문서입니다.
 
 ## 시작하기
 
@@ -37,6 +37,18 @@ Nola Translator 설치부터 주요 기능, 문제가 생겼을 때의 대처 �
 
 - [이용약관](legal/user-agreement)
 - [개인정보 처리방침](legal/privacy-policy)
+
+## 콘텐츠 라이선스
+
+별도 표시가 없는 한, 이 문서에 공개된 모든 콘텐츠는 크리에이티브 커먼즈 저작자표시-동일조건변경허락 4.0 국제 라이선스(CC BY-SA 4.0)에 따라 배포됩니다.
+
+<a href="https://creativecommons.org/licenses/by-sa/4.0/deed.ko" target="_blank" rel="noopener">
+    <img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg" alt="CC BY-SA">
+</a>
+
+참고 프로젝트:
+
+- [PCL CE 도움말 문서](https://github.com/PCL-Community/docs.pclc.cc)의 내용을 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) 라이선스에 따라 인용하고 수정했습니다.
 
 ---
 

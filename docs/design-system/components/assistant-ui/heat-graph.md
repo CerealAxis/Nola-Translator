@@ -2,7 +2,6 @@
 title: Heat graph（热力图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Heat graph（热力图）

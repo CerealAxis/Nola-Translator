@@ -42,7 +42,7 @@ export function MessageAttachments({
                 )}
                 style={{
                   backgroundImage: item.swatch,
-                  backgroundColor: "var(--color-foreground)",
+                  backgroundColor: "var(--foreground)",
                 }}
               />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5 pe-2">

@@ -116,7 +116,7 @@ export function AgentCard({
       >
         {connected ? (
           <>
-            <CheckIcon className="size-3.5 text-emerald-500" />
+            <CheckIcon className="size-3.5 text-chart-2" />
             已连接
           </>
         ) : (

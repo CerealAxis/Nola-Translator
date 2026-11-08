@@ -2,7 +2,6 @@
 title: Checkpoints（检查点）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Checkpoints（检查点）

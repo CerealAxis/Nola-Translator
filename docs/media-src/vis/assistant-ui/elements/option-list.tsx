@@ -273,7 +273,7 @@ export function OptionList({
       {error ? (
         <p
           role="alert"
-          className="px-2 pb-1 text-xs break-words text-red-600 dark:text-red-400"
+          className="px-2 pb-1 text-xs break-words text-destructive"
         >
           {error}
         </p>

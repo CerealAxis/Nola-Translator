@@ -2,7 +2,6 @@
 title: Riverside Loft（河畔阁楼）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Riverside Loft（河畔阁楼）

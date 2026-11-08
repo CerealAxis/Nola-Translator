@@ -2,7 +2,6 @@
 title: Message branches（消息分支）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Message branches（消息分支）

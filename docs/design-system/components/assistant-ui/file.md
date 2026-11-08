@@ -2,7 +2,6 @@
 title: File（文件）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # File（文件）

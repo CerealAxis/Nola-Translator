@@ -93,7 +93,7 @@ export function ApprovalCard({
           className={cn(
             "flex size-9 shrink-0 items-center justify-center rounded-xl",
             variant === "destructive"
-              ? "bg-red-600/10 text-red-600 dark:bg-red-400/10 dark:text-red-400"
+              ? "bg-destructive/10 text-destructive"
               : "bg-foreground/[0.05] text-muted-foreground",
           )}
         >
@@ -196,7 +196,7 @@ export function ApprovalCard({
               </>
             ) : (
               <>
-                <CheckIcon className="size-3.5 text-emerald-500" />
+                <CheckIcon className="size-3.5 text-chart-2" />
                 {statusLabel ?? receiptText.done}
               </>
             )}

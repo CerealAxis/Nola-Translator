@@ -2,7 +2,6 @@
 title: Server panel（服务器面板）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Server panel（服务器面板）
@@ -190,7 +189,7 @@ function toPanelStatus(state: MCPConnectionState): McpServerStatus {
 `McpServerPrimitive.OAuthLink` 启动配置对话框使用的相同 OAuth 流程。一旦 `connectionState` 为 `authRequired`，将其渲染为该行的授权操作：
 
 ```tsx
-<McpServerPrimitive.OAuthLink className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+<McpServerPrimitive.OAuthLink className="rounded-full bg-chart-4/15 px-2 py-0.5 text-[11px] font-medium text-foreground">
   授权
 </McpServerPrimitive.OAuthLink>
 ```

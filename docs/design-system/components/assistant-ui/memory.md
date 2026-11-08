@@ -2,7 +2,6 @@
 title: Memory（记忆）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Memory（记忆）

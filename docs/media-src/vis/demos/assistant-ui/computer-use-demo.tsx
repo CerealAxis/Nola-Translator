@@ -27,12 +27,12 @@ export function ComputerUseDemo() {
       activeIndex={phase}
     >
       <div className="flex flex-col gap-2 p-4">
-        <span className="bg-foreground/[0.07] h-3 w-28 rounded" />
-        <span className="bg-foreground/[0.05] h-2.5 w-full rounded" />
-        <span className="bg-foreground/[0.05] h-2.5 w-4/5 rounded" />
-        <span className="bg-foreground/[0.05] h-2.5 w-2/3 rounded" />
-        <span className="bg-foreground/[0.07] mt-2 h-3 w-20 rounded" />
-        <span className="bg-foreground/[0.05] h-2.5 w-3/4 rounded" />
+        <span className="h-3 w-28 rounded bg-secondary" />
+        <span className="h-2.5 w-full rounded bg-muted" />
+        <span className="h-2.5 w-4/5 rounded bg-muted" />
+        <span className="h-2.5 w-2/3 rounded bg-muted" />
+        <span className="mt-2 h-3 w-20 rounded bg-secondary" />
+        <span className="h-2.5 w-3/4 rounded bg-muted" />
       </div>
     </ComputerUse>
   );

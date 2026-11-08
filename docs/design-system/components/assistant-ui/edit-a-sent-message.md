@@ -2,7 +2,6 @@
 title: Edit a sent message（编辑已发送消息）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Edit a sent message（编辑已发送消息）

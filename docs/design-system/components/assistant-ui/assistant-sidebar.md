@@ -2,7 +2,6 @@
 title: Assistant sidebar（助手侧栏）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Assistant sidebar（助手侧栏）

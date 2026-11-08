@@ -2,7 +2,6 @@
 title: Research report（研究报告）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Research report（研究报告）

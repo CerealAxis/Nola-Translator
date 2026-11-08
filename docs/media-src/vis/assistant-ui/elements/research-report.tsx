@@ -60,7 +60,7 @@ export function ResearchReport({
                 {section.state === "done" ? (
                   <CheckIcon className="text-muted-foreground size-3" />
                 ) : section.state === "writing" ? (
-                  <Loader2Icon className="size-3 animate-spin text-blue-500 motion-reduce:animate-none dark:text-blue-400" />
+                  <Loader2Icon className="size-3 animate-spin text-primary motion-reduce:animate-none" />
                 ) : (
                   <span
                     aria-hidden

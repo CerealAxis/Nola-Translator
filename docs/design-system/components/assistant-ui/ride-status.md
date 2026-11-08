@@ -2,7 +2,6 @@
 title: Ride status（行程状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Ride status（行程状态）

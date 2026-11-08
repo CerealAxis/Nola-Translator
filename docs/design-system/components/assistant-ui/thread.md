@@ -2,7 +2,6 @@
 title: Thread（对话流）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Thread（对话流）

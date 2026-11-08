@@ -2,7 +2,6 @@
 title: Image generation（图像生成）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Image generation（图像生成）

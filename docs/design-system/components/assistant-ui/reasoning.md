@@ -2,7 +2,6 @@
 title: Reasoning（推理）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Reasoning（推理）

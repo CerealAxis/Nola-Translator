@@ -50,7 +50,7 @@ export function ToolError({
       {...props}
     >
       <div className="flex items-center gap-2.5">
-        <AlertCircleIcon className="size-3.5 shrink-0 text-red-500" />
+        <AlertCircleIcon className="size-3.5 shrink-0 text-destructive" />
         <span
           className={cn(mono, "text-muted-foreground min-w-0 wrap-anywhere")}
         >
@@ -69,7 +69,7 @@ export function ToolError({
       <div
         className={cn(
           field,
-          "rounded-xl px-3 py-2 font-mono text-[11px] leading-relaxed break-words text-red-700 dark:text-red-300",
+          "rounded-xl px-3 py-2 font-mono text-[11px] leading-relaxed break-words text-destructive",
         )}
       >
         {message}

@@ -80,7 +80,7 @@ export function RetrievalChunks({
                   mono,
                   "shrink-0 tabular-nums",
                   chunk.score >= 0.8
-                    ? "text-emerald-600 dark:text-emerald-400"
+                    ? "text-chart-2"
                     : "text-muted-foreground",
                 )}
               >
@@ -100,7 +100,7 @@ export function RetrievalChunks({
               className="bg-foreground/[0.06] inset-ring-border h-[2px] w-full overflow-hidden rounded-full inset-ring forced-colors:outline"
             >
               <span
-                className="block h-full rounded-full bg-blue-500/70 transition-[width] duration-500 forced-color-adjust-none dark:bg-blue-400/70"
+                className="block h-full rounded-full bg-primary/70 transition-[width] duration-500 forced-color-adjust-none"
                 style={{ width: `${pct(chunk.score, 1)}%` }}
               />
             </span>

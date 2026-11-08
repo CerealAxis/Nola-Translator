@@ -56,3 +56,4 @@ __pycache__/
 /.cache/
 /engine/uv.lock
 /logs/
+/comics/

@@ -2,7 +2,6 @@
 title: Typing indicator（输入指示器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Typing indicator（输入指示器）

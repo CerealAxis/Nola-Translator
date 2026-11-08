@@ -2,7 +2,6 @@
 title: Response time（响应时间）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Response time（响应时间）

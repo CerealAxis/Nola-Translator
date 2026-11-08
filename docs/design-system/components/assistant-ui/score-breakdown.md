@@ -2,7 +2,6 @@
 title: Score breakdown（评分明细）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Score breakdown（评分明细）

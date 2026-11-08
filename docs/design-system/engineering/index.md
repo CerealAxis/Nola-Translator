@@ -1,7 +1,5 @@
 # 工程规约
 
-阿里巴巴 f2e-spec · 简体中文 · `beb1ac8`　[上游仓库](https://github.com/alibaba/f2e-spec/tree/beb1ac899ea6dab206331263bbcdcad8f8fe336e) · [MPL-2.0 许可证](/vis/f2e-spec-license.txt)
-
 ## 编码规约
 
 - [通用编码规约](./coding/common)

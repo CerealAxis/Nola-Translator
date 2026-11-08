@@ -66,9 +66,9 @@ export function CostMeter({
               className={cn(
                 "h-full transition-[width] duration-500 forced-color-adjust-none motion-reduce:transition-none",
                 i === 0
-                  ? "bg-blue-500 dark:bg-blue-400"
+                  ? "bg-primary"
                   : i === 1
-                    ? "bg-blue-500/55 dark:bg-blue-400/55"
+                    ? "bg-primary/55"
                     : "bg-foreground/25",
               )}
               style={{ width: `${width}%` }}

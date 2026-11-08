@@ -41,7 +41,7 @@
 .writing-action-arrow {
   width: 16px;
   height: 16px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .foundation-demo .writing-dialog {
@@ -86,21 +86,8 @@ body:has([data-writing-scene="recovery"]) .nola-toast-viewport {
   width: min(24rem, calc(100vw - 32px));
 }
 body:has([data-writing-scene="recovery"]) .nola-toast {
-  --nola-ui-foreground: #171717;
-  --nola-ui-muted-foreground: #666;
-  --nola-ui-border: #d4d4d4;
-  --nola-ui-popover: #fff;
-  --nola-ui-destructive: #b91c1c;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
-}
-.dark body:has([data-writing-scene="recovery"]) .nola-toast {
-  --nola-ui-foreground: #f5f5f5;
-  --nola-ui-muted-foreground: #a3a3a3;
-  --nola-ui-border: #404040;
-  --nola-ui-popover: #292929;
-  --nola-ui-destructive: #fca5a5;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 32%);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--overlay-shadow);
 }
 body:has([data-writing-scene="recovery"]) .nola-toast-title {
   font: 500 .875rem/1.5 var(--font-ui);

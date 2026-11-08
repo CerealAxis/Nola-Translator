@@ -2,7 +2,6 @@
 title: 材质
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
-comments: false
 ---
 
 # 材质
@@ -17,7 +16,7 @@ comments: false
 
 **根据内容选择透明程度。** 常规浮层使用不透明表面。字幕覆盖视频时可使用半透明衬底，保证背景明暗变化时文字仍然清楚。
 
-<demo react="foundation-appearance-materials.tsx" :reactFiles="['foundation-appearance-materials.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css', '../foundation-theme.css']" />
+<demo react="foundation-appearance-materials.tsx" :reactFiles="['foundation-appearance-materials.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 字幕衬底服务于文字阅读，菜单表面承载操作。两者分别使用适合内容的表面。
 

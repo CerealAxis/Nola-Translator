@@ -2,7 +2,6 @@
 title: Cost meter（费用计量）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Cost meter（费用计量）

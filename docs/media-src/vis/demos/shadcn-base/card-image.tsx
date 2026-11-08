@@ -12,7 +12,7 @@ import {
 export function CardImage() {
   return (
     <Card className="relative mx-auto w-full max-w-sm pt-0">
-      <div className="absolute inset-0 z-30 aspect-video bg-black/35" />
+      <div className="absolute inset-0 z-30 aspect-video bg-(--shadow-color)/35" />
       <img
         src="https://avatar.vercel.sh/shadcn1"
         alt="活动封面"

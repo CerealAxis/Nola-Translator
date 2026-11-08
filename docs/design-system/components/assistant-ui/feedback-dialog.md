@@ -2,7 +2,6 @@
 title: Feedback dialog（反馈对话框）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Feedback dialog（反馈对话框）

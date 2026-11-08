@@ -2,7 +2,6 @@
 title: Tool group（工具分组）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Tool group（工具分组）

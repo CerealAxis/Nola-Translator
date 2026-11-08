@@ -2,7 +2,6 @@
 title: Media player（媒体播放器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Media player（媒体播放器）

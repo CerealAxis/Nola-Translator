@@ -29,11 +29,11 @@
   .aui-mcp-add-form :is(input:not([type="hidden"]), select),
   .aui-generative-preview :is(input[data-aui="input"], [data-aui="select"], [data-aui="datepicker"])
 ) {
-  @apply h-9 min-h-0 w-full min-w-0 rounded-4xl border border-input bg-input/30 px-3 py-1 text-base text-foreground transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm;
+  @apply h-9 min-h-0 w-full min-w-0 rounded-4xl border border-input bg-transparent px-3 py-1 text-base text-foreground transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30;
 }
 
 :is([data-preview-control="textarea"], .aui-generative-preview textarea[data-aui="input"]) {
-  @apply flex h-auto min-h-16 w-full resize-none rounded-xl border border-input bg-input/30 px-3 py-3 text-base text-foreground transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm;
+  @apply flex h-auto min-h-16 w-full resize-none rounded-xl border border-input bg-transparent px-3 py-3 text-base text-foreground transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30;
   field-sizing: content;
 }
 
@@ -42,7 +42,7 @@
 }
 
 [data-assistant-preview] :has(> [data-preview-control="group-input"]) {
-  @apply h-9 min-w-0 rounded-4xl border border-input bg-input/30 px-3 py-0 transition-colors;
+  @apply h-9 min-w-0 rounded-4xl border border-input bg-transparent px-3 py-0 transition-colors dark:bg-input/30;
 }
 
 [data-assistant-preview] :has(> [data-preview-control="group-input"]:focus-visible) {
@@ -89,11 +89,11 @@
 }
 
 [data-preview-slider]::-webkit-slider-thumb {
-  @apply -mt-0.5 size-4 appearance-none rounded-4xl border border-primary bg-white shadow-sm;
+  @apply -mt-0.5 size-4 appearance-none rounded-4xl border border-primary bg-card shadow-sm;
 }
 
 [data-preview-slider]::-moz-range-thumb {
-  @apply box-border size-4 rounded-4xl border border-primary bg-white shadow-sm;
+  @apply box-border size-4 rounded-4xl border border-primary bg-card shadow-sm;
 }
 
 [data-preview-slider]:focus-visible {
@@ -108,11 +108,11 @@
   @apply h-3 overflow-hidden rounded-4xl bg-muted shadow-none;
 }
 
-[data-assistant-preview] :where([role="progressbar"] > :not(.shimmer, [class*="bg-emerald"])) {
+[data-assistant-preview] :where([role="progressbar"] > :not(.shimmer, .bg-chart-2)) {
   border-radius: 0;
 }
 
-[data-assistant-preview] :where([data-slot="job-progress"][data-state="running"], :not([data-slot="job-progress"])) > [role="progressbar"] > :where(:not(.shimmer, [class*="bg-emerald"])) {
+[data-assistant-preview] :where([data-slot="job-progress"][data-state="running"], :not([data-slot="job-progress"])) > [role="progressbar"] > :where(:not(.shimmer, .bg-chart-2)) {
   @apply bg-primary dark:bg-primary;
 }
 
@@ -159,6 +159,22 @@
 
 .aui-generative-preview [data-aui="badge"][data-aui-variant="danger"] {
   @apply bg-destructive/10 text-destructive dark:bg-destructive/20;
+}
+
+.aui-generative-preview :is([data-aui="caption"], [data-aui="fact-label"], [data-aui="text"][data-aui-color="secondary"]) {
+  @apply text-muted-foreground;
+}
+
+.aui-generative-preview :is([data-aui="badge"][data-aui-variant="success"], [data-aui="fact-delta"][data-aui-tone="good"]) {
+  @apply bg-chart-2/15 text-chart-2;
+}
+
+.aui-generative-preview [data-aui="badge"][data-aui-variant="warning"] {
+  @apply bg-chart-4/15 text-chart-4;
+}
+
+.aui-generative-preview [data-aui="fact-delta"][data-aui-tone="bad"] {
+  @apply bg-destructive/15 text-destructive;
 }
 
 [data-assistant-preview] :is(.aui-md input[type="checkbox"], .aui-generative-preview input[type="checkbox"]:not([role="switch"]), .aui-generative-preview input[type="radio"]) {

@@ -1,6 +1,6 @@
 import { visSidebar } from './vis-sidebar.ts'
 
-const sections = visSidebar[0].items?.find(item => item.text === '组件与反馈')?.items
+const sections = visSidebar[0].items?.find(item => item.text === '组件')?.items
 
 function listComponents(section: string) {
   const items = sections?.find(item => item.text === section)?.items

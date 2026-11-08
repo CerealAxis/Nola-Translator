@@ -44,7 +44,7 @@ export function ComputerUse({
     >
       <div className="flex items-center gap-2 px-3 py-2">
         <span className="flex shrink-0 gap-1">
-          {["bg-red-500/50", "bg-amber-500/50", "bg-emerald-500/50"].map(
+          {["bg-destructive/50", "bg-chart-4/50", "bg-chart-2/50"].map(
             (tint) => (
               <span
                 key={tint}
@@ -72,7 +72,7 @@ export function ComputerUse({
           <span
             key={step.id}
             aria-hidden
-            className="pointer-events-none absolute size-2 rounded-full bg-blue-500 transition-opacity duration-300 dark:bg-blue-400"
+            className="pointer-events-none absolute size-2 rounded-full bg-primary transition-opacity duration-300"
             style={{
               left: `${step.x}%`,
               top: `${step.y}%`,
@@ -84,7 +84,7 @@ export function ComputerUse({
         {active && (
           <MousePointer2Icon
             aria-hidden
-            className="pointer-events-none absolute size-4 fill-blue-500 text-blue-500 transition-[left,top] duration-500 ease-out motion-reduce:transition-none dark:fill-blue-400 dark:text-blue-400"
+            className="pointer-events-none absolute size-4 fill-primary text-primary transition-[left,top] duration-500 ease-out motion-reduce:transition-none"
             style={{ left: `${active.x}%`, top: `${active.y}%` }}
           />
         )}

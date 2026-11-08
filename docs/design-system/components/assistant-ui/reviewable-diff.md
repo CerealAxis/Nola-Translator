@@ -2,7 +2,6 @@
 title: Reviewable diff（可审阅差异）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Reviewable diff（可审阅差异）

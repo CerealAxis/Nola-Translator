@@ -2,7 +2,6 @@
 title: 界面用语
 pageClass: nola-vis-doc nola-vis-writing
 editLink: false
-comments: false
 ---
 
 # 界面用语
@@ -41,7 +40,7 @@ comments: false
 
 <figure>
 
-<demo react="writing-fields.tsx" :reactFiles="['writing-fields.tsx','../figures/WritingExamples.tsx','../figures/WritingExamples.css','../foundation-theme.css']" />
+<demo react="writing-fields.tsx" :reactFiles="['writing-fields.tsx','../figures/WritingExamples.tsx','../figures/WritingExamples.css','../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>标签标明对象，示例提示格式，说明保留填写条件。</figcaption>
 

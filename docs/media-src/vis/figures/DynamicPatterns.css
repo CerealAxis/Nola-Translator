@@ -8,7 +8,7 @@
 }
 
 .fig-dynamic-edit { display: flex; align-items: center; gap: 16px; min-height: 48px; }
-.fig-dynamic-label { flex: none; color: var(--muted); font: var(--font-label); }
+.fig-dynamic-label { flex: none; color: var(--muted-foreground); font: var(--font-label); }
 .fig-dynamic-edit-content { flex: 1; min-width: 0; }
 .fig-dynamic-edit-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .fig-dynamic-edit-controls .input { flex: 1 1 180px; min-width: 0; }
@@ -18,10 +18,10 @@
 .fig-dynamic-form { display: grid; gap: 14px; }
 .fig-dynamic-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .fig-dynamic-switch-row > div { display: grid; gap: 4px; }
-.fig-dynamic-switch-row p { margin: 0; color: var(--muted); font: var(--font-caption); }
+.fig-dynamic-switch-row p { margin: 0; color: var(--muted-foreground); font: var(--font-caption); }
 
 .fig-dynamic-copy { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 80px; }
-.fig-dynamic-copy-status { color: var(--muted); font: var(--font-caption); }
+.fig-dynamic-copy-status { color: var(--muted-foreground); font: var(--font-caption); }
 .fig-dynamic-copy .input { flex-basis: 100%; }
 
 .fig-dynamic-templates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: 100%; }
@@ -35,7 +35,7 @@
 .fig-dynamic-template:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .fig-dynamic-table { display: grid; gap: 16px; }
-.fig-dynamic-no-results { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 16px; color: var(--muted); }
+.fig-dynamic-no-results { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 16px; color: var(--muted-foreground); }
 
 @container (max-width: 480px) {
   .fig-dynamic-templates { grid-template-columns: minmax(0, 1fr); }

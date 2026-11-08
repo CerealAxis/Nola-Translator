@@ -2,7 +2,6 @@
 title: Weekly active users（周活跃用户）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Weekly active users（周活跃用户）

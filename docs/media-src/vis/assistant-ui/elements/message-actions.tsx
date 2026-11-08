@@ -54,7 +54,7 @@ export function MessageActions({
         className={cn(
           buttonClassName,
           "grid place-items-center",
-          copied && "text-emerald-500",
+          copied && "text-chart-2",
         )}
       >
         <CopyIcon

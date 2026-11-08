@@ -88,9 +88,9 @@ export const VoiceStatusDot: FC = () => {
       className={cn(
         "aui-voice-status-dot size-2.5 shrink-0 rounded-full transition-all duration-300",
         state === "idle" && "bg-muted-foreground",
-        state === "connecting" && "animate-pulse bg-amber-500",
-        state === "listening" && "bg-green-500",
-        state === "speaking" && "bg-green-500",
+        state === "connecting" && "animate-pulse bg-chart-4",
+        state === "listening" && "bg-chart-2",
+        state === "speaking" && "bg-chart-2",
         state === "muted" && "bg-destructive",
       )}
     />

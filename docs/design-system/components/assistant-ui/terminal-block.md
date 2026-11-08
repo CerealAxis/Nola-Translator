@@ -2,7 +2,6 @@
 title: Terminal block（终端输出块）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Terminal block（终端输出块）

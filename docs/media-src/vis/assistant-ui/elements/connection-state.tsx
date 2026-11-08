@@ -39,7 +39,7 @@ export function ConnectionState({
     >
       {phase === "dropped" && (
         <>
-          <CloudOffIcon className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <CloudOffIcon className="size-3.5 shrink-0 text-chart-4" />
           <span className="min-w-0 flex-1 text-[13px]">
             连接丢失。运行在服务器上继续进行。
           </span>
@@ -71,7 +71,7 @@ export function ConnectionState({
 
       {phase === "resumed" && (
         <>
-          <CheckIcon className="size-3.5 shrink-0 text-emerald-500" />
+          <CheckIcon className="size-3.5 shrink-0 text-chart-2" />
           <span className="min-w-0 flex-1 text-[13px]">
             已重新选择流。
           </span>

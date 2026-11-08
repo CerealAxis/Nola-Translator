@@ -2,7 +2,6 @@
 title: Connection state（连接状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Connection state（连接状态）

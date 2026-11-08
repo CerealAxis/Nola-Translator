@@ -2,7 +2,6 @@
 title: 动态效果
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
-comments: false
 ---
 
 # 动态效果
@@ -21,7 +20,7 @@ comments: false
 
 **让反馈对应用户刚刚完成的动作。** 修改后的内容在原处显示，短暂强调发生变化的区域。提示结束后，结果仍然保留。
 
-<demo react="foundation-appearance-motion.tsx" :reactFiles="['foundation-appearance-motion.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css', '../foundation-theme.css']" />
+<demo react="foundation-appearance-motion.tsx" :reactFiles="['foundation-appearance-motion.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 点击「应用校对」，观察修改行的短暂强调。再次点击可恢复原文。
 

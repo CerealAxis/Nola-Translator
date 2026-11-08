@@ -111,7 +111,7 @@ export function CanvasSplitHeader({
           mono,
           "shrink-0 transition-colors duration-300",
           saved
-            ? "text-emerald-600 dark:text-emerald-400"
+            ? "text-chart-2"
             : "text-muted-foreground",
         )}
       >

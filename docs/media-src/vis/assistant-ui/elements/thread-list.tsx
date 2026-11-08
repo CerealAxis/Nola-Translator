@@ -82,7 +82,7 @@ export function ThreadList({
                 <>
                   <span
                     aria-hidden
-                    className="size-1.5 rounded-full bg-blue-500 dark:bg-blue-400"
+                    className="size-1.5 rounded-full bg-primary"
                   />
                   <span className="sr-only">未读</span>
                 </>

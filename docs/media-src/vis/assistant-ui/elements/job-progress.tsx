@@ -104,11 +104,11 @@ export function JobProgress({
         : "任务正在运行";
   const outcomeBar =
     outcome?.status === "success"
-      ? "bg-emerald-500"
+      ? "bg-chart-2"
       : outcome?.status === "partial"
-        ? "bg-amber-500 dark:bg-amber-400"
+        ? "bg-chart-4"
         : outcome?.status === "failed"
-          ? "bg-red-600 dark:bg-red-400"
+          ? "bg-destructive"
           : outcome?.status === "cancelled"
             ? "bg-foreground/20"
             : undefined;
@@ -127,13 +127,13 @@ export function JobProgress({
     >
       <div className="flex items-center gap-2.5">
         {outcome?.status === "partial" ? (
-          <CircleAlertIcon className="size-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
+          <CircleAlertIcon className="size-3.5 shrink-0 text-chart-4" />
         ) : outcome?.status === "failed" ? (
-          <XIcon className="size-3.5 shrink-0 text-red-600 dark:text-red-400" />
+          <XIcon className="size-3.5 shrink-0 text-destructive" />
         ) : outcome?.status === "cancelled" ? (
           <CircleSlashIcon className="text-muted-foreground size-3.5 shrink-0" />
         ) : !running ? (
-          <CheckIcon className="size-3.5 shrink-0 text-emerald-500" />
+          <CheckIcon className="size-3.5 shrink-0 text-chart-2" />
         ) : (
           <Loader2Icon className="text-muted-foreground size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
         )}
@@ -175,7 +175,7 @@ export function JobProgress({
           className={cn(
             "block h-full rounded-full transition-[width] duration-500 ease-out forced-color-adjust-none motion-reduce:transition-none",
             outcomeBar ??
-              (finished ? "bg-emerald-500" : "bg-blue-500 dark:bg-blue-400"),
+              (finished ? "bg-chart-2" : "bg-primary"),
           )}
           style={{ width: `${progressPercent}%` }}
         />

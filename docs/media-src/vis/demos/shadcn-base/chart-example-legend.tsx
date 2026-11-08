@@ -23,11 +23,11 @@ const chartData = [
 const chartConfig = {
   desktop: {
     label: "桌面端",
-    color: "#2563eb",
+    color: "var(--chart-1)",
   },
   mobile: {
     label: "移动端",
-    color: "#60a5fa",
+    color: "var(--chart-2)",
   },
 } satisfies ChartConfig
 

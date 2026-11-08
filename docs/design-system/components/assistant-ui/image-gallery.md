@@ -2,7 +2,6 @@
 title: Image gallery（图片集）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Image gallery（图片集）

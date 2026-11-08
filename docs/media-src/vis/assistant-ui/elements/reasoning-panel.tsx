@@ -78,7 +78,7 @@ export function ReasoningPanel({
                   className={cn(
                     "mt-[7px] size-[5px] shrink-0 rounded-full transition-colors duration-300",
                     active
-                      ? "animate-pulse bg-blue-500 dark:bg-blue-400"
+                      ? "animate-pulse bg-primary"
                       : "bg-foreground/20",
                   )}
                 />

@@ -15,9 +15,9 @@ export interface ConfidenceClaim {
 }
 
 const UNDERLINE: Record<Confidence, string> = {
-  grounded: "decoration-emerald-500/50",
-  inferred: "decoration-amber-500/60",
-  uncertain: "decoration-red-500/50 decoration-dotted",
+  grounded: "decoration-chart-2/50",
+  inferred: "decoration-chart-4/60",
+  uncertain: "decoration-destructive/50 decoration-dotted",
 };
 
 const LABEL: Record<Confidence, string> = {
@@ -88,9 +88,9 @@ export function ConfidenceMarker({
               aria-hidden
               className={cn(
                 "size-1.5 rounded-full",
-                hovered.confidence === "grounded" && "bg-emerald-500",
-                hovered.confidence === "inferred" && "bg-amber-500",
-                hovered.confidence === "uncertain" && "bg-red-500",
+                hovered.confidence === "grounded" && "bg-chart-2",
+                hovered.confidence === "inferred" && "bg-chart-4",
+                hovered.confidence === "uncertain" && "bg-destructive",
               )}
             />
             {LABEL[hovered.confidence]} · {hovered.basis}

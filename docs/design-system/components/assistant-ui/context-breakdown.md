@@ -2,7 +2,6 @@
 title: Context breakdown（上下文明细）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Context breakdown（上下文明细）
@@ -74,7 +73,7 @@ export function ThreadContextBreakdown() {
   const usage = useTurnUsage();
   const segments: ContextSegment[] = [
     { label: "提示词", tokens: usage.input, tint: "bg-foreground/30" },
-    { label: "回复", tokens: usage.output, tint: "bg-blue-500/70" },
+    { label: "回复", tokens: usage.output, tint: "bg-chart-1" },
   ];
   return <ContextBreakdown segments={segments} limit={MODEL_CONTEXT_WINDOW} />;
 }
@@ -94,7 +93,7 @@ import { ContextBreakdown } from "@/components/assistant-ui/elements/context-bre
 const segments = [
   { label: "系统提示词", tokens: 1_400, tint: "bg-foreground/20" },
   { label: "工具", tokens: 3_100, tint: "bg-foreground/35" },
-  { label: "会话", tokens: 42_000, tint: "bg-blue-500/70" },
+  { label: "会话", tokens: 42_000, tint: "bg-chart-1" },
 ];
 
 export function ContextPanel() {
@@ -129,7 +128,7 @@ export function ContextPanel() {
 为分段分配可区分的色调。相同类型保持一致。
 
 ```tsx
-{ label: "会话", tokens: 42000, tint: "bg-blue-500/70" }
+{ label: "会话", tokens: 42000, tint: "bg-chart-1" }
 ```
 
 ### 调整面板样式

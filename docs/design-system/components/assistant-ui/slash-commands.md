@@ -2,7 +2,6 @@
 title: Slash commands（斜杠命令）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Slash commands（斜杠命令）

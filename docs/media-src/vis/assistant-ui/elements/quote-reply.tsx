@@ -56,7 +56,7 @@ export function QuoteReply({
     >
       <p className="relative text-[13.5px] leading-relaxed">
         <span className="text-foreground/70">{before}</span>
-        <span className="text-foreground/95 rounded bg-blue-500/18 px-0.5 dark:bg-blue-400/25">
+        <span className="text-foreground/95 rounded bg-primary/18 px-0.5 dark:bg-primary/25">
           {selection}
         </span>
         <span className="text-foreground/70">{after}</span>

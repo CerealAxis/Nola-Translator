@@ -2,7 +2,6 @@
 title: Tool fallback（工具默认展示）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Tool fallback（工具默认展示）

@@ -86,9 +86,9 @@ export function ScheduleCard({
         {history.map((run) => (
           <div key={run.id} className="flex items-baseline gap-2">
             {run.ok ? (
-              <CheckIcon className="size-3 shrink-0 translate-y-0.5 text-emerald-500" />
+              <CheckIcon className="size-3 shrink-0 translate-y-0.5 text-chart-2" />
             ) : (
-              <XIcon className="size-3 shrink-0 translate-y-0.5 text-red-500" />
+              <XIcon className="size-3 shrink-0 translate-y-0.5 text-destructive" />
             )}
             <span className="text-foreground/60 min-w-0 flex-1 truncate text-xs">
               {run.at}

@@ -2,7 +2,6 @@
 title: Draft email（邮件草稿）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Draft email（邮件草稿）

@@ -2,7 +2,6 @@
 title: Follow-up suggestions（后续建议）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Follow-up suggestions（后续建议）

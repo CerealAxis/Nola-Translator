@@ -19,7 +19,7 @@ editLink: false
 
 <figure>
 
-<demo react="contrast-actions.tsx" :reactFiles="['contrast-actions.tsx', '../figures/Contrast.tsx', '../figures/Contrast.css', '../demo.css']" />
+<demo react="contrast-actions.tsx" :reactFiles="['contrast-actions.tsx', '../figures/Contrast.tsx', '../figures/Contrast.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>主要操作与次要操作形成对比。</figcaption>
 </figure>
@@ -35,7 +35,7 @@ editLink: false
 
 <figure>
 
-<demo react="contrast-neutral.tsx" :reactFiles="['contrast-neutral.tsx', '../figures/Contrast.tsx', '../figures/Contrast.css', '../demo.css']" />
+<demo react="contrast-neutral.tsx" :reactFiles="['contrast-neutral.tsx', '../figures/Contrast.tsx', '../figures/Contrast.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>对等决策保持相同权重。</figcaption>
 </figure>
@@ -53,7 +53,7 @@ editLink: false
 
 <figure>
 
-<demo react="contrast-hierarchy.tsx" :reactFiles="['contrast-hierarchy.tsx', '../figures/Contrast.tsx', '../figures/Contrast.css', '../demo.css']" />
+<demo react="contrast-hierarchy.tsx" :reactFiles="['contrast-hierarchy.tsx', '../figures/Contrast.tsx', '../figures/Contrast.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>标题、正文与说明逐级区分。</figcaption>
 </figure>
@@ -71,7 +71,7 @@ editLink: false
 
 <figure>
 
-<demo react="contrast-state.tsx" :reactFiles="['contrast-state.tsx', '../figures/Contrast.tsx', '../figures/Contrast.css', '../demo.css']" />
+<demo react="contrast-state.tsx" :reactFiles="['contrast-state.tsx', '../figures/Contrast.tsx', '../figures/Contrast.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>颜色、文字和图标共同表示状态。</figcaption>
 </figure>

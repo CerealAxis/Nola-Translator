@@ -2,7 +2,6 @@
 title: View event（查看日程）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # View event（查看日程）

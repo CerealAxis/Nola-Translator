@@ -2,7 +2,6 @@
 title: 品牌
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
-comments: false
 ---
 
 # 品牌
@@ -15,7 +14,7 @@ comments: false
 
 **有选择地使用强调色。** 把蓝色用于主要操作、当前选择或需要注意的状态。筛选和导出同时出现时，可以让两者保持中性，把强调色留给正在查看的条目。
 
-<demo react="foundation-media-branding.tsx" :reactFiles="['foundation-media-branding.tsx', '../foundation-theme.css']" />
+<demo react="foundation-media-branding.tsx" :reactFiles="['foundation-media-branding.tsx', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 两侧展示同一份术语库。蓝色从工具按钮移到选中项后，用户更容易看清当前正在查看的内容。勾选标记也保留了选择状态。
 

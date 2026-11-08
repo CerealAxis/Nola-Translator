@@ -2,7 +2,6 @@
 title: Artifact card（产物卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Artifact card（产物卡片）

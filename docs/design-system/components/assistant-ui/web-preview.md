@@ -2,7 +2,6 @@
 title: Web preview（网页预览）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Web preview（网页预览）

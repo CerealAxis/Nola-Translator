@@ -2,7 +2,6 @@
 title: 多语言与数据格式
 pageClass: nola-vis-doc nola-vis-writing
 editLink: false
-comments: false
 ---
 
 # 多语言与数据格式

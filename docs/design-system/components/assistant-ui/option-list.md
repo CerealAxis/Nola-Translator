@@ -2,7 +2,6 @@
 title: Option list（选项列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Option list（选项列表）

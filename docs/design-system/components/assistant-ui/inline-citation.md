@@ -2,7 +2,6 @@
 title: Inline citation（行内引用）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Inline citation（行内引用）

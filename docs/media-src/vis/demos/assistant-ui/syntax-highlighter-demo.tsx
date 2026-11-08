@@ -10,7 +10,7 @@ const components = {
 export default function Demo() {
   return (
     <AssistantPreview>
-      <div className="mx-auto max-w-xl overflow-auto rounded-lg bg-muted p-3 text-sm">
+      <div className="mx-auto max-w-xl overflow-auto rounded-lg bg-card p-3 text-sm text-card-foreground">
         <SyntaxHighlighter language="typescript" code={code} components={components} />
       </div>
     </AssistantPreview>

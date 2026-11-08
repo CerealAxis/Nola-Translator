@@ -2,7 +2,6 @@
 title: Context display（上下文显示）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Context display（上下文显示）

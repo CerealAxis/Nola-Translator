@@ -2,7 +2,6 @@
 title: Math（数学公式）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Math（数学公式）

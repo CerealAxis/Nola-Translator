@@ -2,7 +2,6 @@
 title: Mermaid diagram（Mermaid 图表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Mermaid diagram（Mermaid 图表）

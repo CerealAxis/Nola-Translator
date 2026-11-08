@@ -20,7 +20,7 @@ export default function Demo() {
       <DemoRuntime>
         <ComposerPrimitive.TriggerPopoverRoot>
           <ComposerPrimitive.Root className="mx-auto max-w-md">
-            <ComposerPrimitive.Input className="w-full resize-none rounded-lg border bg-background p-3 text-sm" placeholder="输入 @ 引用文件" />
+            <ComposerPrimitive.Input className="w-full resize-none rounded-lg border border-input bg-card p-3 text-sm text-card-foreground dark:bg-input/30" placeholder="输入 @ 引用文件" />
             <ComposerTriggerPopover char="@" adapter={adapter} directive={{}} />
           </ComposerPrimitive.Root>
         </ComposerPrimitive.TriggerPopoverRoot>

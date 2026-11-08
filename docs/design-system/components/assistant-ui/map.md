@@ -2,7 +2,6 @@
 title: Map（地图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Map（地图）

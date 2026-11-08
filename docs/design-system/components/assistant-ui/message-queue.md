@@ -2,7 +2,6 @@
 title: Message queue（消息队列）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Message queue（消息队列）

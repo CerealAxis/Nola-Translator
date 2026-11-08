@@ -2,7 +2,6 @@
 title: Timeline（时间线）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Timeline（时间线）

@@ -2,7 +2,6 @@
 title: Context（上下文）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Context（上下文）

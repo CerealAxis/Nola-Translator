@@ -1,4 +1,5 @@
-import '../foundation-theme.css';
+import '../shadcn-base/apple-liquid-glass.css';
+import '../shadcn-base/nola-liquid-glass.css';
 import { TypeSpecimen } from '../figures/FoundationAppearance';
 
 export default function Demo() {

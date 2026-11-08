@@ -2,7 +2,6 @@
 title: Voice conversation（语音对话）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Voice conversation（语音对话）

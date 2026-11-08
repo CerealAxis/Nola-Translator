@@ -2,7 +2,6 @@
 title: Reasoning effort（推理强度）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Reasoning effort（推理强度）

@@ -2,7 +2,6 @@
 title: Number ticker（数字滚动）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Number ticker（数字滚动）

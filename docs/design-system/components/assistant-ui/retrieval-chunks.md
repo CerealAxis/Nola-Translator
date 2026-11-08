@@ -2,7 +2,6 @@
 title: Retrieval chunks（检索片段）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Retrieval chunks（检索片段）

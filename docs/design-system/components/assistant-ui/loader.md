@@ -2,7 +2,6 @@
 title: Loader（加载指示器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Loader（加载指示器）

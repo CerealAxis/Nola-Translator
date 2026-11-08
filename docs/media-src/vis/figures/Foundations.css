@@ -119,7 +119,7 @@
   min-width: 0;
 }
 
-.fig-f-comparison figcaption { font: var(--font-caption); color: var(--muted); }
+.fig-f-comparison figcaption { font: var(--font-caption); color: var(--muted-foreground); }
 
 .fig-f-reading { display: grid; gap: 1.5rem; }
 .fig-f-reading section { display: grid; gap: .375rem; }
@@ -147,10 +147,10 @@
 
 /* Guides occupy the gaps between existing components; captions stay outside the card. */
 .fig-foundations {
-  --fig-small-tint: rgb(126 203 255 / 70%);
-  --fig-medium-tint: rgb(191 154 255 / 70%);
-  --fig-large-tint: rgb(255 211 110 / 70%);
-  --fig-axis: rgb(0 113 227 / 70%);
+  --fig-small-tint: color-mix(in srgb, var(--chart-1) 35%, transparent);
+  --fig-medium-tint: color-mix(in srgb, var(--chart-3) 35%, transparent);
+  --fig-large-tint: color-mix(in srgb, var(--chart-4) 35%, transparent);
+  --fig-axis: color-mix(in srgb, var(--primary) 70%, transparent);
 }
 
 .fig-f-key {
@@ -159,7 +159,7 @@
   align-items: center;
   gap: .25rem .875rem;
   margin-block-start: .5rem;
-  color: var(--muted);
+  color: var(--muted-foreground);
   font: var(--font-caption);
 }
 

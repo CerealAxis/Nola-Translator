@@ -2,7 +2,6 @@
 title: Confirm dialog（确认对话框）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Confirm dialog（确认对话框）

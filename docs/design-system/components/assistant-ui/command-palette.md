@@ -2,7 +2,6 @@
 title: Command palette（命令面板）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Command palette（命令面板）

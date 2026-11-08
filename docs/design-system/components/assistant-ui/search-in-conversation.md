@@ -2,7 +2,6 @@
 title: Search in conversation（对话内搜索）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Search in conversation（对话内搜索）

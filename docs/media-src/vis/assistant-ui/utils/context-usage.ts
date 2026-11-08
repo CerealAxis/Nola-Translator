@@ -24,22 +24,22 @@ const getUsageSeverity = (percent: number): UsageSeverity => {
 
 export const getStrokeColor = (percent: number): string => {
   const severity = getUsageSeverity(percent);
-  if (severity === "critical") return "stroke-red-500";
-  if (severity === "warning") return "stroke-amber-500";
-  return "stroke-foreground";
+  if (severity === "critical") return "stroke-destructive";
+  if (severity === "warning") return "stroke-chart-4";
+  return "stroke-primary";
 };
 
 export const getBarColor = (percent: number): string => {
   const severity = getUsageSeverity(percent);
-  if (severity === "critical") return "bg-red-500";
-  if (severity === "warning") return "bg-amber-500";
-  return "bg-foreground";
+  if (severity === "critical") return "bg-destructive";
+  if (severity === "warning") return "bg-chart-4";
+  return "bg-primary";
 };
 
 export const getPercentColor = (percent: number): string => {
   const severity = getUsageSeverity(percent);
-  if (severity === "critical") return "text-red-500";
-  if (severity === "warning") return "text-amber-500";
+  if (severity === "critical") return "text-destructive";
+  if (severity === "warning") return "text-chart-4";
   return "text-muted-foreground";
 };
 

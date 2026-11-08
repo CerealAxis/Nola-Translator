@@ -2,7 +2,6 @@
 title: 无障碍
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
-comments: false
 ---
 
 # 无障碍
@@ -17,7 +16,7 @@ comments: false
 
 **给颜色补充形状和文字。** 同样的点形只换红绿颜色，用户可能分不清状态。加入不同的符号和简短的状态词，在灰度显示中也能识别结果。
 
-<demo react="foundation-environment-status.tsx" :reactFiles="['foundation-environment-status.tsx','../figures/FoundationEnvironment.tsx','../figures/FoundationEnvironment.css','../foundation-theme.css']" />
+<demo react="foundation-environment-status.tsx" :reactFiles="['foundation-environment-status.tsx','../figures/FoundationEnvironment.tsx','../figures/FoundationEnvironment.css','../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 **让屏幕阅读器理解界面。** 提供语义化的标题、列表、表单和表格。标签关联字段，错误关联到对应输入，图标按钮有可访问的名称。内容图片提供替代文字，装饰图形从无障碍树中隐藏。
 
@@ -37,7 +36,7 @@ comments: false
 
 在下例中，用 Tab 在输入框和保存按钮之间移动，用 Enter 保存。结果保留在表单下方，并通过状态区域播报。
 
-<demo react="foundation-environment-focus.tsx" :reactFiles="['foundation-environment-focus.tsx','../figures/FoundationEnvironment.tsx','../figures/FoundationEnvironment.css','../foundation-theme.css']" />
+<demo react="foundation-environment-focus.tsx" :reactFiles="['foundation-environment-focus.tsx','../figures/FoundationEnvironment.tsx','../figures/FoundationEnvironment.css','../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 ## 语音
 

@@ -2,7 +2,6 @@
 title: Directive text（指令文本）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Directive text（指令文本）

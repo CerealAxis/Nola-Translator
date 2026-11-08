@@ -1,5 +1,6 @@
 import { EditModeToolsExample } from '../figures/LightweightExamples';
-import '../demo.css';
+import '../shadcn-base/apple-liquid-glass.css';
+import '../shadcn-base/nola-liquid-glass.css';
 
 export default function EditModeToolsDemo() {
   return <div className="nola-component-demo"><EditModeToolsExample /></div>;

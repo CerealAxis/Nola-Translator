@@ -58,7 +58,7 @@ export function AvatarRtl() {
           alt="@evilrabbit"
         />
         <AvatarFallback>ER</AvatarFallback>
-        <AvatarBadge className="bg-green-600 dark:bg-green-800" />
+        <AvatarBadge className="bg-chart-2" />
       </Avatar>
       <AvatarGroup className="grayscale">
         <Avatar>

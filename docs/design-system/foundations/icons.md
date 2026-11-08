@@ -2,7 +2,6 @@
 title: 图标
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
-comments: false
 ---
 
 # 图标
@@ -15,7 +14,7 @@ comments: false
 
 **保持视觉一致性。** 比较图标的大小、细节、线条粗细和视重。常规操作图形为 16px，较大的导航或空状态可用 20px。图形大小与操作区域分别处理，16px 图形放在至少 36 × 36px 的图标按钮中。
 
-<demo react="foundation-media-icons.tsx" :reactFiles="['foundation-media-icons.tsx', '../figures/FoundationMedia.tsx', '../figures/FoundationMedia.css', '../foundation-theme.css']" />
+<demo react="foundation-media-icons.tsx" :reactFiles="['foundation-media-icons.tsx', '../figures/FoundationMedia.tsx', '../figures/FoundationMedia.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 **让图标与文字相称。** 图标的视觉重量接近相邻文字，图形与标签垂直对齐。使用库中已有组件时，由组件管理图标尺寸与间距。自绘的非对称图标还需检查视觉中心，在资源内部保留适当内边距。
 
@@ -59,7 +58,7 @@ comments: false
 
 账户使用 `UserRound` 等中性人物图形。模型、服务商的身份使用 LobeHub Icons 的对应品牌资源，并在旁边显示完整名称。
 
-<demo react="foundation-media-providers.tsx" :reactFiles="['foundation-media-providers.tsx', '../figures/FoundationMedia.tsx', '../figures/FoundationMedia.css', '../foundation-theme.css']" />
+<demo react="foundation-media-providers.tsx" :reactFiles="['foundation-media-providers.tsx', '../figures/FoundationMedia.tsx', '../figures/FoundationMedia.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 品牌图形保留原始比例。已有单色版本可以跟随文字色；彩色资源保留品牌配色，并在浅深色背景中检查。
 

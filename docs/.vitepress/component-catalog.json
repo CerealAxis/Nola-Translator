@@ -16,7 +16,7 @@
     },
     {
       "path": "chart",
-      "target": ".vitepress-demo-plugin-preview [data-slot=chart]:has(.recharts-xAxis)",
+      "target": ".vitepress-demo-plugin-preview [data-slot=chart]:has(.recharts-bar-rectangle path[fill=\"var(--color-mobile)\"][d])",
       "settle": 1650
     },
     {
@@ -135,6 +135,10 @@
     }
   ],
   "assistant-ui": [
+    {
+      "path": "assistant-ui/agent-plan",
+      "ready": ".vitepress-demo-plugin-preview [role=progressbar]:not([aria-valuenow=\"0\"])"
+    },
     {
       "path": "assistant-ui/agent-status",
       "target": "[data-slot=agent-status]"

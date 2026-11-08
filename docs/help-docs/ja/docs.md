@@ -1,6 +1,6 @@
-# Nola Translator ヘルプ
+# ヘルプドキュメント
 
-Nola Translator のインストールから主な機能、困ったときの対処までまとめています。
+Nola Translator のヘルプドキュメントです。
 
 ## はじめに
 
@@ -37,6 +37,18 @@ Nola Translator のインストールから主な機能、困ったときの対�
 
 - [利用規約](legal/user-agreement)
 - [プライバシーポリシー](legal/privacy-policy)
+
+## コンテンツのライセンス
+
+特に記載がない限り、本ドキュメントで公開するコンテンツはクリエイティブ・コモンズ 表示—継承 4.0 国際パブリック・ライセンス（CC BY-SA 4.0）に基づいて配布します。
+
+<a href="https://creativecommons.org/licenses/by-sa/4.0/deed.ja" target="_blank" rel="noopener">
+    <img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg" alt="CC BY-SA">
+</a>
+
+参考プロジェクト：
+
+- [PCL CE ヘルプドキュメント](https://github.com/PCL-Community/docs.pclc.cc) の内容を、[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) ライセンスに基づいて引用・改変しています。
 
 ---
 

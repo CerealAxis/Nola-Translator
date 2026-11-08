@@ -19,7 +19,7 @@ editLink: false
 
 <figure>
 
-<demo react="alignment-text.tsx" :reactFiles="['alignment-text.tsx', '../figures/Foundations.tsx', '../figures/Foundations.css', '../demo.css']" />
+<demo react="alignment-text.tsx" :reactFiles="['alignment-text.tsx', '../figures/Foundations.tsx', '../figures/Foundations.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>标题与正文共用阅读起点。</figcaption>
 </figure>
@@ -37,7 +37,7 @@ editLink: false
 
 <figure>
 
-<demo react="alignment-form.tsx" :reactFiles="['alignment-form.tsx', '../figures/Foundations.tsx', '../figures/Foundations.css', '../demo.css']" />
+<demo react="alignment-form.tsx" :reactFiles="['alignment-form.tsx', '../figures/Foundations.tsx', '../figures/Foundations.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>标签和输入框分别成列。</figcaption>
 </figure>
@@ -55,7 +55,7 @@ editLink: false
 
 <figure>
 
-<demo react="alignment-numbers.tsx" :reactFiles="['alignment-numbers.tsx', '../figures/Foundations.tsx', '../figures/Foundations.css', '../demo.css']" />
+<demo react="alignment-numbers.tsx" :reactFiles="['alignment-numbers.tsx', '../figures/Foundations.tsx', '../figures/Foundations.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>数值统一精度并右对齐。</figcaption>
 </figure>

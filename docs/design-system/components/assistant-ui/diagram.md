@@ -2,7 +2,6 @@
 title: Diagram（示意图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Diagram（示意图）

@@ -2,7 +2,6 @@
 title: Tooltip icon button（带提示的图标按钮）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Tooltip icon button（带提示的图标按钮）

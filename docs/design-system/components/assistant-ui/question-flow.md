@@ -2,7 +2,6 @@
 title: Question flow（问答流程）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Question flow（问答流程）

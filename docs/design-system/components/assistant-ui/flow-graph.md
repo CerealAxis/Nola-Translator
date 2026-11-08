@@ -2,7 +2,6 @@
 title: Flow graph（流程图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Flow graph（流程图）

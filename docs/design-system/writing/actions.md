@@ -2,7 +2,6 @@
 title: 操作名称
 pageClass: nola-vis-doc nola-vis-writing
 editLink: false
-comments: false
 ---
 
 # 操作名称
@@ -31,7 +30,7 @@ comments: false
 
 <figure>
 
-<demo react="writing-actions.tsx" :reactFiles="['writing-actions.tsx','../figures/WritingExamples.tsx','../figures/WritingExamples.css','../foundation-theme.css']" />
+<demo react="writing-actions.tsx" :reactFiles="['writing-actions.tsx','../figures/WritingExamples.tsx','../figures/WritingExamples.css','../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>入口说明任务，标题沿用名称，按钮表达执行动作。</figcaption>
 

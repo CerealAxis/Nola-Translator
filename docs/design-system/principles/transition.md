@@ -19,7 +19,7 @@ editLink: false
 
 <figure>
 
-<demo react="transition-slide.tsx" :reactFiles="['transition-slide.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../demo.css']" />
+<demo react="transition-slide.tsx" :reactFiles="['transition-slide.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 </figure>
 </div>
@@ -33,7 +33,7 @@ editLink: false
 
 <figure>
 
-<demo react="transition-carousel.tsx" :reactFiles="['transition-carousel.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../demo.css']" />
+<demo react="transition-carousel.tsx" :reactFiles="['transition-carousel.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 </figure>
 </div>
@@ -47,7 +47,7 @@ editLink: false
 
 <figure>
 
-<demo react="transition-fold.tsx" :reactFiles="['transition-fold.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../demo.css']" />
+<demo react="transition-fold.tsx" :reactFiles="['transition-fold.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 </figure>
 </div>
@@ -63,7 +63,7 @@ editLink: false
 
 <figure>
 
-<demo react="transition-states.tsx" :reactFiles="['transition-states.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../demo.css']" />
+<demo react="transition-states.tsx" :reactFiles="['transition-states.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 </figure>
 </div>
@@ -77,7 +77,7 @@ editLink: false
 
 <figure>
 
-<demo react="transition-delete.tsx" :reactFiles="['transition-delete.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../demo.css']" />
+<demo react="transition-delete.tsx" :reactFiles="['transition-delete.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 </figure>
 </div>
@@ -91,7 +91,7 @@ editLink: false
 
 <figure>
 
-<demo react="transition-update.tsx" :reactFiles="['transition-update.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../demo.css']" />
+<demo react="transition-update.tsx" :reactFiles="['transition-update.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 </figure>
 </div>
@@ -105,7 +105,7 @@ editLink: false
 
 <figure>
 
-<demo react="transition-callout.tsx" :reactFiles="['transition-callout.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../demo.css']" />
+<demo react="transition-callout.tsx" :reactFiles="['transition-callout.tsx', '../figures/MotionExamples.tsx', '../figures/MotionExamples.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 </figure>
 </div>

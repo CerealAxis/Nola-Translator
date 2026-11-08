@@ -2,7 +2,6 @@
 title: Empty state（空状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Empty state（空状态）

@@ -2,7 +2,6 @@
 title: Activity graph（活动图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Activity graph（活动图）

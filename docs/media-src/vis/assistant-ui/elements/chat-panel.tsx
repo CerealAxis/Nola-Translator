@@ -106,8 +106,7 @@ export function ChatPanelComposer({
     <div
       data-slot="chat-panel-composer"
       className={cn(
-        field,
-        "mx-3 mb-3 flex h-10 shrink-0 items-center justify-between rounded-full py-1.5 ps-4 pe-1.5",
+        "mx-3 mb-3 flex h-10 shrink-0 items-center justify-between rounded-full border border-input bg-transparent py-1.5 ps-4 pe-1.5 dark:bg-input/30",
         className,
       )}
       {...props}

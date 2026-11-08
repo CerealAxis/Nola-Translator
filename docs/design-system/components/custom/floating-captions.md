@@ -2,7 +2,6 @@
 title: Floating Captions（悬浮字幕）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Floating Captions（悬浮字幕）

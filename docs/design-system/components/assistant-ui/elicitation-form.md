@@ -2,7 +2,6 @@
 title: Elicitation form（信息征询表单）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Elicitation form（信息征询表单）
@@ -74,7 +73,7 @@ export function McpElicitationForm({ serverName }: { serverName: string }) {
           </div>
 
           <McpElicitationPrimitive.Message className="text-muted-foreground text-xs leading-relaxed" />
-          <McpElicitationPrimitive.Error className="text-xs text-red-600 dark:text-red-400" />
+          <McpElicitationPrimitive.Error className="text-xs text-destructive" />
 
           <div className="flex flex-col gap-2.5">
             <McpElicitationPrimitive.Fields>

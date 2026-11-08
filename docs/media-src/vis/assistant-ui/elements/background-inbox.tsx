@@ -45,7 +45,7 @@ export function BackgroundInbox({
             mono,
             "tabular-nums",
             ready > 0
-              ? "text-blue-600 dark:text-blue-400"
+              ? "text-primary"
               : "text-muted-foreground",
           )}
         >
@@ -68,9 +68,9 @@ export function BackgroundInbox({
               {run.state === "running" ? (
                 <Loader2Icon className="text-muted-foreground size-3 animate-spin motion-reduce:animate-none" />
               ) : run.state === "failed" ? (
-                <XIcon className="size-3 text-red-500" />
+                <XIcon className="size-3 text-destructive" />
               ) : (
-                <CheckIcon className="size-3 text-emerald-500" />
+                <CheckIcon className="size-3 text-chart-2" />
               )}
             </span>
 

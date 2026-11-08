@@ -2,7 +2,6 @@
 title: Orb（球形指示器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Orb（球形指示器）

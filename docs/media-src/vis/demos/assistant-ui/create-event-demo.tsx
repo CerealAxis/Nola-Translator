@@ -67,7 +67,7 @@ const spec = {
               "width": 3,
               "height": 32,
               "radius": "full",
-              "background": "color-mix(in oklab, var(--foreground) 80%, transparent)"
+              "background": "var(--primary)"
             },
             {
               "$type": "Col",
@@ -111,7 +111,7 @@ const spec = {
               "width": 3,
               "height": 32,
               "radius": "full",
-              "background": "color-mix(in oklab, var(--foreground) 45%, transparent)"
+              "background": "var(--chart-4)"
             },
             {
               "$type": "Col",
@@ -155,7 +155,7 @@ const spec = {
               "width": 3,
               "height": 32,
               "radius": "full",
-              "background": "color-mix(in oklab, var(--foreground) 25%, transparent)"
+              "background": "var(--chart-2)"
             },
             {
               "$type": "Col",

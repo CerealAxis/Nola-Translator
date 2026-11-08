@@ -2,7 +2,6 @@
 title: Sources（来源）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Sources（来源）

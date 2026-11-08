@@ -44,7 +44,7 @@ export function ContextBreakdown({
             mono,
             "tabular-nums",
             pressure > 0.85
-              ? "text-amber-600 dark:text-amber-400"
+              ? "text-chart-4"
               : "text-muted-foreground",
           )}
         >

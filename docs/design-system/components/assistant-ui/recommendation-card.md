@@ -2,7 +2,6 @@
 title: Recommendation card（建议卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Recommendation card（建议卡片）

@@ -2,7 +2,6 @@
 title: Assistant modal（助手弹窗）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Assistant modal（助手弹窗）

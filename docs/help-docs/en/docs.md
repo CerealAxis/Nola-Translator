@@ -1,6 +1,6 @@
-# Nola Translator Documentation
+# Help Documentation
 
-Everything you need to install Nola Translator, learn what each feature does, and get unstuck when something goes wrong.
+This is the help documentation for Nola Translator.
 
 ## Getting Started
 
@@ -37,6 +37,18 @@ Everything you need to install Nola Translator, learn what each feature does, an
 
 - [Terms of Service](legal/user-agreement)
 - [Privacy Policy](legal/privacy-policy)
+
+## Content License
+
+Unless otherwise stated, all content published in this documentation is distributed under the Creative Commons Attribution-ShareAlike 4.0 International Public License (CC BY-SA 4.0).
+
+<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">
+    <img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg" alt="CC BY-SA">
+</a>
+
+Reference project:
+
+- [PCL CE Help Documentation](https://github.com/PCL-Community/docs.pclc.cc), adapted under the [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) license.
 
 ---
 

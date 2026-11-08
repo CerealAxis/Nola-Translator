@@ -1,4 +1,5 @@
-import '../foundation-theme.css';
+import '../shadcn-base/apple-liquid-glass.css';
+import '../shadcn-base/nola-liquid-glass.css';
 import { WritingActions } from '../figures/WritingExamples';
 
 export default function WritingActionsDemo() {

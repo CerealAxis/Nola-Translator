@@ -11,17 +11,17 @@ import { useStoryPhases } from "../../assistant-ui/use-demo";
 const GROWTH = [0.45, 0.72, 1] as const;
 
 const SEGMENTS: readonly ContextSegment[] = [
-  { label: "系统提示词", tokens: 1_800, tint: "bg-foreground/45" },
-  { label: "工具", tokens: 4_200, tint: "bg-foreground/25" },
+  { label: "系统提示词", tokens: 1_800, tint: "bg-chart-3" },
+  { label: "工具", tokens: 4_200, tint: "bg-chart-4" },
   {
     label: "附件",
     tokens: 38_500,
-    tint: "bg-blue-500/60 dark:bg-blue-400/60",
+    tint: "bg-chart-2",
   },
   {
     label: "对话",
     tokens: 68_400,
-    tint: "bg-blue-500 dark:bg-blue-400",
+    tint: "bg-chart-1",
   },
 ];
 

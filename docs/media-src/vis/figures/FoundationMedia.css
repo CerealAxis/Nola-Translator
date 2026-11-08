@@ -1,4 +1,4 @@
-.foundation-demo .fm-caption { color: var(--muted); font: var(--font-caption); margin: 0; }
+.foundation-demo .fm-caption { color: var(--muted-foreground); font: var(--font-caption); margin: 0; }
 .foundation-demo .fm-icon-appearances { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .foundation-demo .fm-icon-strip { display: grid; justify-items: center; gap: 16px; margin: 0; padding: 24px; background: var(--window); border: 1px solid var(--border); border-radius: 12px; }
 .foundation-demo .fm-icon-strip img { display: block; max-width: 100%; height: auto; }
@@ -14,7 +14,7 @@
 .foundation-demo .fm-provider-list li + li, .foundation-demo .fm-language-list li + li { border-block-start: 1px solid var(--border); }
 .foundation-demo .fm-provider-list li > svg { flex: none; }
 .foundation-demo .fm-provider-list li > span { display: grid; gap: 4px; }
-.foundation-demo .fm-provider-list li > span > span { color: var(--muted); font: var(--font-caption); }
+.foundation-demo .fm-provider-list li > span > span { color: var(--muted-foreground); font: var(--font-caption); }
 .foundation-demo .fm-resolution { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .foundation-demo .fm-resolution figure { display: grid; justify-items: center; gap: 12px; margin: 0; min-width: 0; }
 .foundation-demo .fm-resolution svg { display: block; width: 100%; max-width: 144px; background: var(--window); border: 1px solid var(--border); border-radius: 4px; }

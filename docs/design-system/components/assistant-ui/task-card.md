@@ -2,7 +2,6 @@
 title: Task card（任务卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Task card（任务卡片）

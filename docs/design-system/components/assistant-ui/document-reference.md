@@ -2,7 +2,6 @@
 title: Document reference（文档引用）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Document reference（文档引用）

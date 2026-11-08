@@ -2,7 +2,6 @@
 title: Support tickets（支持工单）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Support tickets（支持工单）

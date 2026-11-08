@@ -25,7 +25,7 @@ export function WebPreviewDemo() {
           {[62, 38, 84, 51].map((height, i) => (
             <span
               key={i}
-              className="w-6 rounded-t bg-blue-500/70 dark:bg-blue-400/70"
+              className="w-6 rounded-t bg-chart-1"
               style={{ height: `${height * 0.4}px` }}
             />
           ))}

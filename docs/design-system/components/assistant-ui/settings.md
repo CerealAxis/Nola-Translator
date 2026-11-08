@@ -2,7 +2,6 @@
 title: Settings（设置）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Settings（设置）

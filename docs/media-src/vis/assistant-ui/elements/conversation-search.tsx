@@ -95,7 +95,7 @@ export function ConversationSearch({
             )}
           >
             <span className="text-muted-foreground">{active.before}</span>
-            <span className="text-foreground/95 rounded bg-amber-400/35 px-0.5">
+            <span className="text-foreground/95 rounded bg-chart-4/35 px-0.5">
               {active.match}
             </span>
             <span className="text-muted-foreground">{active.after}</span>
@@ -111,8 +111,8 @@ export function ConversationSearch({
             className={cn(
               "absolute inset-x-0 h-1 rounded-full transition-colors duration-200 forced-color-adjust-none",
               i === index
-                ? "bg-amber-500 forced-colors:bg-[Highlight]"
-                : "bg-amber-500/35 forced-colors:bg-[CanvasText]",
+                ? "bg-chart-4 forced-colors:bg-[Highlight]"
+                : "bg-chart-4/35 forced-colors:bg-[CanvasText]",
             )}
             style={{ top: `${hit.position}%` }}
           />

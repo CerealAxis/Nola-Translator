@@ -2,7 +2,6 @@
 title: Generative UI（生成式界面）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Generative UI（生成式界面）

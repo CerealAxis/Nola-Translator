@@ -2,7 +2,6 @@
 title: Player card（选手卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Player card（选手卡片）

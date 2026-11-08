@@ -2,7 +2,6 @@
 title: Mentions（提及）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Mentions（提及）

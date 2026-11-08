@@ -2,7 +2,6 @@
 title: Quote（引用）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Quote（引用）

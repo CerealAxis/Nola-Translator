@@ -2,7 +2,6 @@
 title: Comparison（比较）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Comparison（比较）

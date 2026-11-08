@@ -2,7 +2,6 @@
 title: Thread list sidebar（会话列表侧栏）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Thread list sidebar（会话列表侧栏）

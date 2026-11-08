@@ -2,7 +2,6 @@
 title: Read aloud（朗读）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Read aloud（朗读）

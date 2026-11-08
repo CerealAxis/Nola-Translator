@@ -2,7 +2,6 @@
 title: Speaker identity（发言者身份）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Speaker identity（发言者身份）

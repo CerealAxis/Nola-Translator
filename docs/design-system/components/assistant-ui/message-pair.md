@@ -2,7 +2,6 @@
 title: Message pair（消息对）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Message pair（消息对）

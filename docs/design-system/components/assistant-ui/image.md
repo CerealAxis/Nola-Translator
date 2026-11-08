@@ -2,7 +2,6 @@
 title: Image（图片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Image（图片）

@@ -142,8 +142,7 @@ function ReasoningFade({
         data-slot="reasoning-fade"
         className={cn(
           "aui-reasoning-fade pointer-events-none absolute inset-x-0 top-0 z-10 h-8",
-          "bg-[linear-gradient(to_bottom,var(--color-background),transparent)]",
-          "group-data-[variant=muted]/reasoning-root:bg-[linear-gradient(to_bottom,color-mix(in_oklab,var(--color-muted)_50%,var(--color-background)),transparent)]",
+          "bg-linear-to-b from-background to-transparent group-data-[variant=muted]/reasoning-root:from-muted/50",
           "fade-in-0 animate-in",
           "animation-duration-(--animation-duration)",
           className,
@@ -158,8 +157,7 @@ function ReasoningFade({
       data-slot="reasoning-fade"
       className={cn(
         "aui-reasoning-fade pointer-events-none absolute inset-x-0 bottom-0 z-10 h-8",
-        "bg-[linear-gradient(to_top,var(--color-background),transparent)]",
-        "group-data-[variant=muted]/reasoning-root:bg-[linear-gradient(to_top,color-mix(in_oklab,var(--color-muted)_50%,var(--color-background)),transparent)]",
+        "bg-linear-to-t from-background to-transparent group-data-[variant=muted]/reasoning-root:from-muted/50",
         "fade-in-0 animate-in",
         "animation-duration-(--animation-duration)",
         className,

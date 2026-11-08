@@ -2,7 +2,6 @@
 title: Attachment（附件）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Attachment（附件）

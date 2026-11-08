@@ -2,7 +2,6 @@
 title: Streaming text（流式文本）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Streaming text（流式文本）
@@ -131,7 +130,7 @@ const segments: Segment[] = [
 
 ### 重新设置文本样式 {#restyle-the-text}
 
-两种用法都支持用 `className` 调整根元素。默认类名为 `min-h-[8.5rem] max-w-sm text-sm leading-relaxed text-pretty`。高亮文字和光标分别使用 `text-blue-500` 和 `bg-blue-500`，组件没有单独设置这两种颜色的属性。
+两种用法都支持用 `className` 调整根元素。默认类名为 `min-h-[8.5rem] max-w-sm text-sm leading-relaxed text-pretty`。高亮文字和光标分别使用 `text-primary` 和 `bg-primary`，组件没有单独设置这两种颜色的属性。
 
 ```tsx
 <StreamingText className="max-w-none text-base" /* ... */ />

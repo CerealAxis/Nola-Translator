@@ -2,7 +2,6 @@
 title: Thread search（会话搜索）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Thread search（会话搜索）

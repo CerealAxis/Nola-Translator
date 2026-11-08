@@ -2,7 +2,6 @@
 title: Launcher（启动器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Launcher（启动器）

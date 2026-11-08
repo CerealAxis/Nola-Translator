@@ -2,7 +2,6 @@
 title: Error state（错误状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Error state（错误状态）
@@ -52,9 +51,9 @@ import { CircleAlertIcon } from "lucide-react";
 export function MessageError() {
   return (
     <MessagePrimitive.Error>
-      <ErrorPrimitive.Root className="flex items-start gap-2.5 rounded-2xl bg-red-500/[0.06] px-4 py-3 text-sm dark:bg-red-500/10">
-        <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-red-500/80" />
-        <ErrorPrimitive.Message className="text-red-600 dark:text-red-400" />
+      <ErrorPrimitive.Root className="flex items-start gap-2.5 rounded-2xl bg-destructive/10 px-4 py-3 text-sm">
+        <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
+        <ErrorPrimitive.Message className="text-destructive" />
       </ErrorPrimitive.Root>
     </MessagePrimitive.Error>
   );
@@ -71,7 +70,7 @@ export function MessageError() {
 import { ActionBarPrimitive } from "@assistant-ui/react";
 import { RefreshCwIcon } from "lucide-react";
 
-<ActionBarPrimitive.Reload className="ms-auto flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400">
+<ActionBarPrimitive.Reload className="ms-auto flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-destructive hover:bg-destructive/10">
   <RefreshCwIcon className="size-3" />
   重试
 </ActionBarPrimitive.Reload>

@@ -2,7 +2,6 @@
 title: Agent status（代理状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Agent status（代理状态）

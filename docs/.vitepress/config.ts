@@ -133,8 +133,8 @@ const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(lo
     themeConfig: {
       nav: [
         { text: text.nav.home, link: path },
-        ...(locale === 'zh-CN' ? [{ text: '设计原则', link: '/vis/principles/structure' }] : []),
-        { text: docsNav[locale].root.replace(/^Nola Translator\s+/, ''), link: path + 'docs' },
+        { text: text.nav.designDocs, link: '/vis/' },
+        { text: text.nav.docs, link: path + 'docs' },
         { text: text.nav.download, link: downloadUrl },
       ],
       sidebar: locale === 'zh-CN' ? {
@@ -177,7 +177,6 @@ export default withMermaid(defineConfig({
         page.frontmatter.pageClass = page.relativePath.startsWith('vis/principles/')
           ? 'nola-vis-doc nola-vis-principles' : 'nola-vis-doc'
       }
-      page.frontmatter.comments = false
     }
   },
   markdown: {

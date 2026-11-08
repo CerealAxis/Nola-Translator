@@ -2,7 +2,6 @@
 title: Code diff（代码差异）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Code diff（代码差异）

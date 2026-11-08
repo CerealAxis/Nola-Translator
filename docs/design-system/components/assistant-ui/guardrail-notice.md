@@ -2,7 +2,6 @@
 title: Guardrail notice（防护提示）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Guardrail notice（防护提示）

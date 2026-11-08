@@ -33,7 +33,7 @@
 .motion-page { flex: 0 0 100%; padding: var(--panel-padding); }
 .motion-page > p { margin-top: 8px; }
 .motion-page-controls { justify-content: center; margin-top: 12px; }
-.motion-page-controls > span { color: var(--muted); font: var(--font-caption); }
+.motion-page-controls > span { color: var(--muted-foreground); font: var(--font-caption); }
 
 .motion-fold {
   height: var(--collapsible-panel-height);
@@ -41,7 +41,7 @@
   transition: height 150ms ease-out, opacity 150ms ease-out;
 }
 .motion-fold:is([data-starting-style], [data-ending-style]) { height: 0; opacity: 0; }
-.motion-fold > p { padding: 12px 0; color: var(--muted); }
+.motion-fold > p { padding: 12px 0; color: var(--muted-foreground); }
 .motion-next-line, .motion-list li > span { display: block; border-top: 1px solid var(--border); padding-block: 12px; }
 .nola-component-demo .motion-next-line, .nola-component-demo .motion-list { margin-top: 12px; }
 
@@ -68,7 +68,7 @@
 .motion-popover:is([data-starting-style], [data-ending-style]) { transform: scale(.95); opacity: 0; }
 .motion-popover [data-slot='popover-title'] { margin: 0; font: var(--font-title); }
 .motion-popover dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; }
-.motion-popover dt { color: var(--muted); font: var(--font-label); }
+.motion-popover dt { color: var(--muted-foreground); font: var(--font-label); }
 .motion-popover dd { margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {

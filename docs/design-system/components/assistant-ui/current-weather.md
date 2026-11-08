@@ -2,7 +2,6 @@
 title: Current weather（当前天气）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Current weather（当前天气）

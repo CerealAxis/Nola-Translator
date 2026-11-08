@@ -8,7 +8,7 @@ import {
 
 export default function AlertColors() {
   return (
-    <Alert className="max-w-md border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-50">
+    <Alert className="max-w-md border-chart-4/25 [&>svg]:text-chart-4">
       <AlertTriangleIcon />
       <AlertTitle>订阅将在 3 天后到期。</AlertTitle>
       <AlertDescription>

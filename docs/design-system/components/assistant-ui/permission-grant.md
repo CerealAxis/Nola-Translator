@@ -2,7 +2,6 @@
 title: Permission grant（权限授予）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Permission grant（权限授予）

@@ -2,7 +2,6 @@
 title: File tree（文件树）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # File tree（文件树）

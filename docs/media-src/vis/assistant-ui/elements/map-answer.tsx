@@ -77,7 +77,7 @@ export function MapAnswer({
               strokeWidth="1.2"
               strokeDasharray="3 2"
               strokeLinecap="round"
-              className="stroke-blue-500/60 dark:stroke-blue-400/60"
+              className="stroke-primary/60"
             />
           )}
         </svg>
@@ -90,7 +90,7 @@ export function MapAnswer({
               className={cn(
                 "block rounded-full border-2 transition-all duration-200 motion-reduce:transition-none",
                 pin.id === activeId
-                  ? "border-background size-3.5 bg-blue-500 dark:bg-blue-400"
+                  ? "border-background size-3.5 bg-primary"
                   : "border-background bg-foreground/45 size-2.5",
               )}
             />

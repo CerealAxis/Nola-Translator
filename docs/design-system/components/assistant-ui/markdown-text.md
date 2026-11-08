@@ -2,7 +2,6 @@
 title: Markdown text（Markdown 文本）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Markdown text（Markdown 文本）

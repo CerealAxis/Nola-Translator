@@ -2,7 +2,6 @@
 title: Software purchase（软件购买）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Software purchase（软件购买）

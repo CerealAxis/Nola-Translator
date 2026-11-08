@@ -2,7 +2,6 @@
 title: Mobile composer（移动端消息编辑器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Mobile composer（移动端消息编辑器）

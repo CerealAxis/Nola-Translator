@@ -19,7 +19,7 @@ editLink: false
 
 <figure>
 
-<demo react="search-states.tsx" :reactFiles="['search-states.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css', '../demo.css']" />
+<demo react="search-states.tsx" :reactFiles="['search-states.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>输入“林青”筛选其负责的项目，清空后再查看全部。</figcaption>
 </figure>
@@ -39,7 +39,7 @@ editLink: false
 
 <figure>
 
-<demo react="preview-states.tsx" :reactFiles="['preview-states.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css', '../demo.css']" />
+<demo react="preview-states.tsx" :reactFiles="['preview-states.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>输入 `lin`，再补上 `@example.com`，观察输入框下方的提示。</figcaption>
 </figure>
@@ -55,7 +55,7 @@ editLink: false
 
 <figure>
 
-<demo react="task-states.tsx" :reactFiles="['task-states.tsx', '../figures/Interactions.tsx', '../figures/Interactions.css', '../demo.css']" />
+<demo react="task-states.tsx" :reactFiles="['task-states.tsx', '../figures/Interactions.tsx', '../figures/Interactions.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>等待、完成和失败都有明确反馈。</figcaption>
 </figure>

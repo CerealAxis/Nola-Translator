@@ -2,7 +2,6 @@
 title: Chat panel（聊天面板）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Chat panel（聊天面板）

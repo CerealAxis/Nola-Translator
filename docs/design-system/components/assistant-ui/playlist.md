@@ -2,7 +2,6 @@
 title: Playlist（播放列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Playlist（播放列表）

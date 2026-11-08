@@ -2,7 +2,6 @@
 title: Shiki highlighter（Shiki 高亮）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Shiki highlighter（Shiki 高亮）

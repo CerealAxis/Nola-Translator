@@ -318,7 +318,7 @@ const AddServerForm: FC<{ onClose: () => void }> = ({ onClose }) => {
         <FormRow label={"正品"} htmlFor={fieldIds.auth}>
           <McpAddFormPrimitive.AuthSelect
             id={fieldIds.auth}
-            className="aui-mcp-auth-select bg-background h-9 w-full rounded-md border px-2 text-sm"
+            className="aui-mcp-auth-select bg-transparent h-9 w-full rounded-md border px-2 text-sm dark:bg-input/30"
           />
           <div
             className={cn(

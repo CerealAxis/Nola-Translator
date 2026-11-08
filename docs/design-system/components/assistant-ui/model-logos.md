@@ -2,7 +2,6 @@
 title: Model logos（模型标志）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Model logos（模型标志）

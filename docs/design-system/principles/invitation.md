@@ -19,7 +19,7 @@ editLink: false
 
 <figure>
 
-<demo react="invitation-empty.tsx" :reactFiles="['invitation-empty.tsx', '../figures/Interactions.tsx', '../figures/Interactions.css', '../demo.css']" />
+<demo react="invitation-empty.tsx" :reactFiles="['invitation-empty.tsx', '../figures/Interactions.tsx', '../figures/Interactions.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>空状态给出第一步操作。</figcaption>
 </figure>
@@ -39,7 +39,7 @@ editLink: false
 
 <figure>
 
-<demo react="invitation-hover.tsx" :reactFiles="['invitation-hover.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css', '../demo.css']" />
+<demo react="invitation-hover.tsx" :reactFiles="['invitation-hover.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>悬停模板卡片，或按 Tab 聚焦卡片，查看“选择模板”入口。</figcaption>
 </figure>

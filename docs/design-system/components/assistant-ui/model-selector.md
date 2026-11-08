@@ -2,7 +2,6 @@
 title: Model selector（模型选择器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Model selector（模型选择器）

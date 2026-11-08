@@ -2,7 +2,6 @@
 title: Create task（创建任务）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Create task（创建任务）

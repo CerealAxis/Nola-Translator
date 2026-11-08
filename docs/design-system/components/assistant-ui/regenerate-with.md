@@ -2,7 +2,6 @@
 title: Regenerate with（切换模型重新生成）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Regenerate with（切换模型重新生成）

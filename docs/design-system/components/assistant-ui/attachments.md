@@ -2,7 +2,6 @@
 title: Attachments（附件列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Attachments（附件列表）
@@ -101,7 +100,7 @@ export function AddAttachmentButton() {
 用运行时的附件拖放组件接受拖入的文件。
 
 ```tsx
-<ComposerPrimitive.AttachmentDropzone className="data-[dragging=true]:border-dashed data-[dragging=true]:bg-blue-500/[0.04]">
+<ComposerPrimitive.AttachmentDropzone className="data-[dragging=true]:border-dashed data-[dragging=true]:bg-accent">
   {/* 显示对应条目 */}
 </ComposerPrimitive.AttachmentDropzone>
 ```

@@ -2,7 +2,6 @@
 title: Channel message（频道消息）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Channel message（频道消息）

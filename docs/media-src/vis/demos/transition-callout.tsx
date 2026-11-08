@@ -1,5 +1,6 @@
 import { CalloutExample } from '../figures/MotionExamples';
-import '../demo.css';
+import '../shadcn-base/apple-liquid-glass.css';
+import '../shadcn-base/nola-liquid-glass.css';
 
 export default function TransitionCalloutDemo() {
   return <div className="nola-component-demo"><CalloutExample /></div>;

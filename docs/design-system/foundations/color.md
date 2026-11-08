@@ -2,7 +2,6 @@
 title: 颜色
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
-comments: false
 ---
 
 # 颜色
@@ -15,7 +14,7 @@ comments: false
 
 **在实际使用环境中选择颜色。** 同一颜色在浅色、深色和不同背景上的表现会有变化。分别为两种外观提供配色，保留同样的信息层次。
 
-<demo react="foundation-appearance-color.tsx" :reactFiles="['foundation-appearance-color.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css', '../foundation-theme.css']" />
+<demo react="foundation-appearance-color.tsx" :reactFiles="['foundation-appearance-color.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 同一列表在两种外观中保留选中底色、勾选标记和文字。背景与文字成对调整。
 

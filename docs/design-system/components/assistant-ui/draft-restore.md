@@ -2,7 +2,6 @@
 title: Draft restore（恢复草稿）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Draft restore（恢复草稿）

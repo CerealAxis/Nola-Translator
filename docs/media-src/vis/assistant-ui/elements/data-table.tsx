@@ -288,8 +288,8 @@ function Value({
           number === 0
             ? "text-muted-foreground"
             : good
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-red-600 dark:text-red-400",
+              ? "text-chart-2"
+              : "text-destructive",
         )}
       >
         {direction} {withUnit(content, format.unit)}
@@ -360,9 +360,9 @@ function Value({
             variant: tone === "danger" ? "destructive" : "secondary",
           }),
           tone === "success" &&
-            "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+            "bg-chart-2/12 text-chart-2",
           tone === "warning" &&
-            "bg-amber-500/12 text-amber-700 dark:text-amber-300",
+            "bg-chart-4/12 text-chart-4",
         )}
       >
         {textValue(value)}

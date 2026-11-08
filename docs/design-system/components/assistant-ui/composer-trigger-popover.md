@@ -2,7 +2,6 @@
 title: Composer trigger popover（编辑器触发浮层）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Composer trigger popover（编辑器触发浮层）

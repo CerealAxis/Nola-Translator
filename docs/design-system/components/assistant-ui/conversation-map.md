@@ -2,7 +2,6 @@
 title: Conversation map（对话分支图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Conversation map（对话分支图）

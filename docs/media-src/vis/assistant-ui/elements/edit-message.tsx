@@ -80,7 +80,7 @@ export function EditMessage({
       />
 
       {discardedReplies > 0 && (
-        <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+        <div className="flex items-center gap-2 text-chart-4">
           <AlertTriangleIcon className="size-3.5 shrink-0" />
           <span className={cn(mono, "tabular-nums")}>
             发送丢弃 {discardedReplies}{" "}

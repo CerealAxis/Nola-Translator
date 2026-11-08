@@ -2,7 +2,6 @@
 title: Quota banner（配额横幅）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Quota banner（配额横幅）

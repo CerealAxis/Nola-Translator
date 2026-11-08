@@ -2,7 +2,6 @@
 title: Trace waterfall（追踪瀑布图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Trace waterfall（追踪瀑布图）

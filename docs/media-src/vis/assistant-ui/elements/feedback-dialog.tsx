@@ -62,7 +62,7 @@ export function FeedbackDialog({
       >
         {sent && (
           <>
-            <CheckIcon className="size-4 shrink-0 text-emerald-500" />
+            <CheckIcon className="size-4 shrink-0 text-chart-2" />
             谢谢。这有助于我们调整模型。
           </>
         )}

@@ -60,13 +60,13 @@ const spec = {
       "width": "100%",
       "height": 6,
       "radius": "full",
-      "background": "color-mix(in oklab, var(--foreground) 8%, transparent)",
+      "background": "var(--muted)",
       "children": {
         "$type": "Box",
         "width": "62%",
         "height": 6,
         "radius": "full",
-        "background": "var(--aui-live, #3b82f6)"
+        "background": "var(--primary)"
       }
     },
     {

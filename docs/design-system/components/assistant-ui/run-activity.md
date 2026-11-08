@@ -2,7 +2,6 @@
 title: Run activity（运行活动）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Run activity（运行活动）

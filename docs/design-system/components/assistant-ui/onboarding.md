@@ -2,7 +2,6 @@
 title: Onboarding（首次引导）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Onboarding（首次引导）

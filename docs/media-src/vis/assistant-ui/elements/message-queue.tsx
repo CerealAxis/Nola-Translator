@@ -33,8 +33,8 @@ export function MessageQueue({
     >
       <div className={cn(paper, "flex items-center gap-2.5 rounded-2xl p-3")}>
         <span className="relative flex size-2 shrink-0">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-blue-500/60 motion-reduce:hidden" />
-          <span className="relative inline-flex size-2 rounded-full bg-blue-500 dark:bg-blue-400" />
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/60 motion-reduce:hidden" />
+          <span className="relative inline-flex size-2 rounded-full bg-primary" />
         </span>
         <span className="text-foreground/90 min-w-0 flex-1 truncate text-[13.5px]">
           {running}

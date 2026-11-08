@@ -2,7 +2,6 @@
 title: Schedule（计划任务）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Schedule（计划任务）

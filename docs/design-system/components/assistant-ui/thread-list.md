@@ -2,7 +2,6 @@
 title: Thread list（会话列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Thread list（会话列表）

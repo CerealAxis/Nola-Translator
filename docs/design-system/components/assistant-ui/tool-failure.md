@@ -2,7 +2,6 @@
 title: Tool failure（工具故障）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Tool failure（工具故障）

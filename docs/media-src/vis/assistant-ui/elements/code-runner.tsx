@@ -84,7 +84,7 @@ export function CodeRunner({
                   className={cn(
                     "fade-in animate-in fill-mode-both font-mono text-xs leading-relaxed whitespace-pre",
                     state === "error"
-                      ? "text-red-600 dark:text-red-400"
+                      ? "text-destructive"
                       : "text-foreground/70",
                   )}
                   style={{ animationDelay: `${i * 80}ms` }}

@@ -2,7 +2,6 @@
 title: Link preview（链接预览）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Link preview（链接预览）

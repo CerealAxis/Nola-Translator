@@ -2,7 +2,6 @@
 title: Web search（网页搜索）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Web search（网页搜索）

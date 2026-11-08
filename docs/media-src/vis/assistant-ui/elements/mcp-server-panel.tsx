@@ -21,10 +21,10 @@ export interface McpServer {
 }
 
 const DOT: Record<McpServerStatus, string> = {
-  connected: "bg-emerald-500",
+  connected: "bg-chart-2",
   connecting: "bg-foreground/30 animate-pulse",
-  "needs-auth": "bg-amber-500",
-  failed: "bg-red-500",
+  "needs-auth": "bg-chart-4",
+  failed: "bg-destructive",
 };
 
 const LABEL: Record<McpServerStatus, string> = {

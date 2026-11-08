@@ -2,7 +2,6 @@
 title: Purchase receipt（购买收据）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Purchase receipt（购买收据）

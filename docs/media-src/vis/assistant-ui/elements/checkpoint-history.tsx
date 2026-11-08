@@ -62,7 +62,7 @@ export function CheckpointHistory({
               className={cn(
                 "size-1.5 shrink-0 rounded-full",
                 current
-                  ? "bg-blue-500 dark:bg-blue-400"
+                  ? "bg-primary"
                   : ahead
                     ? "border-foreground/25 border"
                     : "bg-foreground/25",

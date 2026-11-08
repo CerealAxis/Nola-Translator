@@ -2,7 +2,6 @@
 title: Canvas（画布）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Canvas（画布）

@@ -58,7 +58,7 @@ const refreshImageZoom = async () => {
   const { default: mediumZoom } = await import('medium-zoom')
   zoom ??= mediumZoom({ background: 'var(--vp-c-bg)', margin: 24 })
   zoom.detach()
-  zoom.attach('.vp-doc img:not([src*="shields.io"]):not([src$="badge.svg"]):not(.linkcard img, .component-catalog img)')
+  zoom.attach('.vp-doc img:not([src*="shields.io"]):not([src$="badge.svg"]):not(.linkcard img)')
 }
 onMounted(() => { void refreshImageZoom() })
 watch(() => page.value.relativePath, () => { void refreshImageZoom() }, { flush: 'post' })
@@ -67,7 +67,7 @@ onMounted(() => {
 })
 watch([() => page.value.relativePath, analyticsAllowed, showPageViews], async ([path, choice, enabled]) => {
   const request = ++counterRequest
-  if (!enabled || !choice || path === 'index.md' || /^[^/]+\/index\.md$/.test(path)) return
+  if (!enabled || !choice || path === 'index.md' || /^(?:zh-CN|zh-TW|zh-HK|en|ja|ko)\/index\.md$/.test(path)) return
   await nextTick()
   if (request !== counterRequest) return
   // The module automatically makes its first request when imported.

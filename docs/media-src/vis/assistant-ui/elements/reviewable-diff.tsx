@@ -104,7 +104,7 @@ export function ReviewableDiff({
                       mono,
                       "fade-in animate-in duration-300",
                       hunk.decision === "kept"
-                        ? "text-emerald-600 dark:text-emerald-400"
+                        ? "text-chart-2"
                         : "text-muted-foreground",
                     )}
                   >
@@ -122,9 +122,9 @@ export function ReviewableDiff({
                       "flex px-4 py-0.5 leading-relaxed whitespace-pre",
                       line.kind === "context" && "text-muted-foreground",
                       line.kind === "added" &&
-                        "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                        "bg-chart-2/10 text-chart-2",
                       line.kind === "removed" &&
-                        "bg-red-500/10 text-red-700 dark:text-red-300",
+                        "bg-destructive/10 text-destructive",
                     )}
                   >
                     <span className="w-4 shrink-0 select-none">

@@ -2,7 +2,6 @@
 title: Spec sheet（规格表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Spec sheet（规格表）

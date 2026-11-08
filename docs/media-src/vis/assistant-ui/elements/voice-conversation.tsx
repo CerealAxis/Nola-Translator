@@ -84,7 +84,7 @@ export function VoiceConversation({
           className={cn(
             "absolute rounded-full transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none",
             mode === "speaking"
-              ? "bg-blue-500/12 dark:bg-blue-400/15"
+              ? "bg-primary/12 dark:bg-primary/15"
               : "bg-foreground/[0.05]",
           )}
           style={{
@@ -99,7 +99,7 @@ export function VoiceConversation({
           className={cn(
             "absolute rounded-full transition-[transform,opacity] duration-150 ease-out motion-reduce:transition-none",
             mode === "speaking"
-              ? "bg-blue-500/20 dark:bg-blue-400/25"
+              ? "bg-primary/20 dark:bg-primary/25"
               : "bg-foreground/[0.08]",
           )}
           style={{
@@ -115,7 +115,7 @@ export function VoiceConversation({
             mode === "connecting" && "bg-foreground/20 animate-pulse",
             mode === "listening" && "bg-foreground/80",
             mode === "thinking" && "bg-foreground/30 animate-pulse",
-            mode === "speaking" && "bg-blue-500 dark:bg-blue-400",
+            mode === "speaking" && "bg-primary",
           )}
           style={{ transform: `scale(${active ? 0.9 + level * 0.2 : 0.85})` }}
         />
@@ -140,7 +140,7 @@ export function VoiceConversation({
                 "w-8 shrink-0",
                 turn.role === "user"
                   ? "text-muted-foreground"
-                  : "text-blue-500/70 dark:text-blue-400/70",
+                  : "text-primary/70",
               )}
             >
               {turn.role === "user" ? "你" : "爱"}
@@ -185,7 +185,7 @@ export function VoiceConversation({
           aria-label={"结束通话"}
           onClick={onEnd}
           disabled={!onEnd}
-          className="flex size-10 items-center justify-center rounded-full bg-red-500/90 text-white transition-[opacity,scale] duration-150 hover:opacity-90 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-30 motion-reduce:transition-none"
+          className="flex size-10 items-center justify-center rounded-full bg-destructive text-destructive-foreground transition-[opacity,scale] duration-150 hover:opacity-90 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-30 motion-reduce:transition-none"
         >
           <PhoneOffIcon className="size-4" />
         </button>

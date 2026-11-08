@@ -2,7 +2,6 @@
 title: Approval card（审批卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Approval card（审批卡片）

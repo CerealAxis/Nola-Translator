@@ -2,7 +2,6 @@
 title: 状态与反馈文案
 pageClass: nola-vis-doc nola-vis-writing
 editLink: false
-comments: false
 ---
 
 # 状态与反馈文案
@@ -43,7 +42,7 @@ comments: false
 
 <figure>
 
-<demo react="writing-recovery.tsx" :reactFiles="['writing-recovery.tsx','../figures/WritingExamples.tsx','../figures/WritingExamples.css','../foundation-theme.css']" />
+<demo react="writing-recovery.tsx" :reactFiles="['writing-recovery.tsx','../figures/WritingExamples.tsx','../figures/WritingExamples.css','../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
 
 <figcaption>Toast 写明任务、问题原因和恢复操作。</figcaption>
 

@@ -52,8 +52,8 @@ export function QuotaBanner({
         <span
           className={cn(
             "text-[13.5px] font-medium",
-            exhausted && "text-red-600 dark:text-red-400",
-            tight && "text-amber-700 dark:text-amber-400",
+            exhausted && "text-destructive",
+            tight && "text-chart-4",
           )}
         >
           {left} {unit} 左
@@ -78,9 +78,9 @@ export function QuotaBanner({
           className={cn(
             "block h-full rounded-full transition-[width] duration-500 forced-color-adjust-none motion-reduce:transition-none",
             exhausted
-              ? "bg-red-500"
+              ? "bg-destructive"
               : tight
-                ? "bg-amber-500"
+                ? "bg-chart-4"
                 : "bg-foreground/40",
           )}
           style={{ width: `${pct(used, limit)}%` }}

@@ -7,7 +7,7 @@
 相关资源：
 
 - 视觉与组件规范：[DESIGN.md](./docs/design-system/DESIGN.md)
-- 设计原则与文档目录：[设计文档](./docs/design-system/outline.md)
+- 设计原则与文档目录：[设计文档](./docs/design-system/index.md)
 - 工程规约：[编码与工程规约目录](./docs/design-system/engineering/index.md)
 - 产品帮助文档：[帮助文档](./docs/help-docs/zh-CN/docs.md)
 - shadcn/ui 文档：[llms.txt](./llms.txt)

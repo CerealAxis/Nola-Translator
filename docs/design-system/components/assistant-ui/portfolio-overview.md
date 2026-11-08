@@ -2,7 +2,6 @@
 title: Portfolio overview（投资组合概览）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Portfolio overview（投资组合概览）

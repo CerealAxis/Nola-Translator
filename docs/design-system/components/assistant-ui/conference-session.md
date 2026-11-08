@@ -2,7 +2,6 @@
 title: Conference session（会议议程）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Conference session（会议议程）

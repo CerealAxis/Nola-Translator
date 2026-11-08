@@ -2,7 +2,6 @@
 title: Thinking indicator（思考指示器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
-comments: false
 ---
 
 # Thinking indicator（思考指示器）
@@ -137,7 +136,7 @@ const label = pending?.type === "tool-call" ? `正在运行 ${pending.toolName}`
 
 ### 调整状态行 {#restyle-the-status-line}
 
-圆点使用 `bg-blue-500`，标签使用 `ShimmerLabel`，用时徽章沿用 `surfaces.tsx` 中的 `mono` 样式。`className` 会合并到根元素的默认样式 `text-muted-foreground flex items-center gap-2.5 text-sm`。
+圆点使用 `bg-primary`，标签使用 `ShimmerLabel`，用时徽章沿用 `surfaces.tsx` 中的 `mono` 样式。`className` 会合并到根元素的默认样式 `text-muted-foreground flex items-center gap-2.5 text-sm`。
 
 ```tsx
 <ThinkingIndicator label={label} elapsed={elapsed} className="gap-1.5 text-xs" />
