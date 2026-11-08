@@ -45,11 +45,8 @@ export default {
         return normalized === `${base}${localePath(localeOfPath(path, base)).slice(1)}`
       }
 
-      // The homepage loads its React/Tailwind stylesheet on demand. A VitePress
-      // SPA transition keeps that global reset on the document page, where it
-      // conflicts with the default theme's navigation layout; a document load
-      // starts with only the VitePress stylesheet and restores the expected layout.
-      if (isHomePath(currentPath) && !isHomePath(pathname)) {
+      // The homepage and docs use global stylesheets that should not survive SPA transitions between them.
+      if (isHomePath(currentPath) !== isHomePath(pathname)) {
         location.assign(href)
         return false
       }

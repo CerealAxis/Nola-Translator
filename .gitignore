@@ -46,6 +46,7 @@ __pycache__/
 .codex-remote-attachments
 /data-location.json
 /data-migration-pending.json
+/workspace-window.json
 /settings.json
 /credentials.json
 /history.jsonl
