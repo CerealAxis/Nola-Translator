@@ -127,7 +127,10 @@ async function main() {
         const foreground = luminance(button.color), background = luminance(button.backgroundColor);
         return { hero, contrast: (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05) };
       })()`)
-      if (dark) assert.ok(colors.hero < .1, `dark hero too bright: ${JSON.stringify(colors)}`)
+      assert.ok(dark ? colors.hero < .1 : colors.hero >= .1 && colors.hero < .45,
+        `${dark ? 'dark' : 'light'} hero luminance: ${JSON.stringify(colors)}`);
+      assert.equal(await js("getComputedStyle(document.querySelector('.site-locale')).backgroundColor"),
+        'rgba(0, 0, 0, 0)', 'homepage locale button must not inherit preview material');
       assert.ok(colors.contrast >= 4.5, `download text contrast: ${JSON.stringify(colors)}`)
     }
     await js("document.querySelector('.site-theme').click()")

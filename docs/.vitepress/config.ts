@@ -208,6 +208,17 @@ export default withMermaid(defineConfig({
         includeFiles: [/vp-doc\.css/, /base\.css/],
         prefix: `:not(:where(.vp-raw, .vp-raw *, ${shadcnPortal}, ${shadcnPortal} *))`,
       }),
+      // VitePress bundles standalone demo styles with the rest of the site CSS.
+      postcssIsolateStyles({
+        includeFiles: [/shadcn-base[/\\](?:apple|nola)-liquid-glass\.css$/],
+        prefix: ':where(:root:has(.nola-vis-doc .nola-component-demo))',
+        transform(scope, selector, scopedSelector) {
+          if (selector === 'html') return `html${scope}`;
+          if (selector.startsWith(':root')) return `${scope}${selector}`;
+          if (selector === '.dark') return `:is(${scope}.dark, ${scopedSelector})`;
+          return scopedSelector;
+        },
+      }),
       postcssIsolateStyles({
         includeFiles: [/shadcn-base[/\\]preview\.css(?:\?|$)/],
         prefix: shadcnScope,
