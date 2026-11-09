@@ -58,7 +58,7 @@ import { cleanupStorageCaches, modelStorageEnvironment } from './model-storage'
 import { registerEngineIpc } from './ipc'
 import { SessionController } from './session-controller'
 import { MeetingMode, MeetingModeError } from './meeting-mode'
-import { BrowserConnection } from './browser-connection'
+import { BrowserConnection, browserTextModel } from './browser-connection'
 import { BrowserIntegrations } from './browser-integrations'
 import { RuntimeManager } from './runtime-manager'
 import { registerRuntimeIpc, recheckRuntimeEnvironment } from './runtime-ipc'
@@ -1175,14 +1175,7 @@ if (!hasSingleInstanceLock) {
         return resource
       },
     )
-    const browserMtBinding = () => {
-      const current = settings.current()
-      const selected = sceneModelBinding(current, 'mt')
-      if (selected && selected !== 'cloud:recognition' && isModelEnabled(current, 'mt', selected)) return selected
-      const state = gateway?.snapshot()
-      return state?.state === 'running' && state.services.mt.state === 'ready'
-        && state.services.mt.model !== 'cloud:recognition' && isModelEnabled(current, 'mt', state.services.mt.model) ? state.services.mt.model : ''
-    }
+    const browserMtBinding = () => browserTextModel(settings.current(), gateway?.snapshot())
     const browserMtUnavailable = () => bindingIsLocal(sceneModelBinding(settings.current(), 'mt')) && gateway?.snapshot().state !== 'running'
       ? 'gatewayNotRunning' as const : 'browserTextModelUnavailable' as const
     browserConnection = new BrowserConnection({ engine: browserEngine, sessions: browserSessions, activity, useGateway: true,
@@ -1220,6 +1213,7 @@ if (!hasSingleInstanceLock) {
         return stream
       },
       textTranslationAvailable: () => browserMtBinding() ? true : browserMtUnavailable(),
+      textTranslationConcurrency: () => gatewayConcurrency(browserMtBinding(), settings.current().modelGateway.concurrency?.mt),
       translateText: async ({ text, sourceLanguage, targetLanguage, glossary }, signal) => {
         const model = browserMtBinding()
         if (!model || !gateway) throw new Error(browserMtUnavailable())

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ChoiceField } from './ChoiceField'
@@ -22,6 +22,26 @@ describe('inline choice field', () => {
     render(<ChoiceField label="Language" value="en" options={[{ value: 'en', label: 'English' }]} disabled onChange={action} />)
     expect(screen.getByRole('combobox', { name: 'Language' })).toBeDisabled()
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
+  it('mounts menus above the scrolling panel inside the extension shadow tree', async () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const shadow = host.attachShadow({ mode: 'open' })
+    const mount = document.createElement('div')
+    mount.className = 'nola-extension'
+    shadow.append(mount)
+    const panel = document.createElement('div')
+    mount.append(panel)
+    const view = render(<ChoiceField label="Language" value="en" options={[{ value: 'en', label: 'English' }]} onChange={vi.fn()} />, { container: panel })
+    try {
+      await userEvent.setup().click(within(panel).getByRole('combobox', { name: 'Language' }))
+      const option = await within(mount).findByRole('option', { name: 'English' })
+      expect(option.getRootNode()).toBe(shadow)
+      expect(panel.contains(option)).toBe(false)
+    } finally {
+      view.unmount()
+      host.remove()
+    }
   })
   it('searches long lists within the caller container and selects the requested value', async () => {
     const action = vi.fn()

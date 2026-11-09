@@ -35,7 +35,6 @@ const ERROR_ALIASES: Record<string, BrowserKey> = {
   browserExtensionVersionMismatch: 'extensionVersionMismatch',
   browserProtocolMismatch: 'updateRequired',
   browserCaptureUnsupported: 'captureUnsupported',
-  browserTabCapturePermission: 'chromiumCapture',
   browserCaptureTargetMismatch: 'wrongCapture',
   browserCaptureCancelled: 'captureCancelled',
   browserAudioSilent: 'tabAudioSilent',

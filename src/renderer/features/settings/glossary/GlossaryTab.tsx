@@ -4,7 +4,7 @@ import { useI18n } from '@/i18n'
 import { getBridge } from '@/store'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogCloseButton, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -103,7 +103,22 @@ export function GlossaryTab({ libraryId }: { libraryId?: string }) {
     {library ? <div className="flex flex-wrap items-center gap-2"><Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/glossary" />}><ArrowLeft data-icon="inline-start" />{t('suite.glossaryTitle')}</Button><h2 className="nola-title">{library.name}</h2></div> : <SettingGroup legend={t('suite.glossaryTitle')} actions={<Button variant="outline" size="sm" disabled={busy} onClick={newLibrary}><Plus data-icon="inline-start" />{t('suite.newLibrary')}</Button>}>
       <SettingsRow label={t('suite.enabled')}><Switch checked={document.enabled} disabled={busy} aria-label={t('suite.enabled')} onCheckedChange={enabled => void mutate({ action: 'setEnabled', enabled })}><SwitchThumb /></Switch></SettingsRow>
     </SettingGroup>}
-    {!library && document.libraries.map(item => <Card key={item.id}><CardHeader><CardTitle>{item.name}</CardTitle><div className="flex items-center gap-2"><Switch checked={item.enabled} disabled={busy} aria-label={`${t('suite.active')} ${item.name}`} onCheckedChange={enabled => { const { entries: _, ...metadata } = item; void mutate({ action: 'saveLibrary', library: { ...metadata, enabled } }) }}><SwitchThumb /></Switch><Button nativeButton={false} variant="outline" size="sm" render={<a href={`#/settings/glossary/${encodeURIComponent(item.id)}`} />}>{t('suite.edit')}</Button></div></CardHeader><CardContent><p>{t('suite.terms', { count: item.entries.length })}</p>{item.description && <p className="text-muted">{item.description}</p>}</CardContent></Card>)}
+    {!library && document.libraries.map(item => (
+      <Card key={item.id} size="sm">
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2}>{item.name}</CardTitle>
+          <CardDescription>{t('suite.terms', { count: item.entries.length })}</CardDescription>
+          <CardAction className="flex items-center gap-2">
+            <Switch checked={item.enabled} disabled={busy} aria-label={`${t('suite.active')} ${item.name}`} onCheckedChange={enabled => {
+              const { entries: _, ...metadata } = item
+              void mutate({ action: 'saveLibrary', library: { ...metadata, enabled } })
+            }}><SwitchThumb /></Switch>
+            <Button nativeButton={false} variant="outline" size="sm" render={<a href={`#/settings/glossary/${encodeURIComponent(item.id)}`} />}>{t('suite.edit')}</Button>
+          </CardAction>
+        </CardHeader>
+        {item.description && <CardContent className="wrap-anywhere">{item.description}</CardContent>}
+      </Card>
+    ))}
     {!library && !document.libraries.length && <Empty><EmptyHeader><EmptyTitle>{t('suite.emptyGlossary')}</EmptyTitle></EmptyHeader><Button disabled={busy} onClick={newLibrary}>{t('suite.newLibrary')}</Button></Empty>}
     {library && <>
       <SettingGroup legend={t('suite.description')} actions={<div className="flex gap-2"><Button variant="outline" size="sm" disabled={busy} onClick={() => { const { entries: _, ...metadata } = library; setFormRevision(document.revision); setLibraryDraft(metadata) }}><Pencil data-icon="inline-start" />{t('suite.edit')}</Button><Button variant="outline" size="sm" disabled={busy} onClick={() => setDeleting({ name: library.name, command: { action: 'deleteLibrary', libraryId: library.id } })}><Trash2 data-icon="inline-start" />{t('suite.delete')}</Button></div>}>

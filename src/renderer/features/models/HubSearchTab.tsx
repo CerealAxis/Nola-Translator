@@ -389,8 +389,17 @@ export function DetailDrawer({ hit, description, onClose, onInstall }: {
   hit: HubHit | null; description: string; onClose: () => void; onInstall: (hit: HubHit) => void
 }) {
   const { t } = useI18n()
+  const [closing, setClosing] = useState(false)
   const summary = hit?.summary
-  return <Dialog open={hit !== null} onOpenChange={(open) => !open && onClose()}>
+  return <Dialog
+    open={hit !== null && !closing}
+    onOpenChange={open => { if (!open) setClosing(true) }}
+    onOpenChangeComplete={open => {
+      if (open || !closing) return
+      onClose()
+      setClosing(false)
+    }}
+  >
 
       <DialogContent className="model-detail-drawer">
         <DialogHeader>

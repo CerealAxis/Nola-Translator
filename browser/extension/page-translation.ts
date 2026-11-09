@@ -1,7 +1,7 @@
 import { normalizeLanguage } from '../../src/shared/languages'
 import { BrowserFailure } from './bridge'
 import { siteEnabled, type Preferences } from './preferences'
-import type { TextTranslation } from './text-translation'
+import { TEXT_TRANSLATION_CONCURRENCY, type TextTranslation } from './text-translation'
 
 const paragraph = 'body, main, article, section, div, p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption, dd, dt, td, th'
 const excluded = 'script, style, noscript, pre, code, kbd, samp, form, textarea, input, select, button, nav, [role=navigation], [role=button], [contenteditable]:not([contenteditable=false]), [hidden], [aria-hidden=true], [data-nola-extension], [data-nola-translation]'
@@ -30,7 +30,8 @@ export function createPageTranslation(translator: TextTranslation) {
   const translations = new Map<HTMLElement, Translation[]>()
   let settings: Preferences | undefined
   let controller: AbortController | undefined
-  let pending = false
+  const pending = new Set<HTMLElement | Document>()
+  let concurrency = TEXT_TRANSLATION_CONCURRENCY
   let error: string | undefined
   let frame = 0
   let title: { source: string; result: string } | undefined
@@ -69,88 +70,95 @@ export function createPageTranslation(translator: TextTranslation) {
     title = undefined
     delete document.documentElement.dataset.nolaSourceTitle; delete document.documentElement.dataset.nolaResultTitle
     window.removeEventListener('pointerover', hover)
-    pending = false; error = undefined
+    pending.clear(); error = undefined
   }
   function schedule() {
-    if (!controller || frame || pending || error) return
-    frame = requestAnimationFrame(() => { frame = 0; void translateNext() })
+    if (!controller || frame || pending.size >= concurrency || error) return
+    frame = requestAnimationFrame(() => { frame = 0; translateNext() })
   }
-  async function translateNext() {
-    if (!controller || !settings || pending) return
+  function queueTranslation(key: HTMLElement | Document, signal: AbortSignal, task: () => Promise<void>) {
+    pending.add(key)
+    void task().catch(failure => {
+      if (!signal.aborted) error ??= failure instanceof BrowserFailure ? failure.code : 'internalError'
+    }).finally(() => {
+      if (signal.aborted) return
+      pending.delete(key)
+      schedule()
+    })
+  }
+  function translateNext() {
+    if (!controller || !settings || pending.size >= concurrency || error) return
+    const preferences = settings
+    const { signal } = controller
     for (const [block, entries] of translations) {
       if (!block.isConnected || entries.some(entry => !entry.node.isConnected || entry.node.data !== (entry.annotation ? entry.source : entry.result) || entry.annotation && !entry.annotation.isConnected)) {
         restore(entries); translations.delete(block)
       }
     }
-    if (!hoverOnly && settings.translateTitle && document.title.trim() && (!title || document.title !== title.result)) {
+    if (!hoverOnly && preferences.translateTitle && !pending.has(document) && document.title.trim() && (!title || document.title !== title.result)) {
       const source = document.title
-      const signal = controller.signal
-      pending = true
-      try {
-        const result = await translator.translate(source, settings.sourceLanguage, settings.pageLanguage, 'web', signal)
+      queueTranslation(document, signal, async () => {
+        const result = await translator.translate(source, preferences.sourceLanguage, preferences.pageLanguage, 'web', signal)
         if (!signal.aborted && document.title === source) { title = { source, result }; document.documentElement.dataset.nolaSourceTitle = source; document.documentElement.dataset.nolaResultTitle = result; document.title = result }
-      } catch (failure) { if (!signal.aborted) error = failure instanceof BrowserFailure ? failure.code : 'internalError' }
-      finally { if (!signal.aborted) { pending = false; schedule() } }
-      return
+      })
     }
     const screen = window.innerHeight
     const rule = siteRule()
     const main = document.querySelector('main, article, [role=main]')
     const blocks = [...document.querySelectorAll<HTMLElement>(paragraph)].flatMap(block => {
-      if (settings!.pageScope === 'main' && main && !main.contains(block)) return []
+      if (preferences.pageScope === 'main' && main && !main.contains(block)) return []
       if (hoverOnly && block !== hovered) return []
       if (matches(block, rule?.excludeSelectors) || rule?.includeSelectors && !matches(block, rule.includeSelectors)) return []
-      if (translations.has(block) || block.closest(excluded) || !block.getClientRects().length || getComputedStyle(block).visibility !== 'visible') return []
+      if (translations.has(block) || pending.has(block) || block.closest(excluded) || !block.getClientRects().length || getComputedStyle(block).visibility !== 'visible') return []
       const rect = block.getBoundingClientRect()
       return rect.bottom >= -screen && rect.top <= screen * 2 ? [{ block, distance: Math.max(rect.top - screen, -rect.bottom, 0) }] : []
     }).sort((a, b) => a.distance - b.distance)
-    const match = blocks.map(({ block }) => ({ block, nodes: findNodes(block) })).find(({ nodes }) => nodes.length)
-    if (!match) return
-    const { block, nodes } = match
-    const { signal } = controller
+    for (const { block } of blocks) {
+      if (pending.size >= concurrency) break
+      const nodes = findNodes(block)
+      if (nodes.length) queueTranslation(block, signal, () => translateBlock(block, nodes, preferences, signal))
+    }
+  }
+  async function translateBlock(block: HTMLElement, nodes: Text[], settings: Preferences, signal: AbortSignal) {
     const { pageLanguage: target, pageDisplay } = settings
     const sourceCode = block.closest('[lang]')?.getAttribute('lang')
     const source = settings.sourceLanguage !== 'auto' ? settings.sourceLanguage : sourceCode ? normalizeLanguage(sourceCode).split(/-(?!Hant$)/)[0] : 'auto'
     const originals = nodes.map(node => node.data)
     const text = originals.map(value => value.trim()).join(' ').trim()
-    pending = true
-    try {
-      const entries: Translation[] = []
-      if (text.length > 4000 || text.length < (settings.minTextLength ?? 1) || source === target || settings.skipLanguages?.includes(source)) { translations.set(block, entries); return }
-      if (pageDisplay === 'bilingual') {
-        const result = await translator.translate(text, source, target, 'web', signal)
-        if (signal.aborted || !block.isConnected || nodes.some((node, index) => node.data !== originals[index] || !block.contains(node))) return
-        const annotation = document.createElement('span')
-        annotation.dataset.nolaTranslation = 'true'
-        annotation.lang = target; annotation.dir = 'auto'; annotation.textContent = result
-        annotation.style.cssText = settings.pageCustomCss ?? ''
-        annotation.style.display = settings.pageStyle === 'plain' ? 'inline' : 'block'
-        if (settings.pageStyle === 'block') annotation.style.backgroundColor = 'color-mix(in srgb, currentColor 8%, transparent)'
-        if (settings.pageStyle === 'underline') annotation.style.textDecoration = 'underline'
-        block.append(annotation)
-        nodes.forEach((node, index) => entries.push({ node, source: originals[index], result, annotation }))
+    const entries: Translation[] = []
+    if (text.length > 4000 || text.length < (settings.minTextLength ?? 1) || source === target || settings.skipLanguages?.includes(source)) { translations.set(block, entries); return }
+    if (pageDisplay === 'bilingual') {
+      const result = await translator.translate(text, source, target, 'web', signal)
+      if (signal.aborted || !block.isConnected || nodes.some((node, index) => node.data !== originals[index] || !block.contains(node))) return
+      const annotation = document.createElement('span')
+      annotation.dataset.nolaTranslation = 'true'
+      annotation.lang = target; annotation.dir = 'auto'; annotation.textContent = result
+      annotation.style.cssText = settings.pageCustomCss ?? ''
+      annotation.style.display = settings.pageStyle === 'plain' ? 'inline' : 'block'
+      if (settings.pageStyle === 'block') annotation.style.backgroundColor = 'color-mix(in srgb, currentColor 8%, transparent)'
+      if (settings.pageStyle === 'underline') annotation.style.textDecoration = 'underline'
+      block.append(annotation)
+      nodes.forEach((node, index) => entries.push({ node, source: originals[index], result, annotation }))
+    } else {
+      // Keep the original elements and event targets, including inline links and emphasis.
+      const results: string[] = []
+      if (!block.querySelector('a, [role=link], button, input, [contenteditable]')) {
+        results.push(await translator.translate(text, source, target, 'web', signal), ...nodes.slice(1).map(() => ''))
       } else {
-        // Keep the original elements and event targets, including inline links and emphasis.
-        const results: string[] = []
-        if (!block.querySelector('a, [role=link], button, input, [contenteditable]')) {
-          results.push(await translator.translate(text, source, target, 'web', signal), ...nodes.slice(1).map(() => ''))
-        } else {
-          for (const value of originals) results.push(await translator.translate(value.trim(), source, target, 'web', signal))
-        }
-        if (signal.aborted || !block.isConnected || nodes.some((node, index) => node.data !== originals[index] || !block.contains(node))) return
-        nodes.forEach((node, index) => {
-          const original = originals[index]
-          const result = results[index] ? original.replace(/\S[\s\S]*\S|\S/u, () => results[index]) : ''
-          const marker = document.createElement('template')
-          marker.dataset.nolaOriginal = original; marker.dataset.nolaResult = result
-          node.before(marker)
-          node.data = result
-          entries.push({ node, source: original, result, marker })
-        })
+        for (const value of originals) results.push(await translator.translate(value.trim(), source, target, 'web', signal))
       }
-      translations.set(block, entries)
-    } catch (failure) { if (!signal.aborted) error = failure instanceof BrowserFailure ? failure.code : 'internalError' }
-    finally { if (!signal.aborted) { pending = false; schedule() } }
+      if (signal.aborted || !block.isConnected || nodes.some((node, index) => node.data !== originals[index] || !block.contains(node))) return
+      nodes.forEach((node, index) => {
+        const original = originals[index]
+        const result = results[index] ? original.replace(/\S[\s\S]*\S|\S/u, () => results[index]) : ''
+        const marker = document.createElement('template')
+        marker.dataset.nolaOriginal = original; marker.dataset.nolaResult = result
+        node.before(marker)
+        node.data = result
+        entries.push({ node, source: original, result, marker })
+      })
+    }
+    translations.set(block, entries)
   }
   const start = (only?: HTMLElement) => {
     if (!settings || !siteEnabled(settings, location.href)) return
@@ -166,6 +174,7 @@ export function createPageTranslation(translator: TextTranslation) {
   }
   return {
     start, stop,
+    setConcurrency(next: number) { if (next !== concurrency) { concurrency = next; schedule() } },
     hover(event: PointerEvent) { hover(event) },
     state: () => ({ pageActive: Boolean(controller), pageError: error }),
     configure(next: Preferences) {

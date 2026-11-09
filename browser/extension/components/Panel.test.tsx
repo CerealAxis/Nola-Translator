@@ -19,12 +19,21 @@ it('limits the panel to connection controls without repeating desktop settings',
   expect(screen.queryByText('Bottom offset')).not.toBeInTheDocument()
 })
 
+it('shows that live translation is waiting when the video is paused', () => {
+  const store = createExtensionStore({ bridge: { request: vi.fn(async () => undefined), subscribe: () => () => {}, close: vi.fn() } })
+  vi.spyOn(store, 'getSnapshot').mockReturnValue({
+    ...store.getSnapshot(), connected: true, status: 'active', playbackPaused: true,
+  })
+  render(<Panel store={store} />)
+  expect(screen.getByRole('status')).toHaveTextContent('Waiting for playback')
+})
+
 function setup() {
   const store = createExtensionStore({ bridge: { request: vi.fn(async () => undefined), subscribe: () => () => {}, close: vi.fn() } })
   store.setPreferences({ ...DEFAULT_PREFERENCES, uiLanguage: 'en' })
   store.updateVideos([document.createElement('video')])
   const toggleSubtitles = vi.fn()
-  render(<Panel store={store} subtitles={{ active: false, tracks: [] }} toggleSubtitles={toggleSubtitles} />)
+  render(<Panel store={store} subtitles={{ active: false, tracks: [], availability: 'ready' }} toggleSubtitles={toggleSubtitles} />)
   return { store, toggleSubtitles }
 }
 

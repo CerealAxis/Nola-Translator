@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { NumberField } from '@base-ui/react/number-field'
 import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
+import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ColorPicker } from '@/components/ui/color-picker'
 import { useI18n } from '@/i18n'
 import { browserConnectionAction } from '@/store/settingsStore'
@@ -56,12 +55,12 @@ export function BrowserTab() {
       })
       return
     }
-    notifyRetryableFailure(t('browser.connectionFailed'), {
+    notifyRetryableFailure(t('errors.browserReconnectTitle'), {
       cause: browserError,
       description: t('errors.browserReconnectDescription'),
       action: { label: t('errors.browserReconnectAction'), onPress: () => {
         reportedBrowserError.current = null
-        void browserConnectionAction('inspect')
+        void browserConnectionAction('repair')
       } },
     })
   }, [browserError, t])
@@ -83,6 +82,10 @@ export function BrowserTab() {
       onChange={enabled => { void browserConnectionAction('browserEnable', enabled, info.browser) }} ariaLabel={enableLabel(info.browser)} />
   )
   const selected = selectedBrowser ? getBrowser(selectedBrowser) : null
+  const reconnect = <Button variant="secondary" size="sm" disabled={browserBusy}
+    onClick={() => { void browserConnectionAction('repair') }}>
+    <RefreshCw aria-hidden="true" />{t('errors.browserReconnectAction')}
+  </Button>
   return (
     <div className="settings-panel browser-settings">
       {selected ? (
@@ -90,73 +93,76 @@ export function BrowserTab() {
           <Button variant="secondary" size="sm" className="browser-settings__back" onClick={() => setSelectedBrowser(null)}>
             <ArrowLeft aria-hidden="true" />{t('browser.backToBrowsers')}
           </Button>
-          <Card className="browser-settings__card">
-            <CardContent className="card__content">
-              <header className="browser-settings__detail-heading">
-                <img className="browser-settings__icon" src={BROWSER_ICONS[selected.browser]} alt="" aria-hidden="true" />
-                <div className="browser-settings__identity">
-                  <h2>{browserName(selected.browser)}</h2>
-                  <p className="browser-settings__status" data-status={selected.extensionStatus} role="status">{extensionStatus(selected)}</p>
-                </div>
-              </header>
-              <div className="browser-settings__detail-actions">
-                <Button variant="secondary" size="sm" disabled={browserBusy}
-                  onClick={() => { void downloadExtension(selected.browser) }}>{t('browser.downloadExtension')}</Button>
-                <Button variant="secondary" size="sm" disabled={browserBusy || !selected.available}
-                  onClick={() => { void browserConnectionAction('manage', undefined, selected.browser) }}>
-                  {t('browser.manageExtension')}<ExternalLink aria-hidden="true" />
-                </Button>
+          <section className="browser-settings__detail">
+            <header className="browser-settings__detail-heading">
+              <img className="browser-settings__icon" src={BROWSER_ICONS[selected.browser]} alt="" aria-hidden="true" />
+              <div className="browser-settings__identity">
+                <h2>{browserName(selected.browser)}</h2>
+                <p className="browser-settings__status" data-status={selected.extensionStatus} role="status">{extensionStatus(selected)}</p>
               </div>
-              <div className="browser-settings__detail-row">
-                <span>{t('browser.extensionVersion', { version: selected.extensionVersion ?? '—' })}</span>
-                <span>{t('browser.expectedExtensionVersion', { version: BROWSER_EXTENSION_VERSION })}</span>
-              </div>
-              <div className="browser-settings__detail-row">
-                <span>{t('browser.allowConnection')}</span>{extensionSwitch(selected)}
-              </div>
-              <div className="browser-settings__detail-row">
-                <span>{t('browser.connectionStatus')}</span>
-                <span className="browser-settings__connection" data-connected={selected.connected}>
-                  <span className="browser-settings__connection-dot" aria-hidden="true" />
-                  {selected.connected ? t('browser.connected') : t('browser.connectionWaiting')}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+            </header>
+            <div className="browser-settings__detail-actions">
+              {reconnect}
+              <Button variant="secondary" size="sm" disabled={browserBusy}
+                onClick={() => { void downloadExtension(selected.browser) }}>{t('browser.downloadExtension')}</Button>
+              <Button variant="secondary" size="sm" disabled={browserBusy || !selected.available}
+                onClick={() => { void browserConnectionAction('manage', undefined, selected.browser) }}>
+                {t('browser.manageExtension')}<ExternalLink aria-hidden="true" />
+              </Button>
+            </div>
+            <div className="browser-settings__detail-row">
+              <span>{t('browser.extensionVersion', { version: selected.extensionVersion ?? '—' })}</span>
+              <span>{t('browser.expectedExtensionVersion', { version: BROWSER_EXTENSION_VERSION })}</span>
+            </div>
+            <div className="browser-settings__detail-row">
+              <span>{t('browser.allowConnection')}</span>{extensionSwitch(selected)}
+            </div>
+            <div className="browser-settings__detail-row">
+              <span>{t('browser.connectionStatus')}</span>
+              <span className="browser-settings__connection" data-connected={selected.connected}>
+                <span className="browser-settings__connection-dot" aria-hidden="true" />
+                {selected.connected ? t('browser.connected') : t('browser.connectionWaiting')}
+              </span>
+            </div>
+          </section>
         </>
       ) : (
-        <Card className="browser-settings__card">
-          <CardHeader className="card__header browser-settings__heading">
-            <CardTitle>{t('browser.title')}</CardTitle><CardDescription>{t('browser.settingsDescription')}</CardDescription>
-            <CardAction><BrowserSwitch isSelected={browser?.enabled ?? false} isDisabled={browserBusy || !browser}
-              onChange={enabled => { void browserConnectionAction('enable', enabled) }} ariaLabel={t('browser.enable')} /></CardAction>
-          </CardHeader>
-          <CardContent className="card__content">
-            <ul className="browser-settings__list" aria-label={t('browser.browserList')}>
-              {BROWSERS.map(kind => {
-                const info = getBrowser(kind)
-                return (
-                  <li key={kind} className="browser-settings__browser" aria-label={browserName(kind)}>
-                    <img className="browser-settings__icon" src={BROWSER_ICONS[kind]} alt="" aria-hidden="true" />
-                    <div className="browser-settings__identity">
-                      <h3>{browserName(kind)}</h3>
-                      <p className="browser-settings__status" data-status={info.extensionStatus} role="status">{extensionStatus(info)}</p>
-                    </div>
-                    <div className="browser-settings__row-actions">
-                      <Button variant="secondary" size="sm" disabled={browserBusy}
-                        aria-label={t('browser.downloadBrowserExtension', { browser: browserName(kind) })}
-                        onClick={() => { void downloadExtension(kind) }}>{t('browser.downloadExtension')}</Button>
-                      {hasExtension(info) ? <Button variant="secondary" size="sm" disabled={browserBusy || !info.available}
-                        aria-label={t('browser.manageBrowserExtension', { browser: browserName(kind) })}
-                        onClick={() => setSelectedBrowser(kind)}>{t('browser.manage')}</Button> : null}
-                      {hasExtension(info) || browser && !info.enabled ? extensionSwitch(info) : null}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          </CardContent>
-        </Card>
+        <section>
+          <div className="browser-settings__heading">
+            <div className="browser-settings__identity">
+              <h2>{t('browser.enable')}</h2>
+              <p>{t('browser.settingsDescription')}</p>
+            </div>
+            <div className="browser-settings__row-actions">
+              {reconnect}
+              <BrowserSwitch isSelected={browser?.enabled ?? false} isDisabled={browserBusy || !browser}
+                onChange={enabled => { void browserConnectionAction('enable', enabled) }} ariaLabel={t('browser.enable')} />
+            </div>
+          </div>
+          <ul className="browser-settings__list" aria-label={t('browser.browserList')}>
+            {BROWSERS.map(kind => {
+              const info = getBrowser(kind)
+              return (
+                <li key={kind} className="browser-settings__browser" aria-label={browserName(kind)}>
+                  <img className="browser-settings__icon" src={BROWSER_ICONS[kind]} alt="" aria-hidden="true" />
+                  <div className="browser-settings__identity">
+                    <h3>{browserName(kind)}</h3>
+                    <p className="browser-settings__status" data-status={info.extensionStatus} role="status">{extensionStatus(info)}</p>
+                  </div>
+                  <div className="browser-settings__row-actions">
+                    <Button variant="secondary" size="sm" disabled={browserBusy}
+                      aria-label={t('browser.downloadBrowserExtension', { browser: browserName(kind) })}
+                      onClick={() => { void downloadExtension(kind) }}>{t('browser.downloadExtension')}</Button>
+                    {hasExtension(info) ? <Button variant="secondary" size="sm" disabled={browserBusy || !info.available}
+                      aria-label={t('browser.manageBrowserExtension', { browser: browserName(kind) })}
+                      onClick={() => setSelectedBrowser(kind)}>{t('browser.manage')}</Button> : null}
+                    {hasExtension(info) || browser && !info.enabled ? extensionSwitch(info) : null}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
       )}
     </div>
   )

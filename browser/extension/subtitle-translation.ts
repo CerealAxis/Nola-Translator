@@ -4,12 +4,13 @@ import { normalizeLanguage } from '../../src/shared/languages'
 import { BrowserFailure } from './bridge'
 import type { Preferences } from './preferences'
 import { TRACK_CANCEL, TRACK_CHANGED, TRACK_RESTORE, TRACK_REQUEST, TRACK_RESPONSE, type SiteTrack, type SubtitleCue } from './site-tracks'
-import type { TextTranslation } from './text-translation'
+import { TEXT_TRANSLATION_CONCURRENCY, type TextTranslation } from './text-translation'
 
 interface Track extends Pick<SiteTrack, 'id' | 'label' | 'language'> { native?: TextTrack }
 export interface SubtitleState {
   active: boolean
   tracks: Track[]
+  availability?: 'checking' | 'ready' | 'unavailable'
   trackId?: string
   error?: string
   transcript?: SubtitleCue[]
@@ -17,7 +18,7 @@ export interface SubtitleState {
   processing?: boolean
 }
 const isSitePlayer = () => ['www.youtube.com', 'www.bilibili.com', 'x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'].includes(location.hostname) || /(^|\.)netflix\.com$/.test(location.hostname)
-function playerRequest(trackId: string | undefined, signal: AbortSignal): Promise<unknown> {
+function playerRequest(trackId: string | undefined, signal: AbortSignal, probe = false): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const nonce = requestId()
     const cancel = () => { cleanup(); reject(signal.reason) }
@@ -31,12 +32,12 @@ function playerRequest(trackId: string | undefined, signal: AbortSignal): Promis
       if (response.value === null || response.value === 'browserSubtitleLoginRequired') reject(new BrowserFailure(response.value ?? 'browserSubtitleReadFailed'))
       else resolve(response.value)
     }
-    const timeout = setTimeout(() => { cleanup(); reject(new BrowserFailure('browserSubtitleReadFailed')) }, 30_000)
+    const timeout = setTimeout(() => { cleanup(); reject(new BrowserFailure('browserSubtitleReadFailed')) }, probe ? 7000 : 30_000)
     function cleanup() { document.dispatchEvent(new CustomEvent(TRACK_CANCEL, { detail: nonce })); clearTimeout(timeout); document.removeEventListener(TRACK_RESPONSE, listener); signal.removeEventListener('abort', cancel) }
     if (signal.aborted) { cancel(); return }
     document.addEventListener(TRACK_RESPONSE, listener)
     signal.addEventListener('abort', cancel, { once: true })
-    document.dispatchEvent(new CustomEvent(TRACK_REQUEST, { detail: JSON.stringify({ nonce, trackId }) }))
+    document.dispatchEvent(new CustomEvent(TRACK_REQUEST, { detail: JSON.stringify({ nonce, trackId, probe }) }))
   })
 }
 const isTrack = (value: unknown): value is Track =>
@@ -55,8 +56,15 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
   let video: HTMLVideoElement | null = null
   let settings: Preferences | undefined
   let controller: AbortController | undefined
+  let probeController: AbortController | undefined
+  let probeTask: Promise<void> | undefined
+  let checkedAt = -Infinity
+  let readable: { track: Track; tracks: Track[]; cues: SubtitleCue[] } | undefined
   let prefetch: AbortController | undefined
+  let refillPrefetch: (() => void) | undefined
+  let concurrency = TEXT_TRANSLATION_CONCURRENCY
   let translated = new Map<string, string>()
+  const skipped = new Set<string>()
   let cues: SubtitleCue[] = []
   let restoreTrack: (() => void) | undefined
   let sourceLanguage = 'auto'
@@ -72,45 +80,77 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
   const pretranslate = () => {
     if (!controller || controller.signal.aborted || !settings || settings.videoDisplay === 'source' || prefetch || failure) return
     const time = video?.currentTime ?? 0
-    const ordered = [...cues.filter(cue => cue.end > time), ...cues.filter(cue => cue.end <= time)]
-    const queue = [...new Set(ordered.map(cue => cue.text))].filter(text => !translated.has(text))
-    if (!queue.length) return
+    const pending = cues.filter(cue => !translated.has(cue.text) && !skipped.has(cue.text))
+    if (!pending.length) return
+    const upcoming = pending.filter(cue => cue.end > time)
+    const earlier = pending.filter(cue => cue.end <= time)
     const owned = new AbortController()
     prefetch = owned
     const target = settings.videoLanguage
-    let index = 0
+    const requested = new Set<string>()
+    let next = 0, backfill = 0
+    const nextCue = () => {
+      const current = video?.currentTime ?? time
+      while (next < upcoming.length && upcoming[next].end <= current) earlier.push(upcoming[next++])
+      return next < upcoming.length ? upcoming[next++] : earlier[backfill++]
+    }
     const worker = async () => {
-      while (index < queue.length && !owned.signal.aborted) {
-        const text = queue[index++]
-        const result = await translator.translate(text, sourceLanguage, target, 'video', owned.signal)
+      while (!owned.signal.aborted && workers <= concurrency) {
+        const cue = nextCue()
+        if (!cue) return
+        const { text } = cue
+        if (requested.has(text)) continue
+        requested.add(text)
+        const result = await translator.translate(text, sourceLanguage, target, 'video', owned.signal).catch((error: unknown) => {
+          if (error instanceof Error && error.message === 'providerEmpty') return ''
+          if (error instanceof Error && ['resourceBusy', 'browserTranslationRateLimited', 'providerRateLimit'].includes(error.message)) {
+            return translator.translate(text, sourceLanguage, target, 'video', owned.signal)
+          }
+          throw error
+        })
         if (owned.signal.aborted) return
+        if (!result) { skipped.add(text); continue }
         translated.set(text, result)
-        onChange()
+        if (state.error === 'providerEmpty') update({ error: undefined }); else onChange()
       }
     }
     // Keep a bounded queue feeding the existing provider batching and rate limits.
-    void Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker)).catch(error => {
-      if (!owned.signal.aborted) {
-        failure = error instanceof BrowserFailure ? error.code : 'internalError'
-        update({ error: failure })
-        owned.abort()
+    let workers = 0
+    const refill = () => {
+      while (!owned.signal.aborted && workers < concurrency && (next < upcoming.length || backfill < earlier.length)) {
+        workers++
+        void worker().catch(error => {
+          if (!owned.signal.aborted) {
+            failure = error instanceof Error ? error.message : 'internalError'
+            update({ error: failure })
+            owned.abort()
+          }
+        }).finally(() => {
+          workers--
+          if (prefetch !== owned) return
+          if (workers) { refill(); return }
+          prefetch = undefined; refillPrefetch = undefined
+          if (!owned.signal.aborted) {
+            if (!translated.size && skipped.size && state.error !== 'providerEmpty') update({ error: 'providerEmpty' })
+            pretranslate()
+          }
+        })
       }
-    }).finally(() => {
-      if (prefetch !== owned) return
-      prefetch = undefined
-      if (!owned.signal.aborted) pretranslate()
-    })
+    }
+    refillPrefetch = refill
+    refill()
   }
   const stop = () => {
     const restorePlatform = Boolean(controller && state.active && state.trackId && nativeCaptionOwner && /(^|\.)netflix\.com$/.test(location.hostname))
     controller?.abort(); controller = undefined
-    prefetch?.abort(); prefetch = undefined
+    prefetch?.abort(); prefetch = undefined; refillPrefetch = undefined
     nativeCaptionStyle.remove()
     nativeCaptionOwner?.removeAttribute('data-nola-subtitle-owner'); nativeCaptionOwner = undefined
     restoreTrack?.(); restoreTrack = undefined
     if (restorePlatform) document.dispatchEvent(new Event(TRACK_RESTORE))
-    cues = []; translated.clear(); failure = undefined
-    update({ active: false, error: undefined, tracks: [], trackId: undefined, transcript: [], summary: undefined, processing: false })
+    cues = []; translated.clear(); skipped.clear(); failure = undefined
+    readable = undefined; checkedAt = -Infinity
+    update({ active: false, availability: undefined, error: undefined, tracks: [], trackId: undefined, transcript: [], summary: undefined, processing: false })
   }
   const localTracks = (sourceVideo: HTMLVideoElement): Track[] => Array.from(sourceVideo.textTracks).flatMap(track => {
     if (!['subtitles', 'captions'].includes(track.kind) || track.label.startsWith('Nola')) return []
@@ -119,8 +159,8 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
     return [{ id, label: track.label || track.language, language: track.language, native: track }]
   })
   const preferredNative = (tracks: Track[]) => tracks.find(track => track.native?.mode === 'showing') ?? tracks.find(track => track.native?.kind === 'subtitles') ?? tracks[0]
-  const waitForNative = async <T,>(read: () => T | undefined, signal: AbortSignal): Promise<T> => {
-    const deadline = performance.now() + 8000
+  const waitForNative = async <T,>(read: () => T | undefined, signal: AbortSignal, timeout = 8000): Promise<T> => {
+    const deadline = performance.now() + timeout
     while (true) {
       signal.throwIfAborted()
       const value = read()
@@ -133,6 +173,24 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
         signal.addEventListener('abort', abort, { once: true })
       })
     }
+  }
+  const readCues = (sourceVideo: HTMLVideoElement, track: TextTrack): SubtitleCue[] => {
+    const element = Array.from(sourceVideo.querySelectorAll('track')).find(element => element.track === track)
+    if (element?.readyState === 3) throw new BrowserFailure('browserSubtitleReadFailed')
+    return Array.from(track.cues ?? []).flatMap(cue => {
+      const vtt = cue as VTTCue
+      let text = ''
+      if (typeof vtt.getCueAsHTML === 'function') {
+        try { text = vtt.getCueAsHTML().textContent ?? '' } catch { /* Malformed cues still have their raw text. */ }
+      }
+      if (!text && typeof vtt.text === 'string') {
+        const decoder = document.createElement('textarea')
+        decoder.innerHTML = vtt.text.replace(/<[^>]*>/g, '')
+        text = decoder.value
+      }
+      const value = { start: cue.startTime, end: cue.endTime, text: text.split(/\r?\n/).map(line => line.trim()).filter(Boolean).join('\n') }
+      return isCue(value) ? [value] : []
+    }).sort((left, right) => left.start - right.start || left.end - right.end)
   }
   const bindNativeTracks = (sourceVideo: HTMLVideoElement, owned: AbortController) => {
     const { signal } = owned
@@ -159,28 +217,10 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
         }
       } finally { writingModes = false }
     }
-    const readCues = (track: TextTrack): SubtitleCue[] => {
-      const element = Array.from(sourceVideo.querySelectorAll('track')).find(element => element.track === track)
-      if (element?.readyState === 3) throw new BrowserFailure('browserSubtitleReadFailed')
-      return Array.from(track.cues ?? []).flatMap(cue => {
-        const vtt = cue as VTTCue
-        let text = ''
-        if (typeof vtt.getCueAsHTML === 'function') {
-          try { text = vtt.getCueAsHTML().textContent ?? '' } catch { /* Malformed cues still have their raw text. */ }
-        }
-        if (!text && typeof vtt.text === 'string') {
-          const decoder = document.createElement('textarea')
-          decoder.innerHTML = vtt.text.replace(/<[^>]*>/g, '')
-          text = decoder.value
-        }
-        const value = { start: cue.startTime, end: cue.endTime, text: text.split(/\r?\n/).map(line => line.trim()).filter(Boolean).join('\n') }
-        return isCue(value) ? [value] : []
-      }).sort((left, right) => left.start - right.start || left.end - right.end)
-    }
     const syncCues = () => {
       if (!current() || !selected || !hideAll) return
       try {
-        const next = readCues(selected)
+        const next = readCues(sourceVideo, selected)
         const key = JSON.stringify(next)
         if (key === signature) return
         signature = key; cues = next
@@ -238,15 +278,94 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
         selected = track; signature = ''
         selected.addEventListener('cuechange', syncCues)
         hideNative()
-        return waitForNative(() => { const next = readCues(track); return next.length ? next : undefined }, signal)
+        return waitForNative(() => { const next = readCues(sourceVideo, track); return next.length ? next : undefined }, signal)
       },
       activate() { hideAll = true; hideNative(); if (selected) signature = JSON.stringify(cues) },
     }
+  }
+  const discoverTracks = async (sourceVideo: HTMLVideoElement, signal: AbortSignal, probe = false): Promise<Track[]> => {
+    if (isSitePlayer()) {
+      try {
+        const available = await playerRequest(undefined, signal, probe)
+        if (!Array.isArray(available)) throw new BrowserFailure('browserSubtitleReadFailed')
+        return [...available.filter(isTrack).slice(0, 100), ...localTracks(sourceVideo)]
+      } catch (error) {
+        signal.throwIfAborted()
+        const native = localTracks(sourceVideo)
+        if (!native.length) throw error
+        return native
+      }
+    }
+    const native = localTracks(sourceVideo)
+    return native.length || probe ? native : waitForNative(() => {
+      const next = localTracks(sourceVideo)
+      return next.length ? next : undefined
+    }, signal)
+  }
+  const checkAvailability = (force = false) => {
+    if (probeController) return probeTask
+    if (video && readable?.track.native && !localTracks(video).some(track => track.id === readable?.track.id)) {
+      readable = undefined; checkedAt = -Infinity
+      force = true
+    }
+    if (!video || state.active || !force && (readable || performance.now() - checkedAt < 8000)) return
+    readable = undefined
+    const sourceVideo = video
+    const owned = new AbortController()
+    const { signal } = owned
+    probeController = owned
+    if (!state.availability || force) update({ availability: 'checking' })
+    probeTask = (async () => {
+      try {
+        const tracks = await discoverTracks(sourceVideo, signal, true)
+        const native = tracks.filter(track => track.native)
+        const preferred = preferredNative(native)
+        const candidates = [...new Set([
+          ...native.filter(track => track.native?.mode === 'showing'),
+          ...tracks.filter(track => !track.native).slice(0, 3),
+          ...(preferred ? [preferred] : []),
+        ])]
+        for (const track of candidates) {
+          signal.throwIfAborted()
+          try {
+            const nativeTrack = track.native
+            let result: unknown
+            if (nativeTrack) {
+              const disabled = nativeTrack.mode === 'disabled'
+              if (disabled) nativeTrack.mode = 'hidden'
+              try {
+                result = await waitForNative(() => {
+                  const cues = readCues(sourceVideo, nativeTrack)
+                  return cues.length ? cues : undefined
+                }, signal, 2000)
+              } finally {
+                if (disabled && nativeTrack.mode === 'hidden') nativeTrack.mode = 'disabled'
+              }
+            } else result = await playerRequest(track.id, signal, true)
+            signal.throwIfAborted()
+            const cues = Array.isArray(result) ? result.filter(isCue) : []
+            if (cues.length) { readable = { track, tracks, cues }; break }
+          } catch { signal.throwIfAborted() }
+        }
+      } catch { /* A failed check is displayed on the disabled control. */ }
+      finally {
+        if (probeController === owned) {
+          probeController = undefined
+          probeTask = undefined
+          checkedAt = performance.now()
+          const availability = readable ? 'ready' : 'unavailable'
+          if (availability !== state.availability) update({ availability })
+        }
+      }
+    })()
+    return probeTask
   }
   const start = async (trackId?: string) => {
     if (!video || !settings) return
     const sourceVideo = video
     const previous = state.tracks
+    probeController?.abort(); probeController = undefined
+    const prepared = readable && (!trackId || readable.track.id === trackId) ? readable : undefined
     stop()
     const owned = new AbortController()
     controller = owned
@@ -255,30 +374,14 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
     restoreTrack = nativeSession.cleanup
     update({ active: true, tracks: previous, trackId })
     try {
-      let native = localTracks(sourceVideo)
-      let tracks = native
-      if (isSitePlayer()) {
-        try {
-          const available = await playerRequest(undefined, signal)
-          if (!Array.isArray(available)) throw new BrowserFailure('browserSubtitleReadFailed')
-          tracks = [...available.filter(isTrack).slice(0, 100), ...native]
-        } catch (error) {
-          signal.throwIfAborted()
-          native = localTracks(sourceVideo)
-          if (!native.length) throw error
-          tracks = native
-        }
-      } else if (!native.length) {
-        native = await waitForNative(() => { const next = localTracks(sourceVideo); return next.length ? next : undefined }, signal)
-        tracks = native
-      }
+      let tracks = prepared?.tracks ?? await discoverTracks(sourceVideo, signal)
       signal.throwIfAborted()
-      let selected = tracks.find(track => track.id === trackId) ?? tracks.find(track => track.native?.mode === 'showing') ?? tracks.find(track => !track.native) ?? preferredNative(native)
-      if (!selected) { nativeSession.cleanup(); update({ active: false, error: 'noSubtitles', tracks }); return }
+      let selected = prepared?.track ?? tracks.find(track => track.id === trackId) ?? tracks.find(track => track.native?.mode === 'showing') ?? tracks.find(track => !track.native) ?? preferredNative(tracks)
+      if (!selected) throw new BrowserFailure('browserSubtitleReadFailed')
       update({ trackId: selected.id, tracks })
       let result: unknown
       try {
-        result = selected.native ? await nativeSession.read(selected.native) : await playerRequest(selected.id, signal)
+        result = selected.native ? await nativeSession.read(selected.native) : prepared && !selected.id.startsWith('netflix:') ? prepared.cues : await playerRequest(selected.id, signal)
         if (!Array.isArray(result) || !result.some(isCue)) throw new BrowserFailure('browserSubtitleReadFailed')
       } catch (error) {
         signal.throwIfAborted()
@@ -298,17 +401,24 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
       nativeCaptionOwner?.setAttribute('data-nola-subtitle-owner', 'true')
       document.documentElement.append(nativeCaptionStyle)
       nativeSession.activate()
-      update({ transcript: cues })
+      update({ transcript: cues, availability: 'ready' })
       pretranslate()
     } catch (error) {
       if (!signal.aborted && controller === owned) {
         owned.abort(); controller = undefined
         restoreTrack?.(); restoreTrack = undefined
-        update({ active: false, error: error instanceof BrowserFailure ? error.code : 'browserSubtitleReadFailed' })
+        readable = undefined
+        checkedAt = performance.now()
+        update({ active: false, availability: 'unavailable', error: error instanceof BrowserFailure ? error.code : 'browserSubtitleReadFailed' })
       }
     }
   }
-  const platformChanged = () => { if (state.active && controller && !controller.signal.aborted) void start() }
+  const platformChanged = () => {
+    readable = undefined
+    checkedAt = -Infinity
+    if (state.active && controller && !controller.signal.aborted) void start()
+    else if (!probeController && state.availability) update({ availability: undefined })
+  }
   document.addEventListener(TRACK_CHANGED, platformChanged)
 
   return {
@@ -361,25 +471,29 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
           if (normalized(part.map(cue => cue.text).join('')) !== normalized(batch.map(cue => cue.text).join('')) || part.some((cue, index) => cue.start < batch[0].start || cue.end > batch.at(-1)!.end || index > 0 && cue.start < part[index - 1].end)) throw new Error('Segmentation changed source')
           result.push(...part)
         }
-        if (!signal.aborted) { prefetch?.abort(); prefetch = undefined; cues = result; translated.clear(); update({ transcript: cues }); pretranslate() }
+      if (!signal.aborted) { prefetch?.abort(); prefetch = undefined; refillPrefetch = undefined; cues = result; translated.clear(); skipped.clear(); update({ transcript: cues }); pretranslate() }
       } catch { if (!signal.aborted) update({ error: 'internalError' }) }
       finally { if (!signal.aborted) update({ processing: false }) }
     },
-    start, stop,
+    start, stop, checkAvailability,
+    setConcurrency(next: number) { concurrency = next; refillPrefetch?.() },
     configure(preferences: Preferences) {
       const changedLanguage = settings?.videoLanguage !== preferences.videoLanguage || settings?.subtitleProvider !== preferences.subtitleProvider || settings?.subtitlePrompt !== preferences.subtitlePrompt
       settings = preferences
       if (!state.active && video && preferences.autoSubtitleSites?.includes(location.origin) && !autoStarted) { autoStarted = true; void start() }
       if (changedLanguage && state.active) void start(state.trackId)
-      else if (preferences.videoDisplay === 'source') { prefetch?.abort(); prefetch = undefined }
+      else if (preferences.videoDisplay === 'source') { prefetch?.abort(); prefetch = undefined; refillPrefetch = undefined }
       else pretranslate()
     },
     selectVideo(next: HTMLVideoElement | null, changed: boolean) {
       if (next === video && !changed) return
       const resume = state.active && Boolean(next)
+      probeController?.abort(); probeController = undefined
+      readable = undefined; checkedAt = -Infinity
       if (video) video.removeEventListener('seeking', resetPrefetch)
       video = next
       video?.addEventListener('seeking', resetPrefetch)
+      if (state.availability) update({ availability: undefined })
       autoStarted = false
       if (resume || next && settings?.autoSubtitleSites?.includes(location.origin)) { autoStarted = true; void start() }
       else if (state.active || state.error) stop()
@@ -392,10 +506,10 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
       const lines = settings.videoDisplay === 'source' ? [current.text] : settings.videoDisplay === 'translation' ? (translation ? [translation] : []) : translation && translation !== current.text ? [current.text, translation] : [current.text]
       return { ...current, lines, translation }
     },
-    destroy() { document.removeEventListener(TRACK_CHANGED, platformChanged); video?.removeEventListener('seeking', resetPrefetch); stop() },
+    destroy() { document.removeEventListener(TRACK_CHANGED, platformChanged); video?.removeEventListener('seeking', resetPrefetch); probeController?.abort(); probeController = undefined; stop() },
   }
   function resetPrefetch() {
-    prefetch?.abort(); prefetch = undefined
+    prefetch?.abort(); prefetch = undefined; refillPrefetch = undefined
     pretranslate()
     onChange()
   }

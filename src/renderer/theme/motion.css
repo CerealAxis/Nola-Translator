@@ -4,7 +4,8 @@
    Imported into @layer base.
    ========================================================================== */
 
-:root {
+:root,
+:host {
   --dur-micro: 120ms; /* hover / press / colour / focus ring */
   --dur-enter: 200ms; /* menu, modal, drawer, toast entering */
   --dur-exit: 120ms; /* exiting */
@@ -249,7 +250,8 @@
    ============================================================================= */
 
 @media (prefers-reduced-motion: reduce) {
-  :root {
+  :root,
+  :host {
     --dur-micro: 0.01ms;
     --dur-enter: 0.01ms;
     --dur-exit: 0.01ms;
@@ -267,7 +269,8 @@
   }
 }
 
-html[data-reduce-motion='true'] {
+html[data-reduce-motion='true'],
+:host([data-reduce-motion='true']) {
   --dur-micro: 0.01ms;
   --dur-enter: 0.01ms;
   --dur-exit: 0.01ms;

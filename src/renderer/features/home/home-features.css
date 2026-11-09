@@ -44,7 +44,7 @@
 }
 .nola-home-bento-copy h3 {
   margin: 0;
-  font: var(--font-title);
+  font: var(--font-title-3);
 }
 .nola-home-bento-copy p {
   max-inline-size: 30rem;

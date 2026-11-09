@@ -1,10 +1,11 @@
+import { useLayoutEffect, useRef } from 'react'
 import { ModelGatewayPage } from './features/model-gateway/ModelGatewayPage'
 import { requestFeatureStart } from './components/primitives/FeatureActivityNotice'
-import { AudioLines, LayoutDashboard, SlidersHorizontal, Settings, MessagesSquare, Network, Headphones, ScanText, BookOpen, Gamepad2 } from 'lucide-react'
+import { ArrowLeft, AudioLines, LayoutDashboard, SlidersHorizontal, Settings, MessagesSquare, Network, Headphones, ScanText, BookOpen, Gamepad2 } from 'lucide-react'
 import { getBridge } from './store'
 import { notifyError } from './components/primitives/notify'
 import { useI18n } from './i18n'
-import { useRoute } from './routes'
+import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, settingsPath, useRoute } from './routes'
 import { HomePage } from './features/home'
 import { OverlayPage } from './features/overlay/OverlayPage'
 import { MeetingModePage } from './features/meeting/MeetingModePage'
@@ -14,6 +15,7 @@ import { GameTranslationPage } from './features/game/GameTranslationPage'
 import { RecordsPage, RecordDetailPage } from './features/records'
 import { ModelsPage } from './features/models'
 import { SettingsPage } from './features/settings'
+import { SETTINGS_NAVIGATION } from './features/settings/settingsNavigation'
 import type { RoutesProps } from './routes'
 import type { AppShellNavigationItem } from './components/primitives/AppShell'
 
@@ -44,8 +46,28 @@ function GameRoutePage() {
 }
 
 export function useApplicationNavigation(): AppShellNavigationItem[] {
-  const { t } = useI18n()
-  const { route, navigate } = useRoute()
+  const { t, dictionary } = useI18n()
+  const { route, path, tab, navigate } = useRoute()
+  const returnPath = useRef('#/')
+  useLayoutEffect(() => {
+    if (route !== 'settings') returnPath.current = path
+  }, [route, path])
+
+  if (route === 'settings') {
+    return [
+      { id: 'settings-back', label: t('suite.back'), icon: ArrowLeft, section: 'settings', path: returnPath.current,
+        onPress: () => navigate(returnPath.current) },
+      ...SETTINGS_TABS.map((item): AppShellNavigationItem => {
+        const { label, icon } = SETTINGS_NAVIGATION[item]
+        const path = settingsPath(item)
+        return {
+          id: item, section: 'settings', icon, path, label: t(label), active: item === (tab ?? DEFAULT_SETTINGS_TAB),
+          hint: item === 'engine' ? dictionary.compute.nextSession : undefined,
+          onboardingTarget: `settings-${item}`, onPress: () => navigate(path),
+        }
+      }),
+    ]
+  }
   const entries = [
     ['overview', 'home', 'nav.home', LayoutDashboard, '#/'],
     ['overview', 'models', 'nav.models', SlidersHorizontal, '#/models'],
@@ -65,7 +87,7 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
     { section: 'features', id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#workbench',
       onPress: () => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) },
     },
-    { section: 'settings', id: 'settings', label: t('nav.settings'), icon: Settings, path: '#/settings/general',
-      active: route === 'settings', onPress: () => navigate('#/settings/general') },
+    { section: 'settings', id: 'settings', label: t('nav.settings'), icon: Settings, path: settingsPath(DEFAULT_SETTINGS_TAB),
+      onPress: () => navigate(settingsPath(DEFAULT_SETTINGS_TAB)) },
   ]
 }

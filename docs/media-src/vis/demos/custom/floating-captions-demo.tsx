@@ -1,7 +1,5 @@
 import { DEFAULT_SETTINGS } from '@/bridge'
 import { OverlayCaptionPreview } from '@/features/overlay/OverlayCaptionPreview'
-import '../../shadcn-base/apple-liquid-glass.css'
-import '../../shadcn-base/nola-liquid-glass.css'
 import '@/theme/app.css'
 import '@/theme/caption-card.css'
 

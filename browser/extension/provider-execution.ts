@@ -1,5 +1,5 @@
 import { PROVIDER_PRESETS, type ProviderConnection } from './providers'
-import { encodeBase64, nativeRequest } from './native-provider'
+import { encodeBase64, nativeRequest, translateNative } from './native-provider'
 import type { SpeechAudio } from './provider-client'
 import type { GlossaryMatch, GlossaryTerm } from '../../src/shared/glossary'
 import { protectGlossary } from './glossary-translation'
@@ -10,6 +10,7 @@ const SAFE_ERRORS = new Set([
   'providerModel', 'providerMissing', 'providerCapability', 'providerInvalid', 'providerEmpty', 'providerResponseSize',
   'providerTimeout', 'providerDisconnected', 'providerRequestFailed', 'providerBatchFormat',
   'browserConnectionUnavailable', 'browserConnectionLost', 'browserProtocolMismatch', 'browserPermissionDenied',
+  'browserAudioBacklog',
   'browserTextModelUnavailable', 'browserTranslationTimeout', 'browserTranslationRateLimited', 'browserS2sUnavailable',
   'browserS2sTargetUnsupported', 'gatewayNotRunning', 'realtimeBackendUnavailable', 'modelNotLoaded', 'modelDisabled',
   'modelUnavailable', 'modelMissing', 'invalidCredential', 'invalidConfiguration', 'resourceBusy', 'torchUnavailable',
@@ -144,7 +145,10 @@ export async function generateWith(provider: ProviderConnection, prompt: string,
 async function translateRaw(provider: ProviderConnection, text: string, source: string, target: string, prompt: string, signal: AbortSignal, terms: readonly GlossaryTerm[] = []): Promise<string> {
   const protocol = PROVIDER_PRESETS.find(p => p.id === provider.preset)!.protocol
   if (source === target) return text
-  if (protocol === 'native') return output((await nativeRequest({ type: 'translate', text, sourceLanguage: source, targetLanguage: target, ...(terms.length ? { glossary: terms } : {}) }, signal)).text)
+  if (protocol === 'native') {
+    const result = await translateNative({ type: 'translate', text, sourceLanguage: source, targetLanguage: target, ...(terms.length ? { glossary: [...terms] } : {}) }, signal)
+    return output(result && 'text' in result ? result.text : undefined)
+  }
   if (protocol === 'google-free') {
     const query = new URLSearchParams({ client: 'gtx', sl: source, tl: target, dt: 't', q: text })
     const response = await providerFetch(endpoint(provider, '/translate_a/single?') + query, {}, signal)

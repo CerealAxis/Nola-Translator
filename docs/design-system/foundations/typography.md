@@ -20,7 +20,7 @@ editLink: false
 
 **用大小、字重和位置区分信息层次。** 页面标题先于分节标题，正文承载完整内容，日期与来源等附加信息退居次要位置。相同层级复用同一文本样式。
 
-<demo react="foundation-appearance-typography.tsx" :reactFiles="['foundation-appearance-typography.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="foundation-appearance-typography.tsx" :reactFiles="['foundation-appearance-typography.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css']" />
 
 页面标题、分节标题、阅读正文和附加信息通过四种文本样式形成层次。
 

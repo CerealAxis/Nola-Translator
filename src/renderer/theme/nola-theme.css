@@ -1,5 +1,5 @@
-/* 桌面产品主题。配色和视觉变量来自设计文档的 apple-liquid-glass.css。 */
-:root {
+:root,
+:host {
   color-scheme: light;
   --background: oklch(0.9700 0.0029 264.5420);
   --foreground: oklch(0.1801 0.0191 255.7673);
@@ -33,7 +33,7 @@
   --sidebar-accent-foreground: oklch(0.3232 0.1376 260.7577);
   --sidebar-border: oklch(0.8994 0.0064 255.4779);
   --sidebar-ring: oklch(0.6007 0.1903 257.9419);
-  --radius: 0.875rem;
+  --radius: calc(var(--nola-rem) * .875);
   --shadow-2xs: 0px 2px 28px 0px hsl(214.7368 10.8571% 34.3137% / 0.05);
   --shadow-xs: 0px 2px 28px 0px hsl(214.7368 10.8571% 34.3137% / 0.05);
   --shadow-sm: 0px 2px 28px 0px hsl(214.7368 10.8571% 34.3137% / 0.10), 0px 1px 2px -1px hsl(214.7368 10.8571% 34.3137% / 0.10);
@@ -115,10 +115,13 @@
   --nola-ui-radius-md: var(--radius-md);
   --nola-ui-radius-lg: var(--radius-lg);
 
-  --font-display: 600 2rem/1.25 var(--font-ui);
-  --font-title: 600 1.25rem/1.4 var(--font-ui);
-  --font-body: 400 .9375rem/1.55 var(--font-ui);
-  --font-body-strong: 600 .9375rem/1.55 var(--font-ui);
+  --font-display: 600 calc(var(--nola-rem) * 2)/1.25 var(--font-ui);
+  --font-h1: var(--font-display);
+  --font-h2: 600 calc(var(--nola-rem) * 1.5)/1.3 var(--font-ui);
+  --font-title: 600 calc(var(--nola-rem) * 1.25)/1.4 var(--font-ui);
+  --font-title-3: 600 calc(var(--nola-rem) * 1.0625)/1.4 var(--font-ui);
+  --font-body: 400 calc(var(--nola-rem) * .9375)/1.55 var(--font-ui);
+  --font-body-strong: 600 calc(var(--nola-rem) * .9375)/1.55 var(--font-ui);
   --nola-text-display: var(--font-display);
   --nola-text-title: var(--font-title);
   --nola-text-subtitle: var(--font-body-strong);
@@ -126,17 +129,19 @@
   --nola-text-body-strong: var(--font-body-strong);
   --nola-text-caption: var(--font-caption);
   --nola-text-micro: var(--font-label);
-  --nola-text-mono: 400 .8125rem/1.5 var(--font-mono);
-  --font-label: 550 .875rem/1.5 var(--font-ui);
-  --font-caption: 400 .8125rem/1.5 var(--font-ui);
-  --field-control-height: 2.25rem;
-  --panel-padding: 1.25rem;
-  --field-gap: .875rem;
+  --nola-text-mono: 400 calc(var(--nola-rem) * .8125)/1.5 var(--font-mono);
+  --font-label: 550 calc(var(--nola-rem) * .875)/1.5 var(--font-ui);
+  --font-caption: 400 calc(var(--nola-rem) * .8125)/1.5 var(--font-ui);
+  --font-control: 500 calc(var(--nola-rem) * .875)/1.5 var(--font-ui);
+  --field-control-height: calc(var(--nola-rem) * 2.25);
+  --panel-padding: calc(var(--nola-rem) * 1.25);
+  --field-gap: calc(var(--nola-rem) * .875);
 
   color: var(--foreground);
 }
 
-:root:is(.dark, [data-theme="dark"]) {
+:root:is(.dark, [data-theme="dark"]),
+:host([data-theme="dark"]) {
   color-scheme: dark;
   --background: oklch(0.1492 0.0093 263.9667);
   --foreground: oklch(0.9602 0.0034 247.8587);
@@ -170,7 +175,7 @@
   --sidebar-accent-foreground: oklch(0.8435 0.0803 251.0277);
   --sidebar-border: oklch(0.2594 0.0104 260.6979);
   --sidebar-ring: oklch(0.6496 0.1885 257.7207);
-  --radius: 1.5rem;
+  --radius: calc(var(--nola-rem) * 1.5);
   --shadow-2xs: 0px 4px 40px 0px hsl(0 0% 0% / 0.23);
   --shadow-xs: 0px 4px 40px 0px hsl(0 0% 0% / 0.23);
   --shadow-sm: 0px 4px 40px 0px hsl(0 0% 0% / 0.45), 0px 1px 2px -1px hsl(0 0% 0% / 0.45);
@@ -190,21 +195,16 @@ body {
   font: var(--font-body);
 }
 
-:is(button, [data-slot="button"]) {
+:is(button:not(:where(.select__trigger)), [data-slot="button"]) {
   border-radius: var(--radius-xl);
 }
 
-:is([data-slot="button"], [data-slot="tabs-trigger"]) {
-  font: 500 .875rem/1.5 var(--font-ui);
-}
-
-[data-slot="card-description"] {
-  color: var(--muted-foreground);
-  font: var(--font-caption);
+[data-slot="button"] {
+  font: var(--font-control);
 }
 
 .nola-toast-title {
-  font: 500 .875rem/1.5 var(--font-ui);
+  font: var(--font-control);
 }
 
 .nola-toast-description {
@@ -342,6 +342,14 @@ body {
   .select__popup, .popover__popup) {
   color: var(--popover-foreground);
   background-color: var(--popover);
+}
+
+.nola-glass-popup {
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--overlay-shadow);
 }
 
 ::selection {

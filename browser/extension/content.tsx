@@ -1,10 +1,12 @@
 import './csp'
 import { createRoot } from 'react-dom/client'
+import { Badge } from '../../src/renderer/components/ui/badge'
 import { Button } from '../../src/renderer/components/ui/button'
+import { ToastProvider } from '../../src/renderer/components/ui/toast'
 import { createBridge } from './bridge'
 import { createExtensionStore } from './store'
 import { alignPlayerTrigger, detectVideos, playerAdapter } from './adapters'
-import { browserText, errorKey } from './i18n'
+import { browserText } from './i18n'
 import { resolveUiLanguage } from '../../src/shared/languages'
 import { Panel } from './components'
 import { NolaLogo } from './logo'
@@ -14,7 +16,7 @@ import { CaptionClock, captionLines, deepFullscreenElement, fullscreenCueBounds,
 import type { CaptionConfig } from './store'
 import { captionLineAppearance, nativeCaptionStyles, nativeCaptionText } from './caption-appearance'
 import { SubtitleHoverPause } from './subtitle-hover'
-import { NativeCaptionTrack } from './nativeCaptions'
+import { NativeCaptionTrack, suppressPlayerCaptions } from './nativeCaptions'
 import { splitTranslationText } from '../../src/renderer/components/caption/translationText'
 import { createTextTranslation } from './text-translation'
 import { readPageContext } from './page-context'
@@ -23,7 +25,7 @@ import { TextActions, editableTarget, editableText, matchesShortcut, type TextAc
 import { prepareContentRuntime, registerContentRuntime } from './content-lifecycle'
 import { createPageTranslation } from './page-translation'
 import { createSubtitleTranslation } from './subtitle-translation'
-import { DEFAULT_PREFERENCES, matchesSitePatterns, siteEnabled, observePreferences, savePreferences } from './preferences'
+import { DEFAULT_PREFERENCES, MAX_WEB_TRANSLATION_CONCURRENCY, matchesSitePatterns, siteEnabled, observePreferences, savePreferences } from './preferences'
 import css from './styles.css?inline'
 
 /**
@@ -39,12 +41,51 @@ function install(): void {
   if (!owner) return
   let unregisterRuntime = () => {}
   let destroyed = false
-  const store = createExtensionStore({ bridge: createBridge() })
+  let initializedVideo = false
+  const desktopBridge = createBridge()
+  const store = createExtensionStore({ bridge: desktopBridge })
   const translator = createTextTranslation(createBridge())
   const page = createPageTranslation(translator)
   const subtitles = createSubtitleTranslation(translator, () => refresh())
   const colorScheme = matchMedia('(prefers-color-scheme: dark)')
+  const reducedTransparency = matchMedia('(prefers-reduced-transparency: reduce)')
   let preferences = DEFAULT_PREFERENCES
+  let webConcurrency = 1
+  let subtitleConcurrency = 1
+  let limitsRequest: AbortController | undefined
+  function configureTranslationLimits() {
+    const sameProvider = preferences.pageProvider === preferences.subtitleProvider
+    translator.configure(webConcurrency, subtitleConcurrency, sameProvider)
+    page.setConcurrency(webConcurrency)
+    subtitles.setConcurrency(subtitleConcurrency)
+  }
+  function refreshTranslationLimits(reset = false) {
+    if (limitsRequest && !reset) return
+    limitsRequest?.abort()
+    const request = new AbortController()
+    limitsRequest = request
+    const valid = (limit?: number): limit is number => typeof limit === 'number' && Number.isInteger(limit) && limit >= 1 && limit <= MAX_WEB_TRANSLATION_CONCURRENCY
+    const desktopWeb = preferences.pageProvider === 'desktop'
+    const desktopSubtitles = preferences.subtitleProvider === 'desktop'
+    const lookups: Promise<void>[] = []
+    if (desktopWeb || desktopSubtitles) lookups.push(providerRequest({ type: 'translationLimits', desktop: true }, request.signal).then(result => {
+      if (destroyed || request.signal.aborted || !valid(result.desktopConcurrency)) return
+      if (desktopWeb) webConcurrency = result.desktopConcurrency
+      if (desktopSubtitles) subtitleConcurrency = result.desktopConcurrency
+      configureTranslationLimits()
+    }))
+    if (!desktopWeb || !desktopSubtitles) lookups.push(providerRequest({ type: 'translationLimits' }, request.signal).then(result => {
+      if (destroyed || request.signal.aborted) return
+      if (!desktopWeb && valid(result.webConcurrency)) webConcurrency = result.webConcurrency
+      if (!desktopSubtitles && valid(result.subtitleConcurrency)) subtitleConcurrency = result.subtitleConcurrency
+      configureTranslationLimits()
+    }))
+    void Promise.allSettled(lookups).then(() => { if (limitsRequest === request) limitsRequest = undefined })
+  }
+  function startPage() {
+    refreshTranslationLimits()
+    page.start()
+  }
   let previousAuto = false
   let floatingHiddenPage = false
   const inputTrigger = createInputTrigger()
@@ -59,10 +100,7 @@ function install(): void {
     const owned = contextController
     if (text.trim()) void providerRequest({ type: 'context', text }, owned.signal).catch(() => { if (!owned.signal.aborted) { contextError = true; refresh() } })
   }
-  const shadowCss = css.replaceAll(':root', ':host')
-    .replace(/\[data-theme=(?:"dark"|'dark'|dark)\]/g, ':host([data-theme=dark])')
-    .replace(/(^|[,\s])(?:html|body)(?=[,\s{])/g, '$1:host')
-  const hosts: HTMLElement[] = []
+  const surfaces: { host: HTMLElement; mount: HTMLDivElement }[] = []
   const shadow = (kind: string, pointerEvents: string): { host: HTMLElement; mount: HTMLDivElement } => {
     const host = document.createElement('div')
     host.dataset.nolaExtension = kind
@@ -70,16 +108,20 @@ function install(): void {
     // Host geometry lives outside the shadow; all theme declarations remain inside it.
     Object.assign(host.style, { position: 'fixed', pointerEvents })
     const root = host.attachShadow({ mode: 'open' })
-    const style = document.createElement('style'); style.textContent = `@layer properties, theme, base, components, utilities;${shadowCss}`
+    const style = document.createElement('style'); style.textContent = `@layer properties, theme, base, components, utilities;${css}`
     const mount = document.createElement('div'); mount.className = 'nola-extension'
-    root.append(style, mount); document.documentElement.append(host); hosts.push(host)
-    return { host, mount }
+    const surface = { host, mount }
+    root.append(style, mount); document.documentElement.append(host); surfaces.push(surface)
+    return surface
   }
   const trigger = shadow('trigger', 'auto')
   trigger.mount.classList.add('nola-trigger')
   const panel = shadow('panel', 'auto')
   trigger.host.className = 'z-popup'; panel.host.className = 'z-popup'
   const overlay = shadow('overlay', 'none')
+  const toast = shadow('toast', 'none')
+  toast.host.className = 'z-toast'
+  const toastRoot = createRoot(toast.mount)
   const floating = shadow('floating', 'auto')
   const floatingRoot = createRoot(floating.mount)
 
@@ -120,7 +162,7 @@ function install(): void {
     if (preferences.inputTranslation && preferences.inputTrigger === 'tripleSpace' && inputTrigger(event, target ?? undefined)) { event.preventDefault(); showActions(target!, true); return }
     if (target && preferences.inputTranslation && event.altKey && !event.ctrlKey && !event.metaKey && event.key === 'Enter') { event.preventDefault(); showActions(target); return }
     if (target) return
-    if (preferences.shortcutPage.toLowerCase() !== 'alt+t' && matchesShortcut(event, preferences.shortcutPage)) { event.preventDefault(); if (page.state().pageActive) page.stop(); else page.start() }
+    if (preferences.shortcutPage.toLowerCase() !== 'alt+t' && matchesShortcut(event, preferences.shortcutPage)) { event.preventDefault(); if (page.state().pageActive) page.stop(); else startPage() }
     else if (preferences.shortcutSelection.toLowerCase() !== 'alt+s' && matchesShortcut(event, preferences.shortcutSelection)) { event.preventDefault(); showActions(undefined, true) }
     else if (preferences.shortcutSubtitles.toLowerCase() !== 'alt+v' && matchesShortcut(event, preferences.shortcutSubtitles)) { event.preventDefault(); toggleSubtitles() }
   }
@@ -130,7 +172,7 @@ function install(): void {
   window.addEventListener('keydown', onKey)
   const onOutsidePress = (event: PointerEvent) => {
     const path = event.composedPath()
-    if (store.getSnapshot().panelOpen && !path.includes(panel.host) && !path.includes(trigger.host)) store.closePanel()
+    if (store.getSnapshot().panelOpen && !path.includes(panel.host) && !path.includes(trigger.host) && !path.includes(toast.host)) store.closePanel()
     if (!path.includes(actions.host)) closeActions()
   }
   window.addEventListener('pointerdown', onOutsidePress)
@@ -153,6 +195,15 @@ function install(): void {
   panelResize.observe(panel.mount)
   const caption = document.createElement('div'); caption.className = 'nola-caption'; caption.setAttribute('aria-live', 'polite'); overlay.mount.append(caption)
   const nativeTrack = new NativeCaptionTrack()
+  let suppressedVideo: HTMLVideoElement | undefined
+  let restorePlayerCaptions: (() => void) | undefined
+  const updatePlayerCaptions = (video?: HTMLVideoElement) => {
+    if (video === suppressedVideo) return
+    nativeTrack.restore()
+    restorePlayerCaptions?.()
+    suppressedVideo = video
+    restorePlayerCaptions = video ? suppressPlayerCaptions(video) : undefined
+  }
   const overlayHoverPause = new SubtitleHoverPause()
   const nativeHoverPause = new SubtitleHoverPause()
   let nativeHoverBounds: { left: number; right: number; top: number; bottom: number; video: HTMLVideoElement } | undefined
@@ -269,7 +320,12 @@ function install(): void {
   }
   const toggleSubtitles = () => {
     if (subtitles.state().active) subtitles.stop()
-    else if (store.getSnapshot().status === 'idle') void subtitles.start()
+    else if (store.getSnapshot().status === 'idle') void (async () => {
+      await subtitles.checkAvailability()
+      if (destroyed || subtitles.state().active || subtitles.state().availability !== 'ready' || store.getSnapshot().status !== 'idle') return
+      refreshTranslationLimits()
+      void subtitles.start()
+    })()
   }
   /**
    * Height the painted text needs, measured against `auto`. Reading it off the box instead would feed
@@ -290,28 +346,40 @@ function install(): void {
     const state = store.getSnapshot()
     const language = resolveUiLanguage(preferences.uiLanguage, navigator.language)
     const t = browserText(preferences.uiLanguage)
-    for (const host of hosts) {
+    const glass = preferences.liquidGlass && !reducedTransparency.matches ? 'on' : 'off'
+    for (const { host, mount } of surfaces) {
       host.lang = language
       host.dataset.theme = preferences.theme === 'auto' ? colorScheme.matches ? 'dark' : 'light' : preferences.theme
+      if (mount.dataset.nolaGlass !== glass) mount.dataset.nolaGlass = glass
     }
     const video = state.selectedVideo ?? state.videos[0]
     const fullscreen = deepFullscreenElement(document)
     const enabled = siteEnabled(preferences, location.href)
+    const live = enabled && (state.status === 'starting' || state.status === 'active')
+    if (live && subtitles.state().active) subtitles.stop()
+    updatePlayerCaptions(live ? video : undefined)
     floating.host.hidden = !enabled || !preferences.floatingButton || floatingHiddenPage || matchesSitePatterns(preferences.floatingDisabledSites, location.href) || Boolean(fullscreen)
     floating.host.style.left = preferences.floatingSide === 'left' ? '0px' : ''
     floating.host.style.right = preferences.floatingSide === 'right' ? '0px' : ''
     floating.host.style.top = `${Math.max(48, Math.min(innerHeight - 96, innerHeight * preferences.floatingPosition))}px`
-    floatingRoot.render(floating.host.hidden ? null : <FloatingControls preferences={preferences} active={page.state().pageActive} error={page.state().pageError} onTranslate={() => { if (siteEnabled(preferences, location.href)) page.start(); refresh() }} onRestore={() => { page.stop(); refresh() }} onPosition={(position, commit) => { preferences = { ...preferences, ...position }; if (commit) void savePreferences(position); refresh() }} onLock={() => { void savePreferences({ floatingLocked: !preferences.floatingLocked }) }} onHide={scope => {
+    floatingRoot.render(floating.host.hidden ? null : <FloatingControls preferences={preferences} active={page.state().pageActive} error={page.state().pageError} onTranslate={() => { if (siteEnabled(preferences, location.href)) startPage(); refresh() }} onRestore={() => { page.stop(); refresh() }} onPosition={(position, commit) => { preferences = { ...preferences, ...position }; if (commit) void savePreferences(position); refresh() }} onLock={() => { void savePreferences({ floatingLocked: !preferences.floatingLocked }) }} onHide={scope => {
       if (scope === 'page') floatingHiddenPage = true
       else if (scope === 'site') void savePreferences({ floatingDisabledSites: [...preferences.floatingDisabledSites, location.origin] })
       else void savePreferences({ floatingButton: false })
       refresh()
     }} />)
-    if (!enabled) { overlayHoverPause.leave(); nativeHoverPause.leave(); for (const host of hosts) host.hidden = true; return }
+    if (!enabled) { overlayHoverPause.leave(); nativeHoverPause.leave(); for (const { host } of surfaces) host.hidden = true; return }
+    toast.host.hidden = false
+    toastRoot.render(<ToastProvider container={toast.mount} closeLabel={t('close')} />)
     if (!video) { for (const host of [trigger.host, panel.host, overlay.host]) host.hidden = true; return }
+    // A native host process belongs to the caption port, so ordinary tabs should never open one.
+    if (!initializedVideo) {
+      initializedVideo = true
+      void store.init()
+    }
     const adapter = playerAdapter(video)
     const parent = fullscreen && fullscreen !== video ? fullscreen : document.documentElement
-    for (const host of [panel.host, overlay.host]) if (host.parentElement !== parent) parent.append(host)
+    for (const host of [panel.host, overlay.host, toast.host]) if (host.parentElement !== parent) parent.append(host)
     if (adapter.controls && !fullscreen?.matches('video')) {
       trigger.host.dataset.docked = 'true'
       if (trigger.host.parentElement !== adapter.controls) {
@@ -330,21 +398,19 @@ function install(): void {
     const spacing = token('--space-1')
     if (!adapter.controls) { trigger.host.style.left = `${Math.max(0, rect.right - trigger.host.getBoundingClientRect().width - token('--space-2'))}px`; trigger.host.style.top = `${rect.top + spacing}px` }
     trigger.host.hidden = fullscreen === video || rect.width < 160
-    // A failed session clears the caption block, so the trigger is the only place left that can
-    // say why the screen is empty.
-    const failure = state.error ? t(errorKey(state.error)) : ''
-    const triggerLabel = failure ? `${t('button')} — ${failure}` : t('button')
+    const triggerLabel = t('button')
     // The native hover tooltip rides on the trigger host.
     trigger.host.title = triggerLabel
     const subtitleVisible = subtitles.state().active || state.status === 'active'
-    triggerRoot.render(<Button size="icon-sm" variant="bare" aria-label={triggerLabel} aria-expanded={state.panelOpen} onClick={store.togglePanel}><NolaLogo /><span className="nola-trigger-state" data-active={subtitleVisible}>{t(subtitleVisible ? 'subtitleOn' : 'subtitleOff')}</span></Button>)
+    triggerRoot.render(<Button size="icon-sm" variant="bare" aria-label={triggerLabel} aria-expanded={state.panelOpen} onClick={store.togglePanel}><NolaLogo /><Badge className="nola-trigger-state" variant={subtitleVisible ? 'default' : 'secondary'}>{t(subtitleVisible ? 'subtitleOn' : 'subtitleOff')}</Badge></Button>)
     const controls = adapter.controls
     if (controls) requestAnimationFrame(() => {
       if (!trigger.host.hidden && trigger.host.parentElement === controls) alignPlayerTrigger(controls, trigger.host)
     })
     panel.host.hidden = !state.panelOpen || fullscreen === video
+    if (!panel.host.hidden && state.status === 'idle') void subtitles.checkAvailability()
     positionPanel()
-    panelRoot.render(<Panel store={store} subtitles={subtitles.state()} toggleSubtitles={toggleSubtitles} selectTrack={id => { void subtitles.start(id) }} subtitleController={subtitles} />)
+    panelRoot.render(<Panel store={store} subtitles={subtitles.state()} toggleSubtitles={toggleSubtitles} selectTrack={id => { void subtitles.start(id) }} subtitleController={subtitles} portalContainer={panel.mount} />)
     overlay.host.style.left = `${rect.left + rect.width * 0.08}px`
     overlay.host.style.width = `${rect.width * 0.84}px`
     caption.style.fontFamily = `${state.config.fontFamily}, ${theme.getPropertyValue('--font-ui')}`
@@ -362,7 +428,7 @@ function install(): void {
     if (segmentKey && segmentKey !== captionKey && !translation?.text) {
       pendingSegmentKey = segmentKey
     }
-    const holdingPrevious = !!pendingSegmentKey && pendingSegmentKey === segmentKey && !translation?.text && !!captionKey
+    const holdingPrevious = !!pendingSegmentKey && pendingSegmentKey === segmentKey && !translation?.text && !!captionKey && !state.error
     if (pendingSegmentKey === segmentKey && translation?.text) {
       pendingTranslation = translation.text
     }
@@ -471,7 +537,7 @@ function install(): void {
         updateContext()
         const active = page.state().pageActive
         page.stop()
-        if (siteEnabled(preferences, location.href) && (active || matchesSitePatterns(preferences.autoSites, location.href) && !matchesSitePatterns(preferences.neverAutoSites, location.href))) page.start()
+        if (siteEnabled(preferences, location.href) && (active || matchesSitePatterns(preferences.autoSites, location.href) && !matchesSitePatterns(preferences.neverAutoSites, location.href))) startPage()
       }
       fingerprint = nextFingerprint
       render()
@@ -489,33 +555,43 @@ function install(): void {
   // content, so its box only ever changes when render() has just changed it, and each of those
   // notifications would run another full-document video scan and another pair of React renders.
   const interval = setInterval(refresh, 1000)
+  const desktopLimitsInterval = setInterval(() => {
+    if (preferences.pageProvider === 'desktop' && page.state().pageActive || preferences.subtitleProvider === 'desktop' && subtitles.state().active) refreshTranslationLimits()
+  }, 5000)
   const playerEvents = ['scroll', 'resize', 'pointermove', 'pointerleave', 'fullscreenchange', 'enterpictureinpicture', 'leavepictureinpicture', 'timeupdate', 'seeked', 'loadedmetadata']
   for (const name of playerEvents) window.addEventListener(name, refresh, true)
   const unobservePreferences = observePreferences(next => {
+    const changedProviders = next.pageProvider !== preferences.pageProvider || next.subtitleProvider !== preferences.subtitleProvider
+    if (next.pageProvider !== preferences.pageProvider) webConcurrency = 1
+    if (next.subtitleProvider !== preferences.subtitleProvider) subtitleConcurrency = 1
     preferences = next
+    configureTranslationLimits()
+    if (siteEnabled(next, location.href)) refreshTranslationLimits(changedProviders)
     updateContext()
     const enabled = siteEnabled(next, location.href)
     store.setPreferences(next); page.configure(next); if (enabled) subtitles.configure(next)
     const auto = enabled && matchesSitePatterns(next.autoSites, location.href) && !matchesSitePatterns(next.neverAutoSites, location.href)
     closeActions()
     if (!enabled) { page.stop(); subtitles.stop(); if (store.getSnapshot().status !== 'idle') void store.stop() }
-    if (auto && !previousAuto) page.start()
+    if (auto && !previousAuto) startPage()
     previousAuto = auto
     refresh()
   })
   let glossaryMatchingRevision: number | undefined
   const glossaryChanged = (changes: Record<string, { newValue?: unknown }>, area: string) => {
+    if (area === 'local' && changes.providerRevision && siteEnabled(preferences, location.href)) refreshTranslationLimits(true)
     const value = changes.glossaryRevision?.newValue
     if (area !== 'local' || !value || typeof value !== 'object' || !('matchingRevision' in value) || typeof value.matchingRevision !== 'number') return
     const changed = glossaryMatchingRevision !== value.matchingRevision
     glossaryMatchingRevision = value.matchingRevision
-    if (changed && page.state().pageActive) { page.stop(); page.start() }
+    if (changed && page.state().pageActive) { page.stop(); startPage() }
   }
   chrome.storage.onChanged.addListener(glossaryChanged)
-  page.configure(preferences); subtitles.configure(preferences)
+  configureTranslationLimits(); page.configure(preferences); subtitles.configure(preferences)
   colorScheme.addEventListener('change', refresh)
+  reducedTransparency.addEventListener('change', refresh)
   const onCommand = (message: unknown, sender: ChromeSender, reply: (response: unknown) => void) => {
-    if (!(sender.url?.startsWith(chrome.runtime.getURL('')) && !sender.tab) || typeof message !== 'object' || message === null || !('type' in message)) return
+    if (!(sender?.url?.startsWith(chrome.runtime.getURL('')) && !sender.tab) || typeof message !== 'object' || message === null || !('type' in message)) return
     if (message.type === 'siteAccessChanged') {
       void chrome.runtime.sendMessage({ type: 'checkSiteAccess' }).then(result => { if (!(result as { allowed?: boolean })?.allowed) destroy() }).catch(() => destroy())
       reply({}); return
@@ -525,19 +601,25 @@ function install(): void {
       case 'translateSelection': showActions(undefined, true); break
       case 'speakSelection': showActions(undefined, false, true); break
       case 'translateInput': { const target = editableTarget(document.activeElement); if (target) showActions(target); break }
-      case 'togglePageTranslation': if (page.state().pageActive) page.stop(); else page.start(); break
-      case 'startPageTranslation': page.start(); break
+      case 'togglePageTranslation': if (page.state().pageActive) page.stop(); else startPage(); break
+      case 'startPageTranslation': startPage(); break
       case 'stopPageTranslation': page.stop(); break
       case 'toggleSubtitles': toggleSubtitles(); break
       case 'toggleRealtime':
         if (store.getSnapshot().status !== 'idle') void store.stop()
-        else store.pressStart()
+        else store.pressStart(sender.url?.split(/[?#]/, 1)[0] === chrome.runtime.getURL('popup.html') ? 'toolbar' : 'sidebar')
         break
-      case 'pageStatus': break
+      case 'refreshDesktopConnection':
+        if (store.getSnapshot().selectedVideo && store.getSnapshot().status === 'idle') {
+          void store.init().then(() => reply({}), () => reply({}))
+          return true
+        }
+        break
+      case 'pageStatus': if (siteEnabled(preferences, location.href) && store.getSnapshot().status === 'idle') void subtitles.checkAvailability(); break
       default: return
     }
     const state = store.getSnapshot()
-    reply({ ...page.state(), video: Boolean(state.selectedVideo), realtime: state.status !== 'idle', liveError: state.liveAttempted ? state.error : undefined, subtitles: subtitles.state().active, subtitleError: subtitles.state().error })
+    reply({ ...page.state(), video: Boolean(state.selectedVideo), realtime: state.status !== 'idle', liveError: state.liveAttempted ? state.error : undefined, subtitles: subtitles.state().active, subtitleError: subtitles.state().error, subtitleAvailability: subtitles.state().availability })
   }
   chrome.runtime.onMessage.addListener(onCommand)
   const destroy = (): void => {
@@ -546,23 +628,27 @@ function install(): void {
     // Browser API objects can already be invalid during an extension replacement.
     // Each release must run even if another one can no longer reach the old context.
     for (const release of [
-      () => { mutation.disconnect(); resize.disconnect(); actionsResize.disconnect(); panelResize.disconnect(); clearInterval(interval); nativeTrack.restore(); unsubscribe() },
+      () => { mutation.disconnect(); resize.disconnect(); actionsResize.disconnect(); panelResize.disconnect(); clearInterval(interval); clearInterval(desktopLimitsInterval); limitsRequest?.abort(); nativeTrack.restore(); updatePlayerCaptions(); unsubscribe() },
       () => { unobservePreferences(); chrome.storage.onChanged.removeListener(glossaryChanged) },
-      () => { colorScheme.removeEventListener('change', refresh); chrome.runtime.onMessage.removeListener(onCommand) },
+      () => {
+        colorScheme.removeEventListener('change', refresh)
+        reducedTransparency.removeEventListener('change', refresh)
+        chrome.runtime.onMessage.removeListener(onCommand)
+      },
       () => { for (const name of playerEvents) window.removeEventListener(name, refresh, true) },
       () => { window.removeEventListener('pointerdown', onOutsidePress); window.removeEventListener('pointerover', hoverPage); window.removeEventListener('pointerup', onSelection); window.removeEventListener('keydown', onKey); window.removeEventListener('pagehide', destroy) },
       () => contextController?.abort(),
       () => { overlayHoverPause.leave(); nativeHoverPause.leave(); caption.removeEventListener('pointerenter', hoverEnter); caption.removeEventListener('pointerleave', hoverLeave); window.removeEventListener('pointermove', nativeHover, true) },
       () => { closeActions(); actionsRoot.unmount(); floatingRoot.unmount() },
       () => subtitles.destroy(), () => page.stop(), () => translator.close(),
-      () => { triggerRoot.unmount(); panelRoot.unmount(); hosts.forEach(host => host.remove()); nativeCueStyles.remove() },
+      () => { triggerRoot.unmount(); panelRoot.unmount(); toastRoot.unmount(); surfaces.forEach(({ host }) => host.remove()); nativeCueStyles.remove() },
       () => unregisterRuntime(),
     ]) { try { release() } catch { /* The old extension context may already be gone. */ } }
     void store.destroy().catch(() => undefined)
   }
   unregisterRuntime = registerContentRuntime(owner, destroy)
   window.addEventListener('pagehide', destroy, { once: true })
-  void store.init(); refresh()
+  refresh()
 }
 install()
 window.addEventListener('pageshow', event => { if (event.persisted) install() })

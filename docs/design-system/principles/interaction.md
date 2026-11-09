@@ -19,7 +19,7 @@ editLink: false
 
 <figure>
 
-<demo react="edit-states.tsx" :reactFiles="['edit-states.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="edit-states.tsx" :reactFiles="['edit-states.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css']" />
 
 <figcaption>点击项目名称进行编辑，然后确认或取消修改。</figcaption>
 </figure>
@@ -39,7 +39,7 @@ editLink: false
 
 <figure>
 
-<demo react="drag-states.tsx" :reactFiles="['drag-states.tsx', '../figures/Interactions.tsx', '../figures/Interactions.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="drag-states.tsx" :reactFiles="['drag-states.tsx', '../figures/Interactions.tsx', '../figures/Interactions.css']" />
 
 <figcaption>上传前与文件拖入后的状态。</figcaption>
 </figure>

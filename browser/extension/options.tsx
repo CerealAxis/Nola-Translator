@@ -1,5 +1,5 @@
 import './csp'
-import { Settings2, Plug, Keyboard, Languages, Captions, MousePointer2, TextCursorInput, Volume2, PanelsTopLeft, MousePointerClick, BookOpen, Archive, PanelTop, Search, Upload, Download, Plus, ArrowLeftRight, ChevronDown, ChevronUp, Copy, RefreshCw, X, Check } from 'lucide-react'
+import { Settings2, Plug, Keyboard, Languages, Captions, MousePointer2, TextCursorInput, Volume2, PanelsTopLeft, MousePointerClick, BookOpen, Archive, PanelTop, Search, Upload, Download, Plus, ArrowLeftRight, ChevronDown, ChevronUp, Copy, RefreshCw, X, Check, CircleHelp } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Button } from '../../src/renderer/components/ui/button'
@@ -8,6 +8,7 @@ import { Textarea } from '../../src/renderer/components/ui/textarea'
 import { Alert, AlertDescription } from '../../src/renderer/components/ui/alert'
 import { Field, FieldGroup, FieldLabel } from '../../src/renderer/components/ui/field'
 import { Switch, SwitchThumb } from '../../src/renderer/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../src/renderer/components/ui/tooltip'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../src/renderer/components/ui/input-group'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '../../src/renderer/components/ui/empty'
 import { Popover, PopoverContent, PopoverTrigger, PopoverTitle } from '../../src/renderer/components/ui/popover'
@@ -19,14 +20,14 @@ import { PopupLanguage } from './components/PopupLanguage'
 import { ProviderAvatar } from './components/ProviderAvatar'
 import { SettingsPreview, type PreviewKind } from './components/SettingsPreview'
 import { NolaLogo } from './logo'
-import { DEFAULT_PREFERENCES, readPreferences, savePreferences, UI_LANGUAGES, type Preferences } from './preferences'
+import { DEFAULT_PREFERENCES, MAX_WEB_TRANSLATION_CONCURRENCY, readPreferences, savePreferences, UI_LANGUAGES, type Preferences } from './preferences'
 import { ColorField, ConnectionStatus, languageOptions, LiveServiceField, RangeField, TargetLanguageField, usePreferences } from './settings-fields'
-import { createProvider, loadProviders, saveProviders, requestProviderAccess, PROVIDER_PRESETS, exportProviderConfig, type ProviderConnection, type Capability } from './providers'
+import { createProvider, isBundledProviderCopy, loadProviders, saveProviders, requestProviderAccess, PROVIDER_PRESETS, exportProviderConfig, visibleProviderConnections, type ProviderConnection, type Capability } from './providers'
 import { GlossaryManager } from './components/GlossaryManager'
 import { parseOptionsRoute } from './options-route'
 import { extensionGlossary, migrateLegacyGlossary, restoreExtensionConfiguration } from './glossary-store'
 import { emptyGlossary, glossaryDocumentSchema } from '../../src/shared/glossary'
-import { clearTranslationCache, synthesize, testProvider, translate } from './provider-client'
+import { clearTranslationCache, providerRequest, synthesize, testProvider, translate } from './provider-client'
 import { browserText, errorKey, type BrowserKey } from './i18n'
 import './styles.css'
 
@@ -41,8 +42,8 @@ const sectionIcons = { general: Settings2, apiProviders: Plug, shortcuts: Keyboa
 const descriptions = { general: 'generalDescription', apiProviders: 'providersDescription', shortcuts: 'shortcutsDescription', web: 'webDescription', video: 'videoDescription', selection: 'selectionDescription', inputTranslation: 'inputDescription', tts: 'ttsDescription', translationHub: 'hubDescription', floatingButton: 'floatingDescription', contextMenu: 'contextDescription', glossary: 'glossaryDescription', backup: 'backupDescription' } as const
 const previewSections: readonly string[] = ['web', 'video', 'selection', 'inputTranslation', 'floatingButton', 'contextMenu']
 const searchKeys: Record<typeof sections[number], BrowserKey[]> = {
-  general: ['interfaceLanguage', 'theme', 'source', 'target', 'siteBlacklist'],
-  apiProviders: ['apiKey', 'baseUrl', 'model', 'featureBindings', 'asr', 'tts', 's2s', 'llm', 'connection'],
+  general: ['interfaceLanguage', 'theme', 'liquidGlass', 'source', 'target', 'siteBlacklist'],
+  apiProviders: ['apiKey', 'baseUrl', 'model', 'webConcurrency', 'featureBindings', 'asr', 'tts', 's2s', 'llm', 'connection'],
   shortcuts: ['translatePage', 'translateSelection', 'hoverTranslation', 'video'],
   web: ['provider', 'display', 'pageScope', 'translateTitle', 'hoverTranslation', 'contextAware', 'minTextLength', 'skipLanguages', 'autoSites', 'neverAutoSites', 'pageStyle', 'customCss', 'prompt', 'requestRate', 'llmBatchSize', 'siteRules'],
   video: ['provider', 'display', 'subtitleFont', 'fontSize', 'subtitleColor', 'subtitleBackground', 'subtitleBackgroundOpacity', 'subtitlePosition', 'subtitlePositionX', 'subtitlePositionY', 'subtitleFollow', 'subtitleTranslationFirst', 'subtitleBold', 'subtitlePauseOnHover', 'customCss', 'autoSubtitleSites'],
@@ -66,9 +67,19 @@ function TextField({ label, value, onChange, multiline = false, type = 'text', d
   const change = (value: string) => { setDraft(value); onChange(value) }
   return <Field className={multiline ? 'nola-field-stack' : undefined}><div className="nola-setting-copy"><FieldLabel htmlFor={id}>{label}</FieldLabel>{description && <p>{description}</p>}</div>{multiline ? <Textarea id={id} value={draft} onFocus={() => { focused.current = true }} onBlur={() => { focused.current = false; onChange(draft) }} onChange={e => change(e.target.value)} /> : <Input id={id} type={type} value={draft} onFocus={() => { focused.current = true }} onBlur={() => { focused.current = false; onChange(draft) }} onChange={e => change(e.target.value)} />}</Field>
 }
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+function Toggle({ label, checked, disabled, hint, onChange }: { label: string; checked: boolean; disabled?: boolean; hint?: string; onChange: (value: boolean) => void }) {
   const id = useId()
-  return <Field className="nola-setting-toggle"><FieldLabel htmlFor={id}>{label}</FieldLabel><Switch id={id} checked={checked} onCheckedChange={onChange}><SwitchThumb /></Switch></Field>
+  const fieldLabel = <FieldLabel htmlFor={id}>{label}</FieldLabel>
+  return <Field className="nola-setting-toggle flex-row items-center justify-between">
+    {hint ? <div className="flex min-w-0 items-center gap-1">
+      {fieldLabel}
+      <TooltipProvider><Tooltip>
+        <TooltipTrigger render={<Button variant="bare" size="icon-xs" aria-label={label} />}><CircleHelp aria-hidden="true" /></TooltipTrigger>
+        <TooltipContent>{hint}</TooltipContent>
+      </Tooltip></TooltipProvider>
+    </div> : fieldLabel}
+    <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={onChange}><SwitchThumb /></Switch>
+  </Field>
 }
 function NumberField({ label, value, onChange, min = 0, max = 100, step = 1 }: { label: string; value: number; onChange: (value: number) => void; min?: number; max?: number; step?: number }) {
   return <TextField label={label} value={String(value)} type="number" onChange={value => { const number = Number(value); if (Number.isFinite(number)) onChange(Math.max(min, Math.min(max, Math.round(number / step) * step))) }} />
@@ -82,7 +93,7 @@ function Group({ title, children }: { title?: string; children: ReactNode }) {
 }
 function ProviderField({ label, value, providers, onChange, capability = 'mt', t }: { label: string; value: string; providers: ProviderConnection[]; onChange: (value: string) => void; capability?: Capability; t: T }) {
   const [error, setError] = useState('')
-  return <><ChoiceField label={label} value={value} options={providers.filter(p => p.capabilities.includes(capability)).map(p => ({ value: p.id, label: p.name }))} onChange={id => { const provider = providers.find(p => p.id === id); if (provider) void requestProviderAccess(provider).then(granted => { if (!granted) throw new Error('permissionFailed'); setError(''); onChange(id) }).catch(() => setError(t('permissionFailed'))) }} />{error && <p role="alert" className="nola-error">{error}</p>}</>
+  return <><ChoiceField label={label} value={value} options={visibleProviderConnections(providers, value).filter(p => p.capabilities.includes(capability)).map(p => ({ value: p.id, label: p.name }))} onChange={id => { const provider = providers.find(p => p.id === id); if (provider) void requestProviderAccess(provider).then(granted => { if (!granted) throw new Error('permissionFailed'); setError(''); onChange(id) }).catch(() => setError(t('permissionFailed'))) }} />{error && <p role="alert" className="nola-error">{error}</p>}</>
 }
 function ShortcutField({ label, value, onChange, modifierOnly = false, error, t }: { label: string; value: string; onChange(value: string): void; modifierOnly?: boolean; error?: string; t: T }) {
   const id = useId()
@@ -120,6 +131,14 @@ function ProviderEditor({ providers, settings, onChange, t }: { providers: Provi
   const [addSearch, setAddSearch] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [provider, setProvider] = useState<ProviderConnection>()
+  const [desktopConcurrency, setDesktopConcurrency] = useState<number>()
+  useEffect(() => {
+    if (provider?.preset !== 'nola') return
+    const controller = new AbortController()
+    void providerRequest({ type: 'translationLimits', desktop: true }, controller.signal)
+      .then(result => { if (!controller.signal.aborted) setDesktopConcurrency(result.desktopConcurrency) }).catch(() => undefined)
+    return () => controller.abort()
+  }, [provider?.preset])
   const currentDraft = useRef(provider)
   currentDraft.current = provider
   useEffect(() => { setResult(''); setShowKey(false) }, [provider?.id])
@@ -146,26 +165,39 @@ function ProviderEditor({ providers, settings, onChange, t }: { providers: Provi
     setPending(true); setResult('')
     try {
       if (!await requestProviderAccess(provider)) throw new Error('permissionFailed')
-      await onChange(providers.map(p => p.id === provider.id ? provider : p)); dirty.current = false; drafts.current.delete(provider.id); setResult(t('saved'))
+      const bundled = isBundledProviderCopy(provider)
+      await onChange(providers.map(p => {
+        if (p.id === provider.id) return provider
+        if (bundled && p.preset === provider.preset && isBundledProviderCopy(p)) return { ...p, translationConcurrency: provider.translationConcurrency }
+        return p
+      }))
+      dirty.current = false; drafts.current.delete(provider.id); setResult(t('saved'))
     } catch (error) { setResult(t(errorKey(error instanceof Error ? error.message : 'providerInvalid'))) } finally { setPending(false) }
   }
   return <div className="nola-provider-layout">
     <aside className="nola-provider-rail" aria-label={t('apiProviders')}>
       <Popover open={adding} onOpenChange={setAdding}><PopoverTrigger render={<Button variant="outline" className="nola-provider-add" />}><Plus data-icon="inline-start" />{t('add')}</PopoverTrigger><PopoverContent className="nola-provider-picker" align="start"><PopoverTitle>{t('preset')}</PopoverTitle><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput aria-label={t('searchOptions')} placeholder={t('searchOptions')} value={addSearch} onChange={e => setAddSearch(e.target.value)} /></InputGroup><div className="nola-provider-picker-list">{PROVIDER_PRESETS.filter(p => p.id !== 'nola' && p.name.toLowerCase().includes(addSearch.toLowerCase())).map(p => <Button variant="bare" key={p.id} disabled={pending} onClick={() => {
+        const existing = providers.find(item => item.preset === p.id && isBundledProviderCopy(item))
+        if (existing) { setSelected(existing.id); setAdding(false); setAddSearch(''); return }
         const created = createProvider(p.id)
+        if (created.capabilities.includes('mt')) created.translationConcurrency = DEFAULT_PREFERENCES.webConcurrency
         setPending(true); void onChange([...providers, created]).then(() => { setSelected(created.id); setAdding(false); setAddSearch('') }).catch(() => setResult(t('invalidConfig'))).finally(() => setPending(false))
       }}>{p.name}</Button>)}</div></PopoverContent></Popover>
-      {providers.map(p => {
+      {visibleProviderConnections(providers, selected).map(p => {
         const count = ['pageProvider', 'selectionProvider', 'inputProvider', 'subtitleProvider', 'asrProvider', 'ttsProvider', 's2sProvider', 'llmProvider'].filter(key => settings[key as keyof Preferences] === p.id).length
-        return <Button className="nola-provider-list-item" key={p.id} variant="outline" aria-pressed={p.id === provider?.id} onClick={() => setSelected(p.id)}><ProviderAvatar provider={p} /><span>{p.name}</span>{count > 0 && <Badge variant="accent">{count}</Badge>}</Button>
+        return <Button className="nola-provider-list-item nola-nav-button" key={p.id} variant="nav" data-active={p.id === provider?.id} aria-pressed={p.id === provider?.id} onClick={() => setSelected(p.id)}><ProviderAvatar provider={p} /><span>{p.name}</span>{count > 0 && <Badge variant="accent">{count}</Badge>}</Button>
       })}
     </aside>
     {provider && <Card className="nola-provider-editor"><CardHeader><CardTitle><ProviderAvatar provider={provider} />{provider.name}</CardTitle></CardHeader><CardContent><FieldGroup>
       {provider.preset === 'nola' ? <p className="nola-muted">{t('nativeProviderHelp')}</p> : <TextField label={t('name')} value={provider.name} onChange={name => update({ name })} />}
+      {provider.preset === 'nola' && <Field><FieldLabel>{t('webConcurrency')}</FieldLabel><div>{desktopConcurrency !== undefined && <span>{desktopConcurrency} · </span>}<span>{t('desktopTranslationConcurrency')}</span></div></Field>}
       {provider.preset === 'nola' && <Button variant="outline" disabled={pending} onClick={() => void test()}>{pending ? t('translating') : t('testConnection')}</Button>}
       {provider.preset !== 'nola' && <>
         <ChoiceField label={t('preset')} value={provider.preset} options={PROVIDER_PRESETS.filter(p => p.id !== 'nola').map(p => ({ value: p.id, label: p.name }))} onChange={id => { const preset = PROVIDER_PRESETS.find(p => p.id === id); if (preset) update({ preset: id, baseUrl: preset.baseUrl, capabilities: [...preset.capabilities], model: preset.model ?? '' }) }} />
         <TextField label={t('baseUrl')} value={provider.baseUrl} onChange={baseUrl => update({ baseUrl })} />
+        {provider.capabilities.includes('mt') && <NumberField key={provider.id} label={t('webConcurrency')} value={provider.translationConcurrency ?? settings.webConcurrency} min={1} max={MAX_WEB_TRANSLATION_CONCURRENCY} onChange={translationConcurrency => {
+          if (translationConcurrency !== (provider.translationConcurrency ?? settings.webConcurrency)) update({ translationConcurrency })
+        }} />}
         {(!['google-free', 'microsoft-free', 'edge-tts'].includes(preset?.protocol ?? '')) && <><TextField label={t('apiKey')} type={showKey ? 'text' : 'password'} value={provider.apiKey} onChange={apiKey => update({ apiKey })} /><Toggle label={t('showApiKey')} checked={showKey} onChange={setShowKey} /></>}
         {(!['google-free', 'microsoft-free', 'edge-tts', 'deepl', 'deeplx'].includes(preset?.protocol ?? '')) && <TextField label={t('model')} value={provider.model} onChange={model => update({ model })} />}
         <details><summary>{t('advancedOptions')}</summary><FieldGroup>
@@ -197,7 +229,7 @@ function TranslationCenter({ settings, providers, locale, t }: { settings: Prefe
   const audioUrl = useRef('')
   const speechRequest = useRef<AbortController | null>(null)
   useEffect(() => () => { requests.current.forEach(controller => controller.abort()); speechRequest.current?.abort(); audio.current?.pause(); if (audioUrl.current) URL.revokeObjectURL(audioUrl.current) }, [])
-  const available = providers.filter(p => p.capabilities.includes('mt'))
+  const available = visibleProviderConnections(providers, settings.pageProvider).filter(p => p.capabilities.includes('mt'))
   const active = selected.filter(id => available.some(p => p.id === id))
   const pending = Object.values(results).some(result => result.pending)
   async function run(ids = active) {
@@ -237,7 +269,7 @@ function TranslationCenter({ settings, providers, locale, t }: { settings: Prefe
   return <div className="nola-translation-center">
     <div className="nola-hub-source">
       <div className="nola-hub-languages"><PopupLanguage size="sm" label={t('source')} value={source} options={[{ value: 'auto', label: t('autoDetect') }, ...languageOptions(locale)]} onChange={setSource} t={t} /><Button variant="bare" size="icon-sm" aria-label={t('swapLanguages')} title={t('swapLanguages')} disabled={source === 'auto'} onClick={() => { setSource(target); setTarget(source) }}><ArrowLeftRight /></Button><PopupLanguage size="sm" label={t('target')} value={target} options={languageOptions(locale)} onChange={setTarget} t={t} /></div>
-      <div className="nola-hub-input"><Textarea aria-label={t('inputText')} placeholder={t('inputText')} value={text} onChange={e => setText(e.target.value)} onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && text.trim() && active.length && !pending) { event.preventDefault(); void run() } }} /><div className="nola-hub-input-actions"><Button variant="bare" size="icon-sm" disabled={!text.trim() || speaking} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak(text, source)}><Volume2 /></Button><Button disabled={pending || !text.trim() || !active.length} onClick={() => void run()}>{t(pending ? 'translating' : 'translateText')}</Button></div></div>
+      <div className="nola-hub-input nola-card nola-glass"><Textarea className="focus-visible:ring-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nola-ui-ring" aria-label={t('inputText')} placeholder={t('inputText')} value={text} onChange={e => setText(e.target.value)} onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && text.trim() && active.length && !pending) { event.preventDefault(); void run() } }} /><div className="nola-hub-input-actions"><Button variant="bare" size="icon-sm" disabled={!text.trim() || speaking} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak(text, source)}><Volume2 /></Button><Button disabled={pending || !text.trim() || !active.length} onClick={() => void run()}>{t(pending ? 'translating' : 'translateText')}</Button></div></div>
     </div>
     <div className="nola-hub-results"><div className="nola-hub-toolbar"><Popover><PopoverTrigger render={<Button variant="outline" />}><Languages data-icon="inline-start" />{t('provider')}<Badge>{active.length}</Badge><ChevronDown data-icon="inline-end" /></PopoverTrigger><PopoverContent className="nola-hub-provider-picker" align="end"><PopoverTitle>{t('selectProviders')}</PopoverTitle>{available.map(p => <Toggle key={p.id} label={p.name} checked={selected.includes(p.id)} onChange={checked => selectProvider(p.id, checked)} />)}</PopoverContent></Popover><Button variant="bare" size="icon-sm" aria-label={t('apiProviders')} title={t('apiProviders')} onClick={() => { window.location.hash = 'apiProviders' }}><Settings2 /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('expand')} title={t('expand')} onClick={() => setCollapsed([])}><ChevronDown /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('collapse')} title={t('collapse')} onClick={() => setCollapsed(active)}><ChevronUp /></Button></div>
       {active.map(id => { const provider = available.find(p => p.id === id)!; const result = results[id]; const expanded = !collapsed.includes(id); return <Card className="nola-hub-result" key={id}><CardHeader><CardTitle><ProviderAvatar provider={provider} />{provider.name}</CardTitle><div className="nola-hub-card-actions"><Button variant="bare" size="icon-sm" disabled={!text.trim() || result?.pending} aria-label={t('refresh')} title={t('refresh')} onClick={() => void run([id])}><RefreshCw /></Button><Button variant="bare" size="icon-sm" disabled={!result?.text || speaking} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak(result!.text!, target)}><Volume2 /></Button><Button variant="bare" size="icon-sm" disabled={!result?.text} aria-label={t(copied === id ? 'copied' : 'copyTranslation')} title={t(copied === id ? 'copied' : 'copyTranslation')} onClick={() => { void navigator.clipboard.writeText(result!.text!).then(() => { setCopied(id); setTimeout(() => setCopied(''), 1500) }).catch(() => setFeedback(t('internalError'))) }}>{copied === id ? <Check /> : <Copy />}</Button><Button variant="bare" size="icon-sm" aria-label={t(expanded ? 'collapse' : 'expand')} aria-expanded={expanded} title={t(expanded ? 'collapse' : 'expand')} onClick={() => setCollapsed(current => expanded ? [...current, id] : current.filter(value => value !== id))}>{expanded ? <ChevronUp /> : <ChevronDown />}</Button><Button variant="bare" size="icon-sm" aria-label={t('close')} title={t('close')} onClick={() => selectProvider(id, false)}><X /></Button></div></CardHeader>{expanded && <CardContent aria-live="polite">{result?.pending ? <p className="nola-muted">{t('translating')}</p> : result?.error ? <p className="nola-error" role="alert">{result.error}</p> : <p>{result?.text || t('inputText')}</p>}</CardContent>}</Card> })}
@@ -292,6 +324,7 @@ function Backup({ settings, t, report }: { settings: Preferences; t: T; report: 
 
 export function Options() {
   const [settings, locale, t] = usePreferences()
+  const supportsGlass = Boolean(globalThis.CSS?.supports?.('backdrop-filter', 'blur(1px)') || globalThis.CSS?.supports?.('-webkit-backdrop-filter', 'blur(1px)'))
   const [section, setSection] = useState<typeof sections[number]>(() => sections.find(section => section === parseOptionsRoute(window.location.hash).section) ?? 'general')
   const [libraryId, setLibraryId] = useState(() => parseOptionsRoute(window.location.hash).libraryId)
   const [query, setQuery] = useState('')
@@ -323,10 +356,10 @@ export function Options() {
   const filtered = sections.filter(key => [t(key), t(descriptions[key]), ...searchKeys[key].map(key => t(key)), ...(key === 'apiProviders' ? providers.map(provider => provider.name) : [])].some(value => value.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())))
   const active = query.trim() ? filtered : [section]
   return <main className="nola-settings-shell">
-    <aside className="nola-settings-sidebar"><header className="nola-options-header"><NolaLogo /><strong>Nola Translator</strong></header><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput ref={searchInput} aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} /></InputGroup>
+    <aside className="nola-settings-sidebar nola-sidebar" data-slot="sidebar-inner"><header className="nola-options-header"><NolaLogo /><strong>Nola Translator</strong></header><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput ref={searchInput} aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} /></InputGroup>
       <nav aria-label={t('settings')}>{navGroups.map(group => {
         const items = group.items.filter(key => filtered.includes(key))
-        return items.length ? <div className="nola-nav-group" key={group.label}><p>{t(group.label)}</p>{items.map(key => { const Icon = sectionIcons[key]; return <Button key={key} variant="outline" aria-current={section === key ? 'page' : undefined} onClick={() => { setSection(key); setQuery(''); window.location.hash = key }}><Icon aria-hidden="true" /><span>{t(key)}</span></Button> })}</div> : null
+        return items.length ? <div className="nola-nav-group" key={group.label}><p>{t(group.label)}</p>{items.map(key => { const Icon = sectionIcons[key]; return <Button key={key} variant="nav" className="nola-nav-button" data-active={section === key} aria-current={section === key ? 'page' : undefined} onClick={() => { setSection(key); setQuery(''); window.location.hash = key }}><Icon aria-hidden="true" /><span>{t(key)}</span></Button> })}</div> : null
       })}</nav>
     </aside>
     <div className="nola-settings-main"><header className="nola-settings-title"><h1>{query ? t('search') : t(section)}</h1>{!query && <p>{t(descriptions[section])}</p>}</header>
@@ -336,6 +369,7 @@ export function Options() {
       {active.includes('general') && <><Group title={t('appearance')}>
         <ChoiceField label={t('interfaceLanguage')} value={settings.uiLanguage} options={UI_LANGUAGES.map((value, index) => ({ value, label: index ? languageLabels[index - 1] : t('browserDefault') }))} onChange={value => save('uiLanguage', value as Preferences['uiLanguage'])} />
         <ChoiceField label={t('theme')} value={settings.theme} options={[{ value: 'auto', label: t('browserDefault') }, { value: 'light', label: t('light') }, { value: 'dark', label: t('dark') }]} onChange={value => save('theme', value as Preferences['theme'])} />
+        <Toggle label={t('liquidGlass')} checked={supportsGlass && settings.liquidGlass} disabled={!supportsGlass} hint={t(supportsGlass ? 'liquidGlassHint' : 'liquidGlassUnavailable')} onChange={value => save('liquidGlass', value)} />
       </Group><Group title={t('translationLanguages')}><ChoiceField label={t('source')} value={settings.sourceLanguage} options={[{ value: 'auto', label: t('autoDetect') }, ...languageOptions(locale)]} onChange={value => save('sourceLanguage', value)} />
         <TargetLanguageField value={settings.pageLanguage} locale={locale} t={t} onChange={value => save('pageLanguage', value)} />
       </Group><Group title={t('siteScope')}>{list('siteBlacklist', 'siteBlacklist')}</Group></>}

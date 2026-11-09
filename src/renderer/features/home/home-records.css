@@ -79,7 +79,7 @@
   color: color-mix(in oklab, var(--entry-tone) 65%, var(--foreground));
 }
 .nola-entry__icon svg { width: var(--space-3); height: var(--space-3); }
-.nola-entry .card__description { white-space: pre-line; font: var(--font-caption); }
+.nola-entry .card__description { white-space: pre-line; }
 .nola-home .nola-entry .card__footer { margin-top: auto; padding: 0; background: transparent; border: 0; }
 .nola-entry__action { max-width: 100%; }
 .nola-entry__decoration {
@@ -189,7 +189,6 @@
 .nola-record-page__page-size { width: 84px; }
 .nola-record-page__page-size .select__trigger { min-height: 32px; }
 .nola-record-detail { flex: 1; min-height: 0; }
-.nola-record-detail .nola-display { font-size: 32px; }
 .nola-record-detail__reading { flex: 1; min-height: 340px; padding: 0; overflow: hidden; }
 .nola-record-detail__reading { gap: 0; padding: 0; }
 .nola-record-detail__reading > .card__content { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; }

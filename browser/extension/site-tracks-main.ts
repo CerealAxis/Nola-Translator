@@ -1,6 +1,6 @@
 import { metadataTracks, hlsSubtitleTracks, xPlaylistOwners } from './platform-track-metadata'
 import { detectVideos, xVideoIdentity } from './adapters'
-import { parseTimedText, observedSubtitleUrl } from './site-tracks'
+import { parseTimedText, parseYouTubeTimedText, observedSubtitleUrl } from './site-tracks'
 import { bilibiliTracks, parseSiteCues, subtitleUrl, TRACK_CANCEL, TRACK_REQUEST, TRACK_RESPONSE, TRACK_RESTORE, TRACK_CHANGED, type SiteTrack } from './site-tracks'
 
 interface NetflixTrack { trackId: string; bcp47?: string; displayName?: string; isNoneTrack?: boolean; isForcedNarrative?: boolean; isImageBased?: boolean }
@@ -35,6 +35,7 @@ interface YouTubePlayer extends HTMLElement {
   getPlayerState?(): number
 }
 const youtubePlayer = () => document.querySelector<YouTubePlayer>('#movie_player')
+const youtubeVideoId = () => new URLSearchParams(location.search).get('v') ?? /^\/(?:shorts|live|embed)\/([^/]+)/.exec(location.pathname)?.[1]
 
 async function get(url: URL | string, credentials: RequestCredentials = 'include', signal?: AbortSignal): Promise<Response> {
   const response = await fetch(url, { credentials, signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000) })
@@ -45,7 +46,7 @@ async function get(url: URL | string, credentials: RequestCredentials = 'include
 function youtubeTracks(): SiteTrack[] {
   const player = youtubePlayer()
   const initial = (window as Window & { ytInitialPlayerResponse?: PlayerData }).ytInitialPlayerResponse
-  const expected = new URLSearchParams(location.search).get('v') ?? /^\/(?:shorts|live|embed)\/([^/]+)/.exec(location.pathname)?.[1]
+  const expected = youtubeVideoId()
   const response = [player?.getPlayerResponse?.(), initial].find(data => data?.videoDetails?.videoId && (!expected || expected === data.videoDetails.videoId))
   if (!response) throw new Error('Player metadata unavailable')
   const tracks = response.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? []
@@ -191,12 +192,12 @@ export function installSiteTracks(): void {
       if (kind === 'youtube') {
         try {
           const resource = subtitleUrl(url, 'youtube', location.origin)
-          if (capturedHref !== location.href || resource.searchParams.get('v') !== new URL(location.href).searchParams.get('v')) return
+          if (capturedHref !== location.href || resource.searchParams.get('v') !== youtubeVideoId()) return
           timedtextUrls.add(resource.href)
           if (timedtextUrls.size > 30) timedtextUrls.delete(timedtextUrls.values().next().value!)
-          const cues = parseSiteCues(JSON.parse(text), 'youtube')
+          const cues = parseYouTubeTimedText(text)
           if (cues.length) { timedtext.set(resource.href, cues); if (timedtext.size > 8) timedtext.delete(timedtext.keys().next().value!) }
-        } catch { /* Only successful native JSON3 subtitle responses are reusable. */ }
+        } catch { /* Only successful native subtitle responses are reusable. */ }
         return
       }
       try {
@@ -243,7 +244,7 @@ export function installSiteTracks(): void {
   document.addEventListener(TRACK_REQUEST, event => {
     const raw = (event as CustomEvent<unknown>).detail
     if (typeof raw !== 'string' || raw.length > 512) return
-    let request: { nonce: string; trackId?: string }
+    let request: { nonce: string; trackId?: string; probe?: boolean }
     try { request = JSON.parse(raw) } catch { return }
     if (requests.size >= 8 || !request || typeof request.nonce !== 'string' || request.nonce.length > 128 || request.trackId !== undefined && typeof request.trackId !== 'string') return
     const owned = new AbortController()
@@ -265,12 +266,20 @@ export function installSiteTracks(): void {
         if (request.trackId === undefined) { reply(available.map(track => ({ id: key(track), language: track.bcp47 ?? 'auto', label: track.displayName ?? track.bcp47 ?? track.trackId }))); return }
         const selected = available.find(track => key(track) === request.trackId)
         if (!selected) throw new Error('Netflix track changed')
+        const trackKey = `${movie}:${selected.trackId}`
+        if (request.probe === true) {
+          const cached = netflixCues.get(trackKey)
+          if (cached?.length) { reply(cached); return }
+          const resource = [...netflixUrls].find(([, value]) => value === trackKey)?.[0]
+          if (!resource) { reply([]); return }
+          const response = await get(observedSubtitleUrl(resource, 'netflix'), 'omit', owned.signal)
+          reply(parseTimedText(await response.text(), 'netflix')); return
+        }
         const original = player.getTimedTextTrack()
         if (!netflixOwner || netflixOwner.movie !== movie) netflixOwner = { movie, original, selected: selected.trackId }
         else netflixOwner.selected = selected.trackId
         restoreOnFailure = netflixOwner
         if (original?.trackId !== selected.trackId) player.setTimedTextTrack(selected)
-        const trackKey = `${movie}:${selected.trackId}`
         const attempted = new Set<string>()
         for (let attempt = 0; attempt < 60; attempt++) {
           owned.signal.throwIfAborted()
@@ -346,6 +355,7 @@ export function installSiteTracks(): void {
           if (location.href !== requestedUrl) throw new Error('Video changed')
           reply(cues); return
         } catch { owned.signal.throwIfAborted() }
+        if (request.probe === true) { reply([]); return }
         // Ask the actual player to mint subtitle credentials instead of retrying a stale URL.
         const player = youtubePlayer()
         for (let attempt = 0; attempt < 12 && player?.getPlayerState && player.getPlayerState() < 1; attempt++) {

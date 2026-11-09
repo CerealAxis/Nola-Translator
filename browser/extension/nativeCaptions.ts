@@ -1,3 +1,31 @@
+export function suppressPlayerCaptions(video: HTMLVideoElement): () => void {
+  const container = video.closest<HTMLElement>('#movie_player,.bpx-player-container,.bilibili-player,.watch-video,.nf-player-container') ?? video.parentElement
+  const style = document.createElement('style')
+  style.dataset.nolaExtension = 'live-caption-suppression'
+  style.textContent = '[data-nola-live-captions] :is(.ytp-caption-window-container,.bpx-player-subtitle-panel,.bilibili-player-video-subtitle,.player-timedtext){visibility:hidden!important}'
+  container?.setAttribute('data-nola-live-captions', '')
+  document.documentElement.append(style)
+  const hidden = new Set<TextTrack>()
+  const tracks = video.textTracks
+  const hide = () => {
+    for (const track of tracks) {
+      if (!['subtitles', 'captions'].includes(track.kind) || track.label.startsWith('Nola')) continue
+      if (track.mode === 'showing') { hidden.add(track); track.mode = 'hidden' }
+      else if (track.mode === 'disabled') hidden.delete(track)
+    }
+  }
+  tracks.addEventListener('addtrack', hide)
+  tracks.addEventListener('change', hide)
+  hide()
+  return () => {
+    tracks.removeEventListener('addtrack', hide)
+    tracks.removeEventListener('change', hide)
+    for (const track of hidden) if (track.mode === 'hidden') track.mode = 'showing'
+    container?.removeAttribute('data-nola-live-captions')
+    style.remove()
+  }
+}
+
 /** Temporary native-video fullscreen captions must preserve the site's existing track modes. */
 export class NativeCaptionTrack {
   private track: TextTrack | null = null

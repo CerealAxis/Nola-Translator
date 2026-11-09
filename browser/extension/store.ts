@@ -152,13 +152,20 @@ function energyOf(buffer: ArrayBuffer): number {
 }
 export function createExtensionStore(dependencies: StoreDependencies) {
   let state: ExtensionState = { status: 'idle', playbackPaused: false, connected: false, capturePending: false, audioCaptured: false, panelOpen: false, captionServiceActive: false, liveAttempted: false, config: DEFAULT_CAPTION_CONFIG, videos: [], selectedVideo: null, epoch: 0, captions: [] }
-  dependencies = { ...dependencies, bridge: createSpeechBridge(dependencies.bridge, () => state.preferences) }
+  let liveWarning: string | undefined
+  dependencies = { ...dependencies, bridge: createSpeechBridge(dependencies.bridge, () => state.preferences, code => {
+    if (state.status !== 'active') return
+    if (code || liveWarning && state.error === liveWarning) set({ error: code })
+    liveWarning = code
+  }) }
   const listeners = new Set<() => void>()
   let sessionId: string | null = null
   let streamId = ''
   let media: MediaStream | null = null
+  let capturedPlayer: HTMLVideoElement | null = null
   let audio: AudioCapture | null = null
   let captureController: AbortController | null = null
+  let tabCaptureDenied = false
   let generation = 0
   let epochSamples = 0
   let sequence = 0
@@ -195,6 +202,8 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     for (const listener of listeners) listener()
   }
   const failCode = (error: unknown): string => error instanceof BrowserFailure ? error.code : error instanceof DOMException && error.name === 'NotAllowedError' ? 'captureCancelled' : 'error'
+  const canShareTabAudio = () => Boolean(document.documentElement.dataset.nolaCaptureHandle
+    && (dependencies.getDisplayMedia || navigator.mediaDevices?.getDisplayMedia))
   const anchor = () => ({ videoTimeMs: Math.max(0, (state.selectedVideo?.currentTime ?? 0) * 1000), playbackRate: state.selectedVideo?.playbackRate || 1 })
   const videoPaused = (): boolean => !state.selectedVideo || state.selectedVideo.paused || state.selectedVideo.seeking || state.selectedVideo.readyState < 3
   const paused = (): boolean => state.playbackPaused || videoPaused()
@@ -208,7 +217,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
   }
   const fence = (): void => { setAccepting(false, 'fence'); audio?.enable(false, state.epoch) }
   const closeResources = async (): Promise<void> => {
-    fence(); captureController?.abort(); captureController = null; videoCleanup?.(); videoCleanup = null
+    fence(); captureController?.abort(); captureController = null; capturedPlayer = null; videoCleanup?.(); videoCleanup = null
     if (endingTimer) { clearTimeout(endingTimer); endingTimer = null }
     if (media) { releaseTracks(media); media = null }
     const previousAudio = audio; audio = null
@@ -216,7 +225,9 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     set({ captions: [], audioCaptured: false, capturePending: false })
   }
   const stop = async (error?: string): Promise<void> => {
+    if (error === 'browserTabCapturePermission' && !canShareTabAudio()) error = 'captureUnsupported'
     const stopGeneration = ++generation; fence()
+    liveWarning = undefined
     transition = Promise.resolve()
     const id = sessionId; sessionId = null
     set({ status: 'stopping', error, liveAttempted: error ? state.liveAttempted : false })
@@ -359,8 +370,13 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     silenceChunks = peakOf(chunk.buffer) > 0 ? 0 : silenceChunks + 1
     if (silenceChunks >= SILENCE_CHUNKS_TO_FAIL && advancing() && (chunk.sourcePeak ?? 0) <= 0) {
       debug('ext.silent', { silenceChunks, sourcePeakDbfs: dbfs(chunk.sourcePeak ?? 0), workletPeakDbfs: dbfs(chunk.workletPeak ?? 0) })
-      if (state.error !== 'tabAudioSilent') set({ error: 'tabAudioSilent' })
-    } else if (silenceChunks === 0 && state.error === 'tabAudioSilent') set({ error: undefined })
+      const needsTabAudio = tabCaptureDenied && capturedPlayer && !capturedPlayer.muted && capturedPlayer.volume > 0
+      if (needsTabAudio && media?.getAudioTracks().every(track => track.muted)) { void stop('browserTabCapturePermission'); return }
+      const warning = !media && canShareTabAudio() ? 'tabAudioSilentTrySharing' : 'tabAudioSilent'
+      if (state.error !== warning) set({ error: warning })
+    } else if (silenceChunks === 0 && (state.error === 'tabAudioSilent' || state.error === 'tabAudioSilentTrySharing')) {
+      set({ error: undefined })
+    }
     const duration = chunk.buffer.byteLength / 2 / chunk.sampleRate * 1000
     if (pendingMs + duration > 2000) { void stop('slowAudio'); return }
     const capturedAtMs = epochSamples / chunk.sampleRate * 1000
@@ -370,19 +386,28 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     const requestEpoch = state.epoch
     void dependencies.bridge.request({ type: 'audio', sessionId, streamId, epoch: requestEpoch, sequence: sequence++, sampleRate: chunk.sampleRate, capturedAtMs, pcmBase64: pcmBase64(chunk.buffer) }).catch(error => { if (requestGeneration === generation && requestEpoch === state.epoch && accepting) { debug('ext.audioFailed', { code: failCode(error) }); void stop(failCode(error)) } }).finally(() => { if (requestGeneration === generation && requestEpoch === state.epoch) pendingMs = Math.max(0, pendingMs - duration) })
   }
-  const start = async (capturePromise: Promise<MediaStream> | null, startGeneration: number, tabCapturePromise?: Promise<AudioCapture>): Promise<void> => {
+  const start = async (capturePromise: Promise<MediaStream> | null, startGeneration: number,
+    tabCapturePromise?: Promise<AudioCapture | undefined>, sharingTab = false): Promise<void> => {
     const enhanced = state.summary?.realtimeTranslation && state.preferences
+    const verifySharedTab = sharingTab || !enhanced
     try {
       if (tabCapturePromise) {
         const created = await tabCapturePromise
-        if (startGeneration !== generation) { await created.close(); return }
-        audio = created; set({ audioCaptured: true })
+        if (startGeneration !== generation) { await created?.close(); return }
+        if (created) { audio = created; set({ audioCaptured: true }) }
+        else if (state.selectedVideo) {
+          capturedPlayer = state.selectedVideo
+          capturePromise = capturePlayerAudio(capturedPlayer).catch(error => {
+            if (tabCaptureDenied) throw new BrowserFailure('browserTabCapturePermission')
+            throw error
+          })
+        }
       }
       if (capturePromise) {
         const stream = await capturePromise
         if (startGeneration !== generation) { releaseTracks(stream); return }
         media = stream
-        if (!enhanced) validateCapture(stream, document.documentElement.dataset.nolaCaptureHandle, location.origin)
+        if (verifySharedTab) validateCapture(stream, document.documentElement.dataset.nolaCaptureHandle, location.origin)
         set({ audioCaptured: true })
         // The audio track's own settings and mute state are the only place a wrong or silent
         // track shows up before any sample reaches the worklet.
@@ -393,7 +418,11 @@ export function createExtensionStore(dependencies: StoreDependencies) {
         } catch { /* A track that cannot be described is not a capture failure. */ }
         for (const track of stream.getTracks()) {
           track.addEventListener('ended', () => { if (startGeneration === generation) void stop('captureCancelled') }, { once: true })
-          if (!enhanced) track.addEventListener('capturehandlechange', () => { try { validateCapture(stream, document.documentElement.dataset.nolaCaptureHandle, location.origin) } catch { void stop('wrongCapture') } })
+          if (verifySharedTab) track.addEventListener('capturehandlechange', () => {
+            if (startGeneration !== generation) return
+            try { validateCapture(stream, document.documentElement.dataset.nolaCaptureHandle, location.origin) }
+            catch { void stop('wrongCapture') }
+          })
         }
         const createdAudio = await (dependencies.audioCapture ?? createAudioCapture)(stream, onAudio, (event, data) => debug(event, data), false)
         if (startGeneration !== generation) { await createdAudio.close(); releaseTracks(stream); return }
@@ -545,7 +574,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
         if (preferred) {
           bind(preferred)
           if (endingTimer) { clearTimeout(endingTimer); endingTimer = null }
-          if (state.summary?.realtimeTranslation && navigator.userAgent.includes('Firefox/')) void stop()
+          if (capturedPlayer) void stop()
           else reset()
         }
         else if (state.status !== 'idle') { fence(); endingTimer ??= setTimeout(() => { endingTimer = null; if (!state.videos.length) void stop() }, 1000) }
@@ -553,7 +582,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       }
     },
     timelineChanged: reset,
-    pressStart() {
+    pressStart(source: 'player' | 'toolbar' | 'sidebar' = 'player') {
       if (state.status !== 'idle' || state.capturePending || !state.selectedVideo || state.summary?.extensionCompatible === false) return
       set({ liveAttempted: true })
       debug('ext.pressStart', { source: captionAudioSource(state.config) })
@@ -561,21 +590,32 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       // getDisplayMedia must run in the original onPress stack, before any await or desktop request.
       // A system capture needs neither the picker nor a gesture: the desktop owns the capture.
       let capturePromise: Promise<MediaStream> | null = null
-      let tabCapturePromise: Promise<AudioCapture> | undefined
+      let tabCapturePromise: Promise<AudioCapture | undefined> | undefined
       const startGeneration = generation + 1
-      if (state.summary?.realtimeTranslation && state.preferences) {
-        if (!navigator.userAgent.includes('Firefox/') && !dependencies.capturePlayerAudio) {
-          captureController = new AbortController()
-          tabCapturePromise = (dependencies.tabAudioCapture ?? createTabAudioCapture)(onAudio, debug, code => { if (startGeneration === generation) void stop(code) }, captureController.signal)
-        } else capturePromise = (dependencies.capturePlayerAudio ?? capturePlayerAudio)(state.selectedVideo)
-      } else if (captionAudioSource(state.config) === 'tab') {
-        // Firefox lacks Capture Handle and verified tab audio (MDN Screen Capture compatibility).
+      tabCaptureDenied = false
+      const enhanced = state.summary?.realtimeTranslation && state.preferences
+      const sharingTab = Boolean(enhanced && source === 'player' && canShareTabAudio())
+      if (sharingTab || (!enhanced && captionAudioSource(state.config) === 'tab')) {
+        // The picker requires a fresh click in the video page itself.
         if (navigator.userAgent.includes('Firefox/')) { set({ error: 'captureUnsupported' }); return }
         try { capturePromise = media ? Promise.resolve(media) : (dependencies.getDisplayMedia ?? (options => navigator.mediaDevices.getDisplayMedia(options)))(CAPTURE_OPTIONS) }
         catch (error) { set({ error: failCode(error) }); return }
+      } else if (enhanced) {
+        if (!navigator.userAgent.includes('Firefox/') && !dependencies.capturePlayerAudio) {
+          captureController = new AbortController()
+          tabCapturePromise = (dependencies.tabAudioCapture ?? createTabAudioCapture)(onAudio, debug, code => { if (startGeneration === generation) void stop(code) }, captureController.signal)
+            .catch(error => {
+              if (source === 'toolbar' || startGeneration !== generation) throw error
+              tabCaptureDenied = error instanceof BrowserFailure && error.code === 'browserTabCapturePermission'
+              return undefined
+            })
+        } else {
+          capturedPlayer = state.selectedVideo
+          capturePromise = (dependencies.capturePlayerAudio ?? capturePlayerAudio)(capturedPlayer)
+        }
       }
       set({ status: 'starting', error: undefined })
-      void start(capturePromise, ++generation, tabCapturePromise)
+      void start(capturePromise, ++generation, tabCapturePromise, sharingTab)
     },
     stop,
     async destroy() { stopSummaryRefresh(); await stop(); unsubscribe(); dependencies.bridge.close(); listeners.clear() },

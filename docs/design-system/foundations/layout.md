@@ -26,7 +26,7 @@ editLink: false
 
 **根据宽度和高度分别调整内容。** 较宽窗口可以并排呈现相关内容，较窄窗口按阅读顺序上下排列。高度不足时让内容滚动，标题与必要操作仍可到达。
 
-<demo react="foundation-appearance-layout.tsx" :reactFiles="['foundation-appearance-layout.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="foundation-appearance-layout.tsx" :reactFiles="['foundation-appearance-layout.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css']" />
 
 同一内容在宽窗口中左右对照，在窄窗口中上下排列。窗口标题和内容顺序保持一致。
 

@@ -114,11 +114,10 @@ describe('排版规则（§3.3）', () => {
     expect(read('nola-theme.css')).not.toMatch(/--font-(ui|sans|mono|serif):|@font-face/)
   })
 
-  it('正文行高不低于 1.6（中文需要更松的行距）', () => {
-    const css = read('typography.css')
-    const body = css.match(/--nola-text-body:[^;]+;/)?.[0] ?? ''
-    const lh = Number(body.match(/1\.(\d+)/)?.[1] ?? '0')
-    expect(lh).toBeGreaterThanOrEqual(6)
+  it('正文行高沿用 Apple Liquid Glass 的产品字号', () => {
+    const css = read('nola-theme.css')
+    expect(css).toContain('--nola-text-body: var(--font-body);')
+    expect(css).toMatch(/--font-body:\s*400[^;]+\/1\.55 var\(--font-ui\);/)
   })
 
   it('所有数字都用 tabular-nums', () => {

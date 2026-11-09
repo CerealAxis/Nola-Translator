@@ -2,7 +2,8 @@ import { generateWith } from './provider-execution'
 import type { ProviderConnection } from './providers'
 
 interface Item { text: string; prompt: string; signal: AbortSignal; resolve(value: string): void; reject(reason: unknown): void }
-interface Batch { provider: ProviderConnection; items: Item[]; runSingle(item: Item): Promise<string>; before(signal: AbortSignal): Promise<void> }
+type RunTranslation = (signal: AbortSignal, run: () => Promise<string>) => Promise<string>
+interface Batch { provider: ProviderConnection; items: Item[]; runSingle(item: Item): Promise<string>; run: RunTranslation }
 const pending = new Map<string, Batch>()
 export function parseBatchResult(text: string, length: number): string[] {
   const parsed: unknown = JSON.parse(text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''))
@@ -26,9 +27,8 @@ async function flush(key: string): Promise<void> {
   const abort = () => { if (items.every(item => item.signal.aborted)) controller.abort() }
   for (const item of items) item.signal.addEventListener('abort', abort, { once: true })
   try {
-    await batch.before(controller.signal)
     const prompt = 'Complete each translation task below. Return ONLY a JSON array of {"id":number,"text":string}, one result for every task ID. Keep all IDs unchanged.\n' + JSON.stringify(items.map((item, id) => ({ id, task: item.prompt })))
-    const response = await generateWith(batch.provider, prompt, controller.signal)
+    const response = await batch.run(controller.signal, () => generateWith(batch.provider, prompt, controller.signal))
     let translated: string[]
     try { translated = parseBatchResult(response, items.length) }
     catch {
@@ -42,12 +42,12 @@ async function flush(key: string): Promise<void> {
   } catch (error) { items.forEach(item => item.reject(error)) }
   finally { items.forEach(item => item.signal.removeEventListener('abort', abort)) }
 }
-export function batchTranslation(key: string, provider: ProviderConnection, text: string, prompt: string, size: number, signal: AbortSignal, runSingle: (item: Item) => Promise<string>, before: (signal: AbortSignal) => Promise<void>): Promise<string> {
+export function batchTranslation(key: string, provider: ProviderConnection, text: string, prompt: string, size: number, signal: AbortSignal, runSingle: (item: Item) => Promise<string>, run: RunTranslation): Promise<string> {
   if (!provider.capabilities.includes('llm') || provider.preset === 'nola' || size <= 1 || prompt.length > 5000) return runSingle({ text, prompt, signal, resolve() {}, reject() {} })
   return new Promise((resolve, reject) => {
     let batch = pending.get(key)
     if (batch && batch.items.reduce((sum, item) => sum + item.prompt.length, 0) + prompt.length > 12000) { void flush(key); batch = undefined }
-    if (!batch) { batch = { provider, items: [], runSingle, before }; pending.set(key, batch); setTimeout(() => { void flush(key) }, 30) }
+    if (!batch) { batch = { provider, items: [], runSingle, run }; pending.set(key, batch); setTimeout(() => { void flush(key) }, 30) }
     batch.items.push({ text, prompt, signal, resolve, reject })
     if (batch.items.length >= Math.min(size, 32)) void flush(key)
   })

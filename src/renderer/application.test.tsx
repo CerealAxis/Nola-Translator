@@ -3,10 +3,10 @@ import { expect, it, vi } from 'vitest'
 import { useApplicationNavigation } from './application'
 import { parseRoute, pathOf } from './routes'
 
-const route = vi.hoisted(() => ({ route: 'settings', tab: 'browser', navigate: vi.fn() }))
+const route = vi.hoisted(() => ({ route: 'home', path: '#/', tab: '', navigate: vi.fn() }))
 vi.mock('./routes', async importOriginal => ({ ...await importOriginal<typeof import('./routes')>(), useRoute: () => route }))
 
-it('shows only the requested sidebar entries and highlights settings for its subpages', () => {
+it('shows the application sidebar outside settings', () => {
   const { result } = renderHook(useApplicationNavigation)
   expect(result.current.map(item => item.id)).toEqual([
     'home', 'models', 'model-gateway', 'workspace', 'meeting', 'screen-translation',
@@ -16,10 +16,34 @@ it('shows only the requested sidebar entries and highlights settings for its sub
     'workspace', 'meeting', 'screen-translation', 'game-translation', 'comic-translation', 'workbench',
   ])
   const settings = result.current.find(item => item.id === 'settings')
-  expect(settings?.active).toBe(true)
   settings?.onPress?.()
   expect(route.navigate).toHaveBeenCalledWith('#/settings/general')
   expect(parseRoute('#/video-captions')).toMatchObject({ route: 'settings', tab: 'browser' })
+})
+
+it('replaces the sidebar in settings and returns to the originating subpage after switching categories', () => {
+  Object.assign(route, { route: 'comic-translation', path: '#/comic-translation/book-1/page-2' })
+  const { result, rerender, unmount } = renderHook(useApplicationNavigation)
+
+  Object.assign(route, { route: 'settings', path: '#/settings/general', tab: 'general' })
+  rerender()
+  expect(result.current.map(item => item.id)).toEqual([
+    'settings-back', 'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine',
+    'storage', 'glossary', 'help', 'developer',
+  ])
+
+  Object.assign(route, { path: '#/settings/browser', tab: 'browser' })
+  rerender()
+  expect(result.current.find(item => item.active)?.id).toBe('browser')
+  result.current[0].onPress?.()
+  expect(route.navigate).toHaveBeenLastCalledWith('#/comic-translation/book-1/page-2')
+  unmount()
+
+  const direct = renderHook(useApplicationNavigation)
+  direct.result.current[0].onPress?.()
+  expect(route.navigate).toHaveBeenLastCalledWith('#/')
+  direct.unmount()
+  Object.assign(route, { route: 'home', path: '#/', tab: '' })
 })
 
 vi.mock('./features/model-gateway/ModelGatewayPage', () => ({ ModelGatewayPage: () => null }))

@@ -1,12 +1,12 @@
 import { DEFAULT_PREFERENCES } from './preferences'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserResponse, BrowserSummary } from '../../src/shared/browser'
 import { BrowserFailure, type ExtensionBridge, type RequestInput } from './bridge'
 import { createExtensionStore } from './store'
 import type { AudioChunk } from './capture'
 
 const summary: BrowserSummary = { protocolVersion: 1, uiLanguage: 'en', sourceLanguage: 'en', targetLanguage: 'zh', devices: [], browserAudio: true, captionServiceActive: true, config: { appearance: { showSource: true, showTranslation: false, colorScheme: 'dark', fontFamily: 'Segoe UI Variable', sourceFontSize: 28, translationFontSize: 22, lineHeight: 1.3, sourceColor: '#F7F7F7', translationColor: '#D7DEE8', backgroundColor: '#0D0E10', backgroundOpacity: 0.85, bottomOffset: 5 }, audioSource: 'tab', sourceLanguage: 'en', targetLanguage: 'zh' } }
-function setup(options: { wrongCapture?: boolean; deferredCapture?: boolean; deferredAudio?: boolean } = {}) {
+function setup(options: { wrongCapture?: boolean; deferredCapture?: boolean; deferredAudio?: boolean; tabAudioCapture?: Parameters<typeof createExtensionStore>[0]['tabAudioCapture'] } = {}) {
   let listener: (response: BrowserResponse) => void = () => undefined
   let onChunk: (chunk: AudioChunk) => void = () => undefined
   const requests: RequestInput[] = []
@@ -22,11 +22,12 @@ function setup(options: { wrongCapture?: boolean; deferredCapture?: boolean; def
   let resolveCapture: (stream: MediaStream) => void = () => undefined
   const getDisplayMedia = vi.fn(() => options.deferredCapture ? new Promise<MediaStream>(resolve => { resolveCapture = resolve }) : Promise.resolve(capture))
   const audio = { enable: vi.fn(), close: vi.fn(async () => undefined) }
-  const store = createExtensionStore({ bridge, getDisplayMedia, audioCapture: async (_stream, callback) => { onChunk = callback; return audio } })
+  const store = createExtensionStore({ bridge, getDisplayMedia, tabAudioCapture: options.tabAudioCapture, audioCapture: async (_stream, callback) => { onChunk = callback; return audio } })
   store.updateVideos([video])
   return { store, bridge, requests, video, capture, audio, getDisplayMedia, stopVideo, stopAudio, resolveCapture: () => resolveCapture(capture), emit: (response: BrowserResponse) => listener(response), rawChunk: (sample: number) => onChunk({ buffer: new Int16Array(4800).fill(sample).buffer, sampleRate: 48000, epoch: store.getSnapshot().epoch, sourcePeak: 0 }), chunk: (epoch = store.getSnapshot().epoch) => onChunk({ buffer: new Int16Array(4800).buffer, sampleRate: 48000, epoch, sourcePeak: 0.1 }) }
 }
 beforeEach(() => { document.documentElement.dataset.nolaCaptureHandle = 'current' })
+afterEach(() => vi.unstubAllGlobals())
 function deferRequest(fixture: ReturnType<typeof setup>, matches: (request: RequestInput) => boolean) {
   const original = vi.mocked(fixture.bridge.request).getMockImplementation()!
   let resolve: (value?: BrowserSummary | { sessionId: string }) => void = () => undefined
@@ -42,6 +43,67 @@ function deferRequest(fixture: ReturnType<typeof setup>, matches: (request: Requ
   return { get captured() { return captured }, resolve: () => resolve(), reject: () => reject(new BrowserFailure('appUnavailable')) }
 }
 describe('extension session lifecycle', () => {
+  it('starts from the toolbar with tab audio when the browser already allows capture', async () => {
+    let receive!: (value: unknown) => void
+    const send = vi.fn((message: { type: string }) => { if (message.type === 'start') queueMicrotask(() => receive({ type: 'ready' })) })
+    vi.stubGlobal('chrome', { runtime: { connect: () => ({ postMessage: send, disconnect: vi.fn(), onMessage: { addListener: (callback: typeof receive) => { receive = callback } }, onDisconnect: { addListener: vi.fn() } }) } })
+    const tabAudio = { enable: vi.fn(), close: vi.fn(async () => undefined) }
+    const tabAudioCapture = vi.fn(async (_onAudio: (chunk: AudioChunk) => void) => tabAudio)
+    const fixture = setup({ tabAudioCapture })
+    const playerCapture = vi.fn()
+    Object.defineProperty(fixture.video, 'captureStream', { value: playerCapture })
+    try {
+      fixture.store.setPreferences(DEFAULT_PREFERENCES)
+      await fixture.store.init()
+      fixture.store.pressStart('toolbar')
+      await vi.waitFor(() => expect(fixture.store.getSnapshot()).toMatchObject({ status: 'active', audioCaptured: true }))
+      expect(tabAudioCapture).toHaveBeenCalledOnce()
+      expect(playerCapture).not.toHaveBeenCalled()
+      expect(fixture.getDisplayMedia).not.toHaveBeenCalled()
+      const [onAudio] = tabAudioCapture.mock.calls[0]
+      const buffer = new ArrayBuffer(3200)
+      for (let index = 0; index < 30; index++) {
+        onAudio({ buffer, sampleRate: 16000, epoch: 0 })
+        await Promise.resolve()
+      }
+      expect(fixture.store.getSnapshot()).toMatchObject({ status: 'active', error: 'tabAudioSilentTrySharing' })
+      new Int16Array(buffer).fill(1000)
+      onAudio({ buffer, sampleRate: 16000, epoch: 0 })
+      expect(fixture.store.getSnapshot().error).toBeUndefined()
+      receive({ type: 'warning', code: 'providerRateLimit' })
+      expect(fixture.store.getSnapshot()).toMatchObject({ status: 'active', error: 'browserTranslationRateLimited' })
+      receive({ type: 'caption', itemId: 'line', text: 'Hello', translation: '你好', final: true })
+      expect(fixture.store.getSnapshot()).toMatchObject({ status: 'active', error: undefined })
+    } finally { await fixture.store.destroy() }
+  })
+  it('opens the share picker from the player and only accepts the current tab', async () => {
+    const tabAudioCapture = vi.fn().mockRejectedValue(new BrowserFailure('browserTabCapturePermission'))
+    const fixture = setup({ tabAudioCapture, wrongCapture: true })
+    const request = vi.mocked(fixture.bridge.request).getMockImplementation()!
+    vi.mocked(fixture.bridge.request).mockImplementation(input => input.type === 'hello'
+      ? Promise.resolve({ ...summary, realtimeTranslation: true }) : request(input))
+    fixture.store.setPreferences({ ...DEFAULT_PREFERENCES, pipeline: 's2s', s2sProvider: 'desktop' })
+    await fixture.store.init()
+    try {
+      fixture.store.pressStart()
+      expect(fixture.getDisplayMedia).toHaveBeenCalledOnce()
+      await vi.waitFor(() => expect(fixture.store.getSnapshot()).toMatchObject({
+        status: 'idle', error: 'wrongCapture',
+      }))
+      expect(fixture.requests.some(input => input.type === 'start')).toBe(false)
+      expect(fixture.stopAudio).toHaveBeenCalledOnce()
+
+      vi.spyOn(fixture.capture, 'getVideoTracks').mockReturnValue([{
+        getSettings: () => ({ displaySurface: 'browser' }),
+        getCaptureHandle: () => ({ handle: 'current', origin: location.origin }),
+      } as MediaStreamTrack])
+      fixture.store.pressStart()
+      await vi.waitFor(() => expect(fixture.store.getSnapshot()).toMatchObject({
+        status: 'active', audioCaptured: true,
+      }))
+      expect(tabAudioCapture).not.toHaveBeenCalled()
+    } finally { await fixture.store.destroy() }
+  })
   it('keeps basic captions compatible with a v3 desktop when matched glossary is not requested', async () => {
     const fixture = setup()
     const original = vi.mocked(fixture.bridge.request).getMockImplementation()!

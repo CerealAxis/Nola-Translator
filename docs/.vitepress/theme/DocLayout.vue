@@ -16,6 +16,7 @@ const pageViewsLabel = computed(() => ({
 } satisfies Record<Locale, string>)[lang.value as Locale])
 const showPageViews = ref(false)
 const analyticsAllowed = ref(false)
+const pageViews = ref<number>()
 const nearbyScrollbars = new Set<HTMLElement>()
 function hideScrollbars() {
   nearbyScrollbars.forEach(element => element.classList.remove('nola-scrollbar-near'))
@@ -50,8 +51,6 @@ onUnmounted(() => {
   document.removeEventListener('pointerleave', hideScrollbars)
   hideScrollbars()
 })
-let counterLoaded = false
-let counterRequest = 0
 let zoom: ReturnType<typeof import('medium-zoom').default> | undefined
 const refreshImageZoom = async () => {
   await nextTick()
@@ -65,16 +64,27 @@ watch(() => page.value.relativePath, () => { void refreshImageZoom() }, { flush:
 onMounted(() => {
   showPageViews.value = location.hostname === 'nola.xaviermc.top'
 })
-watch([() => page.value.relativePath, analyticsAllowed, showPageViews], async ([path, choice, enabled]) => {
-  const request = ++counterRequest
+watch([() => page.value.relativePath, analyticsAllowed, showPageViews], ([path, choice, enabled], _previous, onCleanup) => {
+  pageViews.value = undefined
   if (!enabled || !choice || path === 'index.md' || /^(?:zh-CN|zh-TW|zh-HK|en|ja|ko)\/index\.md$/.test(path)) return
-  await nextTick()
-  if (request !== counterRequest) return
-  // The module automatically makes its first request when imported.
-  const counter = await import('busuanzi.pure.js')
-  if (request !== counterRequest) return
-  if (counterLoaded) counter.fetch()
-  counterLoaded = true
+  const callback = `NolaPageViews_${crypto.randomUUID().replaceAll('-', '')}`
+  const script = document.createElement('script')
+  // shortcut: WebKit can still strip third-party referrers, switch to explicit page IDs when a reachable API is available.
+  script.referrerPolicy = 'no-referrer-when-downgrade'
+  script.src = `https://busuanzi.ibruce.info/busuanzi?jsonpCallback=${callback}`
+  const cleanup = () => {
+    script.remove()
+    Reflect.deleteProperty(window, callback)
+  }
+  Object.assign(window, {
+    [callback]: (data: { page_pv?: unknown } | null) => {
+      const value = data?.page_pv
+      if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) pageViews.value = value
+    },
+  })
+  script.onload = script.onerror = cleanup
+  onCleanup(cleanup)
+  document.head.append(script)
 }, { flush: 'post' })
 // Public identifiers supplied by the repository's Giscus setup.
 const repo = 'CerealAxis/Nola-Translator'
@@ -87,7 +97,7 @@ const categoryId = 'DIC_kwDOUvoCYs4DIc6Z'
     <template #doc-before>
       <div class="nola-doc-meta">
         <time v-if="page.lastUpdated" :datetime="new Date(page.lastUpdated).toISOString()">{{ new Date(page.lastUpdated).toLocaleDateString(lang) }}</time>
-        <span v-if="showPageViews && analyticsAllowed" :key="page.relativePath" id="busuanzi_container_page_pv" class="nola-doc-views"><span>{{ pageViewsLabel }}</span> <span id="busuanzi_value_page_pv">--</span></span>
+        <span v-if="pageViews !== undefined" class="nola-doc-views"><span>{{ pageViewsLabel }}</span> <span>{{ pageViews }}</span></span>
       </div>
     </template>
     <template #doc-after>

@@ -13,6 +13,12 @@ it('preserves custom VAD timing through the session schema', () => {
   expect(sessionConfigSchema.safeParse({ ...config, silence_end_ms: 100 }).success).toBe(false)
 })
 
+it('preserves and validates the interim translation interval', () => {
+  const config = { audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], intermediateTranslationIntervalMs: 1200 }
+  expect(sessionConfigSchema.parse(config).intermediateTranslationIntervalMs).toBe(1200)
+  expect(sessionConfigSchema.safeParse({ ...config, intermediateTranslationIntervalMs: 2001 }).success).toBe(false)
+})
+
 it('builds credential-free Aliyun configuration without replacing the saved local model', () => {
   const recognition = { ...DEFAULT_SETTINGS.recognition, provider: 'aliyun' as const, aliyunWorkspaceId: 'workspace-123', aliyunRegion: 'ap-southeast-1' as const }
   expect(recognitionFieldsOf(recognition)).toEqual({ max_segment_ms: 10000, silence_end_ms: 800, recognitionProvider: 'aliyun', recognitionOptions: { workspaceId: 'workspace-123', region: 'ap-southeast-1', model: 'qwen3-asr-flash-realtime' } })

@@ -27,6 +27,13 @@ def request(model, *, source="en", provisional=False):
     )
 
 
+def test_index_public_accepts_provisional_source(gateway):
+    matched = gateway.match(request("index-translate", provisional=True))
+    capabilities = matched.entry.definition.capabilities
+    assert capabilities.translation_policy.allow_preview
+    assert capabilities.operation_profiles[Operation.TRANSLATE].incremental_translation == "snapshot_retranslate"
+
+
 async def test_local_qwen_prompt_bounds_history_and_escapes_chat_delimiters():
     provider = LocalQwenTranslationProvider(
         endpoint="http://127.0.0.1:8080/v1", model="qwen", context_window=4096,

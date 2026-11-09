@@ -87,6 +87,41 @@ it('limits pretranslation concurrency, reprioritizes on seek and ignores cancele
   expect(translate).toHaveBeenCalledTimes(6)
 })
 
+it('moves expired queued cues behind playback and continues after an empty translation', async () => {
+  const jobs: { text: string; resolve(value: string): void; reject(error: Error): void }[] = []
+  const translate = vi.fn((text: string) => new Promise<string>((resolve, reject) => jobs.push({ text, resolve, reject })))
+  const video = captionVideo(12)
+  const subtitles = createSubtitleTranslation({ translate, close: vi.fn() }, vi.fn())
+  try {
+    subtitles.configure(DEFAULT_PREFERENCES); subtitles.selectVideo(video, false)
+    await subtitles.start()
+    video.currentTime = 800
+    jobs[0].reject(new Error('providerEmpty'))
+    await vi.waitFor(() => expect(jobs[3]?.text).toBe('Sentence 8'))
+    jobs[3].resolve('Current translation')
+    await vi.waitFor(() => expect(subtitles.at(800)?.translation).toBe('Current translation'))
+  } finally { subtitles.destroy(); for (const job of jobs) job.resolve('Canceled') }
+})
+
+it('fills the desktop limit from the current cue as soon as it arrives', async () => {
+  const jobs: string[] = []
+  const translate = vi.fn((text: string, _source: string, _target: string, _lane: string, signal: AbortSignal) => new Promise<string>((_, reject) => {
+    jobs.push(text)
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+  }))
+  const video = captionVideo(18)
+  video.currentTime = 500
+  const subtitles = createSubtitleTranslation({ translate, close: vi.fn() }, vi.fn())
+  try {
+    subtitles.setConcurrency(1)
+    subtitles.configure(DEFAULT_PREFERENCES); subtitles.selectVideo(video, false)
+    await subtitles.start()
+    expect(jobs).toEqual(['Sentence 5'])
+    subtitles.setConcurrency(10)
+    expect(jobs).toEqual(Array.from({ length: 10 }, (_, index) => `Sentence ${index + 5}`))
+  } finally { subtitles.destroy() }
+})
+
 it('starts pretranslation when leaving source-only mode and invalidates old translations on target changes', async () => {
   const translate = vi.fn(async (text: string, _source: string, target: string) => `${target}: ${text}`)
   const subtitles = createSubtitleTranslation({ translate, close: vi.fn() }, vi.fn())
@@ -133,6 +168,29 @@ function trackMessages(reply: (id?: string) => unknown) {
   document.addEventListener(TRACK_REQUEST, listener)
   cleanups.push(() => document.removeEventListener(TRACK_REQUEST, listener))
 }
+
+it('keeps existing-subtitle translation unavailable until a track has readable cues', async () => {
+  const track = nativeTrack('disabled', 'en')
+  track.cues = []
+  const { video } = nativeVideo([track])
+  const { subtitles, translate } = nativeController()
+  subtitles.selectVideo(video, true)
+  vi.useFakeTimers()
+  const check = subtitles.checkAvailability()
+  expect(subtitles.state()).toMatchObject({ availability: 'checking', active: false })
+  await vi.advanceTimersByTimeAsync(2100)
+  await check
+  expect(subtitles.state()).toMatchObject({ availability: 'unavailable', active: false })
+  expect(track.mode).toBe('disabled')
+  expect(translate).not.toHaveBeenCalled()
+
+  track.cues = [{ startTime: 0, endTime: 5, text: 'Loaded captions' }]
+  await subtitles.checkAvailability(true)
+  expect(subtitles.state()).toMatchObject({ availability: 'ready', active: false })
+  expect(track.mode).toBe('disabled')
+  await subtitles.start()
+  expect(translate).toHaveBeenCalledWith('Loaded captions', 'en', expect.any(String), 'video', expect.any(AbortSignal))
+})
 
 it('prefers the player’s showing source, then subtitles, and excludes Nola and metadata tracks', async () => {
   const first = nativeTrack('disabled', 'en')

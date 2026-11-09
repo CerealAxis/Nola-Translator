@@ -29,8 +29,8 @@ export function DownloadsTab() {
     return (
       <Empty className="items-start px-2 py-8 text-left">
         <EmptyHeader className="items-start">
-          <EmptyTitle className="nola-title">{t('models.downloadsEmpty')}</EmptyTitle>
-          <EmptyDescription className="nola-caption">{t('models.downloadsEmptyHint')}</EmptyDescription>
+          <EmptyTitle>{t('models.downloadsEmpty')}</EmptyTitle>
+          <EmptyDescription>{t('models.downloadsEmptyHint')}</EmptyDescription>
         </EmptyHeader>
       </Empty>
     )

@@ -23,17 +23,11 @@ export interface AudioChunk { buffer: ArrayBuffer; sampleRate: number; epoch: nu
 export interface AudioCapture { enable(enabled: boolean, epoch: number): void; close(): Promise<void> }
 export async function capturePlayerAudio(video: HTMLVideoElement): Promise<MediaStream> {
   if (globalThis.isSecureContext === false || location.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) throw new BrowserFailure('browserCaptureUnsupported')
-  if (!navigator.userAgent.includes('Firefox/')) {
-    const response = await chrome.runtime.sendMessage({ type: 'captureTabAudio' }) as { id?: string } | undefined
-    if (!response?.id) throw new BrowserFailure('browserTabCapturePermission')
-    return navigator.mediaDevices.getUserMedia({
-      audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: response.id } } as MediaTrackConstraints,
-    })
-  }
   const player = video as HTMLVideoElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream }
   const capture = player.captureStream ?? player.mozCaptureStream
   if (!capture) throw new BrowserFailure('browserCaptureUnsupported')
-  const stream = capture.call(player)
+  let stream: MediaStream
+  try { stream = capture.call(player) } catch { throw new BrowserFailure('browserCaptureUnsupported') }
   if (!stream.getAudioTracks().length) {
     await new Promise<void>(resolve => {
       const finish = () => { clearTimeout(timeout); stream.removeEventListener('addtrack', onTrack); resolve() }

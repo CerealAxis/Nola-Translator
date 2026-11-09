@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { BrowserConnection, browserCaptionConfig, browserSessionConfig, type BrowserConnectionOptions } from '../../../src/main/browser-connection'
+import { BrowserConnection, browserCaptionConfig, browserSessionConfig, browserTextModel, type BrowserConnectionOptions } from '../../../src/main/browser-connection'
 import { FeatureActivity } from '../../../src/main/feature-activity'
 import { SessionController } from '../../../src/main/session-controller'
 import { DEFAULT_SETTINGS, REALTIME_S2S_MODELS } from '../../../src/shared/settings'
@@ -114,6 +114,28 @@ function send(socket: Socket, value: unknown) { socket.write(`${JSON.stringify(v
 const start = { id: 'start', type: 'start', source: 'tab', streamId: 'stream', sourceLanguage: 'auto', targetLanguage: 'en', epoch: 0, videoTimeMs: 0, playbackRate: 1 }
 
 describe('native pipe boundary', () => {
+  it('prefers the ready gateway MT model over the scene default', () => {
+    const settings = { ...DEFAULT_SETTINGS, modelPolicy: {
+      enabled: { 'mt:cloud:microsoft': true, 'mt:cloud:index-translate': true },
+      defaults: { mt: 'cloud:microsoft' }, selections: {},
+    } }
+    expect(browserTextModel(settings)).toBe('cloud:microsoft')
+    expect(browserTextModel(settings, { state: 'running', services: { mt: { state: 'ready', model: 'cloud:index-translate', name: 'Index Translate' } } })).toBe('cloud:index-translate')
+  })
+  it('admits the desktop concurrency limit on a single native translation connection', async () => {
+    const translateText = vi.fn<NonNullable<BrowserConnectionOptions['translateText']>>((_request, signal) =>
+      new Promise<string>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })))
+    const f = await fixture(undefined, undefined, translateText, { textTranslationConcurrency: () => 10 })
+    const socket = await connect(f.descriptor.pipe)
+    try {
+      const values = responses(socket)
+      send(socket, f.descriptor)
+      send(socket, { id: 'hello', type: 'hello', extensionVersion: BROWSER_EXTENSION_VERSION })
+      for (let index = 0; index < 11; index++) send(socket, { id: `t${index}`, type: 'translate', text: 'Hello', sourceLanguage: 'en', targetLanguage: 'zh' })
+      await expect.poll(() => values.find(value => value.type === 'error' && value.id === 't10')).toMatchObject({ code: 'resourceBusy' })
+      expect(translateText).toHaveBeenCalledTimes(10)
+    } finally { socket.destroy() }
+  })
   it('translates text without starting a caption session and aborts only the owned request', async () => {
     const translateText = vi.fn<NonNullable<BrowserConnectionOptions['translateText']>>()
       .mockResolvedValueOnce('你好')
@@ -313,6 +335,22 @@ describe('native pipe boundary', () => {
     const socket = await connect(descriptor.pipe)
     socket.destroy()
     expect(f.connection.status().enabled).toBe(true)
+  })
+  it('repairs an enabled connection after startup registration fails', async () => {
+    const f = await fixture()
+    await f.connection.setEnabled(false)
+    const register = vi.spyOn(f.connection, 'register').mockRejectedValueOnce(new Error('registration failed')).mockResolvedValue()
+    await expect(f.connection.initialize(true)).rejects.toThrow('registration failed')
+    const handler = vi.mocked(ipcMain.handle).mock.calls.filter(([channel]) => channel === 'browser:connection').at(-1)![1]
+    await handler({} as Electron.IpcMainInvokeEvent, 'repair')
+    const descriptor = JSON.parse(await readFile(join(f.directory, 'Nola/Browser/connection.json'), 'utf8')) as typeof f.descriptor
+    const socket = await connect(descriptor.pipe)
+    const values = responses(socket)
+    send(socket, descriptor)
+    send(socket, { id: 'repaired', type: 'hello' })
+    await expect.poll(() => values.some(value => value.type === 'result' && value.id === 'repaired')).toBe(true)
+    expect(register).toHaveBeenCalledTimes(2)
+    socket.destroy()
   })
   it.runIf(process.platform === 'win32' && existsSync(resolve('artifacts/browser-host/NolaBrowserHost.exe')))('connects through the packaged native EXE and native length framing', async () => {
     const f = await fixture()

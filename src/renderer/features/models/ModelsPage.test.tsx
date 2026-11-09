@@ -10,7 +10,7 @@ import { SOURCE_LANGUAGE_OPTIONS } from '../../../shared/settings'
 import { useModelOptions } from '../../model-options'
 import * as settingsActions from '@/store/settingsStore'
 import * as storeModule from '@/store'
-import type { NolaBridge } from '@/bridge'
+import type { NolaBridge, ResourceRecord } from '@/bridge'
 
 // Publisher avatars pull in an emoji picker with browser-only JSON imports.
 vi.mock('@lobehub/icons/es/features/IconAvatar', () => ({ default: () => null }))
@@ -46,8 +46,11 @@ it('manages OCR model details and deletion within model management', () => {
     state: 'idle', cancellable: false,
   }] })
   render(<ModelsPage />)
+  fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
   const card = screen.getByText('PP-OCRv5 mobile').closest('[data-slot="card"]')!
-  fireEvent.click(within(card as HTMLElement).getByRole('button', { name: '开始配置' }))
+  const details = within(card as HTMLElement).getByRole('button', { name: '查看详情' })
+  expect(details).toHaveAttribute('data-variant', 'default')
+  fireEvent.click(details)
   const dialog = screen.getByRole('dialog')
   expect(within(dialog).getByRole('button', { name: '删除模型' })).toBeInTheDocument()
   expect(within(dialog).queryByText('本地加载器')).not.toBeInTheDocument()
@@ -350,17 +353,29 @@ it('opens the OCR family selector and downloads the chosen language variant', as
 })
 
 
-it('manages installed manga inpainting weights without language configuration', () => {
-  stores.models.setState({ resources: [{
+it.each([false, true])('opens manga inpainting download configuration when installed is %s', installed => {
+  const record: ResourceRecord = {
     resourceId: 'lama-manga', kind: 'inpaintModel', provider: 'lama', name: 'LaMA Manga',
-    description: '', languages: [], installed: true, installedBytes: 204332996,
+    description: '', languages: [], installed, installedBytes: installed ? 204332996 : 0, downloadBytes: 204332996,
     state: 'idle', cancellable: false,
-  }] })
+  }
+  stores.models.setState({ resources: [record] })
+  const manage = vi.spyOn(actions.models, 'manageResource').mockResolvedValue(record)
   render(<ModelsPage />)
-  const card = screen.getByText('LaMA Manga').closest<HTMLElement>('[data-slot="card"]')!
-  fireEvent.click(within(card).getByRole('button', { name: '查看详情' }))
-  const dialog = screen.getByRole('dialog')
-  expect(within(dialog).getByRole('button', { name: '删除模型' })).toBeInTheDocument()
-  expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
-  expect(within(dialog).queryByRole('button', { name: '保存配置' })).not.toBeInTheDocument()
+  if (installed) fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
+  const card = section('漫画修复模型')
+  const open = card.getByRole('button', { name: installed ? '查看详情' : '开始配置' })
+  expect(open).toHaveAttribute('data-variant', 'default')
+  fireEvent.click(open)
+  const dialog = within(screen.getByRole('dialog', { name: 'LaMA Manga' }))
+  expect(dialog.getByText(/195 MB · PyTorch/)).toBeInTheDocument()
+  expect(dialog.queryByRole('combobox')).not.toBeInTheDocument()
+  expect(dialog.queryByRole('button', { name: '保存配置' })).not.toBeInTheDocument()
+  if (installed) {
+    expect(dialog.getByRole('button', { name: '删除模型' })).toBeEnabled()
+    expect(dialog.getByRole('button', { name: '已安装' })).toBeDisabled()
+  } else {
+    fireEvent.click(dialog.getByRole('button', { name: '安装' }))
+    expect(manage).toHaveBeenCalledWith('lama-manga', 'install')
+  }
 })

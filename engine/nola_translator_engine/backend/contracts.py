@@ -200,6 +200,7 @@ class SessionConfig(ContractModel):
     max_segment_ms: int = Field(default=10_000, ge=3000, le=30000)
     silence_end_ms: int = Field(default=900, ge=300, le=2000)
     translation_preview: bool = True
+    translation_preview_interval_ms: int = Field(default=500, ge=0, le=2000)
     latency_detection: bool = False
 
     @model_validator(mode="after")

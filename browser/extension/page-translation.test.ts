@@ -5,6 +5,29 @@ import { DEFAULT_PREFERENCES } from './preferences'
 
 afterEach(() => { vi.restoreAllMocks(); document.body.replaceChildren() })
 
+it('starts visible paragraphs alongside the title and renders out-of-order results', async () => {
+  const originalTitle = document.title
+  document.title = 'Slow title'
+  document.body.innerHTML = '<main><p>First paragraph</p><p>Second paragraph</p><p>Third paragraph</p></main>'
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  const requests = new Map<string, (translation: string) => void>()
+  const translate = vi.fn((text: string) => new Promise<string>(resolve => requests.set(text, resolve)))
+  const page = createPageTranslation({ translate, close: vi.fn() })
+  try {
+    page.configure({ ...DEFAULT_PREFERENCES, pageDisplay: 'translation' })
+    page.start()
+    await waitFor(() => expect([...requests.keys()]).toEqual(['Slow title', 'First paragraph', 'Second paragraph']))
+    requests.get('Second paragraph')?.('Second result')
+    await waitFor(() => expect(requests.has('Third paragraph')).toBe(true))
+    expect([...document.querySelectorAll('p')].map(p => p.textContent)).toEqual(['First paragraph', 'Second result', 'Third paragraph'])
+    page.stop()
+    for (const resolve of requests.values()) resolve('Late result')
+    await Promise.resolve()
+    expect(document.title).toBe('Slow title')
+    expect([...document.querySelectorAll('p')].map(p => p.textContent)).toEqual(['First paragraph', 'Second paragraph', 'Third paragraph'])
+  } finally { page.stop(); document.title = originalTitle }
+})
+
 it('keeps interactive DOM, ignores forms, translates new paragraphs and restores original text', async () => {
   document.documentElement.lang = 'en'
   document.body.innerHTML = '<article><p id="intro">Hello <a href="#details">details</a></p><form><p id="form-label">Search</p></form></article>'

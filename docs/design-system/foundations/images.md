@@ -14,7 +14,7 @@ editLink: false
 
 下图让同一圆形占据相同面积，分别使用 12 × 12、24 × 24 和 36 × 36 个网格表示像素。网格增密后，曲线边缘能保留更多细节。
 
-<demo react="foundation-media-images.tsx" :reactFiles="['foundation-media-images.tsx', '../figures/FoundationMedia.tsx', '../figures/FoundationMedia.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="foundation-media-images.tsx" :reactFiles="['foundation-media-images.tsx', '../figures/FoundationMedia.tsx', '../figures/FoundationMedia.css']" />
 
 为位图提供与实际显示密度相匹配的资源。例如，24 个 CSS 像素的图像，在 2 倍显示密度下需要 48 个物理像素。检查缩略图、窗口缩放和高密度屏幕，避免将小位图直接放大。
 

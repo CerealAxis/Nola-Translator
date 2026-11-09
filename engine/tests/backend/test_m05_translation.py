@@ -71,6 +71,21 @@ def make_scheduler(gateway: FakeGateway, events: list[tuple[str, dict]], **kwarg
     )
 
 
+async def test_configured_preview_interval_delays_queued_snapshot(monkeypatch):
+    clock = [10.0]
+    monkeypatch.setattr('nola_translator_engine.backend.translation_pipeline.time.monotonic', lambda: clock[0])
+    scheduler = TranslationScheduler(
+        FakeGateway(), session_id='session', pipeline_id='pipeline', epoch=0, model_id='model',
+        target_languages=['zh'], event_sink=lambda *_: None, preview_interval_ms=1200,
+    )
+    monkeypatch.setattr(scheduler, '_start', lambda: None)
+    await scheduler.source_snapshot(source('s1', 1, 'one two three'))
+    clock[0] = 11.19
+    assert scheduler._next_task() is None
+    clock[0] = 11.21
+    assert scheduler._next_task() is not None
+
+
 async def test_failed_committed_translation_uses_separate_fallback_credentials():
     class Gateway(FakeGateway):
         async def translate(self, ctx, *, text, source, target, request):

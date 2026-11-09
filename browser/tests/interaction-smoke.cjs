@@ -54,7 +54,7 @@ async function main() {
       await page.evaluate(() => {
         const video = document.createElement('video'); video.width = 640; video.height = 360; document.body.append(video)
         const track = video.addTextTrack('captions', 'English', 'en'); track.mode = 'hidden'
-        for (let i = 0; i < 5; i++) track.addCue(new VTTCue(i * 120, i * 120 + 5, 'Preload cue ' + i))
+        for (let i = 0; i < 5; i++) track.addCue(new VTTCue(i * 120, i * 120 + 5, `Preload cue ${i} ${'longcaption'.repeat(15)}`))
       })
       await page.locator('[data-nola-extension="trigger"]').waitFor()
       await settings.evaluate(async url => { const [tab] = await chrome.tabs.query({ url }); await chrome.tabs.sendMessage(tab.id, { type: 'toggleSubtitles' }) }, origin + '/test')
@@ -62,6 +62,36 @@ async function main() {
       assert.equal(requests.length, 5, 'All five cues must be requested while the video remains paused at zero')
       assert.equal(await page.locator('video').evaluate(video => video.currentTime), 0)
       assert.ok(await page.locator('video').evaluate(video => video.paused))
+      await page.getByRole('button', { name: 'Nola captions' }).click()
+      const panel = page.locator('.nola-subtitle-menu')
+      await panel.getByRole('button', { name: 'Transcript' }).click()
+      const transcript = panel.getByRole('region', { name: 'Transcript' })
+      if (!await transcript.isVisible()) await panel.getByRole('button', { name: 'Transcript' }).click()
+      for (const [theme, width, zoom] of [['light', 1280, 1], ['dark', 640, 2]]) {
+        await page.setViewportSize({ width, height: 900 })
+        await settings.evaluate(async ({ url, theme, zoom }) => {
+          await chrome.storage.local.set({ theme })
+          const [tab] = await chrome.tabs.query({ url })
+          await chrome.tabs.setZoom(tab.id, zoom)
+        }, { url: origin + '/test', theme, zoom })
+        await page.waitForFunction(({ theme, zoom }) => {
+          const host = document.querySelector('[data-nola-extension="panel"]')
+          return host?.dataset.theme === theme && devicePixelRatio === zoom
+        }, { theme, zoom })
+        await panel.evaluate(menu => Promise.allSettled(menu.getAnimations({ subtree: true }).map(animation => animation.finished)))
+        const layout = await transcript.evaluate(list => {
+          const menu = list.closest('.nola-subtitle-menu')
+          const row = list.querySelector('button')
+          const caption = row.lastElementChild
+          const foreground = getComputedStyle(menu).color
+          const text = [...menu.querySelectorAll('.nola-subtitle-study-actions > button, .nola-transcript > button > span')]
+          return { panelFits: menu.scrollWidth <= menu.clientWidth + 1, listFits: list.scrollWidth <= list.clientWidth + 1,
+            textFits: caption.scrollWidth <= caption.clientWidth + 1, wrapped: caption.offsetHeight > parseFloat(getComputedStyle(caption).lineHeight),
+            active: row.getAttribute('aria-current'), foregroundMatches: text.every(element => getComputedStyle(element).color === foreground) }
+        })
+        assert.deepEqual(layout, { panelFits: true, listFits: true, textFits: true, wrapped: true, active: 'true', foregroundMatches: true })
+        await page.screenshot({ path: path.join(output, `transcript-${theme}-${zoom}x.png`) })
+      }
       assert.deepEqual(errors, [])
       const result = { pausedAt: 0, lastCueAt: 480, translatedBeforePlayback: requests.length, errors }
       await fs.writeFile(path.join(output, 'subtitle-prefetch.json'), JSON.stringify(result, null, 2)); console.log(JSON.stringify(result)); return

@@ -38,7 +38,7 @@ editLink: false
 
 切换浅色和深色背景时，让图标保留相同的主体、比例和内部关系。下方对照使用同一份品牌资源，展示背景变化后图标轮廓与细节的辨识度。
 
-<demo react="foundation-media-app-icons.tsx" :reactFiles="['foundation-media-app-icons.tsx', '../figures/FoundationMedia.tsx', '../figures/FoundationMedia.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="foundation-media-app-icons.tsx" :reactFiles="['foundation-media-app-icons.tsx', '../figures/FoundationMedia.tsx', '../figures/FoundationMedia.css']" />
 
 深色背景中保留柔和、清楚的颜色。透明边缘、暗色笔画和细小空隙需要单独检查。制作外观变体时，成组比较各版本，确保用户切换外观后仍能立即找到同一个应用。
 

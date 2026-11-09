@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { getProvider, type ProviderConnection } from './providers'
 import { loadPreferences, type Preferences } from './preferences'
-import { buildTranslationPrompt } from './provider-runtime'
+import { buildTranslationPrompt, scheduleProviderTranslation } from './provider-runtime'
 import { ProviderError, safeProviderError, translateWith } from './provider-execution'
 import { encodeBase64 } from './native-provider'
 import { pcmWav, transcribeWith } from './provider-speech'
@@ -60,9 +60,10 @@ export function setupSpeechRuntime(): void {
     let stream: SpeechSocket | undefined, started = false, ended = false
     let disposeGlossary = () => {}
     let queue = Promise.resolve(), queued = 0, revision = 0, samples: number[] = [], silent = 0
+    let recognition = Promise.resolve(), pendingRecognition = 0
     const reply = (value: unknown) => { if (!ended) { try { port.postMessage(value) } catch { /* A closed page owns no output. */ } } }
     const close = () => { ended = true; controller.abort(); stream?.close(); samples = []; disposeGlossary() }
-    port.onDisconnect.addListener(close)
+    port.onDisconnect.addListener(() => { void chrome.runtime.lastError; close() })
     let source = 'auto', target = 'en', capability: 'asr' | 's2s' = 'asr', provider: ProviderConnection, mtProvider: ProviderConnection
     let sentMs = 0, segmentStartMs = 0, finalMs = 0
     let preferences: Preferences
@@ -76,6 +77,7 @@ export function setupSpeechRuntime(): void {
     const sourceLinks = new Map<string, string>()
     const items = new Map<string, string>()
     let translations = Promise.resolve()
+    const throttled = new Set(['providerRateLimit', 'browserTranslationRateLimited', 'resourceBusy'])
     const publish = (id: string, text: string, final: boolean, translated = '') => {
       const time = itemTimes.get(id) ?? { start: finalMs }
       if (!itemTimes.has(id)) itemTimes.set(id, time)
@@ -91,10 +93,20 @@ export function setupSpeechRuntime(): void {
         const matched = resolveGlossaryTerms(await extensionGlossary.snapshot(), request)
         const terms = matched.terms
         const prompt = buildTranslationPrompt(text, source, target, preferences.subtitlePrompt, terms)
-        const translated = await translateWith(mtProvider, text, source, target, prompt, controller.signal, matched)
+        const run = () => scheduleProviderTranslation(mtProvider, preferences, controller.signal, () => translateWith(mtProvider, text, source, target, prompt, controller.signal, matched))
+        const translated = await run().catch(async error => {
+          if (!throttled.has(safeProviderError(error))) throw error
+          await new Promise(resolve => setTimeout(resolve, 500))
+          controller.signal.throwIfAborted()
+          return run()
+        })
         if (resolveGlossaryTerms(await extensionGlossary.snapshot(), request).signature !== matched.signature) throw new ProviderError('glossaryChanged')
         publish(id, text, true, translated)
-      }).catch(error => { if (!ended) reply({ type: 'error', code: safeProviderError(error) }) })
+      }).catch(error => {
+        if (ended) return
+        const code = safeProviderError(error)
+        reply({ type: throttled.has(code) ? 'warning' : 'error', code })
+      })
     }
     const onEvent = (event: Record<string, unknown>) => {
       const type = String(event.type ?? '')
@@ -125,18 +137,27 @@ export function setupSpeechRuntime(): void {
         publish(id, items.get(id) ?? '', type.endsWith('done'), text)
       } else if (type === 'response.audio.delta' && typeof event.delta === 'string') reply({ type: 'audio', audioBase64: event.delta, contentType: 'audio/pcm', sampleRate: 24000 })
     }
-    const flush = async () => {
+    const flush = () => {
       if (!samples.length) return
+      if (pendingRecognition >= 3) throw new ProviderError('browserAudioBacklog')
       const pcm = new Int16Array(samples); samples = []; silent = 0
-      const text = await transcribeWith(provider, encodeBase64(pcmWav(new Uint8Array(pcm.buffer))), source, controller.signal)
-      const id = crypto.randomUUID(); itemTimes.set(id, { start: segmentStartMs, end: sentMs }); segmentStartMs = sentMs; publish(id, text, true); translateFinal(id, text)
+      const time = { start: segmentStartMs, end: sentMs }; segmentStartMs = sentMs
+      pendingRecognition++
+      recognition = recognition.then(async () => {
+        controller.signal.throwIfAborted()
+        const text = await transcribeWith(provider, encodeBase64(pcmWav(new Uint8Array(pcm.buffer))), source, controller.signal)
+        if (ended || !text.trim()) return
+        const id = crypto.randomUUID(); itemTimes.set(id, time); publish(id, text, true); translateFinal(id, text)
+      }).catch(error => {
+        if (!ended) { reply({ type: 'error', code: safeProviderError(error) }); close() }
+      }).finally(() => { pendingRecognition-- })
     }
     port.onMessage.addListener(raw => {
       const parsed = message.safeParse(raw)
       if (!parsed.success || ended) { reply({ type: 'error', code: 'providerInvalid' }); return }
       const request = parsed.data
       if (request.type === 'stop') { close(); return }
-      if (queued > 100) { reply({ type: 'error', code: 'providerRateLimit' }); close(); return }
+      if (queued > 100) { reply({ type: 'error', code: 'browserAudioBacklog' }); close(); return }
       queued++
       queue = queue.then(async () => {
         if (controller.signal.aborted) return
@@ -163,13 +184,18 @@ export function setupSpeechRuntime(): void {
             else {
               const pcm = new Int16Array(bytes.buffer)
               let peak = 0
-              for (const sample of pcm) { samples.push(sample); peak = Math.max(peak, Math.abs(sample)) }
+              for (const sample of pcm) peak = Math.max(peak, Math.abs(sample))
+              if (!samples.length && peak < 300) { segmentStartMs = sentMs; return }
+              for (const sample of pcm) samples.push(sample)
               silent = peak < 300 ? silent + pcm.length : 0
-              if (samples.length >= 160000 || (samples.length >= 16000 && silent >= 9600)) await flush()
+              if (samples.length >= 160000 || (samples.length >= 16000 && silent >= 9600)) flush()
             }
-          } else if (request.type === 'finish') { if (stream) await stream.finish(); else await flush(); await translations; reply({ type: 'finished' }); close() }
+          } else if (request.type === 'finish') { if (stream) await stream.finish(); else { flush(); await recognition }; await translations; reply({ type: 'finished' }); close() }
         }
-      }).catch(error => { if (!ended) reply({ type: 'error', code: safeProviderError(error) }); close() }).finally(() => { queued-- })
+      }).catch(error => {
+        if (!ended) reply({ type: 'error', code: safeProviderError(error) })
+        close()
+      }).finally(() => { queued-- })
     })
   })
 }

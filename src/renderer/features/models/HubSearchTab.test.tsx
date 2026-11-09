@@ -50,6 +50,11 @@ it('shows metadata before README loading finishes and ignores responses from old
   await act(async () => { introduction.resolve('The model card introduction is shown here.') })
   expect(await screen.findByText('The model card introduction is shown here.')).toBeInTheDocument()
 
+  fireEvent.click(screen.getByRole('button', { name: '查看详情' }))
+  expect(screen.getByRole('dialog', { name: 'initial-model' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
   const input = screen.getByRole('searchbox')
   fireEvent.change(input, { target: { value: 'older' } })
   await waitFor(() => expect(search).toHaveBeenCalledWith('older', 'all'))

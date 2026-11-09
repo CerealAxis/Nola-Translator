@@ -21,10 +21,13 @@
   box-shadow: var(--shadow-lg);
   transition: left var(--dur-enter) var(--ease-nola), top var(--dur-enter) var(--ease-nola);
 }
+:root:is(.dark, [data-theme='dark']) .onboarding-tour__card.card {
+  border-color: var(--border);
+  box-shadow: var(--shadow-lg);
+}
 .onboarding-tour__card > * { flex-shrink: 0; }
 .onboarding-tour__card[data-ready='false'] { visibility: hidden; }
 .onboarding-tour__card p { margin: 0; font: var(--font-body); overflow-wrap: anywhere; }
-.onboarding-tour__card .card__title { font: var(--font-title); }
 .onboarding-tour__card .button { height: var(--field-control-height); min-height: var(--field-control-height); }
 .onboarding-tour__card .button svg { width: var(--space-2); height: var(--space-2); flex-shrink: 0; }
 .onboarding-tour__close.button svg { width: var(--space-1); height: var(--space-1); }

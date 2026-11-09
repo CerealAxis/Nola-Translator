@@ -57,7 +57,7 @@ function EmptyDescription({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="empty-description"
       className={cn(
-        "text-sm/relaxed text-nola-ui-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
+        "nola-caption [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
         className
       )}
       {...props}

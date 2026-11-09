@@ -1573,6 +1573,13 @@
             "title": "Translation Preview",
             "default": true
           },
+          "translation_preview_interval_ms": {
+            "type": "integer",
+            "maximum": 2000.0,
+            "minimum": 0.0,
+            "title": "Translation Preview Interval Ms",
+            "default": 500
+          },
           "latency_detection": {
             "type": "boolean",
             "title": "Latency Detection",

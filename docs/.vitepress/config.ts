@@ -17,8 +17,8 @@ import { shadcnDemoEntry } from './shadcn-demo-entry'
 
 const base = process.env.DOCS_BASE ?? '/'
 const shadcnPreview = fileURLToPath(new URL('../media-src/vis/shadcn-base/', import.meta.url)).replace(/\\/g, '/')
-const shadcnPortal = 'body:has(.shadcn-base-doc) :is([data-base-ui-portal], [data-assistant-preview-portal])'
-const shadcnScope = `:is(.shadcn-base-doc .vitepress-demo-plugin-preview > div, ${shadcnPortal})`
+const demoPortal = 'body:has(.nola-vis-doc) :is([data-base-ui-portal], [data-assistant-preview-portal])'
+const demoScope = `:where(.nola-vis-doc .vitepress-demo-plugin-preview > div, ${demoPortal})`
 
 // Search engines and social previews need a per-page URL, which the static head array cannot provide.
 const localeSegments: Record<Locale, string> = { 'zh-CN': 'zh-CN', 'zh-TW': 'zh-TW', 'zh-HK': 'zh-HK', en: 'en', ja: 'ja', ko: 'ko' }
@@ -206,29 +206,22 @@ export default withMermaid(defineConfig({
     css: { postcss: { plugins: [
       postcssIsolateStyles({
         includeFiles: [/vp-doc\.css/, /base\.css/],
-        prefix: `:not(:where(.vp-raw, .vp-raw *, ${shadcnPortal}, ${shadcnPortal} *))`,
+        prefix: `:not(:where(.vp-raw, .vp-raw *, ${demoPortal}, ${demoPortal} *))`,
       }),
-      // VitePress bundles standalone demo styles with the rest of the site CSS.
+      // Give each preview and its portals the same theme without restyling the site.
       postcssIsolateStyles({
-        includeFiles: [/shadcn-base[/\\](?:apple|nola)-liquid-glass\.css$/],
-        prefix: ':where(:root:has(.nola-vis-doc .nola-component-demo))',
-        transform(scope, selector, scopedSelector) {
-          if (selector === 'html') return `html${scope}`;
-          if (selector.startsWith(':root')) return `${scope}${selector}`;
-          if (selector === '.dark') return `:is(${scope}.dark, ${scopedSelector})`;
-          return scopedSelector;
-        },
-      }),
-      postcssIsolateStyles({
-        includeFiles: [/shadcn-base[/\\]preview\.css(?:\?|$)/],
-        prefix: shadcnScope,
+        includeFiles: [/[/\\]vis[/\\]design-demo\.css(?:\?|$)/],
+        prefix: demoScope,
         transform(scope, selector, scopedSelector, _file, rule) {
           for (let parent = rule.parent; parent; parent = parent.parent) {
             if (parent.type === 'rule') return selector
           }
           if (selector === '.dark') return `.dark ${scope}`
+          if (selector.startsWith(':root:is(')) return `${selector} ${scope}`
+          if (selector.startsWith(':host(')) return ':not(*)'
+          if (selector.startsWith(':is(:root, .nola-extension)')) return selector.replace(':is(:root, .nola-extension)', scope)
           if (selector.startsWith(':root:lang(')) return `${scope}${selector.slice(':root'.length)}`
-          if ([':root', ':host', 'html', 'body'].includes(selector)) return scope
+          if (/^(?:html|body|:root|:host)(?=$|[.:[\s>])/.test(selector)) return selector.replace(/^(?:html|body|:root|:host)/, scope)
           return scopedSelector
         },
       }),

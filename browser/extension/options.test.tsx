@@ -16,7 +16,7 @@ let glossaryDocument: GlossaryDocument | undefined
 
 vi.mock('./preferences', async original => ({ ...await original<typeof import('./preferences')>(), savePreferences: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('./settings-fields', async original => ({ ...await original<typeof import('./settings-fields')>(), usePreferences: () => [settings, 'en', browserText('en')], ConnectionStatus: () => null }))
-vi.mock('./provider-client', () => ({ translate: vi.fn().mockResolvedValue('Translated text'), synthesize: vi.fn(), testProvider: vi.fn().mockResolvedValue('OK'), clearTranslationCache: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('./provider-client', () => ({ translate: vi.fn().mockResolvedValue('Translated text'), synthesize: vi.fn(), testProvider: vi.fn().mockResolvedValue('OK'), clearTranslationCache: vi.fn().mockResolvedValue(undefined), providerRequest: vi.fn().mockResolvedValue({ desktopConcurrency: 10 }) }))
 vi.mock('./providers', async original => { const actual = await original<typeof import('./providers')>(); return { ...actual, loadProviders: vi.fn().mockResolvedValue(actual.DEFAULT_PROVIDERS), saveProviders: vi.fn().mockResolvedValue(undefined), requestProviderAccess: vi.fn().mockResolvedValue(true) } })
 vi.mock('./glossary-store', async original => {
   const actual = await original<typeof import('./glossary-store')>()
@@ -83,6 +83,24 @@ describe('extension settings', () => {
     await user.click(screen.getByRole('button', { name: 'Microsoft Translator' }))
     await user.click(screen.getByRole('button', { name: 'Google Translate' }))
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Draft Google')
+  })
+  it('saves the translation concurrency limit only on the selected channel card', async () => {
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'API connections' }))
+    expect(await screen.findByText('Managed by the desktop app')).toBeVisible()
+    expect(await screen.findByText('10 ·')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Microsoft Translator' }))
+    const limit = screen.getByRole('spinbutton', { name: 'Translation concurrency limit' })
+    expect(limit).toHaveValue(8)
+    await user.clear(limit); await user.type(limit, '6')
+    await user.click(screen.getByRole('button', { name: /^Save$/ }))
+    await waitFor(() => expect(saveProviders).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ id: 'microsoft-translate', translationConcurrency: 6 }),
+    ])))
+    await user.click(screen.getByRole('button', { name: 'Google Translate' }))
+    expect(screen.getByRole('spinbutton', { name: 'Translation concurrency limit' })).toHaveValue(8)
+    await user.click(screen.getByRole('button', { name: 'Microsoft Edge TTS' }))
+    expect(screen.queryByRole('spinbutton', { name: 'Translation concurrency limit' })).toBeNull()
   })
   it('confirms provider removal and restores every affected binding first', async () => {
     const id = 'edge-tts'; settings = { ...settings, ttsProvider: id }

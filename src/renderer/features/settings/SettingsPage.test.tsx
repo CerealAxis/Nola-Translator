@@ -124,10 +124,9 @@ it('lists user settings including glossary and removes retired routes', () => {
   settingsStore.setState({ settings: DEFAULT_SETTINGS, loaded: true })
   window.history.replaceState(null, '', '#/settings/general')
   render(<SettingsPage />)
-  const tabs = screen.getAllByRole('tab').filter(tab => tab.closest('.settings-nav'))
-  expect(tabs.slice(0, 9).map(tab => tab.textContent)).toEqual([
-    '常规', '音频与翻译', '悬浮字幕', '浏览器插件', '快捷键', '引擎与性能', '数据与存储', '术语表', '帮助与关于',
-  ])
+  expect(screen.getByRole('heading', { level: 1, name: '常规' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { level: 2, name: '外观' })).toBeInTheDocument()
+  expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
 })
 
 it('keeps translation with audio and moves recording retention to data settings', async () => {

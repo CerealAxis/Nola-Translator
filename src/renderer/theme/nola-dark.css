@@ -1,5 +1,6 @@
 /* DESIGN v3: both schemes declare the same semantic token set. */
 .dark,
+:host([data-theme='dark']),
 [data-theme='dark'] {
   color-scheme: dark;
   --primary: oklch(70% 0.16 257);

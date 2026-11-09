@@ -149,6 +149,7 @@ class RealtimePipelines:
                     self.gateway, session_id=str(key), pipeline_id=str(session.pipeline_id),
                     epoch=session.epoch, model_id=config.translation_model,
                     target_languages=session.config.target_languages, event_sink=emit_translation,
+                    preview_interval_ms=session.config.translation_preview_interval_ms,
                     provider_options=connection.get("mt_options"),
                     fallback_model_id=config.fallback_translation_model,
                     fallback_provider_options=connection.get("fallback_mt_options"),

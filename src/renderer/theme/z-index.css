@@ -6,7 +6,8 @@
    below keeps the file safe to import standalone.
    ========================================================================== */
 
-:root {
+:root,
+:host {
   --z-base: 0; /* normal content flow */
   --z-sticky: 20; /* sticky toolbars, record table headers */
   --z-caption-scrim: 10; /* overlay card's top/bottom fade scrims */

@@ -71,7 +71,7 @@ export function setupTabAudioRuntime(): void {
     if (tab === undefined || sender?.frameId !== 0 || !url || !secure) { port.disconnect(); return }
     const client: CaptureClient = { port, id: crypto.randomUUID(), closed: false, started: false }
     clients.set(client.id, client)
-    port.onDisconnect.addListener(() => stop(client))
+    port.onDisconnect.addListener(() => { void chrome.runtime.lastError; stop(client) })
     port.onMessage.addListener(raw => {
       if (client.closed || !raw || typeof raw !== 'object') return
       const message = raw as Record<string, unknown>
@@ -84,7 +84,12 @@ export function setupTabAudioRuntime(): void {
           if (client.closed) return
           let streamId: string
           try { streamId = await chrome.tabCapture!.getMediaStreamId({ targetTabId: tab }) }
-          catch { reply(client, { type: 'error', code: 'browserTabCapturePermission' }); stop(client); return }
+          catch (error) {
+            console.debug('[Nola] Could not request a tab audio stream:', error)
+            reply(client, { type: 'error', code: 'browserTabCapturePermission' })
+            stop(client)
+            return
+          }
           if (!client.closed) target.postMessage({ type: 'start', id: client.id, streamId })
         })().catch(() => { reply(client, { type: 'error', code: 'browserCaptureUnsupported' }); stop(client) })
       } else if (message.type === 'gate' && client.started && typeof message.enabled === 'boolean' && Number.isSafeInteger(message.epoch) && Number(message.epoch) >= 0) {

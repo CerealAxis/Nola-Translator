@@ -1,17 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Fieldset } from '@base-ui/react/fieldset'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Captions, Cpu, CircleHelp, FolderOpen, FlaskConical, Keyboard, AudioLines, PanelsTopLeft, SlidersHorizontal, LoaderCircle, BookOpen } from 'lucide-react'
+import { LoaderCircle } from 'lucide-react'
 
 import type { AppSettings } from '@/bridge'
 import { Button } from '@/components/ui/button'
-import { Switch, SwitchThumb, TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Switch, SwitchThumb } from '@/components/ui'
+import { Card, CardContent } from '@/components/ui/card'
+import { FieldGroup } from '@/components/ui/field'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
-import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, settingsPath, useRoute } from '@/routes'
-import type { SettingsTab } from '@/routes'
+import { DEFAULT_SETTINGS_TAB, useRoute } from '@/routes'
 import { actions, isEngineConnected, stores, useStore } from '@/store'
 import { GeneralTab } from './tabs/GeneralTab'
 import { AudioTab } from './tabs/AudioTab'
@@ -25,121 +24,84 @@ import { BrowserTab } from './tabs/BrowserTab'
 import { DeveloperTab } from './tabs/DeveloperTab'
 import { ShortcutsTab } from './tabs/ShortcutsTab'
 import { GlossaryTab } from './glossary/GlossaryTab'
+import { SETTINGS_NAVIGATION } from './settingsNavigation'
 import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
 
-const NAV_ICONS = { general: SlidersHorizontal, audio: AudioLines, appearance: Captions, browser: PanelsTopLeft, shortcuts: Keyboard, engine: Cpu, storage: FolderOpen, glossary: BookOpen, help: CircleHelp, developer: FlaskConical }
-
-/** The nav hint is a Base UI popup, so it carries the same surface tokens as the other tooltips. */
-const NAV_TOOLTIP_CLASS = 'settings-nav__tooltip z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
-
 export function SettingsPage() {
-  const { t, dictionary } = useI18n()
-  const { tab, navigate, glossaryLibraryId } = useRoute()
+  const { t } = useI18n()
+  const { tab, path, glossaryLibraryId } = useRoute()
   const settings = useStore(stores.settings, (state) => state.settings)
   const loadError = useStore(stores.settings, (state) => state.loadError)
   const error = useStore(stores.settings, (state) => state.error)
-  const [compact, setCompact] = useState(() => window.matchMedia('(max-width:850px)').matches)
-  const active: SettingsTab = SETTINGS_TABS.find((item) => item === tab) ?? DEFAULT_SETTINGS_TAB
+  const active = tab ?? DEFAULT_SETTINGS_TAB
+  const page = useRef<HTMLElement>(null)
 
-  useEffect(() => {
-    const media = window.matchMedia('(max-width:850px)')
-    const update = () => setCompact(media.matches)
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [])
+  useLayoutEffect(() => {
+    const scroller = page.current?.closest('.nola-main')
+    if (scroller) scroller.scrollTop = 0
+  }, [path])
 
   useEffect(() => { if (loadError) console.error('[settings.load]', loadError) }, [loadError])
   useEffect(() => { if (error) console.error('[settings]', error) }, [error])
 
-  /*
-   * The settings never arrived. The page says so and offers the way out, and the failure
-   * itself is a notice: a page-sized alert is a state, not a reminder.
-   */
-  if (!settings && loadError) return (
-    <Card className="settings-group">
-      <CardContent className="card__content flex flex-col items-start gap-3">
-        <p className="nola-body-strong">{t('settings.loadFailed')}</p>
-        <Button variant="secondary" size="sm" onClick={() => void actions.settings.loadSettings().catch(() => undefined)}>{t('models.retry')}</Button>
-      </CardContent>
-    </Card>
-  )
-
-  if (!settings && !isEngineConnected()) return null
-
-  if (!settings) return (
-    <Card className="settings-group">
-      <CardContent className="card__content flex items-center gap-2"><LoaderCircle className="animate-spin" aria-hidden="true" size={16} /><p>{t('common.loading')}</p></CardContent>
-    </Card>
-  )
-
-  const labels: Record<SettingsTab, string> = {
-    general: t('modelsSettingsUi.general'), audio: t('modelsSettingsUi.audio'),
-    appearance: t('modelsSettingsUi.appearance'), browser: t('browser.title'),
-    shortcuts: t('modelsSettingsUi.shortcuts'), engine: t('modelsSettingsUi.engine'),
-    storage: t('modelsSettingsUi.storage'), help: t('modelsSettingsUi.help'),
-    developer: t('dev.tabLabel'),
-    glossary: t('suite.glossaryTitle'),
-  }
-  const NAV_HINTS: Partial<Record<SettingsTab, string>> = { engine: dictionary.compute.nextSession }
+  const panels = settings ? {
+    general: <GeneralTab settings={settings} />,
+    shortcuts: <ShortcutsTab settings={settings} />,
+    audio: <AudioTab settings={settings} />,
+    engine: <div className="settings-panel">
+      <ComputeTab settings={settings} />
+      <PerformanceTab settings={settings} />
+      <EngineDiagnostics />
+    </div>,
+    appearance: <AppearanceTab settings={settings} />,
+    storage: <StorageTab settings={settings} />,
+    glossary: <GlossaryTab libraryId={glossaryLibraryId} />,
+    help: <MoreTab />,
+    browser: <BrowserTab />,
+    developer: import.meta.env.DEV ? <DeveloperTab /> : null,
+  } : null
 
   return (
-    <div className="settings-page">
-      <header className="settings-page__heading"><h1>{t('settings.title')}</h1></header>
-      <TabsRoot orientation={compact ? 'horizontal' : 'vertical'} value={active}
-        onValueChange={(value) => navigate(settingsPath(String(value) as SettingsTab))} className="settings-tabs">
-        <div className="settings-nav">
-          <TabsList aria-label={t('modelsSettingsUi.settingsTabs')}>
-            {SETTINGS_TABS.map((item) => {
-              const Icon = NAV_ICONS[item]
-              const hint = NAV_HINTS[item]
-              const content = <><Icon aria-hidden="true" />{labels[item]}{hint ? <span className="tabs__hint" aria-hidden="true"><CircleHelp aria-hidden="true" /></span> : null}</>
-              return (
-                <Tooltip key={item}>
-                  <TooltipTrigger delay={300} render={<TabsTrigger value={item} className="tabs__tab" data-selected={active === item ? 'true' : undefined} data-onboarding={`settings-${item}`}>{content}</TabsTrigger>} />
-                  {hint ? (
-                    <TooltipContent sideOffset={3} className={NAV_TOOLTIP_CLASS}>{hint}</TooltipContent>
-                  ) : null}
-                </Tooltip>
-              )
-            })}
-          </TabsList>
-        </div>
-        <div className="settings-panels">
-          <TabsContent value="general" className="tabs__panel"><GeneralTab settings={settings} /></TabsContent>
-          <TabsContent value="shortcuts" className="tabs__panel"><ShortcutsTab settings={settings} /></TabsContent>
-          <TabsContent value="audio" className="tabs__panel"><AudioTab settings={settings} /></TabsContent>
-          <TabsContent value="engine" className="tabs__panel"><div className="settings-panel">
-            <ComputeTab settings={settings} />
-            <PerformanceTab settings={settings} />
-            <EngineDiagnostics />
-          </div></TabsContent>
-          <TabsContent value="appearance" className="tabs__panel"><AppearanceTab settings={settings} /></TabsContent>
-          <TabsContent value="storage" className="tabs__panel"><StorageTab settings={settings} /></TabsContent>
-          <TabsContent value="glossary" className="tabs__panel"><GlossaryTab libraryId={glossaryLibraryId} /></TabsContent>
-          <TabsContent value="help" className="tabs__panel"><MoreTab /></TabsContent>
-          <TabsContent value="browser" className="tabs__panel"><BrowserTab /></TabsContent>
-          {import.meta.env.DEV ? <TabsContent value="developer" className="tabs__panel"><DeveloperTab /></TabsContent> : null}
-        </div>
-      </TabsRoot>
-    </div>
+    <section className="settings-page" ref={page} aria-labelledby="settings-heading">
+      <h1 id="settings-heading" className="settings-page__heading">{t(SETTINGS_NAVIGATION[active].label)}</h1>
+      <div className="settings-panels">
+        {panels ? panels[active] : loadError ? (
+          <Card size="sm">
+            <CardContent className="flex flex-col items-start gap-3">
+              <p className="nola-body-strong">{t('settings.loadFailed')}</p>
+              <Button variant="secondary" size="sm" onClick={() => void actions.settings.loadSettings().catch(() => undefined)}>{t('models.retry')}</Button>
+            </CardContent>
+          </Card>
+        ) : isEngineConnected() ? (
+          <Card size="sm">
+            <CardContent className="flex items-center gap-2" role="status">
+              <LoaderCircle className="animate-spin" aria-hidden="true" size={16} />
+              <p>{t('common.loading')}</p>
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
+    </section>
   )
 }
 
 export interface SettingGroupProps { legend: string; legendHint?: ReactNode; actions?: ReactNode; children: ReactNode; onboardingTarget?: string; id?: string }
 
 export function SettingGroup({ legend, legendHint, actions, children, onboardingTarget, id }: SettingGroupProps) {
+  const headingId = useId()
   return (
-    <Card id={id} className="settings-group" data-onboarding={onboardingTarget}>
-      <CardHeader className="card__header">
-        <CardTitle className={['card__title', legendHint ? 'settings-group__title-with-hint' : undefined].filter(Boolean).join(' ')}>{legend}{legendHint ? <span className="settings-group__hint">{legendHint}</span> : null}</CardTitle>
-      </CardHeader>
-      <CardContent className="card__content">
-        <Fieldset.Root className="fieldset" aria-label={legend}><div className="settings-group__rows">{children}</div></Fieldset.Root>
-      </CardContent>
-      {actions ? <CardFooter className="justify-end flex-wrap">{actions}</CardFooter> : null}
-    </Card>
+    <section id={id} className="settings-group" data-onboarding={onboardingTarget}>
+      <div className="settings-group__heading">
+        <h2 id={headingId}>{legend}</h2>
+        {legendHint ? <span className="settings-group__hint">{legendHint}</span> : null}
+      </div>
+      <Fieldset.Root className="settings-group__fields" aria-labelledby={headingId}>
+        <FieldGroup className="gap-0">{children}</FieldGroup>
+        {actions ? <div className="settings-group__actions">{actions}</div> : null}
+      </Fieldset.Root>
+    </section>
   )
 }
 

@@ -80,7 +80,7 @@ export function RecommendedFamilyCard({ family, records, onOpen }: RecommendedFa
       {engines.map(engine => <Badge key={engine} >{engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'}</Badge>)}
       {records.some(record => record.installed) ? <Badge  variant="success">{t('models.installed')}</Badge> : null}
     </div></CardContent>
-    <CardFooter className="card__footer"><Button variant="secondary" data-onboarding={`model-family-${family}`} onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
+    <CardFooter className="card__footer"><Button data-onboarding={`model-family-${family}`} onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
   </Card>
 }
 
@@ -260,22 +260,31 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
 }
 
 
-export function OcrFamilyCard({ records, onOpen }: { records: readonly ResourceRecord[]; onOpen(): void }) {
+export type LocalModelFamilyKind = 'ocrModel' | 'inpaintModel'
+
+const LOCAL_MODEL_FAMILIES = {
+  ocrModel: { id: 'ocr', name: 'PP-OCRv5 mobile', description: 'screen.ocrDescription', runtime: 'ONNX Runtime' },
+  inpaintModel: { id: 'inpaint', name: 'LaMA Manga', description: 'suite.inpaintDescription', runtime: 'PyTorch' },
+} as const
+
+export function LocalModelFamilyCard({ kind, records, onOpen }: { kind: LocalModelFamilyKind; records: readonly ResourceRecord[]; onOpen(): void }) {
   const { t } = useI18n()
-  if (!records.length) return null
-  return <Card className="models-card models-family-card h-full" data-model-family="ocr">
-    <CardHeader><CardAction><span aria-hidden="true" className="models-card__icon models-card__icon--recognition"><ModelMark record={records[0]} kind="ocrModel" /></span></CardAction>
-      <CardTitle>PP-OCRv5 mobile</CardTitle><CardDescription>{t('screen.ocrDescription')}</CardDescription>
+  const first = records[0]
+  if (!first) return null
+  const family = LOCAL_MODEL_FAMILIES[kind]
+  return <Card className="models-card models-family-card h-full" data-model-family={family.id}>
+    <CardHeader><CardAction><span aria-hidden="true" className="models-card__icon models-card__icon--recognition"><ModelMark record={first} kind={kind} /></span></CardAction>
+      <CardTitle>{family.name}</CardTitle><CardDescription>{t(family.description)}</CardDescription>
     </CardHeader>
-    <CardContent><div className="models-card__status"><Badge>{t('modelsSettingsUi.localModels')}</Badge><Badge>ONNX Runtime</Badge>
+    <CardContent><div className="models-card__status"><Badge>{t('modelsSettingsUi.localModels')}</Badge><Badge>{family.runtime}</Badge>
       {records.some(record => record.installed) && <Badge variant="success">{t('models.installed')}</Badge>}
     </div></CardContent>
-    <CardFooter><Button variant="secondary" onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
+    <CardFooter><Button onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
   </Card>
 }
 
-export function OcrFamilyDialog({ records, initialResourceId, busyIds, onClose, onInstall, onCancel }: {
-  records: readonly ResourceRecord[]; initialResourceId?: string; busyIds: readonly string[]; onClose(): void;
+export function LocalModelFamilyDialog({ kind, records, initialResourceId, busyIds, onClose, onInstall, onCancel }: {
+  kind: LocalModelFamilyKind; records: readonly ResourceRecord[]; initialResourceId?: string; busyIds: readonly string[]; onClose(): void;
   onInstall(record: ResourceRecord): void; onCancel(record: ResourceRecord): void;
 }) {
   const { t } = useI18n()
@@ -283,6 +292,8 @@ export function OcrFamilyDialog({ records, initialResourceId, busyIds, onClose, 
   const [removing, setRemoving] = useState(false)
   const selected = records.find(record => record.resourceId === selectedId) ?? records[0]
   if (!selected) return null
+  const family = LOCAL_MODEL_FAMILIES[kind]
+  const variantId = `${family.id}-variant`
   const state = resourceStateOf(selected)
   const inFlight = ['queued', 'downloading', 'verifying'].includes(state)
   const busy = removing || busyIds.includes(selected.resourceId)
@@ -293,23 +304,23 @@ export function OcrFamilyDialog({ records, initialResourceId, busyIds, onClose, 
     finally { setRemoving(false) }
   }
   return <Dialog open onOpenChange={open => { if (!open && !removing) onClose() }}>
-    <DialogContent className="models-family-dialog modal__dialog" data-model-family="ocr">
+    <DialogContent className="models-family-dialog modal__dialog" data-model-family={family.id}>
       <DialogCloseButton aria-label={t('common.close')} disabled={removing} />
-      <DialogHeader><DialogTitle>PP-OCRv5 mobile</DialogTitle><p className="models-family-dialog__intro">{t('screen.ocrDescription')}</p></DialogHeader>
+      <DialogHeader><DialogTitle>{family.name}</DialogTitle><p className="models-family-dialog__intro">{t(family.description)}</p></DialogHeader>
       <div className="models-family-dialog__body">
-        <section className="models-family-dialog__model-select">
-          <Label htmlFor="ocr-variant">{t('offline.modelChoice')}</Label>
+        {(kind === 'ocrModel' || records.length > 1) && <section className="models-family-dialog__model-select">
+          <Label htmlFor={variantId}>{t('offline.modelChoice')}</Label>
           <Select value={selected.resourceId} disabled={removing} onValueChange={value => { if (value) setSelectedId(value) }}>
-            <SelectTrigger id="ocr-variant"><SelectValue>{selected.name}</SelectValue></SelectTrigger>
+            <SelectTrigger id={variantId}><SelectValue>{selected.name}</SelectValue></SelectTrigger>
             <SelectContent><SelectGroup>{records.map(record => <SelectItem key={record.resourceId} value={record.resourceId}>
               <span>{record.name}</span><span>{formatBytes(record.downloadBytes ?? record.installedBytes)}</span>
               {record.installed && <Badge variant="success">{t('models.installed')}</Badge>}
             </SelectItem>)}</SelectGroup></SelectContent>
           </Select>
-        </section>
-        <ModelLanguageSelect label={t('modelConfig.languages')} value={selected.languages} codes={selected.languages} onChange={() => undefined} readOnly />
+        </section>}
+        {kind === 'ocrModel' && <ModelLanguageSelect label={t('modelConfig.languages')} value={selected.languages} codes={selected.languages} onChange={() => undefined} readOnly />}
         <section className="models-family-dialog__selection"><Label className="models-family-dialog__label">{t('models.details')}</Label>
-          <p>{selected.name} · {formatBytes(selected.downloadBytes ?? selected.installedBytes)} · ONNX Runtime</p>
+          <p>{selected.name} · {formatBytes(selected.downloadBytes ?? selected.installedBytes)} · {family.runtime}</p>
         </section>
       </div>
       <DialogFooter>

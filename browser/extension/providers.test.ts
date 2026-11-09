@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createProvider, parseProviders, providerSchema, requestProviderAccess } from './providers'
+import { createProvider, parseProviders, providerSchema, requestProviderAccess, visibleProviderConnections } from './providers'
 import { generateWith, translateWith, ProviderError, safeProviderError, readProviderBytes, readProviderJson } from './provider-execution'
-import { buildTranslationPrompt, providerMessageSchema, setupProviderRuntime } from './provider-runtime'
+import { buildTranslationPrompt, providerMessageSchema, runLimitedTranslation, setupProviderRuntime } from './provider-runtime'
 import { parseBatchResult } from './provider-batch'
 
 beforeEach(() => { vi.stubGlobal('chrome', { permissions: { contains: vi.fn().mockResolvedValue(true), request: vi.fn().mockResolvedValue(true) } }); vi.restoreAllMocks() })
 describe('provider trust boundaries', () => {
+  it('shows identical bundled connections once and keeps the bound ID and custom endpoints', () => {
+    const bundled = createProvider('google-translate')
+    const bound = createProvider('google-translate')
+    const custom = { ...createProvider('google-translate'), baseUrl: 'https://example.com' }
+    expect(visibleProviderConnections([bundled, bound, custom], bound.id)).toEqual([bound, custom])
+  })
   it('never forwards response fragments or unknown exception messages as error codes', async () => {
     const secret = 'private-key-should-never-leave-background'
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(`upstream accidentally echoed ${secret}`)))
@@ -60,6 +66,24 @@ describe('provider trust boundaries', () => {
   })
 })
 describe('provider execution', () => {
+  it('shares a channel limit across requests, releases canceled waiters, and lets other channels run', async () => {
+    const cancel = new AbortController()
+    const signal = new AbortController().signal
+    let finish!: (value: string) => void
+    const first = runLimitedTranslation('first-channel', 1, signal, () => new Promise(resolve => { finish = resolve }))
+    const runCanceled = vi.fn(async () => 'canceled')
+    const canceled = expect(runLimitedTranslation('first-channel', 1, cancel.signal, runCanceled)).rejects.toThrow('canceled')
+    const runNext = vi.fn(async () => 'next')
+    const next = runLimitedTranslation('first-channel', 1, signal, runNext)
+    await expect(runLimitedTranslation('other-channel', 1, signal, async () => 'other')).resolves.toBe('other')
+    cancel.abort(new Error('canceled'))
+    await canceled
+    expect(runCanceled).not.toHaveBeenCalled()
+    expect(runNext).not.toHaveBeenCalled()
+    finish('first')
+    await expect(first).resolves.toBe('first')
+    await expect(next).resolves.toBe('next')
+  })
   it('leaves speed and volume to the player instead of applying preferences twice', async () => {
     const providers = await import('./providers')
     const execution = await import('./provider-execution')

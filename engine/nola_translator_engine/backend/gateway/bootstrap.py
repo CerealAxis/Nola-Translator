@@ -30,7 +30,7 @@ from .adapters import (
     MIMO_TTS_ENDPOINT, MIMO_TTS_MODEL, AdapterRegistry, GoogleMtAdapter, IndexPublicMtAdapter,
     CloudAsrAdapter, CustomMtAdapter, LocalWorkerAdapter, MicrosoftMtAdapter, MiMoTtsAdapter, MyMemoryMtAdapter,
 )
-from .capabilities import ConcurrencyCapabilities, ContextCapabilities, LanguageCapabilities, ModelCapabilities, ModelKind, Operation, OperationProfile
+from .capabilities import ConcurrencyCapabilities, ContextCapabilities, LanguageCapabilities, ModelCapabilities, ModelKind, Operation, OperationProfile, TranslationPolicy
 from .definitions import ModelDefinition, ProviderConfiguration
 from .gateway import ModelGateway, ModelRegistry, RegistryEntry
 from .languages import (
@@ -141,8 +141,14 @@ def build_default_gateway(*, model_dir: Path | None = None, worker_factory: Call
         register_local_tts(registry, root)
         register_local_llm(registry, root)
 
+    index_definition = committed_mt_definition("index-translate", adapter_id="index-translate", auto_detection=True)
+    index_definition.capabilities.translation_policy = TranslationPolicy(min_source_state="stable", allow_preview=True)
+    index_profile = index_definition.capabilities.operation_profiles[Operation.TRANSLATE]
+    index_profile.finality = "revisable"
+    index_profile.incremental_translation = "snapshot_retranslate"
+    index_profile.source_revision_support = "replace_snapshot"
     registry.register(
-        committed_mt_definition("index-translate", adapter_id="index-translate", auto_detection=True),
+        index_definition,
         cloud_configuration("index-translate", ModelKind.MT, endpoint=PUBLIC_ENDPOINT),
     )
     mimo_capabilities = ModelCapabilities(
@@ -178,8 +184,6 @@ def build_default_gateway(*, model_dir: Path | None = None, worker_factory: Call
         adapters.register(CloudAsrAdapter(provider))
     adapters.register(GoogleMtAdapter())
     custom_definition = committed_mt_definition("custom-mt", adapter_id="custom-mt", auto_detection=True)
-    from .capabilities import TranslationPolicy
-
     custom_definition.capabilities.translation_policy = TranslationPolicy(min_source_state="stable", allow_preview=True)
     registry.register(custom_definition, cloud_configuration("custom-mt", ModelKind.MT, endpoint=""))
     adapters.register(CustomMtAdapter())

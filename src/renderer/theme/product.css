@@ -1,0 +1,12 @@
+@import './index.css';
+@import './nola-theme.css';
+@import './nola-glass.css';
+
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *) {
+    @slot;
+  }
+  :host([data-theme="dark"]) & {
+    @slot;
+  }
+}

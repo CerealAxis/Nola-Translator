@@ -42,7 +42,7 @@ const PAGES = [
   { name: 'record-detail', hash: '#/records/m-finished', page: 'record' },
 ]
 
-/** 760 is the window's minWidth; 900/901 straddle the settings page's 850px stack breakpoint, 1100 sits on its 1100px one. */
+/** Exercise narrow desktop windows and both sides of the medium layout range. */
 const WIDTHS = [760, 900, 901, 1100]
 const HEIGHT = 780
 
@@ -133,12 +133,11 @@ const PAGE_GROUPS = {
   ],
   settings: [
     { name: 'settings-page', selector: '.settings-page', min: 1 },
-    { name: 'settings-tabs', selector: '.settings-tabs', min: 1 },
-    { name: 'settings-nav', selector: '.settings-nav', min: 1 },
+    { name: 'settings-nav', selector: '[data-settings-navigation]', min: 1 },
     // Every tab stays mounted, so the count is the same whichever one is active.
-    { name: 'settings-tab', selector: '.settings-nav [role="tab"]', min: 7 },
+    { name: 'settings-category', selector: '[data-settings-navigation] button[aria-current="page"]', min: 1 },
     { name: 'settings-panels', selector: '.settings-panels', min: 1 },
-    { name: 'settings-group', selector: '.settings-panels .settings-group, .settings-panels .shortcuts-page__table, .settings-panels .browser-settings__card', min: 1 },
+    { name: 'settings-group', selector: '.settings-panels :is(.settings-group, .shortcuts-page__table, .browser-settings__list)', min: 1 },
   ],
 }
 
@@ -485,30 +484,58 @@ async function main() {
   }
 
   if (process.argv.includes('--settings-navigation')) {
+    // Expanded hit targets do not represent visible overflow.
+    await window.webContents.insertCSS('.settings-page .switch::after, .settings-page .slider__thumb::after { content: none !important; }')
     for (const language of ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko']) for (const theme of ['light', 'dark']) for (const [width, height] of [[760, 560], [1180, 780], [1920, 1140]]) {
       console.log('Settings navigation:', language, theme, width)
       window.setContentSize(width, height)
+      await delay(250)
       await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings(${JSON.stringify({ uiLanguage: language, theme, appearance: { reduceMotion: true } })})`)
+      let layout
       for (const tab of (process.argv.includes('--settings-audio') ? ['audio'] : SETTINGS_TABS)) {
         const context = { language, theme, width, tab }
         await goto(window, `#/settings/${tab}`, 'settings')
+        if (!layout) await delay(250)
         scenarios++
         const state = await window.webContents.executeJavaScript(`(() => {
-          const nav = document.querySelector('.settings-nav');
-          const selected = nav.querySelector('[data-selected="true"]');
-          const tabs = [...nav.querySelectorAll('[role="tab"]')];
+          const nav = document.querySelector('[data-settings-navigation]');
+          const selected = nav.querySelector('[aria-current="page"]');
+          const tabs = [...nav.querySelectorAll('button[data-onboarding^="settings-"]')];
           const panel = document.querySelector('.settings-panels');
+          const headingRect = document.querySelector('.settings-page__heading').getBoundingClientRect();
+          const panelRect = panel.getBoundingClientRect();
+          const stage = panel.querySelector('.nola-overlay-stage');
+          const stageRect = stage?.getBoundingClientRect();
           return { lang: document.documentElement.lang, selected: selected?.dataset.onboarding, count: tabs.length,
+            layout: [headingRect.left, headingRect.top, panelRect.left, panelRect.top, panelRect.width],
+            preview: stage && {
+              flat: !stage.closest('[data-slot="card"]') && stage.children.length === 1 && !!stage.firstElementChild.matches('.nola-caption-preview'),
+              aligned: Math.abs(stageRect.left - panelRect.left) < 1 && Math.abs(stageRect.width - panelRect.width) < 1,
+            },
             order: tabs.map(el => el.dataset.onboarding.replace('settings-', '')),
             icons: tabs.map(el => el.querySelector('svg')?.getAttribute('class')),
             crashed: !!document.querySelector('.nola-main pre'),
             sourceLanguageGroup: !!panel.querySelector('[data-onboarding="recognition-service"]'),
-            groups: panel.querySelectorAll('[data-slot="card"]').length,
-            overflow: [...document.querySelectorAll('.settings-page, .settings-tabs, .settings-nav, .settings-panels, .settings-group.card, .settings-row__label, .settings-control-field, .settings-page button')].filter(el => el.clientWidth > 0 && !el.matches('input, [role="switch"]') && !el.classList.contains('sr-only') && getComputedStyle(el).overflowX !== 'auto' && el.scrollWidth > el.clientWidth + 2).map(el => ({ className: String(el.className), text: el.textContent.slice(0, 80) })),
+            groups: panel.querySelectorAll('.settings-group, [data-slot="card"], .shortcuts-page__table, .browser-settings__list').length,
+            overflow: [...document.querySelectorAll('.settings-page, .settings-panels, .settings-group, .settings-row__label, .settings-control-field, .settings-page button')].filter(el => el.clientWidth > 0 && !el.matches('input, [role="switch"]') && !el.classList.contains('sr-only') && getComputedStyle(el).overflowX !== 'auto' && el.scrollWidth > el.clientWidth + 2).map(el => ({ className: String(el.className), text: el.textContent.slice(0, 80) })),
             collapsed: panel.querySelectorAll('[data-slot="accordion-trigger"]').length,
-            cards: [...panel.querySelectorAll('.settings-group.card')].map(el => { const r = el.getBoundingClientRect(); const h = el.querySelector('[data-slot="card-header"]')?.getBoundingClientRect(); return { left:r.left, width:r.width, headingLeft:h?.left }; }) };
+            sections: [...panel.querySelectorAll('.settings-group')].map(el => {
+              const heading = el.querySelector('h2');
+              const fields = el.querySelector('.settings-group__fields');
+              const r = fields.getBoundingClientRect();
+              const h = heading.getBoundingClientRect();
+              const flat = [el, fields].every(node => {
+                const style = getComputedStyle(node);
+                return style.backgroundImage === 'none' && style.backgroundColor === 'rgba(0, 0, 0, 0)'
+                  && style.boxShadow === 'none' && style.borderTopWidth === '0px';
+              });
+              return { left:r.left, width:r.width, headingLeft:h.left, flat, headingAbove: h.bottom < r.top };
+            }) };
         })()`)
-        if (state.lang !== language || state.selected !== `settings-${tab}` || state.count !== SETTINGS_TABS.length || JSON.stringify(state.order) !== JSON.stringify(SETTINGS_TABS) || new Set(state.icons).size !== SETTINGS_TABS.length || state.crashed || !state.groups || state.overflow.length || state.collapsed || (tab === 'audio' && state.sourceLanguageGroup) || state.cards.some(card => Math.abs(card.left - state.cards[0].left) > 2 || Math.abs(card.width - state.cards[0].width) > 2 || (card.headingLeft !== undefined && Math.abs(card.headingLeft - state.cards[0].headingLeft) > 2))) fail(context, 'Settings categories or layout failed', { state })
+        layout ??= state.layout
+        if (state.layout.some((value, index) => Math.abs(value - layout[index]) >= 1)) fail(context, 'Settings title or content shifted between categories', { expected: layout, actual: state.layout })
+        if (tab === 'appearance' && (!state.preview?.flat || !state.preview.aligned)) fail(context, 'Caption preview must sit directly on a full-width stage', { preview: state.preview })
+        if (state.lang !== language || state.selected !== `settings-${tab}` || state.count !== SETTINGS_TABS.length || JSON.stringify(state.order) !== JSON.stringify(SETTINGS_TABS) || new Set(state.icons).size !== SETTINGS_TABS.length || state.crashed || !state.groups || state.overflow.length || state.collapsed || (tab === 'audio' && state.sourceLanguageGroup) || state.sections.some(section => !section.flat || !section.headingAbove || Math.abs(section.left - section.headingLeft) > 2 || Math.abs(section.width - state.sections[0].width) > 2)) fail(context, 'Settings categories or layout failed', { state })
         if (language === 'zh-CN' && ((theme === 'light' && width === 1180) || (theme === 'dark' && width === 760))) {
           await window.webContents.executeJavaScript(`document.querySelector('.nola-main').scrollTop = 0`)
           await settle(window)
@@ -517,6 +544,39 @@ async function main() {
 
       }
     }
+    window.setContentSize(760, 560)
+    await goto(window, '#/records/m-finished', 'record')
+    await window.webContents.executeJavaScript(`document.querySelector('[data-onboarding="nav-settings"]').click()`)
+    await settle(window)
+    window.webContents.setZoomFactor(2)
+    await settle(window)
+    const zoomed = await window.webContents.executeJavaScript(`(() => {
+      const nav = document.querySelector('[data-settings-navigation]');
+      const fields = document.querySelector('.settings-group__fields');
+      const row = fields?.querySelector('.settings-row');
+      const columns = row && getComputedStyle(row).gridTemplateColumns;
+      return { path: location.hash, collapsed: nav?.closest('aside')?.dataset.state === 'collapsed',
+        singleColumn: columns?.split(' ').length === 1, fits: !!fields && fields.scrollWidth <= fields.clientWidth + 2 };
+    })()`)
+    scenarios++
+    if (zoomed.path !== '#/settings/general' || !zoomed.collapsed || !zoomed.singleColumn || !zoomed.fits) fail({ width: 760, zoom: 2 }, 'Zoomed settings layout failed', { zoomed })
+    await window.webContents.executeJavaScript(`document.querySelector('[data-onboarding="settings-audio"]').click()`)
+    await settle(window)
+    await window.webContents.executeJavaScript(`document.querySelector('[data-onboarding="nav-settings-back"]').click()`)
+    await settle(window)
+    const returnPath = await window.webContents.executeJavaScript('location.hash')
+    if (returnPath !== '#/records/m-finished') fail({ width: 760, zoom: 2 }, 'Settings return lost the originating route', { returnPath })
+    await goto(window, '#/settings/appearance', 'settings')
+    window.webContents.setZoomFactor(2)
+    await settle(window)
+    const previewFits = await window.webContents.executeJavaScript(`(() => {
+      const stage = document.querySelector('.settings-panels .nola-overlay-stage')?.getBoundingClientRect();
+      const caption = document.querySelector('.settings-panels .nola-caption-preview')?.getBoundingClientRect();
+      return !!stage && !!caption && caption.left > stage.left && caption.right < stage.right
+        && caption.top > stage.top && caption.bottom < stage.bottom;
+    })()`)
+    scenarios++
+    if (!previewFits) fail({ width: 760, zoom: 2 }, 'Zoomed caption preview does not fit its stage')
     await writeFile(resolve(output, process.argv.includes('--settings-audio') ? 'settings-audio-results.json' : 'settings-navigation-results.json'), JSON.stringify({ scenarios, failures }, null, 2))
     console.log(JSON.stringify({ scenarios, failures: failures.length, examples: failures.slice(0, 2) }, null, 2))
     app.exit(failures.length ? 1 : 0)

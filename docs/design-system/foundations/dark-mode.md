@@ -20,7 +20,7 @@ editLink: false
 
 **使用随外观变化的语义颜色。** 深色模式通过工作区、面板和浮层的明度差表达层次。正文和辅助文字分别使用对应前景色，分隔线使用边界色。
 
-<demo react="foundation-appearance-dark-mode.tsx" :reactFiles="['foundation-appearance-dark-mode.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="foundation-appearance-dark-mode.tsx" :reactFiles="['foundation-appearance-dark-mode.tsx', '../figures/FoundationAppearance.tsx', '../figures/FoundationAppearance.css']" />
 
 两种外观保留相同的表面层级和文字关系。浮层通过独立表面与边框从内容中浮起。
 

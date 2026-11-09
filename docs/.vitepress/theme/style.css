@@ -14,16 +14,11 @@
   padding: 20px 20px 30px;
 }
 
-/* Keep VitePress control resets from winning over preset utilities outside .vp-raw. */
-:where(body:has(.shadcn-base-doc)) [data-base-ui-portal] :is(button, input, optgroup, select, textarea) {
-  border: revert-layer;
-  padding: revert-layer;
-  line-height: revert-layer;
-  color: revert-layer;
-  font-family: revert-layer;
-  background-color: revert-layer;
-  background-image: revert-layer;
-}
+.nola-vis-doc .vitepress-demo-plugin-preview { padding: 20px 20px 30px; background: var(--surface); }
+.nola-vis-doc .vitepress-demo-plugin__container { border-radius: 14px; overflow: hidden; }
+.nola-vis-doc .vitepress-demo-plugin-lang-tabs { display: none; }
+.nola-vis-doc .vitepress-demo-plugin-file-tabs { padding-inline: 16px; justify-content: flex-start; }
+.nola-vis-doc .vitepress-demo-plugin-description__handle-btn { background: var(--vp-c-bg); }
 
 html:has(.VPDoc),
 .Layout:has(.VPDoc) * {

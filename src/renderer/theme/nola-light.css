@@ -1,5 +1,6 @@
 /* DESIGN v3: both schemes declare the same semantic token set. */
 :root,
+:host,
 [data-theme='light'] {
   color-scheme: light;
   --primary: oklch(60% 0.22 257);

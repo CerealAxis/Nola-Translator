@@ -1,11 +1,12 @@
 import { once } from 'node:events'
 import { loggedHandle } from './logged-ipc'
-import { sceneModelBinding } from '../shared/model-policy'
+import { isModelEnabled, sceneModelBinding } from '../shared/model-policy'
+import type { ModelGatewaySnapshot } from '../shared/model-gateway'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { createServer, type Server, type Socket } from 'node:net'
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { logActivity, logDiagnostic } from './session-log'
-import { mkdir, writeFile, access, rm, copyFile } from 'node:fs/promises'
+import { mkdir, writeFile, access, rm, copyFile, rename } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -26,6 +27,19 @@ const MAX_MESSAGE = 160 * 1024
 const START_REQUEST_BUDGET_MS = 170_000
 /** How often the desktop summarizes the audio it received; 10 chunks/second would be unreadable. */
 const AUDIO_LOG_INTERVAL_MS = 1000
+
+async function publishNativeFile(path: string, data: object): Promise<void> {
+  const temporary = `${path}.${process.pid}.tmp`
+  await writeFile(temporary, JSON.stringify(data))
+  await rename(temporary, path)
+}
+
+export function browserTextModel(settings: AppSettings, gateway?: { state: ModelGatewaySnapshot['state']; services: Pick<ModelGatewaySnapshot['services'], 'mt'> }): string {
+  const service = gateway?.services.mt
+  const active = gateway?.state === 'running' && service?.state === 'ready' ? service.model : ''
+  const scene = sceneModelBinding(settings, 'mt')
+  return [active, scene].find(model => model && model !== 'cloud:recognition' && isModelEnabled(settings, 'mt', model)) ?? ''
+}
 const LEGACY_BROWSER_ERROR_CODES: Readonly<Record<string, BrowserWireErrorCode>> = {
   sessionAlreadyRunning: 'browserSessionAlreadyRunning',
   sessionNotRunning: 'browserSessionNotRunning',
@@ -87,6 +101,7 @@ export interface BrowserConnectionOptions {
 
   translateText?(request: Extract<BrowserRequest, { type: 'translate' }>, signal: AbortSignal): Promise<string>
   textTranslationAvailable?(): true | 'gatewayNotRunning' | 'browserTextModelUnavailable'
+  textTranslationConcurrency?(): number
   prepareS2s?: (model: string) => Promise<PrewarmResult>
   engine: EngineProcess
   activity?: FeatureActivity
@@ -163,6 +178,7 @@ export class BrowserConnection {
   private disposing = false
   private operation = 0
   private mutation: Promise<void> = Promise.resolve()
+  private registration: Promise<void> | null = null
   private readonly cleanup = new Set<Promise<void>>()
   private error: string | undefined
   private devices: AudioDevice[] = []
@@ -207,7 +223,13 @@ export class BrowserConnection {
         }
         return this.status()
       }
-      if (action === 'repair') { await this.register(); return this.status() }
+      if (action === 'repair') {
+        const operation = this.operation
+        await this.register()
+        if (this.enabled && operation === this.operation && !this.disposing) await this.queueListener(true, operation)
+        await options.integrations?.inspect()
+        return this.status()
+      }
       if (action === 'extension') {
         const zip = this.extensionZip(browser === 'firefox')
         await access(zip)
@@ -320,6 +342,7 @@ export class BrowserConnection {
   }
   async initialize(enabled: boolean): Promise<void> {
     const operation = this.operation
+    this.enabled = enabled
     await this.options.integrations?.inspect()
     try {
       await access(join(this.directory, 'native-host.json'))
@@ -331,7 +354,10 @@ export class BrowserConnection {
       if (!this.disposing && operation === this.operation) await this.setEnabled(true)
     }
   }
-  async register(): Promise<void> {
+  register(): Promise<void> {
+    return this.registration ??= this.registerHost().finally(() => { this.registration = null })
+  }
+  private async registerHost(): Promise<void> {
     if (process.platform !== 'win32') throw new Error('Windows is required')
     const executable = app.isPackaged ? join(process.resourcesPath, 'browser', 'NolaBrowserHost.exe') : resolve('artifacts/browser-host/NolaBrowserHost.exe')
     await access(executable)
@@ -342,12 +368,12 @@ export class BrowserConnection {
     if (!sid) throw new Error('Unable to identify Windows user')
     await run('icacls.exe', [this.directory, '/inheritance:r', '/grant:r', `*${sid}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F'], { windowsHide: true })
     const manifest = join(this.directory, 'native-host.json')
-    await writeFile(manifest, JSON.stringify({ name: BROWSER_HOST_NAME, description: 'Nola browser captions connection', path: executable, type: 'stdio', allowed_origins: [`chrome-extension://${BROWSER_EXTENSION_ID}/`] }))
-    for (const browser of ['Google\\Chrome', 'Microsoft\\Edge']) {
+    await publishNativeFile(manifest, { name: BROWSER_HOST_NAME, description: 'Nola browser captions connection', path: executable, type: 'stdio', allowed_origins: [`chrome-extension://${BROWSER_EXTENSION_ID}/`] })
+    for (const browser of ['Google\\Chrome', 'Microsoft\\Edge', 'Quark']) {
       await run('reg.exe', ['add', `HKCU\\Software\\${browser}\\NativeMessagingHosts\\${BROWSER_HOST_NAME}`, '/ve', '/t', 'REG_SZ', '/d', manifest, '/f'], { windowsHide: true })
     }
     const firefoxManifest = join(this.directory, 'native-host-firefox.json')
-    await writeFile(firefoxManifest, JSON.stringify({ name: BROWSER_HOST_NAME, description: 'Nola browser captions connection', path: executable, type: 'stdio', allowed_extensions: [FIREFOX_EXTENSION_ID] }))
+    await publishNativeFile(firefoxManifest, { name: BROWSER_HOST_NAME, description: 'Nola browser captions connection', path: executable, type: 'stdio', allowed_extensions: [FIREFOX_EXTENSION_ID] })
     await run('reg.exe', ['add', `HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${BROWSER_HOST_NAME}`, '/ve', '/t', 'REG_SZ', '/d', firefoxManifest, '/f'], { windowsHide: true })
     this.registered = true
     this.error = undefined
@@ -355,6 +381,9 @@ export class BrowserConnection {
   setEnabled(enabled: boolean): Promise<void> {
     const operation = ++this.operation
     this.enabled = enabled && !this.disposing
+    return this.queueListener(enabled, operation)
+  }
+  private queueListener(enabled: boolean, operation: number): Promise<void> {
     const task = this.mutation.catch(() => undefined).then(() => this.applyEnabled(enabled, operation))
     this.mutation = task.catch(() => undefined)
     return task
@@ -375,12 +404,13 @@ export class BrowserConnection {
       await mkdir(this.directory, { recursive: true })
       if (operation !== this.operation || this.disposing) return
       const server = createServer(socket => this.accept(socket))
-      this.server = server
       await new Promise<void>((resolveListen, reject) => { server.once('error', reject); server.listen(this.pipe, () => { server.off('error', reject); resolveListen() }) })
+      this.server = server
       server.on('error', error => { this.error = error.message })
     }
     if (operation !== this.operation || this.disposing) return
-    await writeFile(join(this.directory, 'connection.json'), JSON.stringify({ pipe: this.pipe, token: this.token, extensionId: BROWSER_EXTENSION_ID, protocolVersion: 1 }))
+    const descriptor = join(this.directory, 'connection.json')
+    await publishNativeFile(descriptor, { pipe: this.pipe, token: this.token, extensionId: BROWSER_EXTENSION_ID, protocolVersion: 1 })
   }
   async dispose(): Promise<void> {
     this.disposing = true
@@ -545,6 +575,7 @@ export class BrowserConnection {
           capabilities: { mt: textTranslation === true, asr: Boolean(this.options.inferCapability), tts: Boolean(this.options.inferCapability), llm: Boolean(this.options.inferCapability), s2s: Boolean(this.options.useGateway) },
           extensionVersion: BROWSER_EXTENSION_VERSION, extensionCompatible: compatible,
           textTranslation: textTranslation === true,
+          textTranslationConcurrency: this.options.textTranslationConcurrency?.(),
           ...(textTranslation === true ? {} : { textTranslationError: textTranslation }),
           realtimeTranslation: Boolean(this.options.useGateway),
           uiLanguage: settings.uiLanguage, sourceLanguage: settings.recognition.sourceLanguage, targetLanguage: settings.translation.targetLanguage,
@@ -623,7 +654,7 @@ export class BrowserConnection {
           return
         }
         if (!this.options.translateText) throw new Error('browserTextModelUnavailable')
-        if (client.translations.size >= 4) throw new Error('resourceBusy')
+        if (client.translations.size >= (this.options.textTranslationConcurrency?.() ?? 4)) throw new Error('resourceBusy')
         if (client.translations.has(request.id)) throw new Error('invalidMessage')
         const controller = new AbortController()
         const timer = setTimeout(() => controller.abort(new Error('browserTranslationTimeout')), 28_000)

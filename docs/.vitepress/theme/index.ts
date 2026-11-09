@@ -12,6 +12,7 @@ import 'vitepress-markdown-timeline/dist/theme/index.css'
 import { localePath } from './content'
 import { detectSiteLocale, localizedSitePath, localeOfPath, readLocalePreference, saveLocalePreference } from './siteLocale'
 import './style.css'
+import '../../media-src/vis/design-demo.css'
 import './style/index.css'
 import 'virtual:group-icons.css'
 

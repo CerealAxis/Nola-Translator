@@ -5,16 +5,22 @@ import { Popup } from './popup'
 import { DEFAULT_PREFERENCES, savePreferences } from './preferences'
 import { browserText } from './i18n'
 import type { createPopupStore } from './popupStore'
+import { BROWSER_PROTOCOL_VERSION } from '../../src/shared/browser'
 let settings = { ...DEFAULT_PREFERENCES }
+const connect = vi.fn()
 vi.mock('./preferences', async original => ({ ...await original<typeof import('./preferences')>(), savePreferences: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('./settings-fields', async original => ({ ...await original<typeof import('./settings-fields')>(), usePreferences: () => [settings, 'en', browserText('en')], ConnectionStatus: () => <p>Nola diagnostic status</p> }))
+vi.mock('./settings-fields', async original => ({ ...await original<typeof import('./settings-fields')>(), usePreferences: () => [settings, 'en', browserText('en')] }))
 vi.mock('./providers', async original => { const actual = await original<typeof import('./providers')>(); return { ...actual, loadProviders: vi.fn().mockResolvedValue(actual.DEFAULT_PROVIDERS), requestProviderAccess: vi.fn().mockResolvedValue(true) } })
-beforeEach(() => { vi.clearAllMocks(); settings = { ...DEFAULT_PREFERENCES }; vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } }, runtime: { getManifest: () => ({ version: '2.0.0' }), openOptionsPage: vi.fn().mockResolvedValue(undefined) } }) })
+beforeEach(() => {
+  vi.clearAllMocks(); settings = { ...DEFAULT_PREFERENCES }
+  connect.mockReset().mockImplementation(() => { throw new Error('Host unavailable') })
+  vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } }, runtime: { connect, getManifest: () => ({ version: '2.0.0' }), openOptionsPage: vi.fn().mockResolvedValue(undefined) } })
+})
 function store(error?: string, video = false) { const state = { enabled: true, pending: false, origin: 'https://example.com', url: 'https://example.com/article', video, error, pageError: error }; return { getSnapshot: () => state, subscribe: () => () => {}, enable: vi.fn(), send: vi.fn().mockResolvedValue(undefined) } as unknown as ReturnType<typeof createPopupStore> }
 it('keeps translation controls usable without an initial native-connection error', async () => {
   render(<Popup store={store()} />)
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  expect(screen.queryByText('Nola diagnostic status')).not.toBeInTheDocument(); expect(screen.getByRole('combobox', { name: 'Source language' })).toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: 'Source language' })).toBeInTheDocument()
   expect(screen.getByText('v2.0.0')).toBeInTheDocument()
   const user = userEvent.setup(); await user.click(screen.getByRole('switch', { name: 'Disable on this website' }))
   expect(savePreferences).toHaveBeenCalledWith({ siteBlacklist: ['https://example.com'] })
@@ -32,12 +38,29 @@ it('disables page and video actions on a website excluded by a domain rule', asy
   const t = browserText('en')
   for (const key of ['translatePage', 'translateSubtitles', 'live'] as const) expect(screen.getByRole('button', { name: t(key) })).toBeDisabled()
 })
-it('shows no native diagnostics when an external provider is selected', async () => {
+it('keeps an external provider usable when the desktop connection is unavailable', async () => {
   settings = { ...DEFAULT_PREFERENCES, pageProvider: 'google' }
   render(<Popup store={store()} />)
   await act(async () => { await Promise.resolve() })
-  expect(screen.queryByText('Nola diagnostic status')).not.toBeInTheDocument()
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: browserText('en')('translatePage') })).toBeEnabled()
+})
+
+it('opens a fresh desktop connection and updates the popup status on reconnect', async () => {
+  let receive: (message: unknown) => void
+  const value = store()
+  render(<Popup store={value} />)
+  const button = await screen.findByRole('button', { name: 'Reconnect' })
+  await waitFor(() => expect(button).toBeEnabled())
+  connect.mockReturnValueOnce({
+    onMessage: { addListener: (listener: typeof receive) => { receive = listener } },
+    onDisconnect: { addListener: vi.fn() }, disconnect: vi.fn(),
+    postMessage: ({ id }: { id: string }) => receive({ type: 'result', id, value: { protocolVersion: BROWSER_PROTOCOL_VERSION } }),
+  })
+  await userEvent.click(button)
+  expect(screen.getByRole('status')).toHaveTextContent('Nola is connected')
+  expect(connect).toHaveBeenCalledTimes(2)
+  expect(value.send).toHaveBeenCalledWith('refreshDesktopConnection')
 })
 
 it('opens the provider assignments and saves only the chosen feature', async () => {

@@ -7,17 +7,19 @@ export interface NavigationItemProps {
   label: string
   active?: boolean
   onPress?: () => void
+  hint?: string
+  onboardingTarget?: string
 }
-export function NavigationItem({ id, icon: Icon, label, active = false, onPress }: NavigationItemProps) {
+export function NavigationItem({ id, icon: Icon, label, active = false, onPress, hint, onboardingTarget }: NavigationItemProps) {
   return (
     <SidebarMenuButton
       render={<Button variant="nav" size="icon" />}
-      tooltip={label}
+      tooltip={hint ?? label}
       isActive={active}
       onClick={onPress}
       aria-label={label}
       aria-current={active ? 'page' : undefined}
-      data-onboarding={id ? `nav-${id}` : undefined}
+      data-onboarding={onboardingTarget ?? (id ? `nav-${id}` : undefined)}
       className="nola-nav-button"
     >
       <Icon aria-hidden="true" data-icon="inline-start" />

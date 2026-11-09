@@ -86,6 +86,22 @@ export function parseSiteCues(payload: unknown, kind: 'youtube' | 'bilibili'): S
   return list.filter(cue => Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.start >= 0 && cue.end > cue.start && cue.text.length > 0 && cue.text.length <= 4000).sort((a, b) => a.start - b.start)
 }
 
+export function parseYouTubeTimedText(text: string): SubtitleCue[] {
+  const source = text.trimStart()
+  if (source.startsWith('{')) return parseSiteCues(JSON.parse(source), 'youtube')
+  if (!source.startsWith('<')) return parseTimedText(source)
+  const xml = new DOMParser().parseFromString(source, 'application/xml')
+  const cues = Array.from(xml.querySelectorAll('text[start][dur], p[t][d]'), row => {
+    const unit = row.hasAttribute('t') ? 1000 : 1
+    const start = Number(row.getAttribute(unit === 1000 ? 't' : 'start')) / unit
+    const duration = Number(row.getAttribute(unit === 1000 ? 'd' : 'dur')) / unit
+    for (const line of row.querySelectorAll('br')) line.replaceWith(xml.createTextNode('\n'))
+    return { start, end: start + duration, text: row.textContent?.trim() ?? '' }
+  })
+  return cues.filter(cue => Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.start >= 0 && cue.end > cue.start && cue.text.length > 0 && cue.text.length <= 4000)
+    .sort((left, right) => left.start - right.start)
+}
+
 export function parseTimedText(text: string, platform?: 'netflix'): SubtitleCue[] {
   const timestamp = (value: string) => value.split(':').reduce((total, part) => total * 60 + Number(part.replace(',', '.')), 0)
   if (text.trimStart().startsWith('<')) {

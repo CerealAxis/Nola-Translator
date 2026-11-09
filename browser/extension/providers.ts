@@ -1,5 +1,6 @@
 import { requestId } from './id'
 import { z } from 'zod'
+import { MAX_WEB_TRANSLATION_CONCURRENCY } from './preferences'
 
 export const CAPABILITIES = ['asr', 'mt', 'tts', 's2s', 'llm'] as const
 export type Capability = typeof CAPABILITIES[number]
@@ -55,6 +56,7 @@ export const providerSchema = z.object({
   }),
   apiKey: z.string().max(16000), model: z.string().trim().max(256),
   capabilities: z.array(z.enum(CAPABILITIES)).min(1).max(5),
+  translationConcurrency: z.number().int().min(1).max(MAX_WEB_TRANSLATION_CONCURRENCY).optional(),
   headers: z.record(z.string().regex(/^[A-Za-z0-9-]+$/), z.string().max(16000)).default({}),
   options: z.record(z.string().max(80), scalar).default({}),
 }).superRefine((value, ctx) => {
@@ -69,6 +71,24 @@ export function createProvider(presetId: string): ProviderConnection {
   return { id: presetId === 'nola' ? 'desktop' : requestId(), name: preset.name, preset: preset.id, baseUrl: preset.baseUrl, apiKey: '', model: preset.model ?? '', capabilities: [...preset.capabilities], headers: {}, options: {} }
 }
 export const DEFAULT_PROVIDERS = ['nola', 'google-translate', 'microsoft-translate', 'edge-tts'].map(id => ({ ...createProvider(id), id: id === 'nola' ? 'desktop' : id }))
+
+export function isBundledProviderCopy(provider: ProviderConnection): boolean {
+  const bundled = DEFAULT_PROVIDERS.find(item => item.preset === provider.preset && item.id !== 'desktop')
+  return Boolean(bundled && provider.name === bundled.name && provider.baseUrl === bundled.baseUrl &&
+    provider.model === bundled.model && !provider.apiKey && !Object.keys(provider.headers).length &&
+    !Object.keys(provider.options).length && provider.capabilities.length === 1 && provider.capabilities[0] === bundled.capabilities[0])
+}
+
+export function visibleProviderConnections(providers: ProviderConnection[], preferredId: string): ProviderConnection[] {
+  const representatives = new Map<string, ProviderConnection>()
+  for (const provider of providers) {
+    if (isBundledProviderCopy(provider) && (!representatives.has(provider.preset) || provider.id === preferredId)) {
+      representatives.set(provider.preset, provider)
+    }
+  }
+  // Keep stored connections and their bindings intact when identical presets share a display row.
+  return providers.filter(provider => !isBundledProviderCopy(provider) || representatives.get(provider.preset) === provider)
+}
 
 // Extension-page IndexedDB is not shared with isolated content scripts on website origins.
 export function providerDatabase(): Promise<IDBDatabase> {

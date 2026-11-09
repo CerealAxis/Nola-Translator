@@ -27,20 +27,18 @@ describe('tab capture validation', () => {
 describe('live player capture', () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
-  it.each(['Chrome/156', 'Chrome/156 Edg/156'])('uses the granted tab capture id on %s', async userAgent => {
-    const captured = stream()
-    const getUserMedia = vi.fn().mockResolvedValue(captured)
-    const sendMessage = vi.fn().mockResolvedValue({ id: 'current-tab' })
+  it.each(['Chrome/156', 'Chrome/156 Edg/156'])('uses player audio directly on %s', async userAgent => {
+    const captured = Object.assign(stream(), { removeTrack: vi.fn() })
+    const player = Object.assign(document.createElement('video'), { captureStream: vi.fn(() => captured) })
+    const getUserMedia = vi.fn()
+    const sendMessage = vi.fn()
     vi.stubGlobal('navigator', { userAgent, mediaDevices: { getUserMedia } })
     vi.stubGlobal('chrome', { runtime: { sendMessage } })
-    await expect(capturePlayerAudio(document.createElement('video'))).resolves.toBe(captured)
-    expect(sendMessage).toHaveBeenCalledWith({ type: 'captureTabAudio' })
-    expect(getUserMedia).toHaveBeenCalledWith({
-      audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: 'current-tab' } },
-    })
-    sendMessage.mockResolvedValue({})
-    await expect(capturePlayerAudio(document.createElement('video'))).rejects.toThrow('browserTabCapturePermission')
-    expect(getUserMedia).toHaveBeenCalledOnce()
+    await expect(capturePlayerAudio(player)).resolves.toBe(captured)
+    expect(player.captureStream).toHaveBeenCalledOnce()
+    expect(captured.removeTrack).toHaveBeenCalledWith(captured.getVideoTracks()[0])
+    expect(sendMessage).not.toHaveBeenCalled()
+    expect(getUserMedia).not.toHaveBeenCalled()
   })
 
   it('on Firefox waits for the player audio and keeps only its audio track', async () => {

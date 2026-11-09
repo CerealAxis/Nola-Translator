@@ -8,6 +8,7 @@ import { migrateLegacyGlossary } from './glossary-store'
 vi.mock('./preferences', async importOriginal => ({ ...await importOriginal<typeof import('./preferences')>(), loadPreferences: vi.fn() }))
 vi.mock('./providers', async importOriginal => ({ ...await importOriginal<typeof import('./providers')>(), getProvider: vi.fn() }))
 vi.mock('./provider-execution', async importOriginal => ({ ...await importOriginal<typeof import('./provider-execution')>(), translateWith: vi.fn(), generateWith: vi.fn() }))
+vi.mock('./native-provider', async importOriginal => ({ ...await importOriginal<typeof import('./native-provider')>(), nativeTranslationSummary: vi.fn(async () => ({ textTranslationConcurrency: 1 })) }))
 vi.mock('./glossary-store', async importOriginal => ({ ...await importOriginal<typeof import('./glossary-store')>(), recoverExtensionConfiguration: vi.fn(), extensionGlossary: { snapshot: vi.fn(async () => migrateLegacyGlossary([{ source: 'Nola', target: '诺拉', sites: 'video.test' }, { source: 'Recognized', target: 'ignore', sites: 'other.test' }], 'Terms')), onChanged: vi.fn(() => () => {}) } }))
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
 
@@ -112,7 +113,12 @@ it.each(['providerAuthentication', 'providerRateLimit', 'glossaryChanged', 'priv
   await expect.poll(() => postMessage.mock.calls.some(([value]) => value.type === 'ready')).toBe(true)
   nativeReceive({ type: 'capabilityEvent', id: streamId, event: { type: 'asr', data: { type: 'transcript', itemId: 'line', text: 'Nola', final: true } } })
   const expected = failure === 'private upstream details' ? 'providerRequestFailed' : failure
-  await expect.poll(() => postMessage.mock.calls.some(([value]) => value.type === 'error' && value.code === expected)).toBe(true)
+  const type = failure === 'providerRateLimit' ? 'warning' : 'error'
+  await expect.poll(() => postMessage.mock.calls.some(([value]) => value.type === type && value.code === expected)).toBe(true)
+  if (failure === 'providerRateLimit') {
+    expect(translateWith).toHaveBeenCalledTimes(2)
+    expect(postMessage.mock.calls.some(([value]) => value.type === 'error')).toBe(false)
+  }
   expect(JSON.stringify(postMessage.mock.calls)).not.toContain('private upstream details')
   receive({ type: 'stop' })
 })

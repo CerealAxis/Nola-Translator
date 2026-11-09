@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Button } from '../../../src/renderer/components/ui/button'
-import { Alert, AlertDescription } from '../../../src/renderer/components/ui/alert'
 import { ArrowLeft, AudioLines, BookOpen, Captions, ChevronRight, Download, Play, RefreshCw, Settings2, Square, X } from 'lucide-react'
 import { captionAudioSource, type ExtensionStore } from '../store'
-import { browserText, errorKey } from '../i18n'
+import { browserText } from '../i18n'
 import { NolaLogo } from '../logo'
 import { ChoiceField } from './ChoiceField'
 import { PopupLanguage } from './PopupLanguage'
@@ -13,9 +12,11 @@ import { Field, FieldGroup, FieldLabel } from '../../../src/renderer/components/
 import { Switch, SwitchThumb } from '../../../src/renderer/components/ui/switch'
 import { DEFAULT_PREFERENCES, savePreferences, type Preferences } from '../preferences'
 import type { SubtitleState, SubtitleTranslation } from '../subtitle-translation'
+import { SubtitleAvailabilityTooltip } from './SubtitleAvailabilityTooltip'
+import { useErrorToasts } from './useErrorToasts'
 
-export interface PanelProps { store: ExtensionStore; subtitles?: SubtitleState; toggleSubtitles?: () => void; selectTrack?: (id: string) => void; subtitleController?: SubtitleTranslation }
-export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitleController }: PanelProps) {
+export interface PanelProps { store: ExtensionStore; subtitles?: SubtitleState; toggleSubtitles?: () => void; selectTrack?: (id: string) => void; subtitleController?: SubtitleTranslation; portalContainer?: HTMLElement }
+export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitleController, portalContainer }: PanelProps) {
   const panel = useRef<HTMLElement>(null)
   const [view, setView] = useState<'main' | 'settings' | 'style' | 'download' | 'study'>('main')
   const [saveError, setSaveError] = useState(false)
@@ -45,6 +46,7 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
     if (row && transcript.current) transcript.current.scrollTop = Math.max(0, row.offsetTop - transcript.current.offsetTop - transcript.current.clientHeight / 2)
   }, [currentTime, transcriptOpen, state.preferences?.subtitleFollow, subtitles?.transcript])
   const t = browserText(state.preferences?.uiLanguage)
+  useErrorToasts(t, state.liveAttempted ? state.error : undefined, subtitles?.error, saveError || exportError ? 'internalError' : undefined)
   const preferences = state.preferences
   const save = (patch: Partial<Preferences>) => { setSaveError(false); void savePreferences(patch).catch(() => setSaveError(true)) }
   const languages = languageOptions(resolveUiLanguage(preferences?.uiLanguage ?? 'auto', navigator.language))
@@ -57,10 +59,10 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
   const available = enhanced || Boolean(state.summary?.browserAudio && state.captionServiceActive)
   const blocked = !state.selectedVideo || !state.connected || !available || !compatible
   const primaryDisabled = state.status === 'active' ? false : blocked || locked
-  const status = !state.connected ? 'statusDisconnected' : !compatible ? 'extensionVersionMismatch' : state.status === 'starting' ? 'starting' : state.status === 'stopping' ? 'stopping' : running ? 'statusRecognizing' : available ? 'statusReady' : 'captionServiceOff'
+  const status = !state.connected ? 'statusDisconnected' : !compatible ? 'extensionVersionMismatch' : state.status === 'starting' ? 'starting' : state.status === 'stopping' ? 'stopping' : running ? (state.playbackPaused ? 'statusWaitingForPlayback' : 'statusRecognizing') : available ? 'statusReady' : 'captionServiceOff'
   const title = view === 'settings' ? t('subtitleSettings') : view === 'style' ? t('subtitleStyle') : view === 'download' ? t('downloadSrt') : view === 'study' ? t('transcript') : t('button')
   const link = (next: typeof view, label: string, Icon: typeof Captions, disabled = false) => <Button variant="bare" size="sm" className="nola-subtitle-menu-item" disabled={disabled} onClick={() => setView(next)}><Icon aria-hidden="true" /><span>{label}</span><ChevronRight aria-hidden="true" /></Button>
-  return <section ref={panel} tabIndex={-1} className="nola-extension nola-panel nola-subtitle-menu" aria-label={t('button')} onKeyDown={event => {
+  return <section ref={panel} tabIndex={-1} className="nola-panel nola-subtitle-menu nola-glass-popup" aria-label={t('button')} onKeyDown={event => {
     if (event.key !== 'Escape' || event.defaultPrevented) return
     event.stopPropagation()
     if (view === 'main') store.closePanel()
@@ -73,11 +75,11 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
     </header>
     {view === 'main' && <>
     {(state.liveAttempted || locked) && <p className="nola-status" role="status">{t(status)}</p>}
-    {state.liveAttempted && (state.error === 'tabAudioSilent'
-      ? <Alert role="status" variant="warning"><AlertDescription>{t(errorKey(state.error))}</AlertDescription></Alert>
-      : state.error ? <Alert variant="danger"><AlertDescription>{t(errorKey(state.error))}</AlertDescription></Alert> : null)}
     {subtitles && <div className="nola-subtitle-toggle">
-      <Captions aria-hidden="true" /><span>{t('translateSubtitles')}</span><Switch aria-label={t('translateSubtitles')} disabled={locked || !state.selectedVideo} checked={subtitles.active} onCheckedChange={toggleSubtitles}><SwitchThumb /></Switch>
+      <Captions aria-hidden="true" /><span>{t('translateSubtitles')}</span>
+      <SubtitleAvailabilityTooltip availability={subtitles.availability} active={subtitles.active} container={portalContainer} t={t}>
+        <Switch aria-label={t('translateSubtitles')} disabled={locked || !state.selectedVideo || !subtitles.active && subtitles.availability !== 'ready'} checked={subtitles.active} onCheckedChange={toggleSubtitles}><SwitchThumb /></Switch>
+      </SubtitleAvailabilityTooltip>
     </div>}
     {link('download', t('downloadSrt'), Download, !subtitleController || !subtitles?.active)}
     {link('study', t('transcript'), BookOpen, !subtitleController || !subtitles?.active)}
@@ -87,17 +89,16 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
         {state.status === 'active' ? <Square aria-hidden="true" /> : <Play aria-hidden="true" />}
         {state.status === 'active' ? t('end') : state.status === 'starting' ? t('starting') : state.status === 'stopping' ? t('stopping') : t(enhanced ? 'live' : 'start')}
       </Button>
-      <Button variant="bare" size="icon-sm" aria-label={t('refresh')} title={t('refresh')} disabled={state.status === 'starting' || state.status === 'stopping' || state.capturePending} onClick={() => { void store.refresh() }}><RefreshCw aria-hidden="true" /></Button>
+      <Button variant="bare" size="icon-sm" aria-label={t('refresh')} title={t('refresh')} disabled={state.status === 'starting' || state.status === 'stopping' || state.capturePending} onClick={() => { subtitleController?.checkAvailability(true); void store.refresh() }}><RefreshCw aria-hidden="true" /></Button>
     </div>
     {tabAudio && !enhanced && <Button variant="secondary" disabled={locked || !state.connected || !compatible} onClick={store.pressCapture}><AudioLines aria-hidden="true" />{t(state.audioCaptured ? 'audioCaptured' : 'captureAudio')}</Button>}
     </>}
     {view === 'download' && <div className="nola-subtitle-page">
       <Button variant="secondary" disabled={exporting} onClick={() => void download(false)}><Download />{t('sourceSubtitles')} · SRT</Button>
       <Button variant="secondary" disabled={exporting} onClick={() => void download(true)}><Download />{t('translatedSubtitles')} · SRT</Button>
-      {exportError && <p role="alert">{t('internalError')}</p>}
     </div>}
     {view === 'study' && subtitles && subtitleController && <div className="nola-subtitle-page">
-      <div className="flex flex-wrap gap-2">
+      <div className="nola-subtitle-study-actions">
         <Button variant="secondary" aria-expanded={transcriptOpen} onClick={() => setTranscriptOpen(!transcriptOpen)}>{t('transcript')}</Button>
         <Button variant="secondary" disabled={subtitles.processing} onClick={() => void subtitleController.summarize()}>{t('summarizeVideo')}</Button>
         <Button variant="secondary" disabled={subtitles.processing} onClick={() => void subtitleController.segment()}>{t('segmentSubtitles')}</Button>
@@ -105,7 +106,7 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
       </div>
       <ChoiceField t={t} label={t('playbackRate')} value={rate} options={[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => ({ value: String(rate), label: `${rate}×` }))} onChange={value => { setRate(value); subtitleController.playback(Number(value)) }} />
       {subtitles.summary && <p dir="auto">{subtitles.summary}</p>}
-      {transcriptOpen && <div ref={transcript} className="nola-transcript" role="region" aria-label={t('transcript')} style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+      {transcriptOpen && <div ref={transcript} className="nola-transcript" role="region" aria-label={t('transcript')}>
         {subtitles.transcript?.map((cue, index) => <Button key={`${cue.start}-${index}`} aria-current={currentTime >= cue.start && currentTime < cue.end ? 'true' : undefined} variant="secondary" onClick={() => subtitleController.seek(cue.start)}><span>{Math.floor(cue.start / 60)}:{String(Math.floor(cue.start % 60)).padStart(2, '0')}</span><span dir="auto">{cue.text}</span></Button>)}
       </div>}
     </div>}
@@ -135,7 +136,5 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
       <Field className="nola-subtitle-style-row"><FieldLabel htmlFor="nola-subtitle-hover">{t('subtitlePauseOnHover')}</FieldLabel><Switch id="nola-subtitle-hover" checked={preferences.subtitlePauseOnHover} onCheckedChange={value => save({ subtitlePauseOnHover: value })}><SwitchThumb /></Switch></Field>
       <Button variant="outline" onClick={() => save(Object.fromEntries((['subtitleSourceSize', 'subtitleSourceColor', 'subtitleSourceFont', 'subtitleTranslationSize', 'subtitleTranslationColor', 'subtitleTranslationFont', 'subtitleBold', 'subtitleBackground', 'subtitleBackgroundOpacity', 'subtitlePauseOnHover'] as const).map(key => [key, DEFAULT_PREFERENCES[key]])))}><RefreshCw />{t('resetStyle')}</Button>
     </FieldGroup>}
-    {subtitles?.error && <p role="alert" className="nola-error">{t(errorKey(subtitles.error))}</p>}
-    {saveError && <p role="alert" className="nola-error">{t('internalError')}</p>}
   </section>
 }

@@ -18,7 +18,7 @@ const LEGACY_ERROR_CODES: Readonly<Record<string, BrowserWireErrorCode>> = {
 function browserErrorCode(code: string): BrowserWireErrorCode {
   return LEGACY_ERROR_CODES[code] ?? code as BrowserWireErrorCode
 }
-export function createBridge(name = 'nola-captions'): ExtensionBridge {
+export function createBridge(name = 'nola-captions', openPort = () => chrome.runtime.connect({ name })): ExtensionBridge {
   let port: ChromePort | null = null
   const pending = new Map<string, { resolve: (value: Extract<BrowserResponse, { type: 'result' }>['value']) => void; reject: (reason: Error) => void; timer: ReturnType<typeof setTimeout> }>()
   const listeners = new Set<(response: BrowserResponse) => void>()
@@ -28,7 +28,7 @@ export function createBridge(name = 'nola-captions'): ExtensionBridge {
     pending.clear()
   }
   const connect = (): ChromePort => {
-    const connected = chrome.runtime.connect({ name })
+    const connected = openPort()
     port = connected
     connected.onMessage.addListener(message => {
       if (port !== connected) return
@@ -80,7 +80,13 @@ export function createBridge(name = 'nola-captions'): ExtensionBridge {
         signal?.addEventListener('abort', abort, { once: true })
         // Compile the content bundle's release into hello: getManifest() can already describe a
         // reloaded background while an old page still runs its previous content script.
-        try { (port ?? connect()).postMessage({ ...input, ...(input.type === 'hello' ? { extensionVersion: BROWSER_EXTENSION_VERSION, protocolVersion: BROWSER_PROTOCOL_VERSION } : {}), id }) } catch { port = null; finish(); clearTimeout(timer); pending.delete(id); reject(new BrowserFailure('browserConnectionUnavailable')) }
+        try { (port ?? connect()).postMessage({ ...input, ...(input.type === 'hello' ? { extensionVersion: BROWSER_EXTENSION_VERSION, protocolVersion: BROWSER_PROTOCOL_VERSION } : {}), id }) }
+        catch {
+          const disconnected = port
+          port = null
+          rejectAll('browserConnectionUnavailable')
+          try { disconnected?.disconnect() } catch { /* The browser may already have closed it. */ }
+        }
       })
     },
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },

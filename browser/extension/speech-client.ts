@@ -30,6 +30,8 @@ export function speechError(code: unknown): BrowserWireErrorCode {
     providerModel: 'modelUnavailable', providerMissing: 'modelUnavailable', providerCapability: 'modelUnavailable',
     providerInvalid: 'invalidMessage', providerAddress: 'invalidConfiguration', providerTimeout: 'translationTimeout',
     providerRateLimit: 'browserTranslationRateLimited', providerResponseSize: 'lineTooLarge',
+    browserTranslationRateLimited: 'browserTranslationRateLimited', resourceBusy: 'resourceBusy',
+    browserAudioBacklog: 'browserAudioBacklog',
     providerDisconnected: 'browserConnectionLost', modelDisabled: 'modelDisabled', modelUnavailable: 'modelUnavailable',
     gatewayNotRunning: 'gatewayNotRunning', invalidCredential: 'invalidCredential',
     browserConnectionUnavailable: 'browserConnectionUnavailable',
@@ -39,7 +41,7 @@ export function speechError(code: unknown): BrowserWireErrorCode {
 }
 
 /** Keep the existing player clock and capture lifecycle while moving provider execution off-page. */
-export function createSpeechBridge(native: ExtensionBridge, preferences: () => Preferences | undefined): ExtensionBridge {
+export function createSpeechBridge(native: ExtensionBridge, preferences: () => Preferences | undefined, onWarning?: (code?: BrowserWireErrorCode) => void): ExtensionBridge {
   const listeners = new Set<(event: BrowserResponse) => void>()
   let port: ChromePort | undefined, epoch = 0, sessionId = '', videoTime = 0, playbackRate = 1, sentMs = 0, activeExternal: boolean | undefined
   let sessionPreferences: Preferences | undefined
@@ -59,12 +61,14 @@ export function createSpeechBridge(native: ExtensionBridge, preferences: () => P
       if (port !== current || !raw || typeof raw !== 'object') return
       const event = raw as Record<string, unknown>
       if (event.type === 'ready') { clearTimeout(timeout); ready?.(); ready = undefined; rejected = undefined }
+      else if (event.type === 'warning') onWarning?.(speechError(event.code))
       else if (event.type === 'error') {
         const code = speechError(event.code)
         rejected?.(new BrowserFailure(code)); rejected = undefined
         emit({ type: 'error', id: '*', code, message: '' }); close()
       } else if (event.type === 'finished') { finished?.(); finished = undefined }
       else if (event.type === 'caption' && sessionId) {
+        if (event.translation) onWarning?.()
         const started = Math.max(0, Number(event.startedAtMs ?? sentMs))
         const ended = typeof event.endedAtMs === 'number' ? Math.max(started, event.endedAtMs) : undefined
         emit({ type: 'event', event: { protocolVersion: 1, type: 'caption', requestId: sessionId, sessionId, streamEpoch: epoch, videoStartedAtMs: videoTime + started * playbackRate, videoEndedAtMs: ended === undefined ? undefined : videoTime + ended * playbackRate,

@@ -44,7 +44,6 @@
   .nola-workspace-body { display: flex; flex: 1 1 0; gap: 16px; min-width: 0; min-height: 0; }
   .nola-workspace-transcript.card { gap: 0; flex: 1 1 0; min-height: 0; padding: 0; --card-spacing: var(--space-2); }
   .nola-transcript-head { display: grid; flex: none; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: var(--card-spacing); border-bottom: 1px solid var(--border); }
-  .nola-transcript-head .card__title { font: var(--font-title); }
   .nola-transcript-head .card__title + .card__title { padding-inline-start: 18px; border-inline-start: 1px solid var(--separator); }
   .nola-transcript-head:not([data-mode="both"]) { grid-template-columns: minmax(0, 1fr); }
   .nola-workspace-caption [data-slot="caption-scroll"] { padding: 0; }
@@ -63,7 +62,6 @@
   .nola-workspace-empty { display: flex; height: 100%; min-height: 120px; justify-content: center; align-items: center; flex-direction: column; gap: 10px; text-align: center; }
   .nola-workspace-notes.card { gap: 0; flex: 0 0 280px; min-height: 0; padding: 0; --card-spacing: var(--space-2); }
   .nola-workspace-notes-heading { padding: var(--card-spacing); display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 10px; flex: none; text-align: left; }
-  .nola-workspace-notes-heading .card__title { font: var(--font-title); }
   .nola-workspace-notes-state { color: var(--nola-ui-muted-foreground); font-size: 12px; white-space: nowrap; }
   .nola-workspace-notes-tools { display: flex; flex: none; gap: var(--space-1); padding: var(--space-1) var(--card-spacing); border-block: 1px solid var(--border); flex-wrap: wrap; }
   .nola-workspace-notes-tools :is(.button, .toggle-button) { border-radius: var(--radius-xl); }
@@ -127,7 +125,7 @@
     .nola-workspace-caption .nola-baseline-pair[data-bilingual="false"] { grid-template-columns: 1fr; }
     .nola-workspace-caption .nola-baseline-pair[data-bilingual="true"] [data-kind="translation"] { border: none; color: var(--primary) !important; }
     .nola-workspace-caption [data-slot="caption-line"] { padding-inline: 0; }
-    .nola-transcript-head .card__title { font-size: 15px; }
+    .nola-transcript-head .card__title { font: var(--font-body-strong); }
     .nola-workspace-config { gap: 10px; }
     .nola-workspace-audio, .nola-workspace-field { flex-basis: 100%; }
     .nola-workspace-view-controls { gap: 10px; }

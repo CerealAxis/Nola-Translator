@@ -50,7 +50,7 @@ export function translationModelPatch(settings: AppSettings, model: ResourceReco
 /** `SessionConfig` 里由翻译设置决定的那几个字段。 */
 export type TranslationFields = Pick<
   SessionConfig,
-  'targetLanguages' | 'allowIntermediateTranslation' | 'translationProvider' | 'translationModelId' | 'translationOptions' | 'fallbackTranslationProvider' | 'fallbackTranslationOptions'
+  'targetLanguages' | 'allowIntermediateTranslation' | 'intermediateTranslationIntervalMs' | 'translationProvider' | 'translationModelId' | 'translationOptions' | 'fallbackTranslationProvider' | 'fallbackTranslationOptions'
 >
 
 export interface TranslationFieldOptions {
@@ -85,6 +85,7 @@ export function translationFieldsOf(
   return {
     targetLanguages,
     allowIntermediateTranslation: supportsIntermediateTranslation(translation.provider) && translation.translateIntermediate,
+    intermediateTranslationIntervalMs: translation.intermediateTranslationIntervalMs,
     // 见文件头第 3 条：全部取自设置，不写死。
     translationProvider: translation.provider,
     /*

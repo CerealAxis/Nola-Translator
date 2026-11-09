@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import '../shadcn-base/preview.css'
 
 const PreviewPortal = createContext<HTMLDivElement | null>(null)
 

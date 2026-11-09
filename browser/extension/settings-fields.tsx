@@ -8,6 +8,7 @@ import { ColorPicker } from '../../src/renderer/components/ui/color-picker'
 import { BROWSER_PROTOCOL_VERSION } from '../../src/shared/browser'
 import { BrowserFailure, createBridge } from './bridge'
 import { ChoiceField } from './components/ChoiceField'
+import { usePortalContainer } from './components/usePortalContainer'
 import { browserText, errorKey } from './i18n'
 import { DEFAULT_PREFERENCES, observePreferences, savePreferences, type Preferences } from './preferences'
 import { requestProviderAccess, type ProviderConnection } from './providers'
@@ -20,8 +21,8 @@ export function RangeField({ label, value, onChange, min = 0, max = 100, step = 
 }
 
 export function ColorField({ label, value, onChange }: { label: string; value: string; onChange(value: string): void }) {
-  const [container, setContainer] = useState<HTMLDivElement | null>(null)
-  return <Field><FieldLabel>{label}</FieldLabel><ColorPicker label={label} value={value} presets={[]} onChange={onChange} container={container} /><div ref={setContainer} className="nola-portal-container" /></Field>
+  const [container, containerRef] = usePortalContainer()
+  return <Field><FieldLabel>{label}</FieldLabel><ColorPicker label={label} value={value} presets={[]} onChange={onChange} container={container} /><div ref={containerRef} className="nola-portal-container" /></Field>
 }
 
 export function usePreferences(): [Preferences, UiLanguage, ReturnType<typeof browserText>] {
@@ -29,36 +30,48 @@ export function usePreferences(): [Preferences, UiLanguage, ReturnType<typeof br
   useEffect(() => observePreferences(setSettings), [])
   const locale = resolveUiLanguage(settings.uiLanguage, navigator.language)
   useEffect(() => {
-    const query = matchMedia('(prefers-color-scheme: dark)')
+    const colorScheme = matchMedia('(prefers-color-scheme: dark)')
+    const reducedTransparency = matchMedia('(prefers-reduced-transparency: reduce)')
     const update = () => {
-      document.documentElement.lang = locale
-      document.documentElement.dataset.theme = settings.theme === 'auto' ? query.matches ? 'dark' : 'light' : settings.theme
+      const root = document.documentElement
+      root.lang = locale
+      root.dataset.theme = settings.theme === 'auto' ? colorScheme.matches ? 'dark' : 'light' : settings.theme
+      root.dataset.nolaGlass = settings.liquidGlass && !reducedTransparency.matches ? 'on' : 'off'
     }
-    query.addEventListener('change', update); update()
-    return () => query.removeEventListener('change', update)
-  }, [locale, settings.theme])
+    colorScheme.addEventListener('change', update)
+    reducedTransparency.addEventListener('change', update)
+    update()
+    return () => {
+      colorScheme.removeEventListener('change', update)
+      reducedTransparency.removeEventListener('change', update)
+    }
+  }, [locale, settings.theme, settings.liquidGlass])
   return [settings, locale, browserText(settings.uiLanguage)]
 }
 
-export function ConnectionStatus({ t, compact = false }: { t: ReturnType<typeof browserText>; compact?: boolean }) {
+export function ConnectionStatus({ t, compact = false, onReconnect }: { t: ReturnType<typeof browserText>; compact?: boolean; onReconnect?: () => Promise<void> }) {
   const [status, setStatus] = useState<{ connected?: boolean; text?: boolean; textError?: string; realtime?: boolean; error?: string }>({})
   const [checking, setChecking] = useState(false)
-  async function check() {
+  async function check(reconnect = false) {
     const bridge = createBridge('nola-popup')
     setChecking(true)
     try {
       const summary = await bridge.request({ type: 'hello' })
       if (!summary || !('protocolVersion' in summary) || summary.protocolVersion !== BROWSER_PROTOCOL_VERSION || summary.extensionCompatible === false) throw new BrowserFailure('browserExtensionVersionMismatch')
+      if (reconnect) await onReconnect?.()
       setStatus({ connected: true, text: summary.textTranslation, textError: summary.textTranslationError, realtime: summary.realtimeTranslation })
     } catch (error) { setStatus({ error: error instanceof BrowserFailure ? error.code : 'browserConnectionUnavailable' }) }
     finally { bridge.close(); setChecking(false) }
   }
   useEffect(() => { void check() }, [])
-  if (compact) return <div className="nola-provider-status"><span role="status">{t(status.connected ? 'nativeReady' : 'nativeOptional')}</span><Button variant="bare" size="xs" onClick={() => { window.open(chrome.runtime.getURL('options.html#apiProviders'), '_blank') }}>{t('diagnostics')}</Button></div>
+  if (compact) return <div className="nola-provider-status" aria-busy={checking}>
+    <span role="status">{t(status.connected ? 'nativeReady' : status.error ? errorKey(status.error) : 'connection')}</span>
+    <Button variant="outline" size="xs" disabled={checking} onClick={() => void check(true)}>{t('reconnect')}</Button>
+  </div>
   return <div className="flex min-w-0 flex-col gap-2">
     {status.error ? <Alert variant={status.error === 'browserConnectionUnavailable' ? 'default' : 'danger'}><AlertDescription>{t(errorKey(status.error))}</AlertDescription></Alert>
-      : status.connected && <p role="status" className="nola-muted">{t('statusReady')}{!compact && <><br />{t(status.text ? 'textReady' : errorKey(status.textError ?? 'browserTextModelUnavailable'))}{status.realtime && <><br />{t('liveAvailable')}</>}</>}</p>}
-    {!compact && <Button className="self-start" variant="outline" disabled={checking} onClick={() => void check()}>{t('testConnection')}</Button>}
+      : status.connected && <p role="status" className="nola-muted">{t('statusReady')}<br />{t(status.text ? 'textReady' : errorKey(status.textError ?? 'browserTextModelUnavailable'))}{status.realtime && <><br />{t('liveAvailable')}</>}</p>}
+    <Button className="self-start" variant="outline" disabled={checking} onClick={() => void check()}>{t('reconnect')}</Button>
   </div>
 }
 

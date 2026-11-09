@@ -25,14 +25,14 @@ it('allows diagnostics from a settings section without trusting another extensio
   expect(unrelated.disconnect).toHaveBeenCalledOnce()
 })
 
-it('cleans obsolete dynamic registrations without creating duplicates or removing unrelated scripts', async () => {
+it('skips missing registrations and removes only obsolete scripts', async () => {
   vi.resetModules()
   const event = () => ({ addListener: vi.fn() })
   const runtime = { onInstalled: event(), onStartup: event(), onMessage: event(), onConnect: event(), getURL: (path: string) => `chrome-extension://nola/${path}` }
   let finish: () => void = () => {}
   const first = new Promise<void>(resolve => { finish = resolve })
-  let registered = [{ id: 'nola-main' }, { id: 'nola-content' }, { id: 'keep-other-script' }]
-  const scripting = { getRegisteredContentScripts: vi.fn(async () => [...registered]), unregisterContentScripts: vi.fn(async ({ ids }: { ids: string[] }) => { await first; registered = registered.filter(script => !ids.includes(script.id)) }), registerContentScripts: vi.fn() }
+  let registered = [undefined, { id: 'nola-main' }, { id: 'nola-content' }, { id: 'keep-other-script' }]
+  const scripting = { getRegisteredContentScripts: vi.fn(async () => [...registered]), unregisterContentScripts: vi.fn(async ({ ids }: { ids: string[] }) => { await first; registered = registered.filter(script => script && !ids.includes(script.id)) }), registerContentScripts: vi.fn() }
   vi.stubGlobal('chrome', { runtime, permissions: { onRemoved: event() }, scripting })
   await import('./background')
   runtime.onInstalled.addListener.mock.calls[0][0]()
@@ -74,6 +74,33 @@ it('returns the toolbar instruction when the native panel API is unavailable', a
   runtime.onMessage.addListener.mock.calls[0][0]({ type: 'openTranslationPanel' }, { id: 'nola', frameId: 0, tab: { id: 7 }, url: 'https://example.test/' }, reply)
   expect(reply).toHaveBeenCalledWith({ ok: false, error: 'openPanelFromToolbar' })
   expect(open).not.toHaveBeenCalled()
+  expect(() => runtime.onMessage.addListener.mock.calls[0][0]({ type: 'openTranslationPanel' }, undefined, reply)).not.toThrow()
+  expect(reply).toHaveBeenLastCalledWith({ ok: false, error: 'permissionFailed' })
+})
+
+it('replaces a broken native port and consumes the page disconnect diagnostic', async () => {
+  vi.resetModules()
+  const event = () => ({ addListener: vi.fn() })
+  const lost = { onMessage: event(), onDisconnect: event(), postMessage: vi.fn(() => { throw new Error('disconnected') }), disconnect: vi.fn() }
+  const fresh = { ...lost, postMessage: vi.fn() }
+  const lastError = vi.fn(() => ({ message: 'Page entered BFCache' }))
+  const runtime = { onInstalled: event(), onStartup: event(), onMessage: event(), onConnect: event(),
+    getURL: (path: string) => `chrome-extension://nola/${path}`,
+    connectNative: vi.fn().mockReturnValueOnce(lost).mockReturnValueOnce(fresh), get lastError() { return lastError() } }
+  vi.stubGlobal('chrome', { runtime, permissions: { onRemoved: event() } })
+  await import('./background')
+  const port = { name: 'nola-popup', sender: { url: runtime.getURL('popup.html') }, onMessage: event(), onDisconnect: event(), postMessage: vi.fn() }
+  runtime.onConnect.addListener.mock.calls[0][0](port)
+  const request = port.onMessage.addListener.mock.calls[0][0]
+  request({ type: 'hello', id: 'before' })
+  await Promise.resolve()
+  expect(lost.disconnect).toHaveBeenCalledOnce()
+  expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({ code: 'browserConnectionLost' }))
+  request({ type: 'hello', id: 'after' })
+  await Promise.resolve()
+  expect(fresh.postMessage).toHaveBeenCalledWith(expect.objectContaining({ id: 'after' }))
+  port.onDisconnect.addListener.mock.calls[0][0]()
+  expect(lastError).toHaveBeenCalledOnce()
 })
 
 it('broadcasts permission changes without relying on revoked URL metadata and checks only the sender origin', async () => {

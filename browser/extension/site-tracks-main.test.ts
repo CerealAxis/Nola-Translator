@@ -24,11 +24,11 @@ it('recovers an empty timedtext response by activating native captions and reusi
   const url = 'https://www.youtube.com/api/timedtext?v=current&lang=en'
   const fetcher = vi.fn(async (input: RequestInfo | URL) => {
     const href = String(input)
-    return { ok: true, url: href, headers: new Headers({ 'content-type': 'application/json' }), clone() { return this }, text: async () => href.includes('pot=fresh') ? JSON.stringify(payload) : '', json: async () => { if (href.includes('pot=fresh')) return payload; throw new SyntaxError('Empty') } } as Response
+    return { ok: true, url: href, headers: new Headers({ 'content-type': 'application/json' }), clone() { return this }, text: async () => href.includes('fmt=srv3') ? '<timedtext><body><p t="1000" d="2000"><s>Native subtitle</s></p></body></timedtext>' : href.includes('pot=fresh') ? JSON.stringify(payload) : '', json: async () => { if (href.includes('pot=fresh')) return payload; throw new SyntaxError('Empty') } } as Response
   })
   vi.stubGlobal('fetch', fetcher)
   const player = document.querySelector('#movie_player')!
-  const toggle = vi.fn(() => { void window.fetch(url + '&pot=fresh') })
+  const toggle = vi.fn(() => { void window.fetch(url + '&pot=fresh&fmt=srv3') })
   Object.assign(player, { getPlayerResponse: () => ({ videoDetails: { videoId: 'current' }, captions: { playerCaptionsTracklistRenderer: { captionTracks: [{ baseUrl: url, vssId: '.en', languageCode: 'en' }] } } }), getOption: () => undefined, toggleSubtitles: toggle })
   installSiteTracks()
   expect(await request()).toMatchObject([{ id: '.en' }])

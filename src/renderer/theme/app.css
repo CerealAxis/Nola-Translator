@@ -80,7 +80,8 @@
   .nola-sidebar[data-collapsible="icon"] .nola-sidebar-nav {
     margin-inline: calc(-1 * var(--space-1)); padding-inline: var(--space-1);
   }
-  .nola-sidebar[data-collapsible="icon"] :is(.nola-sidebar-brand, .nola-sidebar-account) {
+  .nola-sidebar[data-collapsible="icon"] .nola-sidebar-brand,
+  .nola-sidebar[data-collapsible="icon"] .nola-sidebar-account {
     justify-content: center; padding-inline: 0;
   }
   .nola-sidebar[data-collapsible="icon"] :is(.nola-nav-label, [data-slot="sidebar-group-label"]) { display: none; }
@@ -151,7 +152,11 @@
     justify-content: flex-start; gap: var(--space-1); padding-inline: var(--space-1); overflow: hidden;
   }
   .nola-nav-button.button svg { width: var(--space-2); height: var(--space-2); }
-  .nola-sidebar-brand.nola-nav-button.button { height: var(--nola-titlebar-h); font: var(--font-body-strong); }
+  .nola-sidebar-brand.button {
+    display: flex; width: 100%; height: var(--nola-titlebar-h); min-width: 0;
+    justify-content: flex-start; gap: var(--space-1); padding-inline: var(--space-1);
+    overflow: hidden; color: var(--sidebar-foreground); font: var(--font-body-strong);
+  }
   .nola-sidebar[data-collapsible="icon"] .nola-nav-button.button { justify-content: center; padding-inline: 0; }
   .nola-sidebar[data-collapsible="icon"] .nola-sidebar-account__action { display: none; }
   .toast { align-items: center; }

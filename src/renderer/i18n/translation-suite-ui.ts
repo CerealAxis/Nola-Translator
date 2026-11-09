@@ -1,6 +1,7 @@
 import type { DictionaryKey } from './zh-CN'
 
 const copy = {
+  experimentalUnavailable: ['实验性功能，暂不可用', '實驗性功能，暫不可用', '實驗性功能，暫不可用', 'Experimental feature, temporarily unavailable', '実験的な機能のため、現在利用できません', '실험 기능이며 현재 사용할 수 없습니다'],
   legacyTermsUnavailable: ['兼容模式无法应用同传术语。请使用实时后端的翻译模型，或停用适用于同传的术语库。', '相容模式無法套用同傳術語。請使用即時後端的翻譯模型，或停用適用於同傳的術語庫。', '兼容模式無法套用傳譯術語。請使用即時後端的翻譯模型，或停用傳譯術語庫。', 'Compatibility mode cannot apply live glossary terms. Use a realtime backend translation model or disable the live glossary.', '互換モードでは通訳用語を適用できません。リアルタイムバックエンドの翻訳モデルを使うか、通訳用の用語集を無効にしてください。', '호환 모드에서는 통역 용어를 적용할 수 없습니다. 실시간 백엔드 번역 모델을 사용하거나 통역용 용어집을 끄세요.'],
   unsupportedMtTerms: ['所选翻译服务不支持固定译法。请更换翻译模型，或关闭该术语库。', '所選翻譯服務不支援固定譯法。請更換翻譯模型，或關閉該術語庫。', '所選翻譯服務不支援固定譯法。請更換翻譯模型，或關閉該術語庫。', 'The selected translator cannot apply glossary terms. Choose another model or disable this library.', '選択した翻訳サービスは用語指定に対応していません。モデルを変更するか、用語集を無効にしてください。', '선택한 번역 서비스는 용어 지정을 지원하지 않습니다. 모델을 바꾸거나 용어집을 끄세요.'],
   syncGlossaryFailed: ['未能向同传服务发送术语表，请重试。', '未能傳送術語表到同傳服務，請重試。', '無法傳送術語表到傳譯服務，請重試。', 'Could not send the glossary to the interpretation service. Try again.', '通訳サービスに用語集を送信できませんでした。もう一度お試しください。', '통역 서비스로 용어집을 보내지 못했습니다. 다시 시도하세요.'],

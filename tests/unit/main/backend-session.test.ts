@@ -17,6 +17,10 @@ const config: SessionConfig = {
 }
 
 describe('desktop backend session', () => {
+  it('maps the interim translation interval to the backend session', () => {
+    const mapped = mapSessionConfig({ ...config, intermediateTranslationIntervalMs: 1200 }, DEFAULT_SETTINGS, models)
+    expect(mapped?.config.translation_preview_interval_ms).toBe(1200)
+  })
   it.each(['google', 'microsoft'] as const)('maps keyless %s primary and fallback without forwarding old credentials', provider => {
     const ids = new Set([...models, provider])
     const mapped = mapSessionConfig({ ...config, translationProvider: provider, translationOptions: undefined,

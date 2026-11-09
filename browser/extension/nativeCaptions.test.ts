@@ -1,26 +1,25 @@
-import { describe, expect, it, vi } from 'vitest'
-import { NativeCaptionTrack } from './nativeCaptions'
+import { expect, it } from 'vitest'
+import { suppressPlayerCaptions } from './nativeCaptions'
 
-describe('native fullscreen captions', () => {
-  it('does not create or disable text tracks while Nola is idle, then restores them on stop', () => {
-    const existing = [{ mode: 'showing' }, { mode: 'hidden' }] as TextTrack[]
-    const cues: TextTrackCue[] = []
-    const nola = { mode: 'disabled', cues, addCue(cue: TextTrackCue) { cues.push(cue) }, removeCue(cue: TextTrackCue) { cues.splice(cues.indexOf(cue), 1) } } as unknown as TextTrack
-    const video = { textTracks: existing, addTextTrack: vi.fn(() => { existing.push(nola); return nola }) } as unknown as HTMLVideoElement
-    const presenter = new NativeCaptionTrack()
-    presenter.update(video, false, null, 'Nola', 'en')
-    expect(video.addTextTrack).not.toHaveBeenCalled()
-    expect(existing.map(track => track.mode)).toEqual(['showing', 'hidden'])
-    const cue = { text: 'Hello' } as VTTCue
-    presenter.update(video, true, cue, 'Nola', 'en')
-    expect(existing.map(track => track.mode)).toEqual(['disabled', 'disabled', 'showing'])
-    expect(cues).toEqual([cue])
-    presenter.update(video, false, null, 'Nola', 'en')
-    expect(existing.map(track => track.mode)).toEqual(['showing', 'hidden', 'disabled'])
-    expect(cues).toEqual([])
-    presenter.update(video, true, cue, 'Nola', 'en')
-    presenter.restore()
-    expect(video.addTextTrack).toHaveBeenCalledOnce()
-    expect(existing.map(track => track.mode)).toEqual(['showing', 'hidden', 'disabled'])
-  })
+it('hides and restores the player captions without changing disabled or Nola tracks', () => {
+  const player = document.createElement('div')
+  player.id = 'movie_player'
+  const video = player.appendChild(document.createElement('video'))
+  const existing = { kind: 'captions', label: 'English', mode: 'showing' }
+  const disabled = { kind: 'captions', label: 'Chinese', mode: 'disabled' }
+  const own = { kind: 'captions', label: 'Nola', mode: 'showing' }
+  const tracks = [existing, disabled, own]
+  const list = Object.assign(new EventTarget(), { [Symbol.iterator]: () => tracks[Symbol.iterator]() })
+  Object.defineProperty(video, 'textTracks', { value: list })
+  const restore = suppressPlayerCaptions(video)
+  try {
+    expect(player.hasAttribute('data-nola-live-captions')).toBe(true)
+    expect(tracks.map(track => track.mode)).toEqual(['hidden', 'disabled', 'showing'])
+    const added = { kind: 'subtitles', label: 'French', mode: 'showing' }
+    tracks.push(added)
+    list.dispatchEvent(new Event('addtrack'))
+    expect(added.mode).toBe('hidden')
+  } finally { restore() }
+  expect(player.hasAttribute('data-nola-live-captions')).toBe(false)
+  expect(tracks.map(track => track.mode)).toEqual(['showing', 'disabled', 'showing', 'showing'])
 })

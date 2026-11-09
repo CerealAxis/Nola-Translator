@@ -25,6 +25,8 @@ it('shows separate real browser icons and installation states with per-browser a
   const edgeRow = screen.getByRole('listitem', { name: 'Microsoft Edge' })
   expect(within(chromeRow).getByRole('status')).toHaveTextContent('已安装')
   expect(within(edgeRow).getByRole('status')).toHaveTextContent('未安装')
+  fireEvent.click(screen.getByRole('button', { name: '重新连接' }))
+  expect(settingsActions.browserConnectionAction).toHaveBeenCalledWith('repair')
   const images = container.querySelectorAll('img')
   expect(images).toHaveLength(3)
   expect(images[0].getAttribute('src')).toContain('chrome.png')
@@ -112,6 +114,18 @@ it('shows detecting only before the first status result', () => {
   act(() => settingsStore.setState({ browser: { enabled: true, registered: true, captionServiceActive: false, sessionActive: false, connections: 0, browsers: [{ ...chrome, extensionStatus: 'unknown' }, { ...edge, extensionStatus: 'unknown' }] } }))
   expect(screen.queryByText('正在检测')).not.toBeInTheDocument()
   expect(screen.getAllByText('无法确认扩展状态')).toHaveLength(3)
+})
+
+it('shows the browser extension connection failure and restart instructions', async () => {
+  const notify = vi.spyOn(toast, 'notifyRetryableFailure').mockReturnValue('toast')
+  vi.mocked(settingsActions.browserConnectionAction).mockImplementation(async action => {
+    if (action === 'repair') settingsStore.setState({ browserError: 'registration failed' })
+  })
+  render(<BrowserTab />)
+  fireEvent.click(screen.getByRole('button', { name: '重新连接' }))
+  await waitFor(() => expect(notify).toHaveBeenCalledWith('浏览器插件连接失败', expect.objectContaining({
+    description: '请安装好浏览器插件并重启浏览器后重试',
+  })))
 })
 
 it('offers a real retry after a browser extension download fails without showing internal details', async () => {

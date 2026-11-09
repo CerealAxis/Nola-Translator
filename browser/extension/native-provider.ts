@@ -1,4 +1,65 @@
-import { BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, BROWSER_PROTOCOL_VERSION, type BrowserResponse } from '../../src/shared/browser'
+import { BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, BROWSER_PROTOCOL_VERSION, type BrowserResponse, type BrowserSummary } from '../../src/shared/browser'
+import { BrowserFailure, createBridge, type RequestInput } from './bridge'
+
+let translationBridge: ReturnType<typeof openTranslationBridge> | undefined
+
+function openTranslationBridge() {
+  const bridge = createBridge('native-translation', () => chrome.runtime.connectNative(BROWSER_HOST_NAME))
+  let idle: ReturnType<typeof setTimeout>
+  let active = 0
+  const release = () => {
+    clearTimeout(idle)
+    if (!active) idle = setTimeout(() => {
+      if (translationBridge?.bridge === bridge) translationBridge = undefined
+      bridge.close()
+    }, 15_000)
+  }
+  bridge.subscribe(message => {
+    if (message.type === 'error' && message.id === '*' && translationBridge?.bridge === bridge) {
+      translationBridge = undefined
+      bridge.close()
+    }
+  })
+  let handshake: Promise<BrowserSummary> | undefined
+  let expiresAt = 0
+  const summary = () => {
+    release()
+    if (!handshake || Date.now() >= expiresAt) {
+      expiresAt = Infinity
+      handshake = bridge.request({ type: 'hello', browser: navigator.userAgent.includes('Firefox/') ? 'firefox' : navigator.userAgent.includes('Edg/') ? 'edge' : 'chrome' }).then(value => {
+        if (!value || !('protocolVersion' in value)) throw new BrowserFailure('browserProtocolMismatch')
+        expiresAt = Date.now() + 3000
+        return value as BrowserSummary
+      }).catch(error => {
+        if (translationBridge?.bridge === bridge) translationBridge = undefined
+        bridge.close()
+        throw error
+      })
+    }
+    return handshake
+  }
+  return { bridge, summary, async translate(request: Extract<RequestInput, { type: 'translate' }>, signal: AbortSignal) {
+    clearTimeout(idle)
+    active++
+    try {
+      const hello = await summary()
+      if (request.glossary?.length && (hello.protocolVersion < 4 || !hello.features?.matchedGlossaryV1)) throw new BrowserFailure('browserProtocolMismatch')
+      return await bridge.request(request, signal)
+    } catch (error) {
+      if (error instanceof BrowserFailure && ['browserConnectionLost', 'browserConnectionUnavailable'].includes(error.code) && translationBridge?.bridge === bridge) {
+        translationBridge = undefined
+        bridge.close()
+      }
+      throw error
+    } finally { active--; release() }
+  } }
+}
+
+export function nativeTranslationSummary() { return (translationBridge ??= openTranslationBridge()).summary() }
+
+export function translateNative(request: Extract<RequestInput, { type: 'translate' }>, signal: AbortSignal) {
+  return (translationBridge ??= openTranslationBridge()).translate(request, signal)
+}
 
 export async function nativeRequest(payload: Record<string, unknown>, signal: AbortSignal): Promise<Record<string, unknown>> {
   signal.throwIfAborted()

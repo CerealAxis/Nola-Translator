@@ -3,7 +3,7 @@ import { requestProviderAccess, type Capability, type ProviderConnection } from 
 
 export type TranslationPurpose = 'web' | 'subtitle' | 'selection' | 'input'
 export interface SpeechAudio { audioBase64: string; contentType: string }
-export interface ProviderResult { text?: string; audioBase64?: string; contentType?: string; message?: string }
+export interface ProviderResult { text?: string; audioBase64?: string; contentType?: string; message?: string; webConcurrency?: number; subtitleConcurrency?: number; desktopConcurrency?: number }
 export function providerRequest(payload: Record<string, unknown>, signal?: AbortSignal): Promise<ProviderResult> {
   if (signal?.aborted) return Promise.reject(signal.reason)
   return new Promise((resolve, reject) => {

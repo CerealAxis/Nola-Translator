@@ -1,29 +1,27 @@
 /** Desktop shell geometry is owned here; route content owns its only padding. */
 import type { ReactNode } from 'react'
-import { EllipsisVertical, UserRound, type LucideIcon } from 'lucide-react'
+import { EllipsisVertical, UserRound } from 'lucide-react'
 import nolaAvatarUrl from '@/assets/nola-avatar.png'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader,
-  SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
+  SidebarInset, SidebarMenu, SidebarMenuItem, SidebarProvider, SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useI18n } from '@/i18n'
+import { useRoute } from '@/routes'
 import nolaLogoUrl from '../../../../assets/brand/nola-logo.svg'
 import { FeatureActivityNotice } from './FeatureActivityNotice'
 import { TitleBar } from './TitleBar'
 import { NavigationItem } from './NavigationItem'
+import type { NavigationItemProps } from './NavigationItem'
 
-export interface AppShellNavigationItem {
+export interface AppShellNavigationItem extends NavigationItemProps {
   id: string
-  label: string
-  icon: LucideIcon
   path: string
   section: 'overview' | 'features' | 'settings'
-  active?: boolean
-  onPress?: () => void
 }
 export interface AppShellProps {
   children: ReactNode
@@ -36,10 +34,12 @@ const LOCAL_ACCOUNT_EMAIL = 'local@xaviermc.top'
 
 export function AppShell({ children, navigation, title, className = '' }: AppShellProps) {
   const { t } = useI18n()
+  const { navigate } = useRoute()
   const compact = useIsMobile(1025)
   const name = 'Nola Translator'
   const account = t('shellUi.localAccount')
-  const pageTitle = title ?? navigation?.find(item => item.active)?.label ?? name
+  const settings = navigation?.some(item => item.id === 'settings-back')
+  const pageTitle = title ?? (settings ? t('nav.settings') : navigation?.find(item => item.active)?.label) ?? name
   const home = navigation?.find(item => item.id === 'home')
 
   return (
@@ -50,16 +50,17 @@ export function AppShell({ children, navigation, title, className = '' }: AppShe
           <SidebarHeader>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton render={<Button variant="nav" />} tooltip={name} aria-label={name}
-                  className="nola-sidebar-brand nola-nav-button" onClick={home?.onPress}>
+                <Button type="button" variant="bare" aria-label={name}
+                  className="nola-sidebar-brand" onClick={settings ? () => navigate('#/') : home?.onPress}>
                   <img src={nolaLogoUrl} alt="" />
                   <span className="nola-sidebar-copy" aria-hidden="true">{name}</span>
-                </SidebarMenuButton>
+                </Button>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarHeader>
-          <SidebarContent className="nola-sidebar-nav" aria-label={t('shellUi.mainNavigation')}>
-            {navigation && (['overview', 'features', 'settings'] as const).map(section => (
+          <SidebarContent key={settings ? 'settings' : 'main'} className="nola-sidebar-nav"
+            data-settings-navigation={settings || undefined} aria-label={t(settings ? 'modelsSettingsUi.settingsTabs' : 'shellUi.mainNavigation')}>
+            {navigation && (settings ? ['settings'] as const : ['overview', 'features', 'settings'] as const).map(section => (
               <SidebarGroup key={section}>
                 {section === 'features' && <SidebarGroupLabel>{t('shellUi.toolsGroup')}</SidebarGroupLabel>}
                 <SidebarMenu>

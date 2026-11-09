@@ -1,5 +1,5 @@
-/* 产品材质适配设计文档的 nola-liquid-glass.css，三项偏好由各窗口同步。 */
-:root {
+:root,
+:host {
   --nola-glass-blur: 18px;
   --nola-glass-opacity: 58%;
   --nola-glass-saturation: 165%;
@@ -36,7 +36,8 @@
     var(--nola-glass-fill-strong);
 }
 
-:root:is(.dark, [data-theme="dark"]) {
+:root:is(.dark, [data-theme="dark"]),
+:host([data-theme="dark"]) {
   --nola-glass-dark-opacity: 4%;
   --nola-glass-tint: color-mix(in srgb, var(--primary) 17%, transparent);
   --nola-glass-highlight: rgb(255 255 255 / 11%);
@@ -50,10 +51,11 @@
 
 /* 外观偏好默认启用。系统要求实色或浏览器不支持背景模糊时，显示基础主题。 */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  @media not ((prefers-reduced-transparency: reduce) or (prefers-contrast: more) or (forced-colors: active)) {
-    :root:not([data-nola-glass="off"]) {
+  @media not ((prefers-contrast: more) or (forced-colors: active)) {
+    :is(:root, .nola-extension):not([data-nola-glass="off"]) {
       & :is(
         .nola-glass,
+        .nola-glass-popup,
         .card,
         .nola-dialog-content,
         .nola-toast,
@@ -125,7 +127,7 @@
       }
 
       /* 复用组件的实体表面，保留选中、错误和禁用状态自身的语义色。 */
-      & :is([data-slot="table-container"], .nola-records-table__container, [data-slot="toggle-group"],
+      & :is([data-slot="table-container"], .nola-records-table__container,
         .nola-titlebar:not(:where(.nola-shell-content > .nola-titlebar))) {
         background-color: var(--nola-glass-fill-thin);
         backdrop-filter: var(--nola-glass-control-filter);
@@ -137,7 +139,7 @@
       & .nola-home__recent .nola-records-table th {
         background: color-mix(in srgb, var(--muted) var(--nola-glass-control-opacity), transparent);
       }
-      & :is([data-slot="switch"], .checkbox, [data-slot="toggle-group-item"], .toggle-button, .slider__thumb) {
+      & :is([data-slot="switch"], .checkbox, .slider__thumb) {
         box-shadow: var(--nola-glass-inner);
         backdrop-filter: var(--nola-glass-control-filter);
       }
@@ -185,8 +187,8 @@
         border-top: 1px solid var(--nola-glass-stroke-bottom);
       }
 
-      & :is(.tabs__list, [data-slot="tabs-list"]):not([data-variant="line"], .settings-nav *) {
-        background: var(--nola-glass-control-fill);
+      & :is(.tabs__list, [data-slot="tabs-list"], [data-slot="toggle-group"]):not([data-variant="line"], .settings-nav *) {
+        background: var(--default);
         border: 1px solid var(--nola-glass-stroke);
         box-shadow: var(--nola-glass-inner), 0 2px 9px rgb(0 0 0 / 5%);
         -webkit-backdrop-filter: var(--nola-glass-filter);
@@ -195,7 +197,8 @@
       & :is(
         .tabs__tab[data-active],
         .tabs__tab[aria-selected="true"],
-        [data-slot="tabs-trigger"][data-state="active"]
+        [data-slot="tabs-trigger"][data-state="active"],
+        [data-slot="toggle-group-item"]:is([data-pressed], [aria-pressed="true"])
       ):not([data-variant="line"] *, .settings-nav *) {
         background: var(--nola-glass-control-hover);
         box-shadow: var(--nola-glass-inner), 0 2px 8px rgb(0 0 0 / 8%);
@@ -211,12 +214,12 @@
         [data-slot="select-trigger"],
         .search-field__group,
         .number-field__group
-      ) {
+      ):not(:where([data-slot="input-group"] *)) {
         background: var(--nola-glass-control-fill);
         -webkit-backdrop-filter: var(--nola-glass-input-filter);
         backdrop-filter: var(--nola-glass-input-filter);
       }
-      & :is(.input, .select__trigger, textarea:not([data-slot="composer-input"]), [data-slot="input"], [data-slot="textarea"]):focus-visible {
+      & :is(.input, .select__trigger, textarea:not([data-slot="composer-input"]), [data-slot="input"], [data-slot="textarea"]):not(:where([data-slot="input-group-control"])):focus-visible {
         border-color: var(--ring);
         outline: 2px solid var(--ring);
         outline-offset: 2px;

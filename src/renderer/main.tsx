@@ -230,7 +230,7 @@ function Shell() {
   const navigation = useApplicationNavigation()
   const { route } = useRoute()
   const { t } = useI18n()
-  const title = navigation.find(item => item.active)?.label ?? t(ROUTE_TITLES[route])
+  const title = route === 'settings' ? t(ROUTE_TITLES.settings) : navigation.find(item => item.active)?.label ?? t(ROUTE_TITLES[route])
   useOverlayNavigation()
 
   return (

@@ -19,7 +19,7 @@ editLink: false
 
 <figure>
 
-<demo react="undo-states.tsx" :reactFiles="['undo-states.tsx', '../figures/StayExamples.tsx', '../figures/StayExamples.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="undo-states.tsx" :reactFiles="['undo-states.tsx', '../figures/StayExamples.tsx', '../figures/StayExamples.css']" />
 
 <figcaption>点击“移除”，再用通知中的“撤销”恢复该记录。</figcaption>
 </figure>
@@ -35,7 +35,7 @@ editLink: false
 
 <figure>
 
-<demo react="detail-popover.tsx" :reactFiles="['detail-popover.tsx', '../figures/StayExamples.tsx', '../figures/StayExamples.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="detail-popover.tsx" :reactFiles="['detail-popover.tsx', '../figures/StayExamples.tsx', '../figures/StayExamples.css']" />
 
 <figcaption>点击“查看详情”，在当前条目旁打开浮层。</figcaption>
 </figure>
@@ -55,7 +55,7 @@ editLink: false
 
 <figure>
 
-<demo react="inline-states.tsx" :reactFiles="['inline-states.tsx', '../figures/StayExamples.tsx', '../figures/StayExamples.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="inline-states.tsx" :reactFiles="['inline-states.tsx', '../figures/StayExamples.tsx', '../figures/StayExamples.css']" />
 
 <figcaption>点击“展开”，在当前行下方查看详情；收起后保留原有顺序。</figcaption>
 </figure>
@@ -79,7 +79,7 @@ editLink: false
 
 <figure>
 
-<demo react="progressive-options.tsx" :reactFiles="['progressive-options.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css', '../shadcn-base/apple-liquid-glass.css', '../shadcn-base/nola-liquid-glass.css']" />
+<demo react="progressive-options.tsx" :reactFiles="['progressive-options.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css']" />
 
 <figcaption>打开“接收提醒”，再选择提醒方式。</figcaption>
 </figure>

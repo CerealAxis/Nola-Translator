@@ -109,6 +109,7 @@ export interface BrowserSummary {
   features?: { matchedGlossaryV1: boolean }
   capabilities?: Record<'asr' | 'mt' | 'tts' | 's2s' | 'llm', boolean>
   textTranslation?: boolean
+  textTranslationConcurrency?: number
   textTranslationError?: 'gatewayNotRunning' | 'browserTextModelUnavailable'
   realtimeTranslation?: boolean
   extensionVersion?: string

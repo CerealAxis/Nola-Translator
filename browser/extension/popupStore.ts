@@ -1,4 +1,5 @@
 import { BrowserFailure } from './bridge'
+import type { SubtitleState } from './subtitle-translation'
 
 interface TabStatus {
   pageActive?: boolean
@@ -8,8 +9,9 @@ interface TabStatus {
   liveError?: string
   subtitles?: boolean
   subtitleError?: string
+  subtitleAvailability?: SubtitleState['availability']
 }
-type TabAction = 'pageStatus' | 'startPageTranslation' | 'stopPageTranslation' | 'toggleSubtitles' | 'toggleRealtime'
+type TabAction = 'pageStatus' | 'startPageTranslation' | 'stopPageTranslation' | 'toggleSubtitles' | 'toggleRealtime' | 'refreshDesktopConnection'
 export interface PopupState extends TabStatus { availability?: 'loading' | 'ready' | 'restricted' | 'unavailable'; enabled: boolean; pending: boolean; error?: string; origin?: string; url?: string; tabId?: number }
 export function createPopupStore() {
   let state: PopupState = { enabled: false, pending: false, availability: 'loading' }
@@ -22,7 +24,7 @@ export function createPopupStore() {
     try {
       const response = await chrome.tabs.sendMessage(tabId, { type }) as TabStatus | undefined
       if (response && requested === revision) set({ ...response, error: undefined })
-    } catch { if (requested === revision && type !== 'pageStatus') set({ error: 'permissionFailed' }) }
+    } catch { if (requested === revision && type !== 'pageStatus' && type !== 'refreshDesktopConnection') set({ error: 'permissionFailed' }) }
   }
   async function inject(tabId: number) {
     await chrome.scripting.executeScript({ target: { tabId }, files: ['capture-handle.js'], world: 'MAIN' })

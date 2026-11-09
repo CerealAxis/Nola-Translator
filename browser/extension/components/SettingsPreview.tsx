@@ -37,26 +37,26 @@ export function SettingsPreview({ kind, settings, t }: { kind: PreviewKind; sett
                 <div className="nola-illustration-lines nola-illustration-continuation" aria-hidden="true"><i /><i /><i /></div>
               </>}
             </div>
-            {kind === 'selection' && settings.selectionTranslation && <div className="nola-illustration-toolbar" style={{ opacity: settings.selectionOpacity }} onKeyDown={event => { if (event.key === 'Escape') setOpen(false) }}>
+            {kind === 'selection' && settings.selectionTranslation && <div className="nola-illustration-toolbar nola-glass-popup" style={{ opacity: settings.selectionOpacity }} onKeyDown={event => { if (event.key === 'Escape') setOpen(false) }}>
               {settings.selectionTranslate && <Button size="icon-sm" variant="bare" aria-label={translationLabel} title={translationLabel} onClick={() => setTranslated(!translated)}><Languages /></Button>}
               {settings.selectionSpeak && <Volume2 role="img" aria-label={t('tts')} />}
               <Button size="icon-sm" variant="bare" aria-label={t('more')} title={t('more')} aria-expanded={open} onClick={() => setOpen(!open)}><MoreVertical /></Button>
-              {open && <div className="nola-illustration-more" role="group" aria-label={t('more')}>
+              {open && <div className="nola-illustration-more nola-glass-popup" role="group" aria-label={t('more')}>
                 {settings.selectionCopy && <Copy role="img" aria-label={t('copyTranslation')} />}
                 <Button size="icon-sm" variant="bare" aria-label={t('close')} title={t('close')} onClick={() => setOpen(false)}><X /></Button>
               </div>}
             </div>}
             {kind === 'floatingButton' && settings.floatingButton && <div className="nola-demo-floating" data-pinned={settings.floatingLocked} data-side={settings.floatingSide} style={{ top: `${Math.max(20, Math.min(75, settings.floatingPosition * 100))}%` }}>
-              <Button className="nola-demo-floating-action" variant="outline" size="icon-sm" aria-label={t(translated ? 'restorePage' : 'translatePage')} onClick={() => setTranslated(!translated)}><Languages /></Button>
-              <Button className="nola-demo-dock" variant="outline" size="icon" aria-label={t('floatingButton')} onClick={() => settings.floatingClickAction === 'translate' ? setTranslated(!translated) : setOpen(!open)}><NolaLogo /></Button>
+              <Button className="nola-demo-floating-action" variant={translated ? "default" : "outline"} size="sm" aria-label={t(translated ? 'restorePage' : 'translatePage')} onClick={() => setTranslated(!translated)}><Languages /></Button>
+              <Button className="nola-demo-dock" variant="outline" size="lg" aria-label={t('floatingButton')} onClick={() => settings.floatingClickAction === 'translate' ? setTranslated(!translated) : setOpen(!open)}><NolaLogo /></Button>
             </div>}
-            {kind === 'floatingButton' && settings.floatingButton && open && settings.floatingClickAction === 'panel' && <div className="nola-illustration-sidebar">
+            {kind === 'floatingButton' && settings.floatingButton && open && settings.floatingClickAction === 'panel' && <div className="nola-illustration-sidebar nola-glass-popup">
               <header><NolaLogo /><Button size="icon-sm" variant="bare" aria-label={t('close')} onClick={() => setOpen(false)}><X /></Button></header>
               <div className="nola-illustration-lines" aria-hidden="true"><i /><i /></div>
               <Button size="icon-sm" aria-label={translationLabel} onClick={() => setTranslated(!translated)}><Languages /></Button>
               <Settings2 aria-hidden="true" />
             </div>}
-            {kind === 'contextMenu' && settings.contextMenuEnabled && <div className="nola-illustration-context">
+            {kind === 'contextMenu' && settings.contextMenuEnabled && <div className="nola-illustration-context nola-glass-popup">
               {settings.contextMenuPage && <span role="img" aria-label={t('togglePageTranslation')}><Languages /><i /></span>}
               {settings.contextMenuSelection && <span role="img" aria-label={t('translateSelection')}><Languages /><i /></span>}
               {settings.contextMenuSpeak && <span role="img" aria-label={t('speakSelection')}><Volume2 /><i /></span>}

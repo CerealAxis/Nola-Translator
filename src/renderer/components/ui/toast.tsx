@@ -47,7 +47,13 @@ export function updateToast(id: string, payload: ToastPayload): string {
 
 export function closeToast(id: string): void { manager.close(id) }
 
-function ToastViewport({ onEmpty }: { onEmpty?: () => void }) {
+interface ToastProviderProps {
+  onEmpty?: () => void
+  container?: BaseToast.Portal.Props['container']
+  closeLabel?: string
+}
+
+function ToastViewport({ onEmpty, container, closeLabel }: ToastProviderProps) {
   const { t } = useI18n()
   const { toasts } = BaseToast.useToastManager<ToastData>()
   const previousCount = useRef(toasts.length)
@@ -55,7 +61,7 @@ function ToastViewport({ onEmpty }: { onEmpty?: () => void }) {
     if (previousCount.current > 0 && toasts.length === 0) onEmpty?.()
     previousCount.current = toasts.length
   }, [onEmpty, toasts.length])
-  return <BaseToast.Portal>
+  return <BaseToast.Portal container={container}>
     <BaseToast.Viewport className="nola-toast-viewport z-toast" data-slot="toast-viewport">
       {toasts.map(toast => <BaseToast.Root key={toast.id} toast={toast} render={<Card size="sm" data-slot="toast" />} className="nola-toast" data-slot="toast" data-type={toast.type ?? 'info'}>
         <BaseToast.Content className="nola-toast-content">
@@ -69,13 +75,13 @@ function ToastViewport({ onEmpty }: { onEmpty?: () => void }) {
             {toast.description ? <BaseToast.Description className="nola-toast-description" /> : null}
           </div>
           {toast.actionProps ? <BaseToast.Action className="nola-toast-action" render={<Button variant="outline" />} /> : null}
-          <BaseToast.Close render={<Button size="icon" variant="tertiary" className="nola-toast-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent text-nola-ui-muted-foreground!" aria-label={t('common.close')}><X aria-hidden="true" /></Button>} />
+          <BaseToast.Close render={<Button size="icon" variant="tertiary" className="nola-toast-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent text-nola-ui-muted-foreground!" aria-label={closeLabel ?? t('common.close')}><X aria-hidden="true" /></Button>} />
         </BaseToast.Content>
       </BaseToast.Root>)}
     </BaseToast.Viewport>
   </BaseToast.Portal>
 }
 
-export function ToastProvider({ onEmpty }: { onEmpty?: () => void } = {}) {
-  return <BaseToast.Provider toastManager={manager}><ToastViewport onEmpty={onEmpty} /></BaseToast.Provider>
+export function ToastProvider(props: ToastProviderProps = {}) {
+  return <BaseToast.Provider toastManager={manager}><ToastViewport {...props} /></BaseToast.Provider>
 }

@@ -1,5 +1,6 @@
 @layer base {
-  :root {
+  :root,
+  :host {
     --browser-panel-width: 288px;
     --browser-caption-line-height: 1.4;
     --browser-caption-background-mix: 78%;

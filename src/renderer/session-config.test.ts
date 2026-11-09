@@ -56,6 +56,11 @@ describe('translation language choices', () => {
     }
   })
 
+  it('passes the configured interim translation interval to the session', () => {
+    expect(translationFieldsOf({ ...DEFAULT_SETTINGS.translation, intermediateTranslationIntervalMs: 1200 }, { enabled: true }))
+      .toMatchObject({ intermediateTranslationIntervalMs: 1200 })
+  })
+
   it('allows a session to explicitly re-enable translation with a concrete language', () => {
     const translation = { ...DEFAULT_SETTINGS.translation, targetLanguage: NO_TRANSLATION_LANGUAGE }
     expect(translationFieldsOf(translation, { enabled: true, targetLanguage: 'fr' })).toMatchObject({ targetLanguages: ['fr'], translationProvider: 'local' })

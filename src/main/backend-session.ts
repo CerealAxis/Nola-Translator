@@ -41,6 +41,7 @@ export interface MappedBackendSession {
     max_segment_ms?: number
     silence_end_ms?: number
     translation_preview?: boolean
+    translation_preview_interval_ms?: number
     latency_detection?: boolean
   }
   headers: Record<string, string>
@@ -153,6 +154,7 @@ export function mapSessionConfig(
       ...(speech ? { speech_target_language: speechLanguage } : {}),
       max_segment_ms: config.max_segment_ms, silence_end_ms: config.silence_end_ms,
       translation_preview: config.allowIntermediateTranslation,
+      translation_preview_interval_ms: config.intermediateTranslationIntervalMs,
     },
     headers,
     outputDeviceId: options.outputDeviceId,

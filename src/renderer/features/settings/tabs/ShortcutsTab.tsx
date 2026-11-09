@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { Keyboard, Pencil, RotateCcw, Search, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -139,16 +138,12 @@ export function ShortcutsTab({ settings }: SettingsPanelProps) {
     <TooltipContent>{label}</TooltipContent>
   </Tooltip>
   return <div className="settings-panel shortcuts-page">
-    <Card className="shortcuts-page__card">
-      <CardHeader className="shortcuts-page__header">
-        <CardTitle>{t('shortcuts.title')}</CardTitle>
-        <CardAction className="shortcuts-page__toolbar">
-          <InputGroup className="shortcuts-page__search"><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('shortcuts.search')} aria-label={t('shortcuts.search')} /></InputGroup>
-          <Button variant="outline" size="sm" disabled={busy || !snapshot || !changed} onClick={() => void restoreAll()}><RotateCcw data-icon="inline-start" />{t('shortcuts.restoreAll')}</Button>
-        </CardAction>
-      </CardHeader>
-      {error && !editing && <CardContent><Alert variant="danger"><AlertDescription>{error}</AlertDescription></Alert></CardContent>}
-      <CardContent className="shortcuts-page__table">
+    <div className="shortcuts-page__toolbar">
+      <InputGroup className="shortcuts-page__search"><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('shortcuts.search')} aria-label={t('shortcuts.search')} /></InputGroup>
+      <Button variant="outline" size="sm" disabled={busy || !snapshot || !changed} onClick={() => void restoreAll()}><RotateCcw data-icon="inline-start" />{t('shortcuts.restoreAll')}</Button>
+    </div>
+    {error && !editing && <Alert variant="danger"><AlertDescription>{error}</AlertDescription></Alert>}
+    <div className="shortcuts-page__table">
       <Table aria-label={t('shortcuts.title')}><TableHeader><TableRow><TableHead>{t('shortcuts.command')}</TableHead><TableHead>{t('shortcuts.binding')}</TableHead><TableHead>{t('shortcuts.scope')}</TableHead><TableHead>{t('shortcuts.operations')}</TableHead></TableRow></TableHeader>
         <TableBody>{visible.map(row => <TableRow key={row.id} data-shortcut-id={row.id}>
           <TableCell>{row.label}</TableCell>
@@ -172,7 +167,6 @@ export function ShortcutsTab({ settings }: SettingsPanelProps) {
         {!visible.length && <TableRow><TableCell colSpan={4}><Empty><EmptyHeader><EmptyTitle>{t('shortcuts.noResults')}</EmptyTitle></EmptyHeader></Empty></TableCell></TableRow>}
         </TableBody>
       </Table>
-      </CardContent>
-    </Card>
+    </div>
   </div>
 }

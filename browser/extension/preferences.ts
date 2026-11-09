@@ -2,6 +2,7 @@ import { LANGUAGE_CODES, type UiLanguagePreference } from '../../src/shared/lang
 
 export const UI_LANGUAGES: UiLanguagePreference[] = ['auto', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja', 'en']
 export type DisplayMode = 'bilingual' | 'translation'
+export const MAX_WEB_TRANSLATION_CONCURRENCY = 16
 export interface Preferences {
   sourceLanguage: string
   pageProvider: string
@@ -47,6 +48,7 @@ export interface Preferences {
   pagePrompt: string
   subtitlePrompt: string
   requestRate: number
+  webConcurrency: number
   batchSize: number
   shortcutPage: string
   shortcutSelection: string
@@ -61,6 +63,7 @@ export interface Preferences {
 
   uiLanguage: UiLanguagePreference
   theme: 'auto' | 'light' | 'dark'
+  liquidGlass: boolean
   pageLanguage: string
   pageDisplay: DisplayMode
   autoSites: string[]
@@ -95,10 +98,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   contextMenuPage: true, contextMenuSelection: true, contextMenuSpeak: true, contextMenuInput: true, inputSourceLanguage: 'auto', inputTargetLanguage: 'zh',
   floatingSide: 'right', floatingPosition: 0.65, floatingLocked: false, floatingClickAction: 'translate', floatingDisabledSites: [], selectionOpacity: 0.95, selectionTranslate: true, selectionCopy: true, selectionSpeak: true, selectionDisabledSites: [], inputTrigger: 'tripleSpace',
   siteBlacklist: [], neverAutoSites: [], pageStyle: 'underline', pageCustomCss: '', subtitleCustomCss: '', pagePrompt: '', subtitlePrompt: '',
-  requestRate: 5, batchSize: 8, shortcutPage: 'Alt+T', shortcutSelection: 'Alt+S', shortcutHover: 'Alt', shortcutSubtitles: 'Alt+V',
+  requestRate: 5, webConcurrency: 8, batchSize: 8, shortcutPage: 'Alt+T', shortcutSelection: 'Alt+S', shortcutHover: 'Alt', shortcutSubtitles: 'Alt+V',
   ttsVoice: '', ttsRate: 1, ttsPitch: 1, ttsVolume: 1, glossary: [], siteRules: [],
 
-  uiLanguage: 'auto', theme: 'auto', pageLanguage: 'zh', pageDisplay: 'bilingual', autoSites: [],
+  uiLanguage: 'auto', theme: 'auto', liquidGlass: false, pageLanguage: 'zh', pageDisplay: 'bilingual', autoSites: [],
   subtitleSourceSize: 16, subtitleSourceColor: '#ffffff', subtitleSourceFont: 'system-ui', subtitleTranslationSize: 16, subtitleTranslationColor: '#ffffff', subtitleTranslationFont: 'system-ui', subtitleTranslationFirst: false, subtitleBold: false, subtitlePauseOnHover: false,
   autoSubtitleSites: [], subtitleFont: 'system-ui', subtitleColor: '#ffffff', subtitleBackground: '#000000', subtitleBackgroundOpacity: 0.72, subtitleFollow: true, subtitlePositionX: 50, subtitlePositionY: 95,
   videoLanguage: 'zh', videoDisplay: 'bilingual', pipeline: 'cascade', subtitleSize: 16, subtitleOffset: 5,
@@ -148,6 +151,7 @@ export function readPreferences(values: Record<string, unknown>): Preferences {
     pageStyle: values.pageStyle === 'block' || values.pageStyle === 'plain' ? values.pageStyle : 'underline',
     minTextLength: numberIn(values.minTextLength, 1, 1000, 2),
     requestRate: numberIn(values.requestRate, 1, 60, 5), batchSize: numberIn(values.batchSize, 1, 100, 8),
+    webConcurrency: numberIn(values.webConcurrency, 1, MAX_WEB_TRANSLATION_CONCURRENCY, DEFAULT_PREFERENCES.webConcurrency),
     ttsRate: typeof values.ttsRate === 'number' && Number.isFinite(values.ttsRate) ? Math.max(0.1, Math.min(10, values.ttsRate)) : 1,
     ttsPitch: typeof values.ttsPitch === 'number' && Number.isFinite(values.ttsPitch) ? Math.max(0, Math.min(2, values.ttsPitch)) : 1,
     ttsVolume: typeof values.ttsVolume === 'number' && Number.isFinite(values.ttsVolume) ? Math.max(0, Math.min(1, values.ttsVolume)) : 1,

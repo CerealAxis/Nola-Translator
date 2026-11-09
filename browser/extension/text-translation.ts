@@ -3,20 +3,27 @@ import { translate } from './provider-client'
 
 type Lane = 'web' | 'video'
 interface Job { run(): Promise<void>; cancel(): void; signal: AbortSignal }
+export const TEXT_TRANSLATION_CONCURRENCY = 3
+const lanes = ['video', 'web'] as const
 export function createTextTranslation(bridge: ExtensionBridge) {
   const queues: Record<Lane, Job[]> = { video: [], web: [] }
-  let active = 0
+  const active = { web: 0, video: 0 }
+  let limits = { web: TEXT_TRANSLATION_CONCURRENCY, video: TEXT_TRANSLATION_CONCURRENCY }
+  let shared = true
   let closed = false
   const lifetime = new AbortController()
   const runNext = () => {
-    if (active >= 3 || closed) return
-    const lane = queues.video.length ? 'video' : 'web'
-    let job = queues[lane].shift()
-    while (job?.signal.aborted) job = queues[lane].shift()
-    if (!job) return
-    active++
-    void job.run().finally(() => { active--; runNext() })
-    runNext()
+    if (closed || shared && active.web + active.video >= Math.max(limits.web, limits.video)) return
+    for (const lane of lanes) {
+      if (active[lane] >= limits[lane]) continue
+      let job = queues[lane].shift()
+      while (job?.signal.aborted) job = queues[lane].shift()
+      if (!job) continue
+      active[lane]++
+      void job.run().finally(() => { active[lane]--; runNext() })
+      runNext()
+      return
+    }
   }
   return {
     translate(text: string, sourceLanguage: string, targetLanguage: string, lane: Lane, signal: AbortSignal): Promise<string> {
@@ -35,6 +42,7 @@ export function createTextTranslation(bridge: ExtensionBridge) {
       })
     },
     close() { closed = true; lifetime.abort(); for (const lane of [queues.web, queues.video]) for (const job of [...lane]) job.cancel(); bridge.close() },
+    configure(web: number, video: number, sameProvider: boolean) { limits = { web, video }; shared = sameProvider; runNext() },
   }
 }
-export type TextTranslation = ReturnType<typeof createTextTranslation>
+export type TextTranslation = Pick<ReturnType<typeof createTextTranslation>, 'translate' | 'close'>
