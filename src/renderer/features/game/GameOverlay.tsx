@@ -23,7 +23,6 @@ export function GameOverlay({ api, sessionId }: { api: Pick<GameTranslationBridg
   const target = config.showTranslation && line.status === 'ready' ? line.translation : undefined
   if (!source && !target) return null
   const style = {
-    fontFamily: config.fontFamily,
     '--overlay-background-color': config.backgroundColor,
     '--overlay-background-alpha': `${Math.round(config.backgroundOpacity * 100)}%`,
     '--overlay-source-color': config.sourceColor,

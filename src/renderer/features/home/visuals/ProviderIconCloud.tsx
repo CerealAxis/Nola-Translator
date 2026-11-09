@@ -37,9 +37,10 @@ const points = providers.map((_, index) => {
   return { x: Math.cos(angle) * ringRadius, y, z: Math.sin(angle) * ringRadius, index }
 })
 
-export function ProviderIconCloud({ reduceMotion }: { reduceMotion: boolean }) {
+export function ProviderIconCloud({ playing }: { playing: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const marksRef = useRef<HTMLDivElement>(null)
+  const updatePlayback = useRef<(playing: boolean) => void>(null)
 
   useEffect(() => {
     if (typeof CanvasRenderingContext2D === 'undefined') return
@@ -53,7 +54,8 @@ export function ProviderIconCloud({ reduceMotion }: { reduceMotion: boolean }) {
     let sprites: HTMLImageElement[] = []
     let frameId = 0
     let lastTime = 0
-    let visible = false
+    let visible = typeof IntersectionObserver === 'undefined'
+    let playing = false
     let pitch = 0.45
     let yaw = 1.06
     let drag: { id: number; x: number; y: number } | null = null
@@ -107,7 +109,7 @@ export function ProviderIconCloud({ reduceMotion }: { reduceMotion: boolean }) {
     }
 
     function syncMotion() {
-      if (visible && !reduceMotion) {
+      if (visible && playing) {
         if (!frameId) frameId = requestAnimationFrame(animate)
       } else {
         cancelAnimationFrame(frameId)
@@ -166,6 +168,10 @@ export function ProviderIconCloud({ reduceMotion }: { reduceMotion: boolean }) {
       syncMotion()
     })
     viewport?.observe(canvas)
+    updatePlayback.current = active => {
+      playing = active
+      syncMotion()
+    }
 
     const theme = new MutationObserver(loadSprites)
     theme.observe(document.documentElement, { attributeFilter: ['class'] })
@@ -174,6 +180,7 @@ export function ProviderIconCloud({ reduceMotion }: { reduceMotion: boolean }) {
     canvas.addEventListener('pointermove', moveDrag)
     canvas.addEventListener('lostpointercapture', endDrag)
     return () => {
+      updatePlayback.current = null
       viewport?.disconnect()
       theme.disconnect()
       cancelAnimationFrame(frameId)
@@ -182,7 +189,11 @@ export function ProviderIconCloud({ reduceMotion }: { reduceMotion: boolean }) {
       canvas.removeEventListener('pointermove', moveDrag)
       canvas.removeEventListener('lostpointercapture', endDrag)
     }
-  }, [reduceMotion])
+  }, [])
+
+  useEffect(() => {
+    updatePlayback.current?.(playing)
+  }, [playing])
 
   return (
     <div className="nola-home-provider-cloud">

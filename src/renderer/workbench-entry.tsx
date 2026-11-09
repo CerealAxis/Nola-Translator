@@ -1,3 +1,4 @@
+import './index.css'
 import './workbench-entry.css'
 import './theme/desktop-material'
 import { Component, StrictMode, type ReactNode } from 'react'

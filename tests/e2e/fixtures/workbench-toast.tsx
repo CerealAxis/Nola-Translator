@@ -6,6 +6,7 @@ import { I18nProvider } from '@/i18n'
 import { Button } from '@/components/ui/button'
 import { showToast, ToastProvider } from '@/components/ui/toast'
 import { MermaidZoom } from '@/components/assistant-ui/native/mermaid-diagram'
+import '../../../src/renderer/index.css'
 import '../../../src/renderer/workbench-entry.css'
 
 const kind = new URLSearchParams(location.search).get('case') ?? 'toast'

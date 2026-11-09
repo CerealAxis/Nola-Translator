@@ -9,7 +9,6 @@ export type OverlaySettings = {
   mode: 'free' | 'top' | 'bottom'
   colorScheme: 'dark' | 'light'
   alwaysOnTop: boolean
-  fontFamily: string
   fontSize: number
   fontWeight: number
   translationFontSize: number
@@ -411,7 +410,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     mode: 'bottom',
     colorScheme: 'dark',
     alwaysOnTop: true,
-    fontFamily: 'Segoe UI Variable',
     fontSize: 17,
     fontWeight: 500,
     translationFontSize: 16,

@@ -297,6 +297,7 @@ export class SettingsStore {
           targetLanguages?: unknown
         }
         overlay?: Partial<AppSettings['overlay']> & {
+          fontFamily?: unknown
           /** Retired; the rolling overlay derives its own budget from the stage height. */
           maxLines?: unknown
           translationMaxLines?: unknown
@@ -329,6 +330,7 @@ export class SettingsStore {
       }
       // The two retired line-count settings; the rolling overlay derives its budget from the stage height.
       const rawOverlay = { ...(raw.overlay ?? {}) }
+      delete rawOverlay.fontFamily
       delete rawOverlay.maxLines
       delete rawOverlay.translationMaxLines
       delete rawOverlay.locked

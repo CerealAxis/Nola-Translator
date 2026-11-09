@@ -40,7 +40,7 @@
   background: color-mix(in oklch, var(--primary) 4%, transparent);
   opacity: var(--ring-strength);
   transform: translate(-50%, -50%);
-  animation: nola-home-quick-ripple 2.6s var(--ring-delay) ease-in-out infinite;
+  animation: nola-home-quick-ripple 2.6s var(--ring-delay) ease-in-out infinite paused;
 }
 
 .nola-home-quick-caption {
@@ -92,7 +92,11 @@
   height: var(--bar-size);
   border-radius: var(--radius-sm);
   background: var(--primary);
-  animation: nola-home-quick-level 850ms var(--bar-delay) ease-in-out infinite alternate;
+  animation: nola-home-quick-level 850ms var(--bar-delay) ease-in-out infinite alternate paused;
+}
+
+.nola-home-feature-card[data-playing] :is(.nola-home-quick-ring, .nola-home-quick-meter span) {
+  animation-play-state: running;
 }
 
 @keyframes nola-home-quick-ripple {

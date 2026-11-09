@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { ArrowRight, AudioLines, BookOpen, Cpu, Gamepad2, Headphones, Network } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
@@ -84,6 +84,7 @@ export function HomeFeatures() {
   const { navigate } = useRoute()
   const onboardingActive = useStore(stores.settings, state => state.onboardingActive)
   const reduceMotion = useHomeReducedMotion()
+  const [hoveredRoute, setHoveredRoute] = useState<string>()
   const labels = copy[language]
 
   return (
@@ -99,6 +100,7 @@ export function HomeFeatures() {
           const name = t(title)
           const titleId = 'home-feature-title-' + route
           const onboardingTarget = 'target' in feature ? feature.target : undefined
+          const playing = !reduceMotion && hoveredRoute === route
 
           return (
             <article
@@ -108,8 +110,15 @@ export function HomeFeatures() {
               aria-labelledby={titleId}
               data-onboarding={onboardingTarget}
               data-onboarding-cta={onboardingActive && onboardingTarget === 'home-models' || undefined}
+              data-playing={playing || undefined}
+              onPointerEnter={event => {
+                if (event.pointerType === 'mouse') setHoveredRoute(route)
+              }}
+              onPointerLeave={event => {
+                if (event.pointerType === 'mouse') setHoveredRoute(undefined)
+              }}
             >
-              <div className="nola-home-bento-visual" aria-hidden="true"><Visual reduceMotion={reduceMotion} /></div>
+              <div className="nola-home-bento-visual" aria-hidden="true"><Visual playing={playing} /></div>
               <div className="nola-home-bento-copy">
                 <Icon className="nola-home-bento-icon" aria-hidden="true" />
                 <h3 id={titleId}>{name}</h3>

@@ -42,8 +42,8 @@
   .nola-app-body { display: flex; flex: 1; min-height: 0; min-width: 0; }
   .nola-sidebar {
     display: flex; flex: none; flex-direction: column;
-    width: min(40vi, clamp(calc(var(--space-7) * 3.5), 17vi, calc(var(--space-8) * 4)));
-    min-height: 0; padding: var(--space-2);
+    width: min(40vi, clamp(calc(var(--space-7) * 4 + var(--space-2)), 17vi, calc(var(--space-8) * 4)));
+    min-height: 0; padding: 0 var(--space-2) var(--space-2);
     overflow: hidden; transition: width 180ms ease;
   }
   .nola-sidebar[data-collapsible="icon"] {
@@ -51,18 +51,17 @@
     padding-inline: var(--space-1);
   }
   .nola-sidebar > [data-slot="sidebar-header"] { flex: none; margin-block-end: var(--space-2); }
-  .nola-sidebar-brand img { width: calc(var(--space-2) + var(--space-1) / 2); height: auto; flex: none; }
+  .nola-sidebar-brand img { width: 25px; height: 25px; flex: none; }
   .nola-sidebar-nav {
-    display: flex; flex-direction: column; gap: var(--space-3);
+    display: flex; flex: 1; flex-direction: column; gap: var(--space-3);
     min-height: 0; overflow: auto; scrollbar-width: none;
     margin-inline: calc(-1 * var(--space-2)); padding-inline: var(--space-2);
   }
-  .nola-sidebar-nav > [data-slot="sidebar-group"] { flex: none; }
   .nola-sidebar [data-slot="sidebar-menu"] { display: flex; flex-direction: column; gap: calc(var(--space-1) / 2); }
-  .nola-sidebar-main-group { display: flex; flex-direction: column; gap: var(--space-1); }
-  .nola-sidebar [data-slot="sidebar-group-label"] {
-    display: flex; align-items: center;
-    min-height: var(--space-3); padding-inline: var(--space-1);
+  .nola-sidebar-nav > [data-slot="sidebar-group"] { flex: none; }
+  .nola-sidebar-nav [data-slot="sidebar-menu"] { gap: var(--space-1); }
+  .nola-sidebar-nav [data-slot="sidebar-group-label"] {
+    padding-inline: var(--space-1); margin-block-end: var(--space-1);
     color: var(--muted-foreground); font: var(--font-caption);
   }
   .nola-sidebar-footer { flex: none; margin-block-start: var(--space-2); }
@@ -70,12 +69,16 @@
     display: flex; align-items: center; min-height: var(--space-5); gap: var(--space-1);
     padding-inline: var(--space-1); font: var(--font-body-strong);
   }
+  .nola-sidebar-account__copy { display: grid; flex: 1; }
+  .nola-sidebar-account__email {
+    color: var(--muted-foreground); font: var(--font-caption);
+    white-space: normal; overflow-wrap: anywhere;
+  }
   .nola-sidebar-copy, .nola-nav-label {
     min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .nola-sidebar[data-collapsible="icon"] .nola-sidebar-nav {
     margin-inline: calc(-1 * var(--space-1)); padding-inline: var(--space-1);
-    gap: var(--space-1);
   }
   .nola-sidebar[data-collapsible="icon"] :is(.nola-sidebar-brand, .nola-sidebar-account) {
     justify-content: center; padding-inline: 0;
@@ -148,8 +151,9 @@
     justify-content: flex-start; gap: var(--space-1); padding-inline: var(--space-1); overflow: hidden;
   }
   .nola-nav-button.button svg { width: var(--space-2); height: var(--space-2); }
-  .nola-sidebar-brand.nola-nav-button.button { font: var(--font-body-strong); }
+  .nola-sidebar-brand.nola-nav-button.button { height: var(--nola-titlebar-h); font: var(--font-body-strong); }
   .nola-sidebar[data-collapsible="icon"] .nola-nav-button.button { justify-content: center; padding-inline: 0; }
+  .nola-sidebar[data-collapsible="icon"] .nola-sidebar-account__action { display: none; }
   .toast { align-items: center; }
   .toast__action { margin-inline-start: auto; }
   .toast__content > .toast__action { align-self: flex-end; }
@@ -235,19 +239,14 @@
   font: var(--font-body-strong);
 }
 .nola-sidebar .nola-nav-button:focus-visible { outline-color: var(--sidebar-ring); }
-.nola-sidebar .nola-nav-button[data-variant="nav"]:is(:hover, [data-active="true"]) {
+.nola-sidebar .nola-nav-button[data-variant="nav"]:hover {
   background: var(--sidebar-accent);
   color: var(--sidebar-accent-foreground);
 }
-.nola-sidebar .nola-nav-button[data-variant="nav"] {
-  color: var(--sidebar-foreground);
-}
-.nola-sidebar .nola-nav-button[data-variant="default"] {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-.nola-sidebar .nola-nav-button[data-variant="default"]:hover {
-  background: color-mix(in oklch, var(--primary) 90%, var(--sidebar));
+.nola-sidebar .nola-nav-button[data-variant="nav"][data-active="true"] {
+  /* 白字在浅色主题使用文档定义的 hover 蓝，以满足对比度要求。 */
+  background: light-dark(var(--primary-hover), var(--sidebar-primary));
+  color: var(--sidebar-primary-foreground);
 }
 @media (max-width: 480px) {
   .nola-shell-content > .nola-titlebar { padding-inline-start: var(--space-1); }

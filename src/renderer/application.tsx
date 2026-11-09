@@ -1,6 +1,6 @@
 import { ModelGatewayPage } from './features/model-gateway/ModelGatewayPage'
 import { requestFeatureStart } from './components/primitives/FeatureActivityNotice'
-import { CircleHelp, CirclePlus, LayoutDashboard, PanelsTopLeft, Clock, SlidersHorizontal, Settings, MessagesSquare, Network, Headphones, ScanText, BookOpen, Gamepad2 } from 'lucide-react'
+import { AudioLines, LayoutDashboard, SlidersHorizontal, Settings, MessagesSquare, Network, Headphones, ScanText, BookOpen, Gamepad2 } from 'lucide-react'
 import { getBridge } from './store'
 import { notifyError } from './components/primitives/notify'
 import { useI18n } from './i18n'
@@ -45,32 +45,27 @@ function GameRoutePage() {
 
 export function useApplicationNavigation(): AppShellNavigationItem[] {
   const { t } = useI18n()
-  const { route, tab, navigate } = useRoute()
+  const { route, navigate } = useRoute()
   const entries = [
-    ['main', 'workspace', 'nav.workspace', CirclePlus, '#/workspace'],
-    ['main', 'home', 'nav.home', LayoutDashboard, '#/'],
-    ['main', 'meeting', 'meeting.navTitle', Headphones, '#/meeting'],
-    ['main', 'screen-translation', 'screen.navTitle', ScanText, '#/screen-translation'],
-    ['main', 'game-translation', 'suite.gameTitle', Gamepad2, '#/game-translation'],
-    ['main', 'comic-translation', 'suite.comicTitle', BookOpen, '#/comic-translation'],
-    ['tools', 'records', 'nav.records', Clock, '#/records'],
-    ['tools', 'models', 'nav.models', SlidersHorizontal, '#/models'],
-    ['tools', 'model-gateway', 'nav.modelGateway', Network, '#/model-gateway'],
+    ['overview', 'home', 'nav.home', LayoutDashboard, '#/'],
+    ['overview', 'models', 'nav.models', SlidersHorizontal, '#/models'],
+    ['overview', 'model-gateway', 'nav.modelGateway', Network, '#/model-gateway'],
+    ['features', 'workspace', 'nav.workspace', AudioLines, '#/workspace'],
+    ['features', 'meeting', 'meeting.navTitle', Headphones, '#/meeting'],
+    ['features', 'screen-translation', 'screen.navTitle', ScanText, '#/screen-translation'],
+    ['features', 'game-translation', 'suite.gameTitle', Gamepad2, '#/game-translation'],
+    ['features', 'comic-translation', 'suite.comicTitle', BookOpen, '#/comic-translation'],
   ] as const
   return [
     ...entries.map(([section, id, key, icon, path]) => ({
       section, id, label: t(key), icon, path,
-      active: route === id || id === 'workspace' && route === 'overlay' || id === 'records' && route === 'record',
+      active: route === id || id === 'workspace' && route === 'overlay',
       onPress: () => navigate(path),
     })),
-    { section: 'tools', id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#workbench',
+    { section: 'features', id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#workbench',
       onPress: () => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) },
     },
-    { section: 'tools', id: 'browser', label: t('browser.title'), icon: PanelsTopLeft, path: '#/settings/browser',
-      active: route === 'settings' && tab === 'browser', onPress: () => navigate('#/settings/browser') },
-    { section: 'secondary', id: 'settings', label: t('nav.settings'), icon: Settings, path: '#/settings/general',
-      active: route === 'settings' && tab !== 'browser' && tab !== 'help', onPress: () => navigate('#/settings/general') },
-    { section: 'secondary', id: 'help', label: t('modelsSettingsUi.help'), icon: CircleHelp, path: '#/settings/help',
-      active: route === 'settings' && tab === 'help', onPress: () => navigate('#/settings/help') },
+    { section: 'settings', id: 'settings', label: t('nav.settings'), icon: Settings, path: '#/settings/general',
+      active: route === 'settings', onPress: () => navigate('#/settings/general') },
   ]
 }

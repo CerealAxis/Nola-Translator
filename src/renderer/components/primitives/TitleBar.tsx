@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Menu } from '@base-ui/react/menu'
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Check, CircleHelp, Languages, Moon, Sun, Minus, Square, Copy, X } from 'lucide-react'
+import { Check, CircleHelp, Languages, Minus, Square, Copy, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
 import { settingsStore, updateSettings, useStore } from '@/store'
@@ -35,10 +36,12 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
   const { t, uiLanguage, setLanguage } = useI18n()
   const { navigate } = useRoute()
   const { resolved, setTheme } = useNolaTheme()
+  const reduceMotion = useStore(settingsStore, state => state.settings?.appearance?.reduceMotion ?? false)
   const native = isElectronShell()
   const windowsShell = native && window.nolaTranslator?.isWindows === true
   const [maximized, setMaximized] = useState(false)
   const dark = resolved === 'dark'
+  const themeLabel = dark ? t('titleBar.themeToLight') : t('titleBar.themeToDark')
   useEffect(() => {
     const bridge = window.nolaTranslator
     if (!bridge?.isWindows) return
@@ -103,14 +106,12 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
             </Menu.Positioner>
           </Menu.Portal>
         </Menu.Root>
-        {/*
-          * The icon already shows the current theme, so this is
-            a single toggle, not a pair of them. */}
         <Tooltip>
-          <TooltipTrigger delay={800} render={<Button variant="secondary" size="icon" className="nola-titlebar-icon" aria-label={dark ? t('titleBar.themeToLight') : t('titleBar.themeToDark')} onClick={() => setTheme(dark ? 'light' : 'dark')}>
-            {dark ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}
-          </Button>} />
-          <TooltipContent sideOffset={3} className={TOOLTIP_CLASS}>{dark ? t('titleBar.themeToLight') : t('titleBar.themeToDark')}</TooltipContent>
+          <TooltipTrigger delay={800} render={
+            <AnimatedThemeToggler className="nola-titlebar-icon" aria-label={themeLabel}
+              theme={dark ? 'dark' : 'light'} onThemeChange={setTheme} reduceMotion={reduceMotion} />
+          } />
+          <TooltipContent sideOffset={3} className={TOOLTIP_CLASS}>{themeLabel}</TooltipContent>
         </Tooltip>
         {help.length > 0 && <Menu.Root>
           <Menu.Trigger render={<Button variant="secondary" size="icon" className="nola-titlebar-icon" aria-label={t('titleBar.helpMenu')}>

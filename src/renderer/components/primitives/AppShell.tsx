@@ -1,11 +1,12 @@
 /** Desktop shell geometry is owned here; route content owns its only padding. */
 import type { ReactNode } from 'react'
-import type { LucideIcon } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { EllipsisVertical, UserRound, type LucideIcon } from 'lucide-react'
+import nolaAvatarUrl from '@/assets/nola-avatar.png'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import {
-  Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader,
+  Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader,
   SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -20,7 +21,7 @@ export interface AppShellNavigationItem {
   label: string
   icon: LucideIcon
   path: string
-  section: 'main' | 'tools' | 'secondary'
+  section: 'overview' | 'features' | 'settings'
   active?: boolean
   onPress?: () => void
 }
@@ -30,17 +31,16 @@ export interface AppShellProps {
   title?: string
   className?: string
 }
+
+const LOCAL_ACCOUNT_EMAIL = 'local@xaviermc.top'
+
 export function AppShell({ children, navigation, title, className = '' }: AppShellProps) {
   const { t } = useI18n()
   const compact = useIsMobile(1025)
+  const name = 'Nola Translator'
   const account = t('shellUi.localAccount')
-  const name = t('app.name')
   const pageTitle = title ?? navigation?.find(item => item.active)?.label ?? name
   const home = navigation?.find(item => item.id === 'home')
-  const quickAction = navigation?.find(item => item.id === 'workspace')
-  const main = navigation?.filter(item => item.section === 'main' && item !== quickAction) ?? []
-  const tools = navigation?.filter(item => item.section === 'tools') ?? []
-  const secondary = navigation?.filter(item => item.section === 'secondary') ?? []
 
   return (
     <div className={`nola-app-shell ${className}`}>
@@ -59,25 +59,32 @@ export function AppShell({ children, navigation, title, className = '' }: AppShe
             </SidebarMenu>
           </SidebarHeader>
           <SidebarContent className="nola-sidebar-nav" aria-label={t('shellUi.mainNavigation')}>
-            <SidebarGroup>
-              <SidebarGroupContent className="nola-sidebar-main-group">
-                {quickAction ? <NavigationMenu items={[quickAction]} /> : null}
-                <NavigationMenu items={main} />
-              </SidebarGroupContent>
-            </SidebarGroup>
-            <SidebarGroup>
-              <SidebarGroupLabel>{t('shellUi.toolsGroup')}</SidebarGroupLabel>
-              <SidebarGroupContent><NavigationMenu items={tools} /></SidebarGroupContent>
-            </SidebarGroup>
-            <SidebarGroup>
-              <SidebarGroupContent><NavigationMenu items={secondary} /></SidebarGroupContent>
-            </SidebarGroup>
+            {navigation && (['overview', 'features', 'settings'] as const).map(section => (
+              <SidebarGroup key={section}>
+                {section === 'features' && <SidebarGroupLabel>{t('shellUi.toolsGroup')}</SidebarGroupLabel>}
+                <SidebarMenu>
+                  {navigation.filter(item => item.section === section).map(item => (
+                    <SidebarMenuItem key={item.id}><NavigationItem {...item} /></SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroup>
+            ))}
           </SidebarContent>
           <SidebarFooter className="nola-sidebar-footer">
             <SidebarMenu>
-              <SidebarMenuItem className="nola-sidebar-account" title={account}>
-                <Avatar aria-hidden="true"><AvatarFallback>N</AvatarFallback></Avatar>
-                <span className="nola-sidebar-copy">{account}</span>
+              <SidebarMenuItem className="nola-sidebar-account" title={LOCAL_ACCOUNT_EMAIL}>
+                <Avatar aria-hidden="true">
+                  <AvatarImage src={nolaAvatarUrl} alt="" />
+                  <AvatarFallback><UserRound className="size-4" /></AvatarFallback>
+                </Avatar>
+                <div className="nola-sidebar-copy nola-sidebar-account__copy">
+                  <span className="truncate">{account}</span>
+                  <span className="nola-sidebar-account__email">{LOCAL_ACCOUNT_EMAIL}</span>
+                </div>
+                <Button type="button" variant="bare" size="icon-xs" className="nola-sidebar-account__action"
+                  aria-label={t('homeRecordsUi.moreActions', { name: account })}>
+                  <EllipsisVertical aria-hidden="true" />
+                </Button>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarFooter>
@@ -97,15 +104,5 @@ export function AppShell({ children, navigation, title, className = '' }: AppShe
         </SidebarInset>
       </SidebarProvider>
     </div>
-  )
-}
-
-function NavigationMenu({ items }: { items: AppShellNavigationItem[] }) {
-  return (
-    <SidebarMenu>
-      {items.map(item => (
-        <SidebarMenuItem key={item.id}><NavigationItem {...item} /></SidebarMenuItem>
-      ))}
-    </SidebarMenu>
   )
 }

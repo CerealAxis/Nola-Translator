@@ -22,7 +22,7 @@ export function useHomeReducedMotion() {
 }
 
 // 超出视口时暂停装饰动效，避免首页下方的卡片持续刷新。
-export function useHomeVisualViewport(threshold = 0.25, once = false) {
+export function useHomeVisualViewport(threshold = 0.25) {
   const ref = useRef<HTMLDivElement>(null)
   const [inView, setInView] = useState(() => typeof IntersectionObserver === 'undefined')
 
@@ -33,12 +33,11 @@ export function useHomeVisualViewport(threshold = 0.25, once = false) {
     const observer = new IntersectionObserver(([entry]) => {
       const visible = entry.isIntersecting && entry.intersectionRatio >= threshold
       setInView(visible)
-      if (visible && once) observer.disconnect()
     }, { threshold })
 
     observer.observe(node)
     return () => observer.disconnect()
-  }, [once, threshold])
+  }, [threshold])
 
   return { ref, inView }
 }

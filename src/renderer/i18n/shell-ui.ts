@@ -1,9 +1,9 @@
 export const shellZh = {
   mainNavigation: '主导航',
-  toolsGroup: '资源与工具',
+  toolsGroup: '功能',
   expandSidebar: '展开侧边栏',
   collapseSidebar: '收起侧边栏',
-  localAccount: '本地用户',
+  localAccount: '本地账户',
   overlay: '悬浮字幕',
   openOverlay: '打开悬浮字幕',
   captionPreview: '字幕预览',
@@ -52,10 +52,10 @@ export const shellZh = {
 type EnOf<T> = { [K in keyof T]: T[K] extends string ? string : EnOf<T[K]> }
 export const shellEn: EnOf<typeof shellZh> = {
   mainNavigation: 'Main navigation',
-  toolsGroup: 'Resources & tools',
+  toolsGroup: 'Features',
   expandSidebar: 'Expand sidebar',
   collapseSidebar: 'Collapse sidebar',
-  localAccount: 'Local user',
+  localAccount: 'Local account',
   overlay: 'Floating captions',
   openOverlay: 'Open floating captions',
   captionPreview: 'Caption preview',

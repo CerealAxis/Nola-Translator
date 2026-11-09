@@ -227,6 +227,7 @@ export default withMermaid(defineConfig({
             if (parent.type === 'rule') return selector
           }
           if (selector === '.dark') return `.dark ${scope}`
+          if (selector.startsWith(':root:lang(')) return `${scope}${selector.slice(':root'.length)}`
           if ([':root', ':host', 'html', 'body'].includes(selector)) return scope
           return scopedSelector
         },

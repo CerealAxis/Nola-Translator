@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "../../../../src/renderer/theme/base-ui.css";
+@import "../../../../src/renderer/theme/typography.css" layer(base);
+@import "../../../../src/renderer/theme/cjk-fonts.css";
 @import "../../../../src/renderer/theme/z-index.css";
 @source "../Specimen.tsx";
 @source "../examples/**/*.tsx";
@@ -42,9 +44,6 @@
   --sidebar-accent-foreground: oklch(0.3232 0.1376 260.7577);
   --sidebar-border: oklch(0.8994 0.0064 255.4779);
   --sidebar-ring: oklch(0.6007 0.1903 257.9419);
-  --font-sans: Inter, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: JetBrains Mono, monospace;
   --radius: 0.875rem;
   --shadow-x: 0px;
   --shadow-y: 2px;
@@ -97,9 +96,6 @@
   --sidebar-accent-foreground: oklch(0.8435 0.0803 251.0277);
   --sidebar-border: oklch(0.2594 0.0104 260.6979);
   --sidebar-ring: oklch(0.6496 0.1885 257.7207);
-  --font-sans: Segoe UI, Helvetica Neue, Helvetica, Lucida Grande, Arial, Ubuntu, Cantarell, Fira Sans, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   --radius: 1.5rem;
   --shadow-x: 0px;
   --shadow-y: 4px;
@@ -151,9 +147,6 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
-  --font-serif: var(--font-serif);
   --font-heading: var(--font-sans);
 
   --radius-sm: calc(var(--radius) - 4px);
@@ -183,15 +176,6 @@
   }
 }
 
-/* Design-system live examples */
-@font-face {
-  font-family: Inter;
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2");
-}
-
 :root { color-scheme: light; }
 :root.dark { color-scheme: dark; }
 
@@ -217,7 +201,6 @@
   --selection: var(--accent);
   --selection-foreground: var(--accent-foreground);
   --backdrop: color-mix(in srgb, var(--foreground) 40%, transparent);
-  --font-ui: var(--font-sans);
   --font-title: 600 1.25rem/1.4 var(--font-ui);
   --font-body: 400 .9375rem/1.55 var(--font-ui);
   --font-body-strong: 600 .9375rem/1.55 var(--font-ui);

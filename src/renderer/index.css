@@ -2,6 +2,7 @@
 @import 'tailwindcss' source(none);
 @source './';
 @import './theme/index.css';
+@import './theme/cjk-fonts.css';
 @import './theme/app.css';
 @import './theme/nola-theme.css';
 @import './theme/nola-glass.css';
@@ -40,6 +41,7 @@ html[data-overlay-toast='true'] #splash { display: none; }
 }
 
 @custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
 
 @custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));
 

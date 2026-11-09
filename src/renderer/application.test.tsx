@@ -6,16 +6,20 @@ import { parseRoute, pathOf } from './routes'
 const route = vi.hoisted(() => ({ route: 'settings', tab: 'browser', navigate: vi.fn() }))
 vi.mock('./routes', async importOriginal => ({ ...await importOriginal<typeof import('./routes')>(), useRoute: () => route }))
 
-it('opens browser plugin management directly from the main navigation without reviving the caption page', () => {
+it('shows only the requested sidebar entries and highlights settings for its subpages', () => {
   const { result } = renderHook(useApplicationNavigation)
-  const browser = result.current.find(item => item.id === 'browser')!
-  expect(browser.label).toBe('浏览器插件')
-  expect(browser.path).toBe('#/settings/browser')
-  expect(browser.active).toBe(true)
-  expect(result.current.find(item => item.id === 'settings')?.active).toBe(false)
-  browser.onPress?.()
-  expect(route.navigate).toHaveBeenCalledWith('#/settings/browser')
-  expect(result.current.some(item => item.path === '#/video-captions')).toBe(false)
+  expect(result.current.map(item => item.id)).toEqual([
+    'home', 'models', 'model-gateway', 'workspace', 'meeting', 'screen-translation',
+    'game-translation', 'comic-translation', 'workbench', 'settings',
+  ])
+  expect(result.current.filter(item => item.section === 'features').map(item => item.id)).toEqual([
+    'workspace', 'meeting', 'screen-translation', 'game-translation', 'comic-translation', 'workbench',
+  ])
+  const settings = result.current.find(item => item.id === 'settings')
+  expect(settings?.active).toBe(true)
+  settings?.onPress?.()
+  expect(route.navigate).toHaveBeenCalledWith('#/settings/general')
+  expect(parseRoute('#/video-captions')).toMatchObject({ route: 'settings', tab: 'browser' })
 })
 
 vi.mock('./features/model-gateway/ModelGatewayPage', () => ({ ModelGatewayPage: () => null }))

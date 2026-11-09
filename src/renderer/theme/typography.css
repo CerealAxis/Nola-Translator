@@ -9,10 +9,11 @@
    ========================================================================== */
 
 :root {
-  --font-ui:
-    'Segoe UI Variable Text', 'Noto Sans SC', 'Microsoft YaHei UI', 'PingFang SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-cjk-fallback: 'Noto Sans SC';
-  --font-mono: 'Cascadia Mono', 'SF Mono', Consolas, var(--font-cjk-fallback), ui-monospace, monospace;
+  --font-ui: var(--font-cjk-fallback), sans-serif;
+  --font-sans: var(--font-ui);
+  --font-serif: var(--font-ui);
+  --font-mono: var(--font-ui);
 
   /* --- Type scale ----------------------------------------------------------
      Every entry is a complete `font` shorthand, family included, so it applies
@@ -34,28 +35,19 @@
   --nola-autospace: 0.25em;
 }
 
-:root:lang(zh-CN) {
-  --font-ui: 'Noto Sans SC', 'Microsoft YaHei UI', 'PingFang SC', system-ui, sans-serif;
-  --font-cjk-fallback: 'Noto Sans SC';
-}
-
 :root:lang(zh-TW) {
-  --font-ui: 'Noto Sans TC', 'Microsoft JhengHei UI', 'PingFang TC', system-ui, sans-serif;
   --font-cjk-fallback: 'Noto Sans TC';
 }
 
 :root:lang(zh-HK) {
-  --font-ui: 'Noto Sans HK', 'Microsoft JhengHei UI', 'PingFang HK', system-ui, sans-serif;
   --font-cjk-fallback: 'Noto Sans HK';
 }
 
 :root:lang(ko) {
-  --font-ui: 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
   --font-cjk-fallback: 'Noto Sans KR';
 }
 
 :root:lang(ja) {
-  --font-ui: 'Noto Sans JP', 'Yu Gothic UI', 'Meiryo', system-ui, sans-serif;
   --font-cjk-fallback: 'Noto Sans JP';
 }
 

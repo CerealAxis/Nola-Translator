@@ -1,12 +1,4 @@
 /* 桌面产品主题。配色和视觉变量来自设计文档的 apple-liquid-glass.css。 */
-@font-face {
-  font-family: Inter;
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  src: url("../assets/fonts/inter-latin-wght-normal.woff2") format("woff2");
-}
-
 :root {
   color-scheme: light;
   --background: oklch(0.9700 0.0029 264.5420);
@@ -41,9 +33,6 @@
   --sidebar-accent-foreground: oklch(0.3232 0.1376 260.7577);
   --sidebar-border: oklch(0.8994 0.0064 255.4779);
   --sidebar-ring: oklch(0.6007 0.1903 257.9419);
-  --font-sans: Inter, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: JetBrains Mono, monospace;
   --radius: 0.875rem;
   --shadow-2xs: 0px 2px 28px 0px hsl(214.7368 10.8571% 34.3137% / 0.05);
   --shadow-xs: 0px 2px 28px 0px hsl(214.7368 10.8571% 34.3137% / 0.05);
@@ -126,7 +115,6 @@
   --nola-ui-radius-md: var(--radius-md);
   --nola-ui-radius-lg: var(--radius-lg);
 
-  --font-ui: Inter, var(--font-cjk-fallback, system-ui), sans-serif;
   --font-display: 600 2rem/1.25 var(--font-ui);
   --font-title: 600 1.25rem/1.4 var(--font-ui);
   --font-body: 400 .9375rem/1.55 var(--font-ui);
@@ -182,9 +170,6 @@
   --sidebar-accent-foreground: oklch(0.8435 0.0803 251.0277);
   --sidebar-border: oklch(0.2594 0.0104 260.6979);
   --sidebar-ring: oklch(0.6496 0.1885 257.7207);
-  --font-sans: Segoe UI, Helvetica Neue, Helvetica, Lucida Grande, Arial, Ubuntu, Cantarell, Fira Sans, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   --radius: 1.5rem;
   --shadow-2xs: 0px 4px 40px 0px hsl(0 0% 0% / 0.23);
   --shadow-xs: 0px 4px 40px 0px hsl(0 0% 0% / 0.23);
@@ -194,8 +179,6 @@
   --shadow-lg: 0px 4px 40px 0px hsl(0 0% 0% / 0.45), 0px 4px 6px -1px hsl(0 0% 0% / 0.45);
   --shadow-xl: 0px 4px 40px 0px hsl(0 0% 0% / 0.45), 0px 8px 10px -1px hsl(0 0% 0% / 0.45);
   --shadow-2xl: 0px 4px 40px 0px hsl(0 0% 0% / 1.13);
-  --font-ui: Segoe UI, Helvetica Neue, Helvetica, Lucida Grande, Arial, Ubuntu, Cantarell,
-    Fira Sans, var(--font-cjk-fallback, system-ui), sans-serif;
 }
 
 [data-slot="card"] {

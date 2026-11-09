@@ -370,10 +370,10 @@ export const zhTW: Dictionary = {
   },
   "shellUi": {
     "mainNavigation": "主導覽",
-    "toolsGroup": "資源與工具",
+    "toolsGroup": "功能",
     "expandSidebar": "展開側邊欄",
     "collapseSidebar": "收合側邊欄",
-    "localAccount": "本機使用者",
+    "localAccount": "本機帳戶",
     "actionHint": "可點擊下方按鈕繼續處理。",
     "overlay": "懸浮字幕",
     "openOverlay": "開啟懸浮字幕",

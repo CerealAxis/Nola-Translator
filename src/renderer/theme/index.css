@@ -24,13 +24,6 @@
 @layer base {
   :root {
     --selection-neutral: color-mix(in oklch, var(--surface) 90%, var(--foreground));
-    /* --- Font families -------------------------------------------------------
-       typography.css selects bundled CJK faces from the document language. Cascadia
-       Mono and the generic families below it carry no CJK glyphs, so the region face
-       sits in the stack ahead of them: Latin keeps the mono advance, Chinese keeps the
-       type the rest of the UI uses. */
-    --font-mono: "Cascadia Mono", "SF Mono", Consolas, var(--font-cjk-fallback), ui-monospace, monospace;
-
     /* --- Typography scale ----------------------------------------------------
        Per DESIGN.MD typography. 8 steps, display to label.
        CSS shorthand: font-weight size/line-height family */

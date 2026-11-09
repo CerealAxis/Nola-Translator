@@ -6,12 +6,13 @@
 
 相关资源：
 
-- 视觉与组件规范：[DESIGN.md](./docs/design-system/DESIGN.md)
-- 设计原则与文档目录：[设计文档](./docs/design-system/index.md)
+- 设计规范：[DESIGN.md](./docs/design-system/DESIGN.md)
+- 设计原则：[设计文档](./docs/design-system/index.md)
+- 组件文档：[组件文档](./docs/design-system/components/index.md)
 - 工程规约：[编码与工程规约目录](./docs/design-system/engineering/index.md)
 - 产品帮助文档：[帮助文档](./docs/help-docs/zh-CN/docs.md)
-- shadcn/ui 文档：[llms.txt](./llms.txt)
-- assistant-ui 文档：https://www.assistant-ui.com/llms-full.txt
+- shadcn/ui 官方文档：[llms.txt](./llms.txt)
+- assistant-ui 官方文档：https://www.assistant-ui.com/llms-full.txt
 - 项目 Skills：`./skills/`
 
 ## 1. 工作原则
@@ -24,6 +25,7 @@
 - **最小完整改动**：优先复用现有抽象，不借机重构无关模块、不无故引入依赖、不改变未要求的行为。
 - **保护工作区**：保留用户和其他 Agent 已有的修改，不擅自覆盖或清理。
 - **善于借鉴**：优先研究成熟项目及已有实现，避免重复造轮子；借鉴外部代码时注意许可证及兼容性。
+- **查阅文档**：优先查阅本项目已有文档，如果项目文档没有答案，再查阅其他资料。
 
 ### 1.2 验证与交付
 

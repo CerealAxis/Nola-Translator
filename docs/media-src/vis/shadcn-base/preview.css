@@ -4,7 +4,6 @@
 @import "tw-animate-css";
 @import "tw-shimmer";
 @import "./upstream-tailwind.css";
-@import "@fontsource-variable/inter";
 @import "../../../../src/renderer/features/workbench/native-generative.css" layer(components);
 @import "../assistant-ui/control-styles.css";
 
@@ -16,10 +15,6 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--preview-font-sans);
-    --font-sans: var(--preview-font-sans);
-    --font-mono: var(--preview-font-mono);
-    --font-serif: var(--preview-font-serif);
     --shadow: var(--preview-shadow);
     --shadow-2xs: var(--preview-shadow-2xs);
     --shadow-xs: var(--preview-shadow-xs);
@@ -109,9 +104,6 @@
     --sidebar-accent-foreground: oklch(0.3232 0.1376 260.7577);
     --sidebar-border: oklch(0.8994 0.0064 255.4779);
     --sidebar-ring: oklch(0.6007 0.1903 257.9419);
-    --preview-font-sans: Inter, 'Inter Variable', sans-serif;
-    --preview-font-serif: Georgia, serif;
-    --preview-font-mono: JetBrains Mono, monospace;
     --shadow-color: #4e5661;
     --shadow-opacity: 0.10;
     --shadow-blur: 28px;
@@ -165,9 +157,6 @@
     --sidebar-accent-foreground: oklch(0.8435 0.0803 251.0277);
     --sidebar-border: oklch(0.2594 0.0104 260.6979);
     --sidebar-ring: oklch(0.6496 0.1885 257.7207);
-    --preview-font-sans: Segoe UI, Helvetica Neue, Helvetica, Lucida Grande, Arial, Ubuntu, Cantarell, Fira Sans, sans-serif;
-    --preview-font-serif: Georgia, serif;
-    --preview-font-mono: SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
     --shadow-color: #000000;
     --shadow-opacity: 0.45;
     --shadow-blur: 40px;

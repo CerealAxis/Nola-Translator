@@ -135,7 +135,7 @@
   animation: nola-home-manga-scan 7s ease-in-out infinite paused;
 }
 
-.nola-home-manga-stage[data-playing="true"] {
+.nola-home-feature-card[data-playing] .nola-home-manga-stage {
   animation-play-state: running;
 }
 

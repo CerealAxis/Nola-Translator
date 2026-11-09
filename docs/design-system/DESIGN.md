@@ -98,18 +98,17 @@ colors:
 
 ## Typography
 
+Desktop windows and live component previews use the same bundled Noto Sans CJK variable fonts in light and dark mode. Select the family from the interface language. English uses Noto Sans SC, which includes Latin glyphs. Text, shortcut labels, and code use the same family.
+
 ```yaml
 typography:
-  sans:
-    fontFamily: "Inter, sans-serif"
-  sans-dark:
-    fontFamily: "Segoe UI, Helvetica Neue, Helvetica, Lucida Grande, Arial, Ubuntu, Cantarell, Fira Sans, sans-serif"
-  serif:
-    fontFamily: "Georgia, serif"
-  mono:
-    fontFamily: "JetBrains Mono, monospace"
-  mono-dark:
-    fontFamily: "SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
+  fontFamilyByLocale:
+    zh-CN: "Noto Sans SC"
+    zh-TW: "Noto Sans TC"
+    zh-HK: "Noto Sans HK"
+    ja: "Noto Sans JP"
+    ko: "Noto Sans KR"
+    en: "Noto Sans SC"
   title:
     fontSize: 1.25rem
     fontWeight: 600
@@ -178,7 +177,6 @@ typography:
     fontSize: 0.8125rem
     fontWeight: 400
     lineHeight: 1.5
-    fontFamily: "ui-monospace, \"SF Mono\", \"Cascadia Mono\", Consolas, monospace"
   tracking-normal:
     letterSpacing: 0em
 ```

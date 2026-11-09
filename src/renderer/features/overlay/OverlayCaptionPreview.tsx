@@ -30,7 +30,6 @@ export function OverlayCaptionPreview({
     '--preview-translation-font-size': `${config.translationFontSize}px`,
     '--preview-translation-font-weight': config.translationFontWeight,
     '--preview-translation-line-height': config.translationLineHeight,
-    fontFamily: `${config.fontFamily}, var(--font-cjk-fallback), var(--font-ui), sans-serif`,
   } as CSSProperties
 
   return (

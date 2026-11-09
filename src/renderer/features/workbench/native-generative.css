@@ -1019,7 +1019,7 @@ padding: 0.75rem 0.875rem;
 overflow-x: auto;
 border-radius: calc(var(--radius) - 2px);
 background-color: color-mix(in oklab, var(--muted) 60%, transparent);
-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+font-family: var(--font-ui);
 font-size: 0.8125rem;
 line-height: 1.5;
 }
@@ -1115,7 +1115,7 @@ font-size: 0.8125em;
 background-color: color-mix(in oklab, var(--muted) 60%, transparent);
 padding: 0.125rem 0.375rem;
 border-radius: calc(var(--radius) - 4px);
-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+font-family: var(--font-ui);
 }
 [data-aui="markdown"] pre {
 background-color: color-mix(in oklab, var(--muted) 60%, transparent);

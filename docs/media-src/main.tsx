@@ -1,5 +1,4 @@
 import '@/index.css'
-import '@/theme/cjk-fonts.css'
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Button } from '@/components/ui/button'

@@ -10,7 +10,7 @@ const questLines = [
 
 // 改编自 Magic UI Typing Animation（MIT，见 THIRD_PARTY_NOTICES.md）。
 // https://magicui.design/docs/components/typing-animation
-export function GameVisual({ reduceMotion }: { reduceMotion: boolean }) {
+export function GameVisual({ playing }: { playing: boolean }) {
   const { ref, inView } = useHomeVisualViewport()
   const [lineIndex, setLineIndex] = useState(0)
   const [visibleCount, setVisibleCount] = useState(0)
@@ -18,7 +18,7 @@ export function GameVisual({ reduceMotion }: { reduceMotion: boolean }) {
   const done = visibleCount >= translation.length
 
   useEffect(() => {
-    if (reduceMotion || !inView) return
+    if (!playing || !inView) return
 
     const timeout = setTimeout(() => {
       if (done) {
@@ -30,7 +30,7 @@ export function GameVisual({ reduceMotion }: { reduceMotion: boolean }) {
     }, done ? 3400 : 85)
 
     return () => clearTimeout(timeout)
-  }, [done, inView, reduceMotion, visibleCount])
+  }, [done, inView, playing, visibleCount])
 
   return (
     <div ref={ref} className="nola-home-game-stage">
@@ -55,8 +55,8 @@ export function GameVisual({ reduceMotion }: { reduceMotion: boolean }) {
         </div>
         <div className="nola-home-game-translation" lang="zh-CN">
           <Languages />
-          <span>{reduceMotion ? translation : translation.slice(0, visibleCount)}</span>
-          {!reduceMotion && !done && <span className="nola-home-game-caret" />}
+          <span>{playing ? translation.slice(0, visibleCount) : translation}</span>
+          {playing && !done && <span className="nola-home-game-caret" />}
         </div>
       </div>
     </div>
@@ -97,10 +97,8 @@ function MangaSpread({ translated = false }: { translated?: boolean }) {
 // 复用 Magic UI Lens 的双层内容和径向遮罩（MIT）。镜片自动经过两个气泡，露出译文层。
 // https://magicui.design/docs/components/lens
 export function MangaVisual() {
-  const { ref, inView } = useHomeVisualViewport()
-
   return (
-    <div ref={ref} className="nola-home-manga-stage" data-playing={inView}>
+    <div className="nola-home-manga-stage">
       <MangaSpread />
       <div className="nola-home-manga-lens">
         <MangaSpread translated />

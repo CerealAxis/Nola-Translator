@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 
 import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
@@ -18,7 +18,6 @@ import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
-const FONT_FAMILIES = ['Segoe UI Variable', 'Noto Sans SC', 'Noto Sans TC', 'Noto Sans HK', 'Noto Sans JP', 'Noto Sans KR', 'Microsoft YaHei UI', 'PingFang SC', 'Cascadia Mono', 'Source Han Sans SC']
 const PRESET_COLORS = ['#F7F7F7', '#D7DEE8', '#87D5FF', '#0D0E10', '#FFFFFF', '#4C9AFF']
 
 export function AppearanceTab({ settings }: SettingsPanelProps) {
@@ -34,7 +33,6 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
    * though nothing written here failed. The indicator follows this tab's own writes.
    */
   const [saveError, setSaveError] = useState(false)
-  const fontOptions = useMemo<PickerOption[]>(() => FONT_FAMILIES.map((family) => ({ value: family, label: family })), [])
   const write = (patch: Partial<typeof overlay>) => {
     void updateSettings({ overlay: patch })
       .then(() => setSaveError(false))
@@ -78,7 +76,6 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
               '--preview-translation-font-size': `${overlay.translationFontSize}px`,
               '--preview-translation-font-weight': overlay.translationFontWeight,
               '--preview-translation-line-height': overlay.translationLineHeight,
-              fontFamily: `${overlay.fontFamily}, var(--font-cjk-fallback), var(--font-ui), sans-serif`,
             } as CSSProperties}
             aria-hidden="true"
           >
@@ -129,7 +126,6 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
       </SettingGroup>
 
       <SettingGroup legend={t('modelsSettingsUi.fontColors')}>
-        <SettingsRow label={t('settings.fontFamily')}><SettingSelect value={overlay.fontFamily} options={fontOptions} ariaLabel={t('settings.fontFamily')} onChange={(fontFamily) => write({ fontFamily })} /></SettingsRow>
         <SliderRow label={t('settings.sourceFontSize')} value={overlay.fontSize} min={10} max={48} step={1} unit="px" onChange={(fontSize) => write({ fontSize })} />
         <SliderRow label={t('settings.translationFontSize')} value={overlay.translationFontSize} min={10} max={48} step={1} unit="px" onChange={(translationFontSize) => write({ translationFontSize })} />
         <SliderRow label={t('settings.lineHeight')} value={overlay.lineHeight} min={1} max={2.5} step={0.05} onChange={(lineHeight) => write({ lineHeight, translationLineHeight:lineHeight })} />

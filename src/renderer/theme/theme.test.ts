@@ -107,11 +107,11 @@ describe('设计硬规则由 CSS 自证（§1.8）', () => {
 })
 
 describe('排版规则（§3.3）', () => {
-  it('中文字体栈里没有 SF Pro 与 Inter', () => {
+  it('界面字体按语言选择 Noto，深浅主题不另设字体', () => {
     const css = read('typography.css')
-    expect(css).toContain('Microsoft YaHei UI')
-    expect(css).not.toMatch(/SF Pro/i)
-    expect(css).not.toMatch(/"Inter"/)
+    expect(css).toContain('--font-ui: var(--font-cjk-fallback), sans-serif')
+    for (const region of ['SC', 'TC', 'HK', 'JP', 'KR']) expect(css).toContain(`'Noto Sans ${region}'`)
+    expect(read('nola-theme.css')).not.toMatch(/--font-(ui|sans|mono|serif):|@font-face/)
   })
 
   it('正文行高不低于 1.6（中文需要更松的行距）', () => {

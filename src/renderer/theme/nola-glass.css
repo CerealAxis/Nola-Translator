@@ -227,7 +227,7 @@
         .button[data-variant="outline"]:not([data-size^="icon"]),
         [data-slot="button"][data-variant="secondary"]:not([data-size^="icon"]),
         [data-slot="button"][data-variant="outline"]:not([data-size^="icon"])
-      ) {
+      ):not(:where(.nola-home-poster *)) {
         background: var(--nola-glass-control-fill);
         border-color: var(--nola-glass-stroke);
         box-shadow: var(--nola-glass-inner), 0 3px 12px rgb(0 0 0 / 6%);
@@ -239,12 +239,12 @@
         .button[data-variant="outline"]:not([data-size^="icon"]),
         [data-slot="button"][data-variant="secondary"]:not([data-size^="icon"]),
         [data-slot="button"][data-variant="outline"]:not([data-size^="icon"])
-      ):hover:not(:disabled, [aria-disabled="true"]) {
+      ):hover:not(:disabled, [aria-disabled="true"], :where(.nola-home-poster *)) {
         background: var(--nola-glass-control-hover);
         box-shadow: var(--nola-glass-inner), 0 5px 17px rgb(0 0 0 / 9%);
       }
 
-      & :is(.button[data-variant="default"], [data-slot="button"][data-variant="default"]):not(:where(.nola-sidebar *)) {
+      & :is(.button[data-variant="default"], [data-slot="button"][data-variant="default"]):not(:where(.nola-sidebar *, .nola-home-poster *)) {
         background:
           linear-gradient(160deg, rgb(255 255 255 / 18%) 0%, transparent 70%),
           color-mix(in srgb, var(--primary) clamp(87%, calc(var(--nola-glass-base-opacity) + 35%), 100%), transparent);
@@ -254,7 +254,7 @@
         -webkit-backdrop-filter: var(--nola-glass-control-filter);
         backdrop-filter: var(--nola-glass-control-filter);
       }
-      & :is(.button[data-variant="default"], [data-slot="button"][data-variant="default"]):hover:not(:disabled, [aria-disabled="true"], :where(.nola-sidebar *)) {
+      & :is(.button[data-variant="default"], [data-slot="button"][data-variant="default"]):hover:not(:disabled, [aria-disabled="true"], :where(.nola-sidebar *, .nola-home-poster *)) {
         background:
           linear-gradient(160deg, rgb(255 255 255 / 20%), transparent 70%),
           color-mix(in srgb, var(--primary) 100%, transparent);

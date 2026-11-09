@@ -6,13 +6,14 @@
   container-type: inline-size;
 }
 
-.nola-home--dashboard .nola-home-poster.card {
+.nola-home--dashboard .nola-home-poster {
   position: relative;
   isolation: isolate;
   display: flex;
+  flex-direction: column;
   align-items: start;
-  justify-content: center;
-  min-block-size: 10rem;
+  justify-content: end;
+  min-block-size: calc(var(--space-8) * 2 + var(--space-2));
   max-block-size: 23rem;
   aspect-ratio: 24 / 5;
   overflow: hidden;
@@ -36,6 +37,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 60%;
 }
 
 .nola-home-poster__copy {
@@ -48,10 +50,20 @@
   color: white;
 }
 
-.nola-home-poster__copy h1 {
+.nola-home-poster__heading {
+  display: grid;
+  gap: calc(var(--space-1) / 2);
+}
+
+.nola-home-poster__heading h1 {
   margin: 0;
   font: var(--font-display);
   text-wrap: balance;
+}
+
+.nola-home-poster__heading p {
+  margin: 0;
+  font: var(--font-body);
 }
 
 .nola-home-section {
@@ -94,13 +106,17 @@
 }
 
 @container (max-width: 700px) {
-  .nola-home--dashboard .nola-home-poster.card {
+  .nola-home--dashboard .nola-home-poster {
     padding: var(--space-3);
   }
 }
 
 @container (max-width: 560px) {
-  .nola-home-poster__copy h1 {
+  .nola-home--dashboard .nola-home-poster {
+    aspect-ratio: auto;
+  }
+
+  .nola-home-poster__heading h1 {
     font: var(--font-title);
   }
 }
