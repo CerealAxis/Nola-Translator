@@ -177,8 +177,8 @@ export function AudioTab({ settings }: SettingsPanelProps) {
                 }}>
                 <SliderControl>
                   <SliderTrack className="relative h-1 w-full rounded-full bg-surface-tertiary">
-                    <SliderIndicator className="rounded-full bg-accent" />
-                    <SliderThumb className="size-3 rounded-full bg-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus" aria-label={t(label)} />
+                    <SliderIndicator className="rounded-full bg-primary" />
+                    <SliderThumb className="size-3 rounded-full bg-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus" aria-label={t(label)} />
                   </SliderTrack>
                 </SliderControl>
               </SliderRoot>

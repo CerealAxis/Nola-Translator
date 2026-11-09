@@ -1,0 +1,110 @@
+.nola-home-bento {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 22rem;
+  gap: var(--space-2);
+}
+.nola-home-feature-card {
+  --bento-duration: 300ms;
+  --bento-shift: var(--space-5);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-inline-size: 0;
+  overflow: hidden;
+  padding: var(--space-2);
+  border: 1px solid color-mix(in oklch, var(--border) 52%, transparent);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: var(--shadow-xs);
+}
+.nola-home-feature--wide { grid-column: span 2; }
+.nola-home-feature--small { grid-column: span 1; }
+.nola-home-bento-visual {
+  position: absolute;
+  inset: 0 0 auto;
+  block-size: 14.5rem;
+  z-index: -1;
+  overflow: hidden;
+  /* 参考 Magic UI Bento Demo，动效在靠近正文前渐隐到卡片底色。 */
+  opacity: .88;
+  mask-image: linear-gradient(to bottom, black 12%, rgb(0 0 0 / 55%) 52%, transparent 90%);
+  pointer-events: none;
+}
+.nola-home-bento-copy {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-1) / 2);
+  transition: transform var(--bento-duration) ease;
+  pointer-events: none;
+}
+.nola-home-bento-copy h3 {
+  margin: 0;
+  font: var(--font-title);
+}
+.nola-home-bento-copy p {
+  max-inline-size: 30rem;
+  margin: 0;
+  color: var(--muted-foreground);
+  font: var(--font-body);
+}
+.nola-home-bento-icon {
+  flex: none;
+  width: var(--space-6);
+  height: var(--space-6);
+  color: color-mix(in oklch, var(--card-foreground) 84%, var(--muted-foreground));
+  stroke-width: 1.8;
+  transform-origin: left center;
+  transition: transform var(--bento-duration) ease;
+}
+.nola-home-bento-cta {
+  position: absolute;
+  inset-inline: var(--space-2);
+  inset-block-end: var(--space-2);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  transform: translateY(var(--bento-shift));
+  opacity: 0;
+  transition: opacity var(--bento-duration) ease, transform var(--bento-duration) ease;
+}
+.nola-home-bento-cta .button { padding-inline: calc(var(--space-1) / 2); }
+.nola-home-feature-card:is(:hover, :focus-within, [data-onboarding-cta]) .nola-home-bento-copy {
+  transform: translateY(calc(-1 * var(--bento-shift)));
+}
+.nola-home-feature-card:is(:hover, :focus-within, [data-onboarding-cta]) .nola-home-bento-icon {
+  transform: scale(.75);
+}
+.nola-home-feature-card:is(:hover, :focus-within, [data-onboarding-cta]) .nola-home-bento-cta {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+@media (hover: none), (pointer: coarse) {
+  .nola-home-feature-card .nola-home-bento-copy {
+    transform: translateY(calc(-1 * var(--bento-shift)));
+  }
+  .nola-home-feature-card .nola-home-bento-cta {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nola-home-feature-card :is(.nola-home-bento-copy, .nola-home-bento-icon, .nola-home-bento-cta) {
+    transition: none;
+  }
+}
+
+@container (max-width: 700px) {
+  .nola-home-bento { grid-template-columns: minmax(0, 1fr); }
+  .nola-home-bento > .nola-home-feature-card { grid-column: auto; }
+}
+
+.nola-home-bento[data-reduce-motion] :is(.nola-home-bento-copy, .nola-home-bento-icon, .nola-home-bento-cta) {
+  transition: none;
+}

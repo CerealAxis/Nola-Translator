@@ -1,0 +1,20 @@
+.nola-home-provider-cloud {
+  display: flex;
+  justify-content: center;
+  padding-block-start: var(--space-1);
+}
+
+.nola-home-provider-cloud canvas {
+  display: block;
+  inline-size: min(100%, 13rem);
+  block-size: auto;
+  aspect-ratio: 1;
+  color: var(--card-foreground);
+  pointer-events: auto;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.nola-home-provider-cloud canvas:active {
+  cursor: grabbing;
+}

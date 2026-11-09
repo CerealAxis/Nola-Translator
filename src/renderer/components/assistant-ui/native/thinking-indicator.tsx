@@ -25,7 +25,7 @@ export function ThinkingIndicator({
     >
       <span
         aria-hidden
-        className="size-1.5 shrink-0 animate-pulse rounded-full bg-blue-500 motion-reduce:animate-none dark:bg-blue-400"
+        className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
       />
       <ShimmerLabel
         key={label}

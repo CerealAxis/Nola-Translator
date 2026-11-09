@@ -56,7 +56,7 @@ export function SubagentList({
           >
             <div className="flex items-center gap-2">
               {done ? (
-                <CheckIcon className="fade-in zoom-in-90 animate-in size-3.5 shrink-0 text-emerald-500 duration-200" />
+                <CheckIcon className="fade-in zoom-in-90 animate-in size-3.5 shrink-0 text-chart-2 duration-200" />
               ) : (
                 <Loader2Icon className="text-muted-foreground size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
               )}
@@ -78,7 +78,7 @@ export function SubagentList({
               <span
                 className={cn(
                   "block h-full rounded-full transition-[width] duration-700 forced-color-adjust-none",
-                  done ? "bg-emerald-500/70" : "bg-foreground/60",
+                  done ? "bg-chart-2/70" : "bg-foreground/60",
                 )}
                 style={{ width: `${percentage}%` }}
               />

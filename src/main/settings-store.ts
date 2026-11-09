@@ -7,7 +7,7 @@ import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PR
 import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFF } from '../shared/pypi-mirrors'
 import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
 import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
-import { settingsPatchSchema } from './settings-schema'
+import { glassSettingsShape, settingsPatchSchema } from './settings-schema'
 import { customModelSchema, synchronizeCustomModel } from '../shared/custom-models'
 import { LANGUAGE_CODES } from '../shared/languages'
 import { mergeModelPolicy, modelPolicyOf, modelPolicySchema } from '../shared/model-policy'
@@ -394,7 +394,15 @@ export class SettingsStore {
             ? { aliyunModel: 'qwen3.8-livetranslate-flash-realtime' } : {}),
         },
         recording: { ...DEFAULT_SETTINGS.recording, ...(raw.recording ?? {}) },
-        appearance: { ...DEFAULT_SETTINGS.appearance, ...(raw.appearance ?? {}) },
+        appearance: {
+          ...DEFAULT_SETTINGS.appearance,
+          ...raw.appearance,
+          liquidGlass: typeof raw.appearance?.liquidGlass === 'boolean'
+            ? raw.appearance.liquidGlass : DEFAULT_SETTINGS.appearance.liquidGlass,
+          glassBlur: glassSettingsShape.glassBlur.safeParse(raw.appearance?.glassBlur).data ?? DEFAULT_SETTINGS.appearance.glassBlur,
+          glassOpacity: glassSettingsShape.glassOpacity.safeParse(raw.appearance?.glassOpacity).data ?? DEFAULT_SETTINGS.appearance.glassOpacity,
+          glassSaturation: glassSettingsShape.glassSaturation.safeParse(raw.appearance?.glassSaturation).data ?? DEFAULT_SETTINGS.appearance.glassSaturation,
+        },
         browserConnection: {
           enabled: typeof raw.browserConnection?.enabled === 'boolean'
             ? raw.browserConnection.enabled

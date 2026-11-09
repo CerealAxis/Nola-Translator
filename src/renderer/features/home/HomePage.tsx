@@ -1,54 +1,51 @@
 import type { ReactNode } from 'react'
-import { Mic, PanelsTopLeft, Clock, SlidersHorizontal, Network, MessageSquareText } from 'lucide-react'
+import { ArrowDown } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
-import { requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
-import { notifyError } from '@/components/primitives/notify'
-import { HeroSection, FeatureCard } from '@/components/home'
-import { useI18n } from '@/i18n'
-import { pathOf, recordPath, useRoute } from '@/routes'
-import { actions, getBridge, stores, useStore } from '@/store'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { useI18n, type UiLanguage } from '@/i18n'
+import { useRoute } from '@/routes'
+import poster from '@/assets/home-poster.png'
+import { HomeFeatures } from './HomeFeatures'
+import { HomeReleaseAnnouncements } from './HomeReleaseAnnouncements'
 import { RecentMeetings } from './RecentMeetings'
-import './home-records.css'
+import './home-page.css'
+
+const posterCopy = {
+  'zh-CN': { title: '电脑声音，实时翻译', action: '查看同传' },
+  'zh-TW': { title: '電腦聲音，即時翻譯', action: '查看同步口譯' },
+  'zh-HK': { title: '電腦聲音，即時翻譯', action: '查看即時傳譯' },
+  ja: { title: 'PC の音声をリアルタイムで翻訳', action: '同時通訳を見る' },
+  ko: { title: '컴퓨터 소리를 실시간으로 번역', action: '동시통역 보기' },
+  en: { title: 'Translate computer audio in real time', action: 'Explore live translation' },
+} satisfies Record<UiLanguage, { title: string; action: string }>
 
 export function HomePage(): ReactNode {
-  const { t } = useI18n()
-  const { navigate, path } = useRoute()
-  const meetings = useStore(stores.meetings, (state) => state.meetings)
-  const loading = useStore(stores.meetings, (state) => state.loading)
-  const loaded = useStore(stores.meetings, (state) => state.loaded)
-  const loadError = useStore(stores.meetings, (state) => state.error)
-  /*
-   * No sessions yet and a list that could not be read are different states, and the
-   * empty state claims the first one. The store keeps the reason; the notice tells
-   * the user, and the retry button lets them ask again.
-   */
-  const loadFailed = !loaded && !loading && loadError !== null
-  const retryLoad = () => {
-    /*
-     * The store keeps the failure and the effect above reports it, so this call
-     * only asks again and announces the list it got back. A load that is already
-     * running resolves without reading anything, so the notice would announce a
-     * list that was never fetched.
-     */
-    if (stores.meetings.getState().loading) return
-    void actions.meetings.loadMeetings().catch(() => undefined)
-  }
-  const goWorkspace = () => navigate(pathOf('workspace'))
-  const goRecords = () => navigate(pathOf('records'))
+  const { language } = useI18n()
+  const { path } = useRoute()
+  const copy = posterCopy[language]
+
   return (
     <ErrorBoundary resetKey={path}>
-      <div className="nola-home">
-        <HeroSection />
-        <div className="nola-home__entries" data-onboarding="home-entries">
-          <FeatureCard onboardingTarget="home-models" variant="tertiary" icon={<SlidersHorizontal aria-hidden="true" />} title={t('home.models')} description={t('homeRecordsUi.modelsDescription')} buttonText={t('homeRecordsUi.openModels')} onButtonClick={() => navigate(pathOf('models'))} />
-          <FeatureCard variant="quaternary" icon={<Network aria-hidden="true" />} title={t('homeRecordsUi.gatewayTitle')} description={t('homeRecordsUi.gatewayDescription')} buttonText={t('homeRecordsUi.openGateway')} onButtonClick={() => navigate(pathOf('model-gateway'))} />
-          <FeatureCard onboardingTarget="home-quick" variant="primary" icon={<Mic aria-hidden="true" />} title={t('home.quickStart')} description={t('homeRecordsUi.quickDescription')} buttonText={t('workspace.start')} onButtonClick={goWorkspace} />
-          <FeatureCard onboardingTarget="home-browser" variant="secondary" className="nola-entry--browser" icon={<PanelsTopLeft aria-hidden="true" />} title={t('browser.title')} description={t('homeRecordsUi.browserDescription')} buttonText={t('browser.manage')} onButtonClick={() => navigate('#/settings/browser')} />
-          <FeatureCard variant="secondary" className="nola-entry--workbench" icon={<MessageSquareText aria-hidden="true" />} title={t('workbench.title')} description={t('homeRecordsUi.workbenchDescription')} buttonText={t('homeRecordsUi.openWorkbench')} onButtonClick={() => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) }} />
-        </div>
-        <RecentMeetings meetings={meetings} loading={loading} failed={loadFailed} onRetry={retryLoad} onOpen={(id) => navigate(recordPath(id))} onStart={goWorkspace} onOpenAll={goRecords} />
+      <div className="nola-home nola-home--dashboard">
+        <Card className="nola-home-poster">
+          <img src={poster} alt="" className="nola-home-poster__image" />
+          <div className="nola-home-poster__copy">
+            <h1>{copy.title}</h1>
+            <Button
+              size="sm"
+              aria-controls="home-feature-workspace"
+              onClick={() => document.getElementById('home-feature-workspace')?.scrollIntoView({ block: 'start' })}
+            >
+              {copy.action}
+              <ArrowDown data-icon="inline-end" aria-hidden="true" />
+            </Button>
+          </div>
+        </Card>
+        <HomeFeatures />
+        <RecentMeetings />
+        <HomeReleaseAnnouncements />
       </div>
     </ErrorBoundary>
   )
 }
-

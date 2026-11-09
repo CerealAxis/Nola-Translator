@@ -45,7 +45,7 @@ it('muted the unconfirmed tail and leaves the confirmed text in the foreground c
   const { container } = render(track('translation', { key: 's', text: '我们需要仔细地分析问题', stableText: '我们需要' }))
   const confirmed = confirmedOf(container)
   const tail = tailOf(container)
-  expect(tail?.style.color).toBe('var(--muted)')
+  expect(tail?.style.color).toBe('var(--nola-ui-muted-foreground)')
   // The confirmed part carries no colour of its own: it inherits the track's foreground.
   expect(confirmed?.style.color).toBe('')
   // Only the tail animates, so the confirmed text never fades in again.
@@ -100,7 +100,7 @@ it('keeps the confirmed text when a Chinese translation was rewritten, whatever 
   }))
   expect(confirmedOf(container)?.textContent).toBe('我们需要更仔细')
   expect(tailOf(container)?.textContent).toBeTruthy()
-  expect(tailOf(container)?.style.color).toBe('var(--muted)')
+  expect(tailOf(container)?.style.color).toBe('var(--nola-ui-muted-foreground)')
 })
 
 it('replaces the whole tail when the model rewrites it, keeping graphemes intact', () => {

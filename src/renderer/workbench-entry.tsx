@@ -1,4 +1,5 @@
 import './workbench-entry.css'
+import './theme/desktop-material'
 import { Component, StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { I18nProvider, useI18n } from '@/i18n'

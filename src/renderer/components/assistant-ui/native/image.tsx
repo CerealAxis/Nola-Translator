@@ -493,7 +493,7 @@ function ImageZoom({ src, alt, children, labels }: ImageZoomProps) {
           <div
             ref={overlayRef}
             data-slot="image-zoom-overlay"
-            className="aui-image-zoom-overlay fade-in animate-in fixed inset-0 z-overlay flex items-center justify-center bg-black/80 duration-200"
+            className="aui-image-zoom-overlay fade-in animate-in fixed inset-0 z-overlay flex items-center justify-center bg-nola-ui-backdrop duration-200"
             onClick={handleClose}
           >
             <Card

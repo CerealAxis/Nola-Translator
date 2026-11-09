@@ -141,7 +141,7 @@ export function ComposerBar({
       className={cn(
         paper,
         "flex w-full flex-col gap-2 rounded-[24px] p-2.5 transition-colors",
-        dragActive && "bg-blue-500/[0.04] dark:bg-blue-500/10",
+        dragActive && "bg-accent",
         className,
       )}
       {...props}
@@ -353,7 +353,7 @@ export function ComposerAttachmentChip({
       )}
       {...props}
     >
-      <span className="bg-background text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-[10px] dark:bg-white/10">
+      <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-[10px]">
         <Icon className="size-4" />
       </span>
       <span className="flex flex-col">
@@ -364,7 +364,7 @@ export function ComposerAttachmentChip({
           className={cn(
             "text-[11px]",
             attachment.state === "error"
-              ? "text-red-600/80 dark:text-red-400/80"
+              ? "text-destructive/80"
               : "text-muted-foreground",
           )}
         >
@@ -384,13 +384,13 @@ export function ComposerAttachmentChip({
             <XIcon />
           </button>
         ) : attachment.state === "done" ? (
-          <CheckIcon className="size-3.5 text-emerald-500" />
+          <CheckIcon className="size-3.5 text-chart-2" />
         ) : null}
       </span>
       {attachment.state === "uploading" && (
         <span
           aria-hidden
-          className="absolute inset-x-0 bottom-0 h-0.5 bg-blue-500/70 transition-[width] duration-300 dark:bg-blue-400/70"
+          className="absolute inset-x-0 bottom-0 h-0.5 bg-primary/70 transition-[width] duration-300"
           style={{ width: `${pct(attachment.progress ?? 0, 100)}%` }}
         />
       )}
@@ -419,7 +419,7 @@ export function ComposerInput({
         onSubmit?.();
       }}
       className={cn(
-        "placeholder:text-muted-foreground min-h-11 w-full bg-transparent px-3 text-[15px] caret-blue-500 outline-none dark:caret-blue-400",
+        "placeholder:text-muted-foreground min-h-11 w-full bg-transparent px-3 text-[15px] caret-primary outline-none",
         className,
       )}
       {...props}
@@ -446,7 +446,7 @@ export function ComposerVoice({
       {recording && (
         <span
           aria-hidden
-          className="size-1.5 animate-pulse rounded-full bg-blue-500 dark:bg-blue-400"
+          className="size-1.5 animate-pulse rounded-full bg-primary"
         />
       )}
       <div className="flex h-6 items-center gap-[3px]" aria-hidden>
@@ -608,7 +608,7 @@ export function ComposerContext({
             className={cn(
               mono,
               "tabular-nums",
-              warn ? "text-red-500 dark:text-red-400" : "text-muted-foreground",
+              warn ? "text-destructive" : "text-muted-foreground",
             )}
           >
             {Math.round(fraction * 100)}%
@@ -660,7 +660,7 @@ export function ComposerContext({
         className={cn(
           ghostButton,
           "size-8",
-          warn && "text-red-500 dark:text-red-400",
+          warn && "text-destructive",
         )}
       >
         <svg viewBox="0 0 16 16" className="size-4 -rotate-90" aria-hidden>

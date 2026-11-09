@@ -370,6 +370,7 @@ export const zhHK: Dictionary = {
   },
   "shellUi": {
     "mainNavigation": "主導覽",
+    "toolsGroup": "資源與工具",
     "expandSidebar": "展開側邊欄",
     "collapseSidebar": "收起側邊欄",
     "localAccount": "本機使用者",
@@ -1030,6 +1031,10 @@ export const zhHK: Dictionary = {
     "githubAccelerateAuto": "自動選擇",
     "theme": "主題",
     "reduceMotion": "減少動效",
+    "liquidGlass": "磨砂玻璃效果",
+    "glassBlur": "磨砂玻璃模糊",
+    "glassOpacity": "磨砂玻璃不透明度",
+    "glassSaturation": "磨砂玻璃飽和度",
     "resetAppearanceFailed": "還原預設外觀失敗，請重試。",
     "uiLanguage": "介面語言",
     "audioDevicesGroup": "音訊裝置",

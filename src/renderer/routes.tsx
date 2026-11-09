@@ -259,7 +259,7 @@ export function useRoute(): UseRoute {
 // -- 渲染 ---------------------------------------------------------------------
 
 /** 路由 id 到页面标题。文案是页面自己的名字，不是"占位"两个字。 */
-const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title' | 'meeting.title' | 'screen.title' | 'suite.gameTitle' | 'suite.comicTitle'> = {
+export const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title' | 'meeting.title' | 'screen.title' | 'suite.gameTitle' | 'suite.comicTitle'> = {
   home: 'nav.home',
   workspace: 'nav.workspace',
   overlay: 'shellUi.overlay',

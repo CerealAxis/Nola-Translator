@@ -151,7 +151,7 @@ const channels = {
   previewOverlayToast: 'app:overlay-toast-preview',
   dismissOverlayToast: 'app:overlay-toast-dismissed',
   overlayToastAction: 'app:overlay-toast-action',
-  checkLatestRelease: 'app:check-latest-release', openReleasePage: 'app:open-release-page',
+  checkLatestRelease: 'app:check-latest-release', listRecentReleases: 'app:list-recent-releases', openReleasePage: 'app:open-release-page',
 } as const
 
 // Unwraps the channel prefix Electron adds to handler errors; see stripIpcErrorMessage.
@@ -447,6 +447,7 @@ const api: NolaTranslatorApi = {
     return () => ipcRenderer.off(channels.overlayToastAction, wrapped)
   },
   checkLatestRelease: (force?: boolean) => invoke(channels.checkLatestRelease, force),
+  listRecentReleases: () => invoke(channels.listRecentReleases),
   openReleasePage: (url: string) => invoke(channels.openReleasePage, url),
 }
 

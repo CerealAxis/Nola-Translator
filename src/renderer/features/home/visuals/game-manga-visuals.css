@@ -1,0 +1,288 @@
+.nola-home-game-stage,
+.nola-home-manga-stage {
+  position: relative;
+  isolation: isolate;
+  block-size: 11.5rem;
+  margin: var(--space-2) auto 0;
+}
+
+.nola-home-game-stage {
+  --game-scene-tint: color-mix(in oklab, var(--primary) 28%, var(--muted-foreground));
+  inline-size: min(calc(100% - var(--space-4)), 28rem);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    color-mix(in oklab, var(--game-scene-tint) 16%, var(--card)),
+    color-mix(in oklab, var(--game-scene-tint) 5%, var(--card))
+  );
+}
+
+.nola-home-game-scene {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.nola-home-game-sun {
+  fill: color-mix(in oklab, var(--border) 62%, var(--card));
+}
+
+.nola-home-game-hills {
+  fill: color-mix(in oklab, var(--game-scene-tint) 32%, var(--card));
+}
+
+.nola-home-game-peaks {
+  fill: color-mix(in oklab, var(--game-scene-tint) 9%, var(--card));
+}
+
+.nola-home-game-ground {
+  fill: color-mix(in oklab, var(--game-scene-tint) 44%, var(--card));
+}
+
+.nola-home-game-tower {
+  fill: color-mix(in oklab, var(--game-scene-tint) 68%, var(--card-foreground));
+}
+
+.nola-home-game-road {
+  fill: color-mix(in oklab, var(--border) 50%, var(--card));
+}
+
+.nola-home-game-hud {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  inset-inline-start: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-1) / 2);
+  padding: calc(var(--space-1) / 2) var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--game-scene-tint);
+  background: color-mix(in oklch, var(--card) 78%, transparent);
+}
+
+.nola-home-game-hud svg {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  fill: currentColor;
+}
+
+.nola-home-game-hud svg:last-child {
+  fill: none;
+  opacity: 0.65;
+}
+
+.nola-home-game-dialog {
+  position: absolute;
+  inset-inline: var(--space-1);
+  inset-block-end: var(--space-1);
+  display: grid;
+  gap: calc(var(--space-1) / 2);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--card) 92%, transparent);
+  box-shadow: var(--shadow-xs);
+}
+
+.nola-home-game-source,
+.nola-home-game-translation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-block-size: 1.25rem;
+  font: var(--font-caption);
+}
+
+.nola-home-game-source {
+  color: var(--muted-foreground);
+}
+
+.nola-home-game-translation {
+  color: var(--card-foreground);
+  font-weight: 600;
+}
+
+.nola-home-game-dialog svg {
+  flex: none;
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+}
+
+.nola-home-game-translation svg {
+  color: var(--primary);
+}
+
+.nola-home-game-caret {
+  inline-size: 1px;
+  block-size: 0.9em;
+  margin-inline-start: calc(var(--space-1) / -2);
+  background: var(--primary);
+}
+
+@property --nola-home-manga-lens-x {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 26%;
+}
+
+.nola-home-manga-stage {
+  --nola-home-manga-lens-size: 6.5rem;
+  --nola-home-manga-lens-y: 31%;
+  --nola-home-manga-lens-x: 26%;
+  inline-size: min(calc(100% - var(--space-4)), 35rem);
+  animation: nola-home-manga-scan 7s ease-in-out infinite paused;
+}
+
+.nola-home-manga-stage[data-playing="true"] {
+  animation-play-state: running;
+}
+
+.nola-home-manga-spread {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: var(--space-1);
+  padding: calc(var(--space-1) / 2);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--border), var(--shadow-xs);
+}
+
+.nola-home-manga-panel {
+  position: relative;
+  min-inline-size: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--card-foreground) 64%, var(--card));
+  border-radius: var(--radius-sm);
+  color: var(--card-foreground);
+  background-color: color-mix(in oklab, var(--manga-panel-accent) 10%, var(--card));
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in oklab, var(--manga-panel-accent) 25%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 5px 5px;
+}
+
+.nola-home-manga-panel--cat {
+  --manga-panel-accent: color-mix(in oklab, var(--chart-2) 46%, var(--muted-foreground));
+}
+
+.nola-home-manga-panel--fox {
+  --manga-panel-accent: color-mix(in oklab, var(--chart-2) 25%, var(--muted-foreground));
+}
+
+.nola-home-manga-ink {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nola-home-manga-scenery {
+  stroke: color-mix(in oklab, var(--manga-panel-accent) 54%, var(--card));
+}
+
+.nola-home-manga-figure {
+  fill: color-mix(in oklab, var(--manga-panel-accent) 27%, var(--card));
+}
+
+.nola-home-manga-expression {
+  stroke: var(--manga-panel-accent);
+}
+
+.nola-home-manga-bubble {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-start: 50%;
+  inline-size: max-content;
+  max-inline-size: calc(100% - var(--space-1));
+  margin: 0;
+  padding: calc(var(--space-1) / 2) var(--space-1);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-lg);
+  font: var(--font-caption);
+  text-align: center;
+  background: var(--card);
+  transform: translateX(-50%);
+}
+
+.nola-home-manga-bubble::after {
+  content: '';
+  position: absolute;
+  inset-block-end: -4px;
+  inset-inline-start: 60%;
+  inline-size: 6px;
+  block-size: 6px;
+  border-inline-end: 1px solid currentColor;
+  border-block-end: 1px solid currentColor;
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.nola-home-manga-lens {
+  position: absolute;
+  inset: 0;
+  mask-image: radial-gradient(
+    circle calc(var(--nola-home-manga-lens-size) / 2) at var(--nola-home-manga-lens-x) var(--nola-home-manga-lens-y),
+    black 98%,
+    transparent 100%
+  );
+}
+
+.nola-home-manga-lens .nola-home-manga-bubble {
+  color: var(--accent-foreground);
+  font-weight: 600;
+  background: var(--accent);
+}
+
+.nola-home-manga-lens-ring {
+  position: absolute;
+  inset-block-start: var(--nola-home-manga-lens-y);
+  inset-inline-start: var(--nola-home-manga-lens-x);
+  inline-size: var(--nola-home-manga-lens-size);
+  block-size: var(--nola-home-manga-lens-size);
+  border: 1px solid var(--primary);
+  border-radius: 50%;
+  color: var(--primary-foreground);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 15%, transparent);
+  transform: translate(-50%, -50%);
+}
+
+.nola-home-manga-lens-ring svg {
+  position: absolute;
+  inset-block-start: 1px;
+  inset-inline-end: 1px;
+  box-sizing: content-box;
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  padding: calc(var(--space-1) / 2);
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+@keyframes nola-home-manga-scan {
+  0%, 25%, 100% {
+    --nola-home-manga-lens-x: 26%;
+  }
+
+  45%, 80% {
+    --nola-home-manga-lens-x: 76%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nola-home-manga-stage {
+    animation: none;
+  }
+}
+
+.nola-home-bento[data-reduce-motion] .nola-home-manga-stage { animation: none; }

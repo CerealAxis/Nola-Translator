@@ -18,7 +18,7 @@ import type {
 import type { AppSettings, AppSettingsPatch, CredentialProvider } from './settings'
 import type { ComputeSnapshot, RuntimeSnapshot } from './compute'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from './browser'
-import type { AppUpdateCheckResult } from './app-updates'
+import type { AppUpdateCheckResult, ReleaseAnnouncement } from './app-updates'
 import type { SupportErrorCode } from './error-catalog'
 
 export type DiagnosticCopyContext = {
@@ -236,5 +236,6 @@ export type NolaTranslatorApi = {
   triggerOverlayToastAction?(actionId: MainErrorNotification['actionId']): void
   onOverlayToastAction?(listener: (actionId: NonNullable<MainErrorNotification['actionId']>) => void): () => void
   checkLatestRelease(force?: boolean): Promise<AppUpdateCheckResult>
+  listRecentReleases?(): Promise<ReleaseAnnouncement[]>
   openReleasePage(url: string): Promise<void>
 }

@@ -200,8 +200,8 @@ export function StyleSliderRow({ label, value, min, max, step, unit, onChange }:
     <SliderRoot className="slider" min={min} max={max} step={step} value={value} onValueChange={scalar}>
       <SliderControl className="flex w-full touch-none items-center py-2 select-none">
         <SliderTrack className="slider__track relative h-1 w-full rounded-full bg-surface-tertiary">
-          <SliderIndicator className="slider__fill rounded-full bg-accent" />
-          <SliderThumb className="slider__thumb size-3 rounded-full bg-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus" aria-label={label} />
+          <SliderIndicator className="slider__fill rounded-full bg-primary" />
+          <SliderThumb className="slider__thumb size-3 rounded-full bg-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus" aria-label={label} />
         </SliderTrack>
       </SliderControl>
     </SliderRoot>

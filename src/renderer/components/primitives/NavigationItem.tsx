@@ -11,7 +11,7 @@ export interface NavigationItemProps {
 export function NavigationItem({ id, icon: Icon, label, active = false, onPress }: NavigationItemProps) {
   return (
     <SidebarMenuButton
-      render={<Button variant="nav" size="icon" />}
+      render={<Button variant={id === 'workspace' ? 'default' : 'nav'} size="icon" />}
       tooltip={label}
       isActive={active}
       onClick={onPress}

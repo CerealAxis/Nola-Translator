@@ -126,7 +126,7 @@ export function RecordsTable({ meetings, onOpen, onRename, onExport, onDelete, p
                       <Checkbox.Indicator className={CHECKBOX_INDICATOR_CLASS}><Check aria-hidden="true" size={12} strokeWidth={3} /></Checkbox.Indicator>
                     </Checkbox.Root>
                   </td> : null}
-                  <td role="rowheader" className="nola-records-table__name table__cell"><div className="nola-records-table__title">{live ? <Mic aria-hidden="true" className="text-accent" /> : <FileText aria-hidden="true" />}<Button variant="secondary" onClick={() => onOpen(meeting.meetingId)} className="nola-records-table__open">{title}</Button></div></td>
+                  <td role="rowheader" className="nola-records-table__name table__cell"><div className="nola-records-table__title">{live ? <Mic aria-hidden="true" className="text-primary" /> : <FileText aria-hidden="true" />}<Button variant="secondary" onClick={() => onOpen(meeting.meetingId)} className="nola-records-table__open">{title}</Button></div></td>
                   <td className="nola-records-table__time table__cell">{formatDateTime(meeting.endedAtMs ?? meeting.startedAtMs)}</td>
                   <td className="nola-records-table__duration table__cell">{formatClock(meeting.durationMs)}</td>
                   <td className="nola-records-table__language table__cell">{languageLabel(meeting.sourceLanguage)} → {languageLabel(meeting.targetLanguage)}</td>

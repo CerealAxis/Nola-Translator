@@ -17,7 +17,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-2);
-  color: var(--muted);
+  color: var(--nola-ui-muted-foreground);
   font: var(--font-caption);
 }
 
@@ -71,7 +71,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
-  color: var(--muted);
+  color: var(--nola-ui-muted-foreground);
   font: var(--font-caption);
 }
 
@@ -115,7 +115,7 @@
   display: inline;
   pointer-events: auto;
   cursor: pointer;
-  color: var(--accent);
+  color: var(--primary);
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
@@ -126,27 +126,43 @@
 }
 
 .app-update-markdown .markdown-alert {
-  --app-update-alert-accent: var(--accent);
+  --app-update-alert-accent: var(--primary);
   margin-block: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--border);
-  border-inline-start: 2px solid var(--app-update-alert-accent);
-  border-radius: var(--radius-lg);
-  background: var(--surface-secondary);
+  padding: var(--space-1) var(--space-2);
+  border-inline-start: calc(var(--space-1) / 2) solid var(--app-update-alert-accent);
 }
 
 .app-update-markdown .markdown-alert-tip {
   --app-update-alert-accent: var(--success);
 }
 
-.app-update-markdown :is(.markdown-alert-warning, .markdown-alert-caution) {
+.app-update-markdown .markdown-alert-important {
+  --app-update-alert-accent: var(--chart-3);
+}
+
+.app-update-markdown .markdown-alert-warning {
   --app-update-alert-accent: var(--warning);
 }
 
+.app-update-markdown .markdown-alert-caution {
+  --app-update-alert-accent: var(--destructive);
+}
+
 .app-update-markdown .markdown-alert-title {
+  display: flex;
+  align-items: center;
   margin-block: 0 var(--space-1);
   color: var(--app-update-alert-accent);
-  font-weight: 600;
+  font: var(--font-body-strong);
+}
+
+.app-update-markdown .markdown-alert-title svg {
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  margin: 0;
+  margin-inline-end: var(--space-1);
+  fill: currentColor;
 }
 
 .app-update-markdown .markdown-alert > :last-child {

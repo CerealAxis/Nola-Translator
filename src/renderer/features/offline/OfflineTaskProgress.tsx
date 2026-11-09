@@ -43,7 +43,7 @@ export function OfflineTaskProgress({ task, workflow }: OfflineTaskProgressProps
       <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-surface-secondary">
         <Progress.Indicator className={[
           'h-full rounded-sm',
-          task.state === 'failed' ? 'bg-danger' : 'bg-accent',
+          task.state === 'failed' ? 'bg-danger' : 'bg-primary',
           indeterminate ? 'w-2/5 animate-pulse motion-reduce:animate-none' : '',
         ].filter(Boolean).join(' ')} />
       </Progress.Track>

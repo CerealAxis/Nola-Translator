@@ -14,10 +14,10 @@ const sampleCount = 30
 const waveDuration = 16_000
 const waveStep = 100
 const waveTicks = [-16, -12, -8, -4, 0]
-const axisTick = { fill: 'var(--muted)' }
+const axisTick = { fill: 'var(--nola-ui-muted-foreground)' }
 const colors = {
   total: 'var(--primary)',
-  asr: 'var(--muted)',
+  asr: 'var(--nola-ui-muted-foreground)',
   mt: 'var(--success)',
   tts: 'var(--color-purple)',
   remote: 'var(--success)',
@@ -87,7 +87,7 @@ function LatencyTrend({ snapshot }: { snapshot: LatencySnapshot }) {
               <XAxis dataKey="at" tickFormatter={value => clock.format(value)} minTickGap={24} tick={axisTick} tickLine={false} axisLine={false} />
               <YAxis width="auto" unit=" ms" tick={axisTick} tickLine={false} axisLine={false} />
               <ChartLegend verticalAlign="top" itemSorter={null} content={<ChartLegendContent className="nola-caption flex-wrap justify-start gap-x-[var(--space-2)] gap-y-[var(--space-1)] pb-[var(--space-1)]" />} />
-              <ChartTooltip cursor={{ stroke: 'var(--muted)' }} content={<ChartTooltipContent labelFormatter={value =>
+              <ChartTooltip cursor={{ stroke: 'var(--nola-ui-muted-foreground)' }} content={<ChartTooltipContent labelFormatter={value =>
                 typeof value === 'number' ? clock.format(value) : value} />} />
               <Area type="linear" dataKey="total" stroke="var(--color-total)" strokeWidth={2.5}
                 fill="var(--color-total)" fillOpacity={0.12} dot={{ r: 2 }} isAnimationActive={false} />

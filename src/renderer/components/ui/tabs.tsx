@@ -3,7 +3,9 @@ import { cn } from '@/lib/utils'
 import type { ComponentProps } from 'react'
 
 export interface TabsRootProps extends ComponentProps<typeof TabsPrimitive.Root> {}
-export interface TabsListProps extends ComponentProps<typeof TabsPrimitive.List> {}
+export interface TabsListProps extends ComponentProps<typeof TabsPrimitive.List> {
+  variant?: 'default' | 'line'
+}
 export interface TabsTriggerProps extends ComponentProps<typeof TabsPrimitive.Tab> {}
 export interface TabsContentProps extends ComponentProps<typeof TabsPrimitive.Panel> {}
 export interface TabsIndicatorProps extends ComponentProps<typeof TabsPrimitive.Indicator> {}
@@ -11,8 +13,8 @@ export interface TabsIndicatorProps extends ComponentProps<typeof TabsPrimitive.
 function Tabs({ className, ...props }: TabsPrimitive.Root.Props) {
   return <TabsPrimitive.Root data-slot="tabs" className={cn('min-w-0', className)} {...props} />
 }
-function TabsList({ className, ...props }: TabsPrimitive.List.Props) {
-  return <TabsPrimitive.List data-slot="tabs-list" className={cn('tabs__list', className)} {...props} />
+function TabsList({ className, variant = 'default', ...props }: TabsListProps) {
+  return <TabsPrimitive.List data-slot="tabs-list" data-variant={variant} className={cn('tabs__list', className)} {...props} />
 }
 function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
   return <TabsPrimitive.Tab data-slot="tabs-trigger" className={cn('tabs__tab', className)} {...props} />

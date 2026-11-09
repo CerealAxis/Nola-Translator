@@ -127,7 +127,10 @@ function createMainWindow(theme: AppSettings['theme']): void {
   const window = new BrowserWindow(createMainWindowOptions(preload, theme, __dirname))
   mainWindow = window
 
-  window.once('ready-to-show', () => window.show())
+  window.once('ready-to-show', () => {
+    window.maximize()
+    window.show()
+  })
   window.on('close', event => {
     if (quitting && desktopData?.pending) { event.preventDefault(); return }
     if (quitting) return
@@ -1590,7 +1593,8 @@ if (!hasSingleInstanceLock) {
       },
     })
     await tray.initialize()
-    createOverlayWindow(initialSettings.theme, initialSettings.overlay)
+    // IPC 初始化可能已预建字幕窗，复用同一窗口以保留会话授权。
+    getOverlayWindow()
     void whenRuntimeReady().then(() => engine!.start()).catch((error) => {
       if (!quitting) console.error('engine environment initialization/start failed', error)
     })

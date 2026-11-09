@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 
-import { checkLatestRelease, isTrustedReleaseUrl } from '../../../src/main/github-updates'
+import { checkLatestRelease, fetchRecentReleases, isTrustedReleaseUrl } from '../../../src/main/github-updates'
 
 function feed(tag: string, content = '<p>Feature release notes</p>'): string {
   const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -62,4 +62,34 @@ it('only opens release pages from the application repository', () => {
   expect(isTrustedReleaseUrl('https://github.com/CerealAxis/Nola-Translator/releases/tag/v1.2.0')).toBe(true)
   expect(isTrustedReleaseUrl('https://example.com/CerealAxis/Nola-Translator/releases/tag/v1.2.0')).toBe(false)
   expect(isTrustedReleaseUrl('https://github.com/other/repo/releases/tag/v1.2.0')).toBe(false)
+})
+
+it('selects the three newest published releases and preserves their Markdown', async () => {
+  const publishedAt = '2026-11-01T09:00:00Z'
+  const notes = '# Release notes\n\n' + 'Keep the original Markdown.\n'.repeat(800) + '\n## 原始公告\n'
+  const release = (tag: string, body = '') => ({
+    tag_name: tag, published_at: publishedAt, body,
+    html_url: 'https://github.com/CerealAxis/Nola-Translator/releases/tag/' + tag,
+  })
+  const fetcher: typeof fetch = async url => {
+    expect(url).toBe('https://api.github.com/repos/CerealAxis/Nola-Translator/releases?per_page=100')
+    return Response.json([
+      release('v1.3.0'),
+      { ...release('v2.0.0'), draft: true },
+      release('v1.2.0'),
+      release('v1.10.0', notes),
+      { ...release('v3.0.0'), html_url: 'https://example.com/release' },
+      release('v1.5.0'),
+      { ...release('v4.0.0'), published_at: null },
+    ])
+  }
+
+  const announcements = await fetchRecentReleases(fetcher)
+
+  expect(announcements.map(item => item.tag)).toEqual(['v1.10.0', 'v1.5.0', 'v1.3.0'])
+  expect(announcements[0]).toEqual({
+    tag: 'v1.10.0', publishedAt, notes,
+    url: 'https://github.com/CerealAxis/Nola-Translator/releases/tag/v1.10.0',
+  })
+  await expect(fetchRecentReleases(async () => new Response(null, { status: 403 }))).rejects.toThrow('403')
 })

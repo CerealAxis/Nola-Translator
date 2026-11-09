@@ -41,34 +41,46 @@
   .nola-shell-content { display: flex; flex: 1; flex-direction: column; min-width: 0; }
   .nola-app-body { display: flex; flex: 1; min-height: 0; min-width: 0; }
   .nola-sidebar {
-    display: flex; flex: none; flex-direction: column; width: min(calc(var(--space-5) * 5), 40vi);
-    min-height: 0; overflow: hidden; border-inline-end: 1px solid var(--border);
-    background: var(--surface-secondary); transition: width 180ms ease;
+    display: flex; flex: none; flex-direction: column;
+    width: min(40vi, clamp(calc(var(--space-7) * 3.5), 17vi, calc(var(--space-8) * 4)));
+    min-height: 0; padding: var(--space-2);
+    overflow: hidden; transition: width 180ms ease;
   }
-  .nola-sidebar[data-collapsible="icon"] { width: var(--nola-sidebar-w); }
-  .nola-sidebar-brand {
-    display: flex; align-items: center; flex: none; gap: var(--space-1);
-    min-height: var(--nola-titlebar-h); padding-inline: var(--space-2);
-    font: var(--font-title);
+  .nola-sidebar[data-collapsible="icon"] {
+    width: var(--nola-sidebar-w);
+    padding-inline: var(--space-1);
   }
-  .nola-sidebar-brand img { width: var(--space-3); height: var(--space-3); flex: none; }
-  .nola-sidebar-nav { flex: 1; min-height: 0; overflow: auto; scrollbar-width: none; padding: var(--space-1); }
-  .nola-sidebar-nav ul { display: flex; flex-direction: column; gap: var(--space-1); }
-  .nola-sidebar-footer { flex: none; padding: 0 var(--space-1) var(--space-1); }
+  .nola-sidebar > [data-slot="sidebar-header"] { flex: none; margin-block-end: var(--space-2); }
+  .nola-sidebar-brand img { width: calc(var(--space-2) + var(--space-1) / 2); height: auto; flex: none; }
+  .nola-sidebar-nav {
+    display: flex; flex-direction: column; gap: var(--space-3);
+    min-height: 0; overflow: auto; scrollbar-width: none;
+    margin-inline: calc(-1 * var(--space-2)); padding-inline: var(--space-2);
+  }
+  .nola-sidebar-nav > [data-slot="sidebar-group"] { flex: none; }
+  .nola-sidebar [data-slot="sidebar-menu"] { display: flex; flex-direction: column; gap: calc(var(--space-1) / 2); }
+  .nola-sidebar-main-group { display: flex; flex-direction: column; gap: var(--space-1); }
+  .nola-sidebar [data-slot="sidebar-group-label"] {
+    display: flex; align-items: center;
+    min-height: var(--space-3); padding-inline: var(--space-1);
+    color: var(--muted-foreground); font: var(--font-caption);
+  }
+  .nola-sidebar-footer { flex: none; margin-block-start: var(--space-2); }
   .nola-sidebar-account {
-    display: flex; align-items: center; min-height: var(--space-6); gap: var(--space-1);
-    padding: var(--space-1); margin-top: var(--space-1);
-    font: var(--font-body-strong);
+    display: flex; align-items: center; min-height: var(--space-5); gap: var(--space-1);
+    padding-inline: var(--space-1); font: var(--font-body-strong);
   }
-  .nola-sidebar-account .nola-sidebar-copy > * { display: block; }
-  .nola-sidebar-account small { color: var(--muted); font: var(--font-label); }
-  .nola-sidebar-copy, .nola-nav-label, .nola-sidebar-account .nola-sidebar-copy > * {
+  .nola-sidebar-copy, .nola-nav-label {
     min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .nola-sidebar[data-collapsible="icon"] .nola-sidebar-nav {
+    margin-inline: calc(-1 * var(--space-1)); padding-inline: var(--space-1);
+    gap: var(--space-1);
   }
   .nola-sidebar[data-collapsible="icon"] :is(.nola-sidebar-brand, .nola-sidebar-account) {
     justify-content: center; padding-inline: 0;
   }
-  .nola-sidebar[data-collapsible="icon"] .nola-nav-label { display: none; }
+  .nola-sidebar[data-collapsible="icon"] :is(.nola-nav-label, [data-slot="sidebar-group-label"]) { display: none; }
   .nola-sidebar[data-collapsible="icon"] .nola-sidebar-copy {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; clip-path: inset(50%);
   }
@@ -132,10 +144,11 @@
 }
 @layer utilities {
   .nola-nav-button.button {
-    position: relative; display: flex; width: 100%; height: var(--space-5); min-width: 0;
-    justify-content: flex-start; gap: var(--space-2); padding-inline: var(--space-2); overflow: hidden;
+    position: relative; display: flex; width: 100%; height: var(--space-4); min-width: 0;
+    justify-content: flex-start; gap: var(--space-1); padding-inline: var(--space-1); overflow: hidden;
   }
-  .nola-nav-button.button svg { width: calc(var(--space-2) + var(--space-1) / 2); height: calc(var(--space-2) + var(--space-1) / 2); }
+  .nola-nav-button.button svg { width: var(--space-2); height: var(--space-2); }
+  .nola-sidebar-brand.nola-nav-button.button { font: var(--font-body-strong); }
   .nola-sidebar[data-collapsible="icon"] .nola-nav-button.button { justify-content: center; padding-inline: 0; }
   .toast { align-items: center; }
   .toast__action { margin-inline-start: auto; }
@@ -147,7 +160,7 @@
     justify-content: flex-start; padding-inline-start: var(--space-1);
     border-radius: var(--radius-xl); background: transparent;
   }
-  .nola-sidebar-account [data-slot="avatar-fallback"] { background: var(--accent-soft); color: var(--foreground); font: var(--font-body-strong); }
+  .nola-sidebar-account [data-slot="avatar-fallback"] { background: var(--surface-secondary); color: var(--nola-ui-muted-foreground); font: var(--font-body-strong); }
   .nola-window-control.button { width: var(--space-6); height: 100%; flex-shrink: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--foreground); }
   .nola-window-control.button svg { width: 16px; height: 16px; stroke-width: 1.8; }
   .nola-window-control.button:hover { background: color-mix(in oklch, var(--accent) 9%, transparent); }
@@ -185,9 +198,62 @@
    later of the two declarations. */
 .nola-titlebar--windows { padding-right: 0; }
 
-/* Align the sidebar glyph with the centered route content's inner edge. */
+.nola-app-shell > .nola-shell-layout {
+  background: var(--sidebar);
+}
+/* 侧栏与外壳共用底色，内嵌面板在接缝处用阴影抬高。 */
+.nola-shell-layout > .nola-sidebar[data-variant="inset"] {
+  border: 0;
+  background: transparent;
+}
+.nola-shell-layout > [data-slot="sidebar-inset"] {
+  min-height: 0;
+  border-start-start-radius: calc(var(--radius-xl) + var(--space-1));
+  background: var(--background);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.nola-shell-content .nola-main {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
 .nola-shell-content > .nola-titlebar {
-  padding-inline-start: calc(max(0px, (100% - var(--nola-content-max)) / 2) + var(--nola-page-padding) - var(--space-1));
+  padding-inline-start: calc(max(0px, (100% - var(--nola-content-max)) / 2) + var(--nola-page-padding));
+  border-block-end: 1px solid var(--border);
+}
+.nola-shell-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.nola-shell-heading [data-slot="separator"] { align-self: center; height: var(--space-2); }
+.nola-shell-heading__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--font-body-strong);
+}
+.nola-sidebar .nola-nav-button:focus-visible { outline-color: var(--sidebar-ring); }
+.nola-sidebar .nola-nav-button[data-variant="nav"]:is(:hover, [data-active="true"]) {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+.nola-sidebar .nola-nav-button[data-variant="nav"] {
+  color: var(--sidebar-foreground);
+}
+.nola-sidebar .nola-nav-button[data-variant="default"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.nola-sidebar .nola-nav-button[data-variant="default"]:hover {
+  background: color-mix(in oklch, var(--primary) 90%, var(--sidebar));
+}
+@media (max-width: 480px) {
+  .nola-shell-content > .nola-titlebar { padding-inline-start: var(--space-1); }
+  .nola-shell-heading { gap: calc(var(--space-1) / 2); }
+  .nola-shell-content .nola-titlebar-tools--windows { gap: 0; margin-inline-end: 0; }
+  .nola-shell-content .nola-window-control.button { width: var(--space-4); }
 }
 
 /* The scene is decorative; its four wires reflect independent capture and playback evidence. */
@@ -206,19 +272,19 @@
 .nola-meeting-participant[data-person=remote] { background: color-mix(in oklch, var(--color-purple) 12%, var(--surface-secondary)); }
 .nola-meeting-room { position: relative; display: grid; place-items: center; height: calc(var(--space-8) + var(--space-2)); overflow: hidden; }
 .nola-meeting-room__window { position: absolute; inset-inline-start: 9%; top: 12%; width: 23%; height: 50%; border: calc(var(--space-1) / 2) solid color-mix(in oklch, var(--surface) 70%, transparent); border-radius: var(--radius-sm); background: linear-gradient(90deg, transparent 46%, var(--surface) 47%, var(--surface) 53%, transparent 54%); }
-.nola-meeting-room__shelf { position: absolute; inset-inline-end: 8%; top: 24%; width: 19%; height: var(--space-1); background: color-mix(in oklch, var(--muted) 20%, transparent); box-shadow: 0 var(--space-4) 0 color-mix(in oklch, var(--muted) 20%, transparent); }
+.nola-meeting-room__shelf { position: absolute; inset-inline-end: 8%; top: 24%; width: 19%; height: var(--space-1); background: color-mix(in oklch, var(--nola-ui-muted-foreground) 20%, transparent); box-shadow: 0 var(--space-4) 0 color-mix(in oklch, var(--nola-ui-muted-foreground) 20%, transparent); }
 .nola-meeting-room [data-slot=avatar] { width: var(--space-6); height: var(--space-6); }
-.nola-meeting-room [data-slot=avatar-fallback] { background: var(--surface); color: var(--accent); }
+.nola-meeting-room [data-slot=avatar-fallback] { background: var(--surface); color: var(--primary); }
 .nola-meeting-room [data-slot=avatar-fallback] svg { width: var(--space-4); height: var(--space-4); stroke-width: 1; }
 .nola-meeting-participant__name { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); padding: calc(var(--space-1) / 2) var(--space-1); font: var(--font-label); background: color-mix(in oklch, var(--surface) 75%, transparent); }
-.nola-meeting-participant__name svg { flex: none; width: var(--space-2); height: var(--space-2); color: var(--muted); }
+.nola-meeting-participant__name svg { flex: none; width: var(--space-2); height: var(--space-2); color: var(--nola-ui-muted-foreground); }
 .nola-meeting-participant__name svg[data-active=true] { color: var(--success); }
 .nola-meeting-link { position: relative; width: 100%; height: var(--space-6); }
 .nola-meeting-wires { width: 100%; height: 100%; overflow: visible; }
 .nola-meeting-wire-hit { position: absolute; inset-inline: 0; top: calc(var(--space-1) / 2); height: calc(var(--space-2) + var(--space-1)); }
 .nola-meeting-wire-hit[data-output=true] { top: calc(var(--space-2) + var(--space-1)); }
 .nola-meeting-wire-hit:focus-visible { outline: 2px solid var(--focus); border-radius: var(--radius-sm); }
-.nola-meeting-endpoint { display: grid; place-items: center; width: var(--space-5); height: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--muted); }
+.nola-meeting-endpoint { display: grid; place-items: center; width: var(--space-5); height: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--nola-ui-muted-foreground); }
 .nola-meeting-endpoint svg { width: var(--space-3); height: var(--space-3); }
 .nola-meeting-wire, .nola-meeting-marker { color: var(--border); }
 .nola-meeting-wire[data-state=connected], .nola-meeting-wire[data-state=active], .nola-meeting-marker[data-state=connected], .nola-meeting-marker[data-state=active] { color: var(--success); }

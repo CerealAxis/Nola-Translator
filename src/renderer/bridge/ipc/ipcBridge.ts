@@ -278,6 +278,7 @@ export function createIpcBridge(): NolaBridge {
       dismissOverlayToast: () => injectedApi()?.dismissOverlayToast?.(),
       triggerOverlayToastAction: actionId => injectedApi()?.triggerOverlayToastAction?.(actionId),
       checkLatestRelease: (force) => call('checkLatestRelease', (injected) => injected.checkLatestRelease(force)),
+      listRecentReleases: () => call('listRecentReleases', api => api.listRecentReleases?.() ?? Promise.reject(new MissingIpcApiError('listRecentReleases'))),
       openReleasePage: (url) => call('openReleasePage', (injected) => injected.openReleasePage(url)),
     },
     translation: {

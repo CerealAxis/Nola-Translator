@@ -7,8 +7,19 @@ import { LANGUAGE_CODES } from '../shared/languages'
 import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from '../shared/pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { computeSettingsPatchSchema } from '../shared/compute'
-import { REALTIME_S2S_MODELS, RECOGNITION_MODEL_IDS } from '../shared/settings'
+import { GLASS_CONTROLS, REALTIME_S2S_MODELS, RECOGNITION_MODEL_IDS, type GlassControl } from '../shared/settings'
 import { meetingModeSettingsSchema } from '../shared/meeting-mode'
+
+function glassControlSchema(key: GlassControl) {
+  const { min, max } = GLASS_CONTROLS[key]
+  return z.number().int().min(min).max(max)
+}
+
+export const glassSettingsShape = {
+  glassBlur: glassControlSchema('glassBlur'),
+  glassOpacity: glassControlSchema('glassOpacity'),
+  glassSaturation: glassControlSchema('glassSaturation'),
+}
 
 /**
  * The runtime half of the settings contract.
@@ -104,6 +115,8 @@ export const settingsPatchSchema = z.object({
   }).partial().optional(),
   appearance: z.object({
     reduceMotion: z.boolean().optional(),
+    liquidGlass: z.boolean().optional(),
+    ...glassSettingsShape,
   }).partial().optional(),
   overlay: z.object({
     mode: z.enum(['free', 'top', 'bottom']).optional(),

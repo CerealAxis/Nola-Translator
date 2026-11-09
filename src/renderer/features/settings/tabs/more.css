@@ -16,7 +16,7 @@
 .settings-more__identity-copy { min-width: 0; }
 .settings-more__identity-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-1); }
 .settings-more__name { margin: 0; font: var(--font-title); color: var(--foreground); overflow-wrap: anywhere; }
-.settings-more__description { margin: calc(var(--space-1) / 2) 0 0; font: var(--font-caption); color: var(--muted); overflow-wrap: anywhere; }
+.settings-more__description { margin: calc(var(--space-1) / 2) 0 0; font: var(--font-caption); color: var(--nola-ui-muted-foreground); overflow-wrap: anywhere; }
 .settings-more__link.button { border-radius: var(--radius-xl); }
 .settings-more .settings-row .link { gap: calc(var(--space-1) / 2); }
 .settings-more .settings-row .link svg { width: var(--space-2); height: var(--space-2); flex-shrink: 0; }

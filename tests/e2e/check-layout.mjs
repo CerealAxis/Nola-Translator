@@ -70,10 +70,10 @@ const SHELL_OVERFLOW = [
 const PAGE_GROUPS = {
   home: [
     { name: 'home', selector: '.nola-home', min: 1 },
-    { name: 'hero', selector: '.nola-home-hero', min: 1 },
-    { name: 'entry-card', selector: '.nola-home__entries .nola-entry', min: 4 },
+    { name: 'hero', selector: '.nola-home-poster', min: 1 },
+    { name: 'feature-card', selector: '.nola-home-feature-card', min: 6 },
     { name: 'recent', selector: '.nola-home__recent', min: 1 },
-    { name: 'recent-table', selector: '.nola-home__recent .nola-records-table', min: 1 },
+    { name: 'recent-row', selector: '.nola-home__recent .nola-home-list-row', min: 1 },
   ],
   workspace: [
     { name: 'quick-settings', selector: '.nola-overlay-page', min: 1 },
@@ -980,10 +980,10 @@ async function main() {
       await settle(window)
       const switched = await window.webContents.executeJavaScript(`({
         lang: document.documentElement.lang,
-        firstNav: document.querySelector('.nola-sidebar-nav .nola-nav-button .nola-nav-label')?.textContent?.trim() ?? '',
+        homeNav: document.querySelector('[data-onboarding="nav-home"] .nola-nav-label')?.textContent?.trim() ?? '',
       })`)
       scenarios += 1
-      if (!picked || switched.lang !== 'en' || !switched.firstNav.includes('Home')) {
+      if (!picked || switched.lang !== 'en' || !switched.homeNav.includes('Home')) {
         fail({ language: 'en', width: 1100, page: 'language-menu' }, 'switching to English via the menu failed', { picked, switched })
       }
       // Back to Chinese, so the language path is covered in both directions.

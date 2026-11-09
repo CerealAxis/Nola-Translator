@@ -277,6 +277,9 @@ export async function openRuntimeSettings(component: 'engine' | 'llama' | 'crisp
 /** Fields a drag emits. Changes within 180ms collapse into one write. */
 const DEBOUNCE_MS = 180
 const DEBOUNCED_PATHS: ReadonlySet<string> = new Set([
+  'appearance.glassBlur',
+  'appearance.glassOpacity',
+  'appearance.glassSaturation',
   'overlay.fontSize',
   'overlay.fontWeight',
   'overlay.translationFontSize',
@@ -392,6 +395,7 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     modelGateway: { ...base.modelGateway, ...patch.modelGateway,
       ...(patch.modelGateway?.concurrency ? { concurrency: { ...base.modelGateway.concurrency, ...patch.modelGateway.concurrency } } : {}) },
     recognition: { ...base.recognition, ...patch.recognition },
+    appearance: { ...base.appearance, ...patch.appearance },
     overlay: { ...base.overlay, ...patch.overlay },
     videoCaptions: { ...base.videoCaptions, ...patch.videoCaptions },
     browserCaptions: { ...base.browserCaptions, ...patch.browserCaptions },
@@ -441,6 +445,7 @@ function mergePatches(a: AppSettingsPatch, b: AppSettingsPatch): AppSettingsPatc
       ? { recognition: { ...a.recognition, ...b.recognition } }
       : {}),
     ...(a.overlay || b.overlay ? { overlay: { ...a.overlay, ...b.overlay } } : {}),
+    ...(a.appearance || b.appearance ? { appearance: { ...a.appearance, ...b.appearance } } : {}),
     ...(a.videoCaptions || b.videoCaptions ? { videoCaptions: { ...a.videoCaptions, ...b.videoCaptions } } : {}),
     ...(a.browserCaptions || b.browserCaptions ? { browserCaptions: { ...a.browserCaptions, ...b.browserCaptions } } : {}),
     ...(a.translation || b.translation ? { translation: { ...a.translation, ...b.translation } } : {}),

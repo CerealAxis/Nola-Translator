@@ -30,9 +30,13 @@ function SidebarProvider({ defaultOpen, ...props }: ComponentProps<'div'> & { de
   )
 }
 
-function Sidebar(props: ComponentProps<'aside'>) {
+function Sidebar({ variant = 'sidebar', ...props }: ComponentProps<'aside'> & { variant?: 'sidebar' | 'inset' }) {
   const { open, sidebarId } = useSidebar()
-  return <aside {...props} id={sidebarId} data-slot="sidebar" data-state={open ? 'expanded' : 'collapsed'} data-collapsible={open ? undefined : 'icon'} />
+  return <aside {...props} id={sidebarId} data-slot="sidebar" data-variant={variant} data-state={open ? 'expanded' : 'collapsed'} data-collapsible={open ? undefined : 'icon'} />
+}
+
+function SidebarInset(props: ComponentProps<'div'>) {
+  return <div data-slot="sidebar-inset" {...props} />
 }
 
 function SidebarTrigger({ expandLabel, collapseLabel, ...props }: Omit<ComponentProps<typeof Button>, 'children'> & {
@@ -70,6 +74,18 @@ function SidebarFooter(props: ComponentProps<'div'>) {
   return <div data-slot="sidebar-footer" {...props} />
 }
 
+function SidebarGroup(props: ComponentProps<'div'>) {
+  return <div data-slot="sidebar-group" {...props} />
+}
+
+function SidebarGroupLabel(props: ComponentProps<'div'>) {
+  return <div data-slot="sidebar-group-label" {...props} />
+}
+
+function SidebarGroupContent(props: ComponentProps<'div'>) {
+  return <div data-slot="sidebar-group-content" {...props} />
+}
+
 function SidebarMenu(props: ComponentProps<'ul'>) {
   return <ul data-slot="sidebar-menu" {...props} />
 }
@@ -97,4 +113,7 @@ function SidebarMenuButton({ render, isActive = false, tooltip, ...props }: useR
   )
 }
 
-export { Sidebar, SidebarProvider, SidebarTrigger, SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton }
+export {
+  Sidebar, SidebarInset, SidebarProvider, SidebarTrigger, SidebarHeader, SidebarContent, SidebarFooter,
+  SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton,
+}

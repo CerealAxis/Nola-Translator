@@ -2,6 +2,7 @@ import { ModelCapabilityNotices } from './features/models/ModelCapabilityNotices
 import { ModelDownloadNotice } from './features/models/ModelDownloadNotice'
 import { OfflineFailureNotice } from './features/offline/OfflineFailureNotice'
 import './index.css'
+import './theme/desktop-material'
 import './theme/cjk-fonts.css'
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -16,7 +17,7 @@ import type { TranslationKey } from './i18n'
 import { AppShell, ErrorBoundary, TitleBar } from './components/primitives'
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert'
 import { Button } from './components/ui/button'
-import { Routes, useRoute } from './routes'
+import { ROUTE_TITLES, Routes, useRoute } from './routes'
 import { actions, disposeStores, initStores, isEngineConnected, stores, useStore } from './store'
 import type { SettingsCommand } from './store/settingsStore'
 import { OverlayRoot } from './features/overlay/OverlayRoot'
@@ -228,14 +229,17 @@ function SettingsErrorNotice() {
 /** 侧边栏导航 + 路由联动 */
 function Shell() {
   const navigation = useApplicationNavigation()
+  const { route } = useRoute()
+  const { t } = useI18n()
+  const title = navigation.find(item => item.active)?.label ?? t(ROUTE_TITLES[route])
   useOverlayNavigation()
 
   return (
-    <AppShell navigation={navigation}>
+    <AppShell navigation={navigation} title={title}>
       {isEngineConnected() ? null : <EngineDisconnectedNotice />}
       <SettingsErrorNotice />
       <Routes pages={APPLICATION_PAGES} />
-      <OnboardingTour />
+      <OnboardingTour autoStart={false} />
     </AppShell>
   )
 }

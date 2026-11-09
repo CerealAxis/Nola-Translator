@@ -1,4 +1,5 @@
 import './index.css'
+import './theme/desktop-material'
 import './theme/cjk-fonts.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

@@ -19,13 +19,13 @@
   .nola-workspace-audio .label { white-space: nowrap; font-size: 13px; }
   .nola-workspace-audio .select__trigger { flex: 1; min-width: 0; height: var(--field-control-height); border-radius: var(--field-radius); background: var(--surface-secondary); box-shadow: none; border: 1px solid var(--border); }
   .nola-workspace-audio .select__value { text-align: center; }
-  .nola-workspace-audio svg, .nola-workspace-picker svg { flex: none; width: 18px; height: 18px; color: var(--accent); }
+  .nola-workspace-audio svg, .nola-workspace-picker svg { flex: none; width: 18px; height: 18px; color: var(--primary); }
   .nola-workspace-field { display: flex; flex: 1 1 220px; gap: 12px; align-items: center; min-width: 0; }
   .nola-workspace-field > span { font-size: 13px; white-space: nowrap; }
   .nola-workspace-picker { display: flex; gap: var(--space-1); align-items: center; justify-content: start; flex: 1; min-width: 0; height: var(--field-control-height); padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: var(--field-radius); background: var(--surface-secondary); font: var(--font-body); }
   .nola-workspace-picker > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .nola-workspace-picker:disabled { opacity: .65; }
-  .nola-workspace-overlay { height: var(--field-control-height); min-width: 0; border: 1px solid var(--accent); border-radius: var(--radius-xl); color: var(--accent); font: var(--font-body); }
+  .nola-workspace-overlay { height: var(--field-control-height); min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-xl); color: var(--primary); font: var(--font-body); }
   .nola-workspace-view-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 20px; padding-top: 14px; }
   /* The TabsList supplies the shared segmented track and selection state. */
   .nola-workspace-font-control { display: flex; align-items: center; gap: 12px; font-size: 13px; }
@@ -40,7 +40,7 @@
   .switch.nola-workspace-notes-switch .switch__control { flex: none; width: 32px; height: 18.4px; border-radius: 9999px; background: var(--nola-ui-input); }
   .switch.nola-workspace-notes-switch[data-checked] .switch__control, .switch.nola-workspace-notes-switch[aria-checked='true'] .switch__control { background: var(--nola-ui-primary); }
   .nola-workspace-notes-switch__label { font-size: 13px; color: var(--foreground); }
-  .nola-workspace-notes-switch svg { width: 18px; height: 18px; color: var(--accent); }
+  .nola-workspace-notes-switch svg { width: 18px; height: 18px; color: var(--primary); }
   .nola-workspace-body { display: flex; flex: 1 1 0; gap: 16px; min-width: 0; min-height: 0; }
   .nola-workspace-transcript.card { gap: 0; flex: 1 1 0; min-height: 0; padding: 0; --card-spacing: var(--space-2); }
   .nola-transcript-head { display: grid; flex: none; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: var(--card-spacing); border-bottom: 1px solid var(--border); }
@@ -55,7 +55,7 @@
   .nola-workspace-caption [data-slot="caption-line"] { padding: 0 14px; overflow-wrap: anywhere; opacity: 1 !important; }
   .nola-workspace-caption [data-slot="caption-line"] > .bg-accent { display: none; }
   .nola-workspace-caption .nola-baseline-pair[data-bilingual="true"] [data-kind="translation"] { border-inline-start: 1px solid var(--separator); }
-  .nola-caption-timestamp { align-self: start; padding-top: 5px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .nola-caption-timestamp { align-self: start; padding-top: 5px; color: var(--nola-ui-muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; }
   .nola-workspace-caption [data-latest="true"] { border-radius: 10px; background: var(--accent-soft); }
   .nola-workspace-caption [data-interim="true"] { opacity: .72 !important; }
   .nola-workspace-caption[data-paused="true"] [data-slot="caption-line"] { opacity: .8 !important; }
@@ -64,19 +64,19 @@
   .nola-workspace-notes.card { gap: 0; flex: 0 0 280px; min-height: 0; padding: 0; --card-spacing: var(--space-2); }
   .nola-workspace-notes-heading { padding: var(--card-spacing); display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 10px; flex: none; text-align: left; }
   .nola-workspace-notes-heading .card__title { font: var(--font-title); }
-  .nola-workspace-notes-state { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .nola-workspace-notes-state { color: var(--nola-ui-muted-foreground); font-size: 12px; white-space: nowrap; }
   .nola-workspace-notes-tools { display: flex; flex: none; gap: var(--space-1); padding: var(--space-1) var(--card-spacing); border-block: 1px solid var(--border); flex-wrap: wrap; }
   .nola-workspace-notes-tools :is(.button, .toggle-button) { border-radius: var(--radius-xl); }
   .nola-workspace-notes-tools .button { background: transparent; }
   .nola-workspace-notes-tools .button:hover,
-  .nola-workspace-notes-tools .button[aria-pressed="true"] { background: var(--surface-tertiary); color: var(--accent); }
+  .nola-workspace-notes-tools .button[aria-pressed="true"] { background: var(--surface-tertiary); color: var(--primary); }
   .nola-workspace-notes-tools .toggle-button { background: var(--surface-secondary); color: var(--foreground); }
-  .nola-workspace-notes-tools .toggle-button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .nola-workspace-notes-tools .toggle-button[aria-pressed="true"] { background: var(--accent-soft); color: var(--primary); }
   .nola-workspace-notes-content { display: flex; flex: 1; min-height: 0; padding: var(--card-spacing); }
   .nola-workspace-notes-editor { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; color: var(--foreground); font: var(--font-body); }
-  .nola-workspace-notes-editor .tiptap { min-height: 100%; padding: var(--space-1); overflow-wrap: anywhere; outline: none; caret-color: var(--accent); }
+  .nola-workspace-notes-editor .tiptap { min-height: 100%; padding: var(--space-1); overflow-wrap: anywhere; outline: none; caret-color: var(--primary); }
   .nola-workspace-notes-editor .tiptap:focus-visible { box-shadow: inset 0 0 0 1px var(--field-border-focus); border-radius: var(--radius-sm); }
-  .nola-workspace-notes-editor[data-empty="true"] .tiptap::before { content: attr(data-placeholder); float: left; height: 0; color: var(--muted); pointer-events: none; }
+  .nola-workspace-notes-editor[data-empty="true"] .tiptap::before { content: attr(data-placeholder); float: left; height: 0; color: var(--nola-ui-muted-foreground); pointer-events: none; }
   .nola-workspace-notes-editor .tiptap > :first-child { margin-top: 0; }
   .nola-workspace-notes-editor .tiptap > :last-child { margin-bottom: 0; }
   .nola-workspace-notes-editor :is(p, ul, ol, blockquote, pre, table) { margin-block: 0 var(--space-1); }
@@ -90,21 +90,21 @@
   .nola-workspace-notes-editor ul[data-type="taskList"] { list-style: none; padding-inline-start: 0; }
   .nola-workspace-notes-editor li[data-type="taskItem"] { display: flex; align-items: baseline; gap: var(--space-1); }
   .nola-workspace-notes-editor li[data-type="taskItem"] > div { flex: 1; min-width: 0; }
-  .nola-workspace-notes-editor input[type="checkbox"] { accent-color: var(--accent); }
-  .nola-workspace-notes-editor blockquote { padding-inline-start: var(--space-2); border-inline-start: 2px solid var(--border); color: var(--muted); }
+  .nola-workspace-notes-editor input[type="checkbox"] { accent-color: var(--primary); }
+  .nola-workspace-notes-editor blockquote { padding-inline-start: var(--space-2); border-inline-start: 2px solid var(--border); color: var(--nola-ui-muted-foreground); }
   .nola-workspace-notes-editor :not(pre) > code { padding-inline: var(--space-1); border-radius: var(--radius-sm); background: var(--surface-secondary); }
   .nola-workspace-notes-editor pre { overflow-x: auto; padding: var(--space-1); border-radius: var(--radius-md); background: var(--surface-secondary); }
   .nola-workspace-notes-editor table { width: 100%; border-collapse: collapse; }
   .nola-workspace-notes-editor :is(th, td) { min-width: var(--space-4); padding: var(--space-1); border: 1px solid var(--border); text-align: start; }
-  .nola-workspace-notes-editor a { color: var(--accent); text-decoration: underline; }
+  .nola-workspace-notes-editor a { color: var(--primary); text-decoration: underline; }
   .nola-workspace-notes-editor hr { margin-block: var(--space-2); border-top: 1px solid var(--border); }
   .nola-workspace-notes-editor img { max-width: 100%; height: auto; }
-  .nola-workspace-notes-handle { align-self: start; width: 36px; min-width: 36px; height: 36px; border-radius: var(--radius-xl); color: var(--accent); }
+  .nola-workspace-notes-handle { align-self: start; width: 36px; min-width: 36px; height: 36px; border-radius: var(--radius-xl); color: var(--primary); }
   .nola-workspace-session-bar { display: flex; flex: none; flex-wrap: wrap; min-width: 0; min-height: 72px; gap: 14px; align-items: center; padding: 14px 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
   .nola-workspace-audio-status { display: flex; min-width: 0; align-items: center; gap: 10px; font-size: 13px; }
   .nola-workspace-audio-status > span:last-child { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .nola-workspace-mic { display: grid; width: 36px; height: 36px; place-items: center; background: var(--surface-secondary); border-radius: var(--radius-full); color: var(--accent); }
-  .nola-workspace-wave { display: flex; flex: 1 1 90px; max-width: 290px; height: 42px; gap: 4px; align-items: center; justify-content: center; color: var(--accent); opacity: .5; }
+  .nola-workspace-mic { display: grid; width: 36px; height: 36px; place-items: center; background: var(--surface-secondary); border-radius: var(--radius-full); color: var(--primary); }
+  .nola-workspace-wave { display: flex; flex: 1 1 90px; max-width: 290px; height: 42px; gap: 4px; align-items: center; justify-content: center; color: var(--primary); opacity: .5; }
   .nola-workspace-wave span { width: 3px; flex: 0 1 3px; border-radius: 3px; background: currentColor; }
   .nola-workspace-bar-spacer { flex: 1; }
   @media (max-width: 1200px) {
@@ -125,7 +125,7 @@
     .nola-workspace-transcript.card { min-height: 300px; max-height: 520px; }
     .nola-workspace-caption .nola-baseline-pair { grid-template-columns: 1fr; gap: 8px; }
     .nola-workspace-caption .nola-baseline-pair[data-bilingual="false"] { grid-template-columns: 1fr; }
-    .nola-workspace-caption .nola-baseline-pair[data-bilingual="true"] [data-kind="translation"] { border: none; color: var(--accent) !important; }
+    .nola-workspace-caption .nola-baseline-pair[data-bilingual="true"] [data-kind="translation"] { border: none; color: var(--primary) !important; }
     .nola-workspace-caption [data-slot="caption-line"] { padding-inline: 0; }
     .nola-transcript-head .card__title { font-size: 15px; }
     .nola-workspace-config { gap: 10px; }

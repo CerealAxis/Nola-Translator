@@ -3,6 +3,8 @@
 @source './';
 @import './theme/index.css';
 @import './theme/app.css';
+@import './theme/nola-theme.css';
+@import './theme/nola-glass.css';
 @import "tw-shimmer";
 
 html,
@@ -16,9 +18,7 @@ body,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-ui);
-  font-size: 14px;
-  line-height: 1.65;
+  font: var(--font-body);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow: hidden;
@@ -44,6 +44,9 @@ html[data-overlay-toast='true'] #splash { display: none; }
 @custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));
 
 @theme inline {
+  /* 旧页面的 text-muted 表示辅助文字，新的组件使用 text-muted-foreground。 */
+  --color-muted: var(--muted-foreground);
+
   @keyframes collapsible-down {
   from {
     height: 0;

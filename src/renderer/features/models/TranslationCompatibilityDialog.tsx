@@ -23,7 +23,7 @@ export interface TranslationCompatibilityDialogProps {
 }
 
 /** Row states follow DESIGN §8: highlight while navigating, accent-soft once the row is the current value. */
-const ITEM_CLASS = 'flex cursor-default items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm data-[highlighted]:bg-surface-tertiary data-[selected]:bg-accent-soft data-[selected]:text-accent aria-disabled:opacity-50'
+const ITEM_CLASS = 'flex cursor-default items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm data-[highlighted]:bg-surface-tertiary data-[selected]:bg-accent-soft data-[selected]:text-primary aria-disabled:opacity-50'
 
 export function TranslationCompatibilityDialog(props: TranslationCompatibilityDialogProps) {
   const { t, language } = useI18n()

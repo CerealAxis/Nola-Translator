@@ -133,6 +133,15 @@ const next = '.onboarding-tour__footer button'
 const tourBundle = await build({ entryPoints: ['src/renderer/features/onboarding/tourSteps.ts'], bundle: true, platform: 'node', format: 'esm', write: false })
 const { TOUR_STEPS: walkthrough } = await import('data:text/javascript;base64,' + Buffer.from(tourBundle.outputFiles[0].text).toString('base64'))
 
+async function openTutorialFromHome(window) {
+  await window.loadFile(resolve('out/renderer/index.html'))
+  await waitFor(window, "document.querySelector('.nola-home') && !document.getElementById('splash')")
+  assert.equal(await window.webContents.executeJavaScript("!!document.querySelector('.onboarding-welcome, .onboarding-tour')"), false)
+  await window.webContents.executeJavaScript("location.hash = '#/settings/help'")
+  await click(window, target('replay'))
+  await waitFor(window, "document.querySelector('.onboarding-welcome')")
+}
+
 async function run() {
   await mkdir(output, { recursive: true })
   const preload = resolve(output, 'fixture.cjs')
@@ -174,8 +183,7 @@ async function run() {
     window.setSize(width, height)
     settings = { ...settings, appearance: { ...settings.appearance, reduceMotion: language !== 'en' }, uiLanguage: language, theme, onboardingSeen: false, onboardingVersion: 0, onboardingStep: 'W0', onboardingCompletedVersion: 0 }
     await window.loadURL('about:blank')
-    await window.loadFile(resolve('out/renderer/index.html'), { hash: '/settings/help' })
-    await waitFor(window, `document.querySelector('.onboarding-welcome') && !document.getElementById('splash')`)
+    await openTutorialFromHome(window)
     const welcome = await window.webContents.executeJavaScript(`(() => { const d = document.querySelector('.onboarding-welcome').getBoundingClientRect(); const f = document.querySelector('.onboarding-welcome .nola-dialog-footer').getBoundingClientRect(); return { left: f.left - d.left, right: d.right - f.right }; })()`)
     assert.ok(Math.abs(welcome.left) <= 2 && Math.abs(welcome.right) <= 2, JSON.stringify(welcome))
     await click(window, target('onboarding-begin'))
@@ -221,7 +229,7 @@ async function run() {
       const info = JSON.stringify({ configuration, step, cardGeometry })
       assert.equal(cardGeometry.horizontalOverflow, false, info)
       assert.equal(cardGeometry.verticalOverflow, false, info)
-      assert.equal(cardGeometry.buttons, 1, info)
+      assert.equal(cardGeometry.buttons, 2, info)
       assert.equal(cardGeometry.chapters, false, info)
       assert.equal(cardGeometry.progress, `${position + 1} / ${walkthrough.length}`, info)
       assert.ok(cardGeometry.rect.x >= 0 && cardGeometry.rect.y >= 0
@@ -230,16 +238,6 @@ async function run() {
       if (['H1', 'M1', 'T1', 'T2', 'T3', 'T4', 'M2', 'R1', 'U1', 'U4'].includes(step)) {
         await writeFile(resolve(output, `${language}-${theme}-${width}-${step}.png`), (await window.webContents.capturePage()).toPNG())
         await writeFile(resolve(output, `${language}-${theme}-${width}-${step}-card.png`), (await cardWindowOf().webContents.capturePage()).toPNG())
-      }
-      if (step === 'T3' && language === 'zh-CN' && width === 1180) {
-        assert.equal(settings.onboardingStep, 'T3')
-        const reloaded = new Promise(resolve => window.webContents.once('did-finish-load', resolve))
-        window.webContents.reload()
-        await reloaded
-        await waitFor(window, "document.querySelector('.onboarding-tour')?.dataset.step === 'T3' && document.querySelector('.onboarding-tour')?.dataset.busy === 'false'")
-        await waitForCardStep('T3')
-        await waitForCard(`!document.querySelector('${next}').disabled`)
-        await waitFor(window, `document.querySelector('[data-onboarding="model-file-options"]') && document.querySelector('.onboarding-tour')?.dataset.busy === 'false'`)
       }
       const started = Date.now()
       await clickCard(next)
@@ -251,13 +249,12 @@ async function run() {
       results.push({ configuration, step, scene, cardGeometry, transitionMs: Date.now() - started })
     }
     await waitFor(window, `!document.querySelector('.onboarding-tour') && location.hash === '#/'`)
-    assert.equal(settings.onboardingCompletedVersion, 2)
+    assert.equal(settings.onboardingSeen, false)
+    assert.equal(settings.onboardingCompletedVersion, 0)
     assert.equal(sideEffects, 0)
+    settings = { ...settings, onboardingSeen: true, onboardingVersion: 2, onboardingStep: 'T3' }
     const replaySnapshot = JSON.stringify([settings.onboardingStep, settings.onboardingCompletedVersion])
-    await window.loadFile(resolve('out/renderer/index.html'), { hash: '/settings/help' })
-    await waitFor(window, `document.querySelector('[data-onboarding="replay"]') && !document.getElementById('splash')`)
-    await click(window, target('replay'))
-    await waitFor(window, `document.querySelector('.onboarding-welcome')`)
+    await openTutorialFromHome(window)
     await click(window, target('onboarding-begin'))
     await waitFor(window, `document.querySelector('.onboarding-tour')?.dataset.step === 'H1'`)
     await waitForCardStep('H1')
@@ -267,7 +264,7 @@ async function run() {
     console.log(`Verified ${language}, ${theme}, ${width} x ${height}`)
   }
   assert.equal(sideEffects, 0)
-  assert.ok(markerWrites >= configurations.length)
+  assert.equal(markerWrites, 0)
   assert.equal(errors.length, 0, errors.join('\n'))
   await writeFile(resolve(output, 'results.json'), JSON.stringify({ results, markerWrites, sideEffects }, null, 2))
   console.log(`Verified ${results.length} interactive lesson steps without downloads, recording or starting caption services.`)

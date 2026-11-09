@@ -35,3 +35,11 @@ it('allows remote announcement images without a domain allowlist', () => {
   expect(policy).toContain('https:')
   expect(policy).toContain('http:')
 })
+
+it('renders the GitHub alert icon while filtering SVG from announcement content', () => {
+  renderNotes('> [!TIP]\n> 提示内容\n\n<svg><circle /></svg><script>alert(1)</script>')
+  expect(screen.getByText('Tip').querySelector('svg[aria-hidden="true"]')).not.toBeNull()
+  expect(screen.getByText('提示内容')).toBeVisible()
+  expect(document.querySelector('.app-update-markdown circle')).toBeNull()
+  expect(document.querySelector('.app-update-markdown script')).toBeNull()
+})

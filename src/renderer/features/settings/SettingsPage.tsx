@@ -6,7 +6,7 @@ import { Captions, Cpu, CircleHelp, FolderOpen, FlaskConical, Keyboard, AudioLin
 
 import type { AppSettings } from '@/bridge'
 import { Button } from '@/components/ui/button'
-import { Switch, SwitchThumb, TabsContent, TabsIndicator, TabsList, TabsRoot, TabsTrigger } from '@/components/ui'
+import { Switch, SwitchThumb, TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
@@ -90,7 +90,7 @@ export function SettingsPage() {
       <TabsRoot orientation={compact ? 'horizontal' : 'vertical'} value={active}
         onValueChange={(value) => navigate(settingsPath(String(value) as SettingsTab))} className="settings-tabs">
         <div className="settings-nav">
-          <TabsList className="tabs__list relative" aria-label={t('modelsSettingsUi.settingsTabs')}>
+          <TabsList aria-label={t('modelsSettingsUi.settingsTabs')}>
             {SETTINGS_TABS.map((item) => {
               const Icon = NAV_ICONS[item]
               const hint = NAV_HINTS[item]
@@ -104,9 +104,6 @@ export function SettingsPage() {
                 </Tooltip>
               )
             })}
-            {/* Base UI positions the indicator from the active tab's box and leaves the
-                geometry to CSS, so the four offsets and sizes come from its own variables. */}
-            <TabsIndicator className="tabs__indicator absolute left-[var(--active-tab-left)] top-[var(--active-tab-top)] h-[var(--active-tab-height)] w-[var(--active-tab-width)]" />
           </TabsList>
         </div>
         <div className="settings-panels">

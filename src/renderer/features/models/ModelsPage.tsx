@@ -260,7 +260,7 @@ export function ModelsPage() {
         className="models-tabs"
       >
         <div className="tabs__list-container" data-onboarding="models-tabs">
-          <TabsList className="tabs__list" aria-label={t('modelsSettingsUi.catalogTabs')}>
+          <TabsList variant="line" aria-label={t('modelsSettingsUi.catalogTabs')}>
             <CountTab id="recommended" label={t('models.tabRecommended')} count={null} />
             <CountTab id="installed" label={t('models.tabInstalled')} count={installed.length + installedCloudModels.length} />
             <CountTab id="search" label={t('models.tabSearch')} count={null} />

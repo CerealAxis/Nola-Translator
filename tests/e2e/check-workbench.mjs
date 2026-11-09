@@ -17,7 +17,9 @@ if (!process.versions.electron) {
     resolve: { alias: { '@': resolve('src/renderer'), '@renderer': resolve('src/renderer') } },
     build: { rollupOptions: { input: resolve('src/renderer/workbench.html') }, outDir: resolve(output, 'renderer'), emptyOutDir: true, minify: false, chunkSizeWarningLimit: 5000 } })
   const { build: bundle } = await import('esbuild')
-  await bundle({ entryPoints: ['src/main/workbench.ts'], bundle: true, packages: 'external', platform: 'node', format: 'esm', external: ['electron'], outfile: resolve(output, 'window.mjs') })
+  await bundle({ stdin: { contents: `export { registerWorkbench } from './src/main/workbench';
+    export { createGatewayLanguageModel } from './src/main/gateway-language-model';`, resolveDir: process.cwd() },
+  bundle: true, packages: 'external', platform: 'node', format: 'esm', external: ['electron'], outfile: resolve(output, 'window.mjs') })
   const { default: electron } = await import('electron')
   const childEnv = { ...process.env }; delete childEnv.ELECTRON_RUN_AS_NODE
   const child = spawn(electron, [self, ...process.argv.slice(2)], { stdio: 'inherit', env: childEnv })
@@ -34,6 +36,7 @@ if (!process.versions.electron) {
     const { DEFAULT_SETTINGS } = await import('data:text/javascript;base64,' + Buffer.from(defaultsBundle.outputFiles[0].text).toString('base64'))
     let settings = { ...structuredClone(DEFAULT_SETTINGS), theme: 'light', uiLanguage: 'zh-CN' }
     const resources = []
+    const services = {}
     if (process.argv.includes('--smoke')) {
       settings.recognition.modelId = 'qwen3-asr-1.7b-crisp-q4-k'
       settings.translation.localModelId = 'index-translate-2b-q4-k-m'
@@ -45,9 +48,25 @@ if (!process.versions.electron) {
         ['hub:voice/custom', 'ttsModel', 'Installed custom TTS', true],
         ['not-installed', 'recognitionModel', 'Uninstalled model', false],
       ]) resources.push({ resourceId, kind, name, installed, provider: 'fixture', description: '', languages: ['zh', 'en'], installedBytes: 1, state: 'idle', cancellable: false })
+      // 模拟模型网关已加载的能力，以及工作台会话选中的已配置模型。
+      const defaults = {
+        asr: 'resource:qwen3-asr-1.7b-crisp-q4-k',
+        mt: 'resource:index-translate-2b-q4-k-m',
+        tts: 'resource:hub:voice/custom',
+        llm: 'custom:existing',
+      }
+      settings.modelPolicy = {
+        enabled: Object.fromEntries(Object.entries(defaults).map(([kind, model]) => [`${kind}:${model}`, true])),
+        defaults,
+        selections: defaults,
+      }
+      for (const [kind, model] of Object.entries(defaults)) {
+        if (model.startsWith('resource:')) services[kind] = { state: 'ready', model, name: '' }
+      }
     }
     ipcMain.handle('fixture:settings', () => settings)
     ipcMain.handle('fixture:resources', () => ({ storagePath: '', resources }))
+    ipcMain.handle('fixture:gateway', () => ({ state: 'running', services }))
     let mainPage = ''
     let terminalExecutions = 0
     const wavFixture = Buffer.alloc(44 + 3200)
@@ -81,7 +100,9 @@ if (!process.versions.electron) {
       isWindows:true,getSettings:()=>ipcRenderer.invoke('fixture:settings'),updateSettings:p=>ipcRenderer.invoke('fixture:update',p),
       onSettingsChanged:fn=>{const cb=(_,s)=>fn(s);ipcRenderer.on('fixture:settings-changed',cb);return()=>ipcRenderer.removeListener('fixture:settings-changed',cb)},
       onOverlayMenuChanged:()=>()=>{},onOverlayLockChanged:()=>()=>{},onEngineEvent:()=>()=>{},onOpenAppearance:()=>()=>{},
-      listResources:()=>ipcRenderer.invoke('fixture:resources'),hasTranslationCredential:async()=>false,
+      listResources:()=>ipcRenderer.invoke('fixture:resources'),
+      hasTranslationCredential:async slot=>slot==='cloud-model:existing',
+      gateway:{snapshot:()=>ipcRenderer.invoke('fixture:gateway'),onChanged:()=>()=>{}},
       streamLanguageModel:request=>ipcRenderer.invoke('app:language-model:stream',request),
       resolveLanguageModelAudio:result=>ipcRenderer.invoke('app:language-model:audio-result',result),
       directModel:request=>ipcRenderer.invoke('fixture:direct-model',request),
@@ -159,7 +180,7 @@ if (!process.versions.electron) {
     const workspace = { project: async () => workspaceSnapshot.selectedProject ? fixtureProject : undefined, skills: async () => [], definitions: async () => workspaceSnapshot.subagents, canUseTerminal: async () => !!workspaceSnapshot.selectedProject,
       terminal: async () => { terminalExecutions++; return JSON.stringify({ exitCode: 0, output: 'Native approved terminal output' }) },
       action: async action => { if (action.action === 'subagent') workspaceSnapshot.subagents = [...workspaceSnapshot.subagents.filter(item => item.id !== action.agent.id), action.agent]; if (action.action === 'selectProject') workspaceSnapshot.selectedProject = action.id; return workspaceSnapshot } }
-    const { registerWorkbench } = await import(pathToFileURL(resolve(output, 'window.mjs')).href)
+    const { registerWorkbench, createGatewayLanguageModel } = await import(pathToFileURL(resolve(output, 'window.mjs')).href)
     const workerPath = resolve(output, 'fixture-model-worker.cjs')
     await writeFile(workerPath, `require('node:readline').createInterface({ input: process.stdin }).on('line', line => {
       const request = JSON.parse(line);
@@ -168,12 +189,18 @@ if (!process.versions.electron) {
         : { text: request.kind === 'asr' ? 'Default ASR tool transcript' : 'Default MT tool translation' };
       setTimeout(() => process.stdout.write(JSON.stringify({ ...result, id: request.id }) + '\\n'), 800);
     });`)
+    const modelSettings = { getSettings: () => settings, getCredential: async () => 'fixture-secret' }
     registerWorkbench(() => settings.theme, resolve('out/main'), options => {
       const win = new BrowserWindow({ ...options, show: false, webPreferences: { ...options.webPreferences, preload, offscreen: true, backgroundThrottling: false } })
       win.webContents.on('console-message', event => { if (event.level === 'error') errors.push(event.message) })
       win.webContents.on('render-process-gone', (_, details) => errors.push(JSON.stringify(details)))
       return win
-    }, { getSettings: () => settings, getCredential: async () => 'fixture-secret', workspace,
+    }, { ...modelSettings, workspace,
+      acquireLanguageModel: async binding => {
+        const { signal } = new AbortController()
+        const model = await createGatewayLanguageModel(modelSettings, binding, signal)
+        return { ...model, signal, release: () => { void model.close() } }
+      },
       directLaunch: async () => ({ command: process.execPath, args: [workerPath], cwd: output, env: { ELECTRON_RUN_AS_NODE: '1' } }) })
     const host = new BrowserWindow({ show: false, webPreferences: { preload, offscreen: true, backgroundThrottling: false } })
     if (process.argv.includes('--production')) await host.loadFile(resolve('out/renderer/index.html'))
@@ -205,7 +232,7 @@ if (!process.versions.electron) {
     await waitFor(`!!document.querySelector('.aui-composer-input')`)
     if (process.argv.includes('--smoke')) {
       assert.ok(await evaluate(`document.documentElement.classList.contains('native-agent-document')`))
-      assert.match(await evaluate(`getComputedStyle(document.documentElement).getPropertyValue('--background').trim()`), /^oklch\((?:1|100%) 0 0\)$/)
+      assert.match(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).backdropFilter`), /blur\(/)
       await waitFor(`document.querySelector('[data-testid="native-composer"] [data-slot="composer-model-trigger"]').innerText.includes('Existing language model')`)
       assert.ok(await evaluate(`!!document.querySelector('[data-testid="native-agent-app"]')`))
       assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).padding`), '10px')

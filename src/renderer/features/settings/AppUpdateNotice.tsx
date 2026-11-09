@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowUpRight, ImageOff } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import { rehypeGithubAlerts } from 'rehype-github-alerts'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema, type Options as Schema } from 'rehype-sanitize'
@@ -74,6 +74,35 @@ function ReleaseImage({ alt, src, width, height }: React.ImgHTMLAttributes<HTMLI
     : <img src={src} alt={alt ?? ''} width={width} height={height} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
 }
 
+export function ReleaseNotesMarkdown({ notes, releaseUrl }: { notes: string; releaseUrl?: string }): ReactNode {
+  return (
+    <div className="app-update-markdown">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, releaseNotesSchema], rehypeGithubAlerts]}
+        urlTransform={releaseUrl ? value => {
+          const safe = defaultUrlTransform(value)
+          if (!safe) return undefined
+          try {
+            const url = new URL(safe, releaseUrl)
+            return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : undefined
+          } catch {
+            return undefined
+          }
+        } : undefined}
+        components={{
+          a: ({ href, children }) => href
+            ? <a href={href} target="_blank" rel="noreferrer" className="app-update-markdown__link">{children}</a>
+            : <>{children}</>,
+          img: ReleaseImage,
+        }}
+      >
+        {normalizeReleaseNotesCallouts(notes)}
+      </ReactMarkdown>
+    </div>
+  )
+}
+
 export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, isOpening, isCurrentVersion = false }: AppUpdateDialogProps): ReactNode {
   const { t } = useI18n()
   // A result without these renders nothing in the wrapper, so the fallbacks never show.
@@ -91,22 +120,7 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
         </DialogHeader>
         <div className="app-update-dialog-body nola-scrollbar flex-1">
           {result.releaseNotes.trim()
-            ? (
-              <div className="app-update-markdown">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw, rehypeGithubAlerts, [rehypeSanitize, releaseNotesSchema]]}
-                  components={{
-                    a: ({ href, children }) => href
-                      ? <a href={href} target="_blank" rel="noreferrer" className="app-update-markdown__link">{children}</a>
-                      : <>{children}</>,
-                    img: ReleaseImage,
-                  }}
-                >
-                  {normalizeReleaseNotesCallouts(result.releaseNotes)}
-                </ReactMarkdown>
-              </div>
-            )
+            ? <ReleaseNotesMarkdown notes={result.releaseNotes} />
             : <div className="nola-caption text-muted">{displayReleaseName(result.releaseName)}<p>{t('appUpdate.notesUnavailable')}</p></div>}
         </div>
         <DialogFooter className="app-update-dialog-footer">
@@ -127,7 +141,7 @@ export interface AppUpdateNoticeProps {
 export function AppUpdateNotice({ isAppReady }: AppUpdateNoticeProps): React.JSX.Element | null {
   const { t } = useI18n()
   const result = useStore(stores.settings, (state) => state.appUpdate)
-  const deferForTour = useStore(stores.settings, state => state.onboardingActive || (!!state.settings && !state.settings.onboardingSeen && !state.onboardingAutoAttempted))
+  const deferForTour = useStore(stores.settings, state => state.onboardingActive)
   const [isOpen, setIsOpen] = useState(false)
   const [opening, setOpening] = useState(false)
   const [startupSettled, setStartupSettled] = useState(false)

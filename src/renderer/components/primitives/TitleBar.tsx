@@ -88,7 +88,7 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
           </Button>} />
           <Menu.Portal>
             <Menu.Positioner className="z-dropdown" sideOffset={4}>
-              <Menu.Popup className={MENU_POPUP_CLASS}>
+              <Menu.Popup data-slot="dropdown-menu-content" className={MENU_POPUP_CLASS}>
                 <Menu.List>
                   <Menu.RadioGroup value={uiLanguage} onValueChange={selectLanguage}>
                     {options.map(option => (
@@ -118,7 +118,7 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
           </Button>} />
           <Menu.Portal>
             <Menu.Positioner className="z-dropdown" sideOffset={4}>
-              <Menu.Popup className={MENU_POPUP_CLASS}>
+              <Menu.Popup data-slot="dropdown-menu-content" className={MENU_POPUP_CLASS}>
                 <Menu.List>
                   {help.map(item => <Menu.Item key={item.key} className={MENU_ITEM_CLASS} onClick={item.onSelect}>{item.label}</Menu.Item>)}
                 </Menu.List>

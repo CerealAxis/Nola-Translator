@@ -7,3 +7,11 @@ export interface AppUpdateCheckResult {
   releaseNotes: string
   releaseUrl: string | null
 }
+
+/** A published GitHub release with its original Markdown. */
+export interface ReleaseAnnouncement {
+  tag: string
+  publishedAt: string
+  notes: string
+  url: string
+}

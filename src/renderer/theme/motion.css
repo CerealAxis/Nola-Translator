@@ -235,7 +235,7 @@
 /* Selection: background to accent-soft, text to accent (DESIGN §8). */
 .nola-menu-item[data-selected='true'] {
   background-color: var(--accent-soft);
-  color: var(--accent);
+  color: var(--primary);
 }
 
 /* =============================================================================

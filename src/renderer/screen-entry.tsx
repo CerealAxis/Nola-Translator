@@ -1,4 +1,5 @@
 import './index.css'
+import './theme/desktop-material'
 import './theme/cjk-fonts.css'
 import { createRoot } from 'react-dom/client'
 import { createIpcBridge } from '@/bridge/ipc/ipcBridge'

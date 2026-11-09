@@ -1,12 +1,19 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
-import type { AppUpdateCheckResult } from '../shared/app-updates'
+import type { AppUpdateCheckResult, ReleaseAnnouncement } from '../shared/app-updates'
 
-const RELEASE_ENDPOINT = 'https://api.github.com/repos/CerealAxis/Nola-Translator/releases/latest'
+const RELEASES_ENDPOINT = 'https://api.github.com/repos/CerealAxis/Nola-Translator/releases'
+const RELEASE_HEADERS = {
+  Accept: 'application/vnd.github+json',
+  'User-Agent': 'Nola-Translator',
+  'X-GitHub-Api-Version': '2022-11-28',
+}
 const RELEASE_PAGE_PREFIX = 'https://github.com/CerealAxis/Nola-Translator/releases/tag/'
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const RELEASE_CACHE_FORMAT = 2
+const RECENT_RELEASE_LIMIT = 3
+const RECENT_RELEASE_TTL_MS = 5 * 60 * 1000
 
 interface ReleaseMetadata {
   tag: string
@@ -67,17 +74,17 @@ function comparePrerelease(left: string | null, right: string | null): number {
   return 0
 }
 
-function isNewer(candidate: string, current: string): boolean {
+function compareVersions(candidate: string, current: string): number {
   const next = parseVersion(candidate)
   const installed = parseVersion(current)
-  if (!next || !installed) return false
+  if (!next || !installed) return 0
   for (let index = 0; index < next.parts.length; index += 1) {
-    if (next.parts[index] !== installed.parts[index]) return next.parts[index]! > installed.parts[index]!
+    if (next.parts[index] !== installed.parts[index]) return next.parts[index]! - installed.parts[index]!
   }
-  return comparePrerelease(next.prerelease, installed.prerelease) > 0
+  return comparePrerelease(next.prerelease, installed.prerelease)
 }
 
-function releaseMetadata(value: unknown): ReleaseMetadata | null {
+function releaseMetadata(value: unknown, notesLimit = 20_000): ReleaseMetadata | null {
   if (!value || typeof value !== 'object') return null
   const release = value as Record<string, unknown>
   if (typeof release.tag_name !== 'string' || !parseVersion(release.tag_name)) return null
@@ -86,7 +93,7 @@ function releaseMetadata(value: unknown): ReleaseMetadata | null {
   return {
     tag: release.tag_name,
     name: typeof release.name === 'string' && release.name.trim() ? release.name.trim() : release.tag_name,
-    notes: typeof release.body === 'string' ? release.body.slice(0, 20_000) : '',
+    notes: typeof release.body === 'string' ? release.body.slice(0, notesLimit) : '',
     url: releaseUrl,
   }
 }
@@ -171,12 +178,8 @@ export async function checkLatestRelease(
   let release = force ? null : await readCache(cachePath, now)
   if (!release) {
     try {
-      const response = await fetcher(RELEASE_ENDPOINT, {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'User-Agent': 'Nola-Translator',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
+      const response = await fetcher(RELEASES_ENDPOINT + '/latest', {
+        headers: RELEASE_HEADERS,
         signal: AbortSignal.timeout(8_000),
       })
       if (!response.ok) return unavailable(currentVersion)
@@ -187,7 +190,7 @@ export async function checkLatestRelease(
       return unavailable(currentVersion)
     }
   }
-  const updateAvailable = isNewer(release.tag, currentVersion)
+  const updateAvailable = compareVersions(release.tag, currentVersion) > 0
   return {
     currentVersion: withoutVersionPrefix(currentVersion),
     latestVersion: withoutVersionPrefix(release.tag),
@@ -196,6 +199,48 @@ export async function checkLatestRelease(
     releaseNotes: release.notes,
     releaseUrl: release.url,
   }
+}
+
+function releaseAnnouncement(value: unknown): ReleaseAnnouncement | null {
+  if (!value || typeof value !== 'object') return null
+  const release = value as Record<string, unknown>
+  if (release.draft === true || typeof release.published_at !== 'string'
+    || !Number.isFinite(Date.parse(release.published_at))) return null
+
+  const metadata = releaseMetadata(value, Infinity)
+  if (!metadata || !isTrustedReleaseUrl(metadata.url)) return null
+  return { tag: metadata.tag, publishedAt: release.published_at, notes: metadata.notes, url: metadata.url }
+}
+
+/** 直接读取项目已发布的版本，保留完整 Markdown。 */
+export async function fetchRecentReleases(fetcher: typeof fetch = fetch): Promise<ReleaseAnnouncement[]> {
+  const response = await fetcher(RELEASES_ENDPOINT + '?per_page=100', {
+    headers: RELEASE_HEADERS,
+    signal: AbortSignal.timeout(8_000),
+  })
+  if (!response.ok) throw new Error('GitHub releases request failed: ' + response.status)
+  const body: unknown = await response.json()
+  if (!Array.isArray(body)) throw new Error('GitHub releases response was not a list')
+  return body.map(releaseAnnouncement)
+    .filter((release): release is ReleaseAnnouncement => release !== null)
+    .sort((left, right) => compareVersions(right.tag, left.tag) || Date.parse(right.publishedAt) - Date.parse(left.publishedAt))
+    .slice(0, RECENT_RELEASE_LIMIT)
+}
+
+let recentReleasesRequest: Promise<ReleaseAnnouncement[]> | undefined
+let recentReleasesCache: { checkedAt: number; releases: ReleaseAnnouncement[] } | undefined
+
+/** 切换桌面页面时复用近期的 GitHub 请求结果。 */
+export function listRecentReleases(): Promise<ReleaseAnnouncement[]> {
+  if (recentReleasesCache && Date.now() - recentReleasesCache.checkedAt < RECENT_RELEASE_TTL_MS) {
+    return Promise.resolve(recentReleasesCache.releases)
+  }
+  if (recentReleasesRequest) return recentReleasesRequest
+  recentReleasesRequest = fetchRecentReleases().then(releases => {
+    recentReleasesCache = { checkedAt: Date.now(), releases }
+    return releases
+  }).finally(() => { recentReleasesRequest = undefined })
+  return recentReleasesRequest
 }
 
 function unavailable(currentVersion: string): AppUpdateCheckResult {

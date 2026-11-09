@@ -4,9 +4,9 @@
 .screen-toolbar { display: flex; flex: none; width: max-content; height: max-content; flex-direction: column; gap: var(--space-1); padding: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); color: var(--foreground); }
 .screen-toolbar__main { display: flex; align-items: center; gap: calc(var(--space-1) / 2); }
 .screen-toolbar__main > button { flex-shrink: 0; }
-.screen-toolbar__drag { display: grid; place-items: center; align-self: stretch; min-width: var(--space-3); color: var(--muted); -webkit-app-region: drag; }
+.screen-toolbar__drag { display: grid; place-items: center; align-self: stretch; min-width: var(--space-3); color: var(--nola-ui-muted-foreground); -webkit-app-region: drag; }
 .screen-toolbar__drag svg { width: var(--space-2); height: var(--space-3); }
-.screen-toolbar__status { display: flex; align-items: center; gap: var(--space-1); max-width: calc(var(--space-8) * 7); min-height: var(--space-3); padding-inline: var(--space-1); font: var(--nola-text-caption); color: var(--muted); }
+.screen-toolbar__status { display: flex; align-items: center; gap: var(--space-1); max-width: calc(var(--space-8) * 7); min-height: var(--space-3); padding-inline: var(--space-1); font: var(--nola-text-caption); color: var(--nola-ui-muted-foreground); }
 .screen-toolbar__status > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .screen-toolbar__settings { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2); border-top: 1px solid var(--separator); }
 .screen-toolbar__switch[data-slot="field"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }

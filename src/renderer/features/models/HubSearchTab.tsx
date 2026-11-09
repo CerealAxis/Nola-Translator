@@ -405,7 +405,7 @@ export function DetailDrawer({ hit, description, onClose, onInstall }: {
             {summary.libraryName ? <Row label={t('models.loader')} value={summary.libraryName} /> : null}
             {summary.downloadBytes !== undefined ? <Row label={t('models.size')} value={formatBytes(summary.downloadBytes)} /> : null}
             <Row label={t('models.fileCount')} value={String(summary.fileCount)} />
-            <a className="text-accent underline" href={`https://huggingface.co/${summary.repo}`} target="_blank" rel="noreferrer">
+            <a className="text-primary underline" href={`https://huggingface.co/${summary.repo}`} target="_blank" rel="noreferrer">
               {t('models.viewOnHub')}
             </a>
           </> : null}

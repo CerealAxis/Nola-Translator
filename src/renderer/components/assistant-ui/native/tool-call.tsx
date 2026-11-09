@@ -71,7 +71,7 @@ export function ToolCall({
         </span>
         <span className="ms-auto flex w-4 shrink-0 items-center justify-end">
           {!running && (
-            <CheckIcon className="fade-in zoom-in-90 animate-in size-3.5 text-emerald-500 duration-200" />
+            <CheckIcon className="fade-in zoom-in-90 animate-in size-3.5 text-chart-2 duration-200" />
           )}
         </span>
       </CollapsibleTrigger>

@@ -1,6 +1,6 @@
 import { ModelGatewayPage } from './features/model-gateway/ModelGatewayPage'
 import { requestFeatureStart } from './components/primitives/FeatureActivityNotice'
-import { Home, Mic, PanelsTopLeft, Clock, SlidersHorizontal, Settings, MessagesSquare, Network, Headphones, ScanText, BookOpen, Gamepad2 } from 'lucide-react'
+import { CircleHelp, CirclePlus, LayoutDashboard, PanelsTopLeft, Clock, SlidersHorizontal, Settings, MessagesSquare, Network, Headphones, ScanText, BookOpen, Gamepad2 } from 'lucide-react'
 import { getBridge } from './store'
 import { notifyError } from './components/primitives/notify'
 import { useI18n } from './i18n'
@@ -47,28 +47,30 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
   const { t } = useI18n()
   const { route, tab, navigate } = useRoute()
   const entries = [
-    ['home', 'nav.home', Home, '#/'],
-    ['model-gateway', 'nav.modelGateway', Network, '#/model-gateway'],
-    ['models', 'nav.models', SlidersHorizontal, '#/models'],
-    ['workspace', 'nav.workspace', Mic, '#/workspace'],
-    ['meeting', 'meeting.navTitle', Headphones, '#/meeting'],
-    ['screen-translation', 'screen.navTitle', ScanText, '#/screen-translation'],
-    ['game-translation', 'suite.gameTitle', Gamepad2, '#/game-translation'],
-    ['comic-translation', 'suite.comicTitle', BookOpen, '#/comic-translation'],
-    ['records', 'nav.records', Clock, '#/records'],
-    ['settings', 'nav.settings', Settings, '#/settings/general'],
+    ['main', 'workspace', 'nav.workspace', CirclePlus, '#/workspace'],
+    ['main', 'home', 'nav.home', LayoutDashboard, '#/'],
+    ['main', 'meeting', 'meeting.navTitle', Headphones, '#/meeting'],
+    ['main', 'screen-translation', 'screen.navTitle', ScanText, '#/screen-translation'],
+    ['main', 'game-translation', 'suite.gameTitle', Gamepad2, '#/game-translation'],
+    ['main', 'comic-translation', 'suite.comicTitle', BookOpen, '#/comic-translation'],
+    ['tools', 'records', 'nav.records', Clock, '#/records'],
+    ['tools', 'models', 'nav.models', SlidersHorizontal, '#/models'],
+    ['tools', 'model-gateway', 'nav.modelGateway', Network, '#/model-gateway'],
   ] as const
-  const navigation: AppShellNavigationItem[] = entries.map(([id, key, icon, path]) => ({
-    id, label: t(key), icon, path,
-    active: route === id || id === 'workspace' && route === 'overlay' || id === 'records' && route === 'record',
-    onPress: () => navigate(path),
-  }))
-  const settingsIndex = navigation.findIndex(item => item.id === 'settings')
-  if (route === 'settings' && tab === 'browser') navigation[settingsIndex].active = false
-  navigation.splice(4, 0, { id: 'browser', label: t('browser.title'), icon: PanelsTopLeft, path: '#/settings/browser', active: route === 'settings' && tab === 'browser', onPress: () => navigate('#/settings/browser') })
-  navigation.splice(navigation.length - 1, 0, {
-      id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#workbench',
+  return [
+    ...entries.map(([section, id, key, icon, path]) => ({
+      section, id, label: t(key), icon, path,
+      active: route === id || id === 'workspace' && route === 'overlay' || id === 'records' && route === 'record',
+      onPress: () => navigate(path),
+    })),
+    { section: 'tools', id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#workbench',
       onPress: () => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) },
-  })
-  return navigation
+    },
+    { section: 'tools', id: 'browser', label: t('browser.title'), icon: PanelsTopLeft, path: '#/settings/browser',
+      active: route === 'settings' && tab === 'browser', onPress: () => navigate('#/settings/browser') },
+    { section: 'secondary', id: 'settings', label: t('nav.settings'), icon: Settings, path: '#/settings/general',
+      active: route === 'settings' && tab !== 'browser' && tab !== 'help', onPress: () => navigate('#/settings/general') },
+    { section: 'secondary', id: 'help', label: t('modelsSettingsUi.help'), icon: CircleHelp, path: '#/settings/help',
+      active: route === 'settings' && tab === 'help', onPress: () => navigate('#/settings/help') },
+  ]
 }

@@ -14,5 +14,5 @@
 }
 
 .startup-failure__hint {
-  color: var(--muted);
+  color: var(--nola-ui-muted-foreground);
 }

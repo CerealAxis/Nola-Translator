@@ -23,7 +23,7 @@ export const INTERIM_FADE = 0.72
 export const PAUSED_DIM = 0.8
 
 /** Translation sits one step below source in colour, not size: a size gap inflates row heights side by side. */
-const TRANSLATION_COLOR = 'color-mix(in oklab, var(--foreground) 88%, var(--muted))'
+const TRANSLATION_COLOR = 'color-mix(in oklab, var(--foreground) 88%, var(--nola-ui-muted-foreground))'
 
 export type CaptionLineKind = 'source' | 'translation'
 
@@ -87,7 +87,7 @@ export function CaptionLine({
     lineHeight,
     opacity: paused ? opacity * PAUSED_DIM : opacity,
     // Interim is the only state that switches text colour; the two final levels ride the ramp.
-    color: interim ? 'var(--muted)' : kind === 'translation' ? TRANSLATION_COLOR : 'var(--foreground)',
+    color: interim ? 'var(--nola-ui-muted-foreground)' : kind === 'translation' ? TRANSLATION_COLOR : 'var(--foreground)',
   }
 
   // The tail has to be the end of the line, otherwise the split would put the
@@ -116,11 +116,11 @@ export function CaptionLine({
         .join(' ')}
       style={style}
     >
-      {current ? <span className="absolute inset-y-1 left-0 w-[2px] rounded-full bg-accent" aria-hidden="true" /> : null}
+      {current ? <span className="absolute inset-y-1 left-0 w-[2px] rounded-full bg-primary" aria-hidden="true" /> : null}
       {unconfirmed
         ? <>
           {confirmed ? <span className="nola-caption-confirmed" data-part="confirmed">{confirmed}</span> : null}
-          <span className="nola-caption-tail" data-part="tail" style={{ color: 'var(--muted)' }}>{unconfirmed}</span>
+          <span className="nola-caption-tail" data-part="tail" style={{ color: 'var(--nola-ui-muted-foreground)' }}>{unconfirmed}</span>
         </>
         : confirmed}
     </p>

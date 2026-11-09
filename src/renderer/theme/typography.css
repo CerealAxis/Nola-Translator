@@ -97,12 +97,12 @@
 
 .nola-caption {
   font: var(--nola-text-caption);
-  color: var(--muted);
+  color: var(--nola-ui-muted-foreground);
 }
 
 .nola-micro {
   font: var(--nola-text-micro);
-  color: var(--muted);
+  color: var(--nola-ui-muted-foreground);
 }
 
 .nola-mono {

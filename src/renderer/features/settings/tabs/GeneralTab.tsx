@@ -18,17 +18,20 @@ import { useNolaTheme } from '@/components/primitives'
 import { notifyError } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { SliderControl, SliderIndicator, SliderRoot, SliderThumb, SliderTrack } from '@/components/ui/slider'
 import { useI18n } from '@/i18n'
 import type { UiLanguagePreference } from '@/i18n'
 import { updateSettings } from '@/store'
 import { GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_NODES, GITHUB_PROXY_OFF, findGithubProxyNode } from '../../../../shared/github-proxies'
 import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_NODES, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFF, PYTORCH_WHEEL_MIRRORS } from '../../../../shared/pypi-mirrors'
+import { GLASS_CONTROLS, type GlassControl } from '../../../../shared/settings'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
 export function GeneralTab({ settings }: SettingsPanelProps) {
   const { t, uiLanguage, setLanguage } = useI18n()
   const reduceMotion = settings.appearance?.reduceMotion ?? false
+  const glassEnabled = settings.appearance?.liquidGlass !== false
 
   useEffect(() => {
     document.documentElement.dataset.reduceMotion = reduceMotion ? 'true' : 'false'
@@ -52,6 +55,33 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
     <div className="settings-panel">
       <SettingGroup legend={t('settings.groupAppearance')}>
         <ThemeRow />
+        <SettingsRow label={t('settings.liquidGlass')}>
+          <SettingSwitch
+            isSelected={glassEnabled}
+            ariaLabel={t('settings.liquidGlass')}
+            onChange={liquidGlass => {
+              void updateSettings({ appearance: { liquidGlass } }).catch(() => undefined)
+            }}
+          />
+        </SettingsRow>
+        {(Object.keys(GLASS_CONTROLS) as GlassControl[]).map(key => {
+          const { initial, min, max, unit } = GLASS_CONTROLS[key]
+          const label = t(`settings.${key}`)
+          const value = settings.appearance?.[key] ?? initial
+          return (
+            <SettingsRow key={key} label={label}>
+              <div className="settings-glass-slider">
+                <SliderRoot value={value} min={min} max={max} disabled={!glassEnabled}
+                  onValueChange={next => { void updateSettings({ appearance: { [key]: next } }).catch(() => undefined) }}>
+                  <SliderControl>
+                    <SliderTrack><SliderIndicator /><SliderThumb aria-label={label} aria-valuetext={`${value}${unit}`} /></SliderTrack>
+                  </SliderControl>
+                </SliderRoot>
+                <span aria-hidden="true" className="settings-glass-slider__value">{value}{unit}</span>
+              </div>
+            </SettingsRow>
+          )
+        })}
         <SettingsRow label={t('settings.reduceMotion')}>
           <SettingSwitch
             isSelected={reduceMotion}

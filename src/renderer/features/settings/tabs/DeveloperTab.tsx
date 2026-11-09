@@ -793,7 +793,7 @@ function StatusGroup() {
             <span className="nola-micro text-muted">{t('dev.statusProgressPending')}</span>
             <Progress.Root value={0.35} min={0} max={1} className="w-full" aria-label={t('dev.statusProgressPending')}>
               <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-surface-secondary">
-                <Progress.Indicator className="h-full rounded-sm bg-accent" />
+                <Progress.Indicator className="h-full rounded-sm bg-primary" />
               </Progress.Track>
             </Progress.Root>
           </div>
@@ -801,7 +801,7 @@ function StatusGroup() {
             <span className="nola-micro text-muted">{t('dev.statusProgressDone')}</span>
             <Progress.Root value={0.85} min={0} max={1} className="w-full" aria-label={t('dev.statusProgressDone')}>
               <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-surface-secondary">
-                <Progress.Indicator className="h-full rounded-sm bg-accent" />
+                <Progress.Indicator className="h-full rounded-sm bg-primary" />
               </Progress.Track>
             </Progress.Root>
           </div>

@@ -38,8 +38,8 @@ export function DualColumnView({ segments, sourceLabel, targetLabel, fontScale =
       <SliderRoot className="nola-dual__split" min={MIN_SPLIT} max={MAX_SPLIT} step={5} value={split} onValueChange={(next: number | readonly number[]) => setSplit(typeof next === 'number' ? next : (next[0] ?? split))}>
         <SliderControl className="py-0">
           <SliderTrack className="h-1 w-full rounded-full bg-surface-tertiary">
-            <SliderIndicator className="rounded-full bg-accent" />
-            <SliderThumb className="size-3 rounded-full bg-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus" aria-label={sourceLabel + ' / ' + targetLabel} />
+            <SliderIndicator className="rounded-full bg-primary" />
+            <SliderThumb className="size-3 rounded-full bg-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus" aria-label={sourceLabel + ' / ' + targetLabel} />
           </SliderTrack>
         </SliderControl>
       </SliderRoot>
@@ -50,7 +50,7 @@ export function DualColumnView({ segments, sourceLabel, targetLabel, fontScale =
               const isCurrent = currentIndex !== undefined && index === currentIndex
               const opacity = lineOpacity(currentIndex === undefined ? 0 : index - currentIndex) * (segment.interim ? .72 : 1)
               return <div key={variant} data-current={isCurrent ? 'true' : undefined} data-interim={segment.interim ? 'true' : undefined} className={'nola-dual__cell ' + (variant === 'source' ? 'text-foreground' : 'text-muted')} style={{ opacity, minHeight: lineBox, lineHeight: lineBox + 'px' }}>
-                {isCurrent ? <span aria-hidden="true" className="absolute top-1 bottom-1 left-0 w-[2px] rounded-full bg-accent" /> : null}
+                {isCurrent ? <span aria-hidden="true" className="absolute top-1 bottom-1 left-0 w-[2px] rounded-full bg-primary" /> : null}
                 {variant === 'source' ? segment.source : segment.target}
               </div>
             })}

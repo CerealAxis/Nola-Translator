@@ -8,6 +8,31 @@ import { GITHUB_PROXY_AUTO } from '../../../src/shared/github-proxies'
 import { PYPI_MIRROR_AUTO, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO } from '../../../src/shared/pypi-mirrors'
 
 describe('设置存储', () => {
+  it('为旧配置补齐毛玻璃参数并保留关闭前的调节值', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-appearance-'))
+    const path = join(directory, 'settings.json')
+    try {
+      await writeFile(path, JSON.stringify({ version: 2, appearance: { reduceMotion: true } }))
+      const store = new SettingsStore(path)
+      expect((await store.load()).appearance).toEqual({ ...DEFAULT_SETTINGS.appearance, reduceMotion: true })
+
+      await store.update({ appearance: { glassBlur: 23, glassOpacity: 77, glassSaturation: 110 } })
+      await store.update({ appearance: { liquidGlass: false } })
+      expect((await new SettingsStore(path).load()).appearance).toEqual({
+        reduceMotion: true,
+        liquidGlass: false,
+        glassBlur: 23,
+        glassOpacity: 77,
+        glassSaturation: 110,
+      })
+
+      await writeFile(path, JSON.stringify({ version: 2, appearance: { liquidGlass: false, glassOpacity: 1000, glassBlur: 0 } }))
+      expect((await new SettingsStore(path).load()).appearance).toEqual({
+        ...DEFAULT_SETTINGS.appearance, liquidGlass: false, glassBlur: 0,
+      })
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
   it('persists multiple custom models and keeps the selected connection synchronized', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-custom-models-'))
     const path = join(directory, 'settings.json')

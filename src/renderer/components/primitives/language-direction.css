@@ -5,6 +5,6 @@
 .nola-language-popup { display: flex; flex-direction: column; width: max(var(--anchor-width), calc(var(--space-8) * 3)); max-width: calc(100vi - var(--space-4)); max-height: min(var(--available-height), calc(var(--space-8) * 5)); overflow: hidden; }
 .nola-language-popup > .input { flex: none; width: 100%; margin-bottom: var(--space-1); }
 .nola-language-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nola-language-empty { color: var(--muted); font: var(--font-caption); }
+.nola-language-empty { color: var(--nola-ui-muted-foreground); font: var(--font-caption); }
 .nola-language-empty:not(:empty) { padding: var(--space-2); }
 .nola-language-popup .select__item[data-highlighted], .nola-language-popup .select__item[data-selected] { background: var(--selection-neutral); color: var(--foreground); }

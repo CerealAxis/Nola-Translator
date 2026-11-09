@@ -423,7 +423,7 @@ function IdleGuide({
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-8">
       <div className="flex max-w-96 flex-col items-start gap-3">
-        <span className="flex size-10 items-center justify-center rounded-[10px] bg-surface-tertiary text-accent">
+        <span className="flex size-10 items-center justify-center rounded-[10px] bg-surface-tertiary text-primary">
           <Captions className="size-5" aria-hidden="true" />
         </span>
         <h2 className="nola-display text-foreground">{t('workspaceUi.idleTitle')}</h2>

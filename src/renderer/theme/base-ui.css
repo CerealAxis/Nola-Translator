@@ -508,7 +508,7 @@
   }
   .select__group { min-width: 0; }
   .select__field-label { display: block; font: var(--font-body-strong); color: var(--foreground); }
-  .select__group-label { padding: var(--space-1); font: var(--font-label); color: var(--muted); }
+  .select__group-label { padding: var(--space-1); font: var(--font-label); color: var(--nola-ui-muted-foreground); }
   .select__popover .select__item {
     position: relative;
     display: flex;
@@ -596,13 +596,13 @@
   .toggle-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; min-width: 32px; padding: 0 10px; border: 0; border-radius: var(--nola-ui-radius-lg); outline: none; background: transparent; color: var(--nola-ui-foreground); font-size: 14px; font-weight: 500; white-space: nowrap; transition: background-color 150ms, box-shadow 150ms; }
   .toggle-button:hover, .toggle-button[data-pressed], .toggle-button[aria-pressed='true'] { background: var(--nola-ui-muted); }
   .toggle-button svg { width: 16px; height: 16px; flex: none; }
-  .nola-segmented .toggle-button { flex: 1; min-width: 0; height: var(--space-4); padding-inline: var(--space-2); border-radius: var(--radius-xl); color: var(--muted); font: var(--font-caption); font-weight: 500; }
+  .nola-segmented .toggle-button { flex: 1; min-width: 0; height: var(--space-4); padding-inline: var(--space-2); border-radius: var(--radius-xl); color: var(--nola-ui-muted-foreground); font: var(--font-caption); font-weight: 500; }
   .nola-segmented .toggle-button:hover { background: color-mix(in oklch, var(--foreground) 7%, transparent); }
   .nola-segmented .toggle-button:is([data-pressed], [aria-pressed='true'], [data-selected='true']) { background: var(--segment); color: var(--segment-foreground); box-shadow: var(--shadow-surface); }
 
-  .tabs__list { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--space-1) / 4); width: fit-content; max-width: 100%; min-height: var(--field-control-height); padding: calc(var(--space-1) / 2); border-radius: var(--radius-xl); background: var(--default); color: var(--muted); }
+  .tabs__list { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--space-1) / 4); width: fit-content; max-width: 100%; min-height: var(--field-control-height); padding: calc(var(--space-1) / 2); border-radius: var(--radius-xl); background: var(--default); color: var(--nola-ui-muted-foreground); }
   .tabs__list[data-orientation='vertical'] { flex-direction: column; height: fit-content; }
-  .tabs__tab { position: relative; display: inline-flex; flex: 1; align-items: center; justify-content: center; gap: var(--space-1); min-width: 0; min-height: var(--space-4); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-xl); outline: none; color: var(--muted); font: var(--font-caption); font-weight: 500; white-space: nowrap; transition: color 150ms, background-color 150ms; }
+  .tabs__tab { position: relative; display: inline-flex; flex: 1; align-items: center; justify-content: center; gap: var(--space-1); min-width: 0; min-height: var(--space-4); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-xl); outline: none; color: var(--nola-ui-muted-foreground); font: var(--font-caption); font-weight: 500; white-space: nowrap; transition: color 150ms, background-color 150ms; }
   .tabs__tab:hover { color: var(--nola-ui-foreground); }
   .tabs__tab:hover { background: color-mix(in oklch, var(--foreground) 7%, transparent); }
   .tabs__tab[data-active], .tabs__tab[aria-selected='true'] { background: var(--segment); color: var(--segment-foreground); box-shadow: var(--shadow-surface); }

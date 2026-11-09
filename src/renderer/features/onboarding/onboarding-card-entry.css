@@ -11,6 +11,8 @@
 @source '../../components/ui/spinner.tsx';
 @import 'tw-shimmer';
 @import '../../theme/index.css';
+@import '../../theme/nola-theme.css';
+@import '../../theme/nola-glass.css';
 @import '../../theme/cjk-fonts.css';
 @import './onboarding.css';
 

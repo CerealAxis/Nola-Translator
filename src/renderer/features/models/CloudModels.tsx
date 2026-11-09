@@ -90,7 +90,7 @@ export function CloudModelCard({ model, installed = false, onOpen }: CloudModelC
       {model.runtimeState ? <Badge variant={model.runtimeState === 'failed' ? 'danger' : 'accent'}>{t(`gateway.${model.runtimeState}`)}</Badge> : null}
     </div></CardContent>
     <CardFooter className="card__footer">
-      <Button onClick={() => onOpen(model.id)}>{installed ? t('models.openDetails') : recommendedActionLabel}</Button>
+      <Button variant="secondary" onClick={() => onOpen(model.id)}>{installed ? t('models.openDetails') : recommendedActionLabel}</Button>
     </CardFooter>
   </Card>
 }

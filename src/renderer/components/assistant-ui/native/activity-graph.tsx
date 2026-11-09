@@ -7,10 +7,10 @@ import { mono, paper } from "./surfaces";
 
 const LEVEL_TINT = [
   "bg-foreground/[0.06] inset-ring inset-ring-border forced-colors:border",
-  "bg-blue-500/25 dark:bg-blue-400/25 forced-color-adjust-none",
-  "bg-blue-500/45 dark:bg-blue-400/45 forced-color-adjust-none",
-  "bg-blue-500/70 dark:bg-blue-400/70 forced-color-adjust-none",
-  "bg-blue-500 dark:bg-blue-400 forced-color-adjust-none",
+  "bg-primary/25 forced-color-adjust-none",
+  "bg-primary/45 forced-color-adjust-none",
+  "bg-primary/70 forced-color-adjust-none",
+  "bg-primary forced-color-adjust-none",
 ] as const;
 
 export function ActivityGraph({

@@ -20,7 +20,7 @@ import type { MainErrorNotification, ModelStorageInfo } from '../shared/bridge'
 import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
 import { settingsPatchSchema } from './settings-schema'
 import { diagnosticCopyContextSchema } from '../shared/schemas'
-import { checkLatestRelease, isTrustedReleaseUrl } from './github-updates'
+import { checkLatestRelease, isTrustedReleaseUrl, listRecentReleases } from './github-updates'
 
 const channels = {
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings',
@@ -31,7 +31,7 @@ const channels = {
   openMainPage: 'app:open-main-page',
   notifyMainError: 'app:overlay-error', mainErrorNotification: 'app:main-error-notification',
   openAppearance: 'app:open-appearance',
-  checkLatestRelease: 'app:check-latest-release', openReleasePage: 'app:open-release-page',
+  checkLatestRelease: 'app:check-latest-release', listRecentReleases: 'app:list-recent-releases', openReleasePage: 'app:open-release-page',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
   listMeetings: 'meeting:list', getMeeting: 'meeting:get', readMeeting: 'meeting:read',
   renameMeeting: 'meeting:rename', setMeetingNotes: 'meeting:set-notes', deleteMeeting: 'meeting:delete', exportMeeting: 'meeting:export',
@@ -257,6 +257,7 @@ export function registerAppIpc(options: {
   loggedHandle(channels.getSettings, () => options.settings.current())
   loggedHandle(channels.checkLatestRelease, (_event, force: unknown) =>
     checkLatestRelease(app.getVersion(), join(resolveDataRoot(), '.cache', 'github-release.json'), force === true))
+  loggedHandle(channels.listRecentReleases, () => listRecentReleases())
   loggedHandle(channels.openReleasePage, (_event, url: unknown) => {
     if (!isTrustedReleaseUrl(url)) throw new Error('INVALID_ARGUMENT')
     return shell.openExternal(url)

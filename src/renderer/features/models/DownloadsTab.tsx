@@ -125,7 +125,7 @@ function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: 
           {!failed && !cancelling ? <div className="flex w-full min-w-0 flex-col gap-[var(--space-1)]">
             <Progress.Root className="w-full" value={value} min={0} max={1} aria-label={t('models.stateLabel')}>
               <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm border border-border bg-surface-secondary">
-                <Progress.Indicator className="h-full rounded-sm bg-accent transition-[width] duration-[var(--dur-enter)]" />
+                <Progress.Indicator className="h-full rounded-sm bg-primary transition-[width] duration-[var(--dur-enter)]" />
               </Progress.Track>
             </Progress.Root>
             <span className="nola-micro text-muted tabular">

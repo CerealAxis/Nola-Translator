@@ -80,7 +80,7 @@ export function RecommendedFamilyCard({ family, records, onOpen }: RecommendedFa
       {engines.map(engine => <Badge key={engine} >{engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'}</Badge>)}
       {records.some(record => record.installed) ? <Badge  variant="success">{t('models.installed')}</Badge> : null}
     </div></CardContent>
-    <CardFooter className="card__footer"><Button data-onboarding={`model-family-${family}`} onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
+    <CardFooter className="card__footer"><Button variant="secondary" data-onboarding={`model-family-${family}`} onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
   </Card>
 }
 
@@ -270,7 +270,7 @@ export function OcrFamilyCard({ records, onOpen }: { records: readonly ResourceR
     <CardContent><div className="models-card__status"><Badge>{t('modelsSettingsUi.localModels')}</Badge><Badge>ONNX Runtime</Badge>
       {records.some(record => record.installed) && <Badge variant="success">{t('models.installed')}</Badge>}
     </div></CardContent>
-    <CardFooter><Button onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
+    <CardFooter><Button variant="secondary" onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
   </Card>
 }
 

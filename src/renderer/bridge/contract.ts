@@ -1,6 +1,6 @@
 import type { ModelConfiguration } from '../../shared/model-capabilities'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from '../../shared/browser'
-import type { AppUpdateCheckResult } from '../../shared/app-updates'
+import type { AppUpdateCheckResult, ReleaseAnnouncement } from '../../shared/app-updates'
 /**
  * The renderer's data-access interface: the method and type surface every
  * component reads through. The production implementation is `createIpcBridge()`,
@@ -176,6 +176,7 @@ export interface NolaBridge {
     dismissOverlayToast?(): void
     triggerOverlayToastAction?(actionId: MainErrorNotification['actionId']): void
     checkLatestRelease(force?: boolean): Promise<AppUpdateCheckResult>
+    listRecentReleases?(): Promise<ReleaseAnnouncement[]>
     openReleasePage(url: string): Promise<void>
   }
   translation: { hasCredential(p: CredentialProvider): Promise<boolean>; setCredential(p: CredentialProvider, v: string): Promise<void> }
@@ -287,6 +288,7 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'app.dismissOverlayToast': 'ipc',
   'app.triggerOverlayToastAction': 'ipc',
   'app.checkLatestRelease': 'ipc',
+  'app.listRecentReleases': 'ipc',
   'app.openReleasePage': 'ipc',
   'translation.hasCredential': 'ipc',
   'translation.setCredential': 'ipc',

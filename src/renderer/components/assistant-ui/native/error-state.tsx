@@ -54,23 +54,23 @@ export function ErrorState({
       key="error"
       role="alert"
       className={cn(
-        "fade-in animate-in flex w-full max-w-sm items-start gap-2.5 rounded-2xl bg-red-500/[0.06] px-4 py-3 text-sm duration-300 motion-reduce:animate-none dark:bg-red-500/10",
+        "fade-in animate-in flex w-full max-w-sm items-start gap-2.5 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive duration-300 motion-reduce:animate-none",
         className,
       )}
 
       {...props}
     >
-      <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-red-500/80" />
+      <CircleAlertIcon className="mt-0.5 size-4 shrink-0" />
       <div>
-        <p className="font-medium text-red-600 dark:text-red-400">{title}</p>
-        <p className="mt-0.5 text-[13px] leading-snug text-red-600/60 dark:text-red-400/60">
+        <p className="font-medium text-destructive">{title}</p>
+        <p className="mt-0.5 text-sm text-destructive/90">
           {detail}
         </p>
       </div>
       <button
         type="button"
         onClick={onRetry}
-        className="ms-auto flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/10 dark:text-red-400"
+        className="ms-auto flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
       >
         <RefreshCwIcon className="size-3" />
         {retryLabel}

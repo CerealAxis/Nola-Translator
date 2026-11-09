@@ -35,7 +35,7 @@ const SUB_PLACEMENT: Record<1 | 2 | 3, string> = {
 }
 
 const ICON_PLATE =
-  'grid place-items-center rounded-lg bg-surface-secondary text-accent transition-colors duration-[var(--dur-micro)] group-hover:bg-surface-tertiary'
+  'grid place-items-center rounded-lg bg-surface-secondary text-primary transition-colors duration-[var(--dur-micro)] group-hover:bg-surface-tertiary'
 
 const TOOLTIP_CLASS =
   'z-overlay max-w-64 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'

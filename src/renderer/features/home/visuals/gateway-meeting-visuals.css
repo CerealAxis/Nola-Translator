@@ -1,0 +1,192 @@
+.nola-home-gateway-orbit {
+  position: relative;
+  display: grid;
+  inline-size: min(100%, 36rem);
+  margin-inline: auto;
+  place-items: center;
+}
+
+.nola-home-gateway-orbit::before {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-position: center;
+  background-size: var(--space-2) var(--space-2);
+  mask-image: radial-gradient(ellipse, black, transparent 72%);
+  content: '';
+}
+
+.nola-home-gateway-orbit__diagram {
+  --orbit-radius: 4.8125rem;
+  position: relative;
+  display: grid;
+  inline-size: 14rem;
+  aspect-ratio: 1;
+  place-items: center;
+}
+
+.nola-home-gateway-orbit__track {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  stroke: color-mix(in oklch, var(--primary) 25%, var(--border));
+  stroke-width: 1;
+}
+
+.nola-home-gateway-orbit__center,
+.nola-home-gateway-orbit__node {
+  position: absolute;
+  display: grid;
+  inline-size: var(--space-6);
+  block-size: var(--space-6);
+  place-content: center;
+  justify-items: center;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow-xs);
+}
+
+.nola-home-gateway-orbit__center {
+  border-radius: var(--radius-lg);
+}
+
+.nola-home-gateway-orbit__center img {
+  inline-size: var(--space-4);
+  block-size: var(--space-4);
+}
+
+.nola-home-gateway-orbit__node {
+  gap: calc(var(--space-1) / 2);
+  border-color: color-mix(in oklch, var(--nola-home-node-tone) 24%, var(--border));
+  border-radius: var(--radius-lg);
+  color: color-mix(in oklch, var(--nola-home-node-tone) 72%, var(--card-foreground));
+  font: var(--font-label);
+  line-height: 1;
+  animation: nola-home-gateway-orbit 18s linear infinite;
+}
+
+.nola-home-gateway-orbit__node svg {
+  inline-size: var(--space-2);
+  block-size: var(--space-2);
+  color: var(--nola-home-node-tone);
+  stroke-width: 1.8;
+}
+
+.nola-home-gateway-orbit__node[data-tone="primary"],
+.nola-home-meeting-turns__row[data-tone="primary"] {
+  --nola-home-node-tone: var(--primary);
+}
+
+.nola-home-gateway-orbit__node[data-tone="teal"],
+.nola-home-meeting-turns__row[data-tone="teal"] {
+  --nola-home-node-tone: var(--chart-2);
+}
+
+.nola-home-gateway-orbit__node[data-tone="violet"] {
+  --nola-home-node-tone: var(--chart-3);
+}
+
+.nola-home-gateway-orbit__node[data-tone="amber"] {
+  --nola-home-node-tone: var(--chart-4);
+}
+
+/* 与 Orbiting Circles 一样，沿半径平移后反转角度，节点自身保持直立。 */
+@keyframes nola-home-gateway-orbit {
+  from {
+    transform:
+      rotate(var(--orbit-angle))
+      translateY(var(--orbit-radius))
+      rotate(calc(-1 * var(--orbit-angle)));
+  }
+
+  to {
+    transform:
+      rotate(calc(var(--orbit-angle) + 1turn))
+      translateY(var(--orbit-radius))
+      rotate(calc(-1 * var(--orbit-angle) - 1turn));
+  }
+}
+
+.nola-home-feature-card:is(:hover, :focus-within) .nola-home-gateway-orbit__node {
+  animation-play-state: paused;
+}
+
+.nola-home-meeting-turns {
+  display: grid;
+  inline-size: min(calc(100% - 2 * var(--space-2)), 22rem);
+  gap: var(--space-1);
+  margin: var(--space-3) auto 0;
+}
+
+.nola-home-meeting-turns__row {
+  display: flex;
+  min-inline-size: 0;
+  gap: var(--space-1);
+  padding: var(--space-1) calc(var(--space-1) * 1.5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-xs);
+}
+
+.nola-home-meeting-turns__row [data-slot="avatar-fallback"] {
+  color: color-mix(in oklch, var(--nola-home-node-tone) 68%, var(--card-foreground));
+  background: color-mix(in oklch, var(--nola-home-node-tone) 13%, var(--card));
+}
+
+.nola-home-meeting-turns__copy {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.nola-home-meeting-turns__speaker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--card-foreground);
+  font: var(--font-label);
+}
+
+.nola-home-meeting-turns__speaker svg {
+  inline-size: var(--space-2);
+  block-size: var(--space-2);
+  color: var(--nola-home-node-tone);
+}
+
+.nola-home-meeting-turns__source,
+.nola-home-meeting-turns__translation {
+  margin: 0;
+  font: var(--font-caption);
+}
+
+.nola-home-meeting-turns__source {
+  color: var(--muted-foreground);
+}
+
+.nola-home-meeting-turns__translation {
+  color: var(--card-foreground);
+}
+
+.nola-home-meeting-turns__translation span {
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nola-home-gateway-orbit__node {
+    animation-play-state: paused;
+  }
+}
+
+.nola-home-bento:not([data-reduce-motion]) .nola-home-meeting-turns__translation span { opacity: 0; }
+
+.nola-home-bento:not([data-reduce-motion]) .nola-home-meeting-turns[data-playing="true"] .nola-home-meeting-turns__translation span {
+  animation: nola-home-meeting-phrase-in 300ms var(--turn-delay) ease both;
+}
+
+@keyframes nola-home-meeting-phrase-in {
+  from { opacity: 0; transform: translateY(4px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+.nola-home-bento[data-reduce-motion] .nola-home-gateway-orbit__node { animation-play-state: paused; }

@@ -191,8 +191,8 @@ export function AudioPlayerBar({
       >
         <SliderControl>
           <SliderTrack className="h-1 w-full rounded-full bg-surface-tertiary">
-            <SliderIndicator className="rounded-full bg-accent" />
-            <SliderThumb aria-label={t('records.columnDuration')} className="size-3 rounded-full bg-accent" />
+            <SliderIndicator className="rounded-full bg-primary" />
+            <SliderThumb aria-label={t('records.columnDuration')} className="size-3 rounded-full bg-primary" />
           </SliderTrack>
         </SliderControl>
       </SliderRoot>

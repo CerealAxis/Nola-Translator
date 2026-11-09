@@ -150,7 +150,7 @@ export function CaptionRevisionText({ text, stableText }: CaptionRevisionTextPro
           className="nola-caption-change nola-caption-tail"
           data-part="tail"
           data-entering={part.entering ? 'true' : 'false'}
-          style={{ color: 'var(--muted)' }}
+          style={{ color: 'var(--nola-ui-muted-foreground)' }}
           onAnimationEnd={event => {
             if (event.target === event.currentTarget) {
               setRevision(current => ({ ...current, parts: settle(current.parts, part.id) }))

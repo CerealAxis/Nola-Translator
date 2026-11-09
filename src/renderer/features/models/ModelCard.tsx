@@ -243,7 +243,7 @@ function ProgressLine({ record, state }: { record: ResourceRecord; state: Resour
         aria-label={t('models.stateLabel')}
       >
         <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-default">
-          <Progress.Indicator className="h-full rounded-sm bg-accent transition-[width] duration-[var(--dur-enter)]" />
+          <Progress.Indicator className="h-full rounded-sm bg-primary transition-[width] duration-[var(--dur-enter)]" />
         </Progress.Track>
       </Progress.Root>
       <span className="nola-micro text-muted tabular">

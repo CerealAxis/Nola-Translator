@@ -7,7 +7,7 @@ import { ModelConfigurationDialog } from './ModelConfigurationDialog'
 /** Opens configuration only for newly installed imported models. */
 export function ModelCapabilityNotices() {
   const settings = useStore(stores.settings, state => state.settings)
-  const deferForTour = useStore(stores.settings, state => state.onboardingActive || (!!state.settings && !state.settings.onboardingSeen && !state.onboardingAutoAttempted))
+  const deferForTour = useStore(stores.settings, state => state.onboardingActive)
   const resources = useStore(stores.models, state => state.resources)
   const status = useStore(stores.session, state => state.status)
   const [configurationQueue, setConfigurationQueue] = useState<string[]>([])

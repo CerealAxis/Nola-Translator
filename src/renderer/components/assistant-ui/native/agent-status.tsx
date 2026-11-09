@@ -36,7 +36,7 @@ export function AgentStatus({
       {...props}
     >
       {state === "done" ? (
-        <CheckIcon aria-hidden className="size-3 shrink-0 text-emerald-500" />
+        <CheckIcon aria-hidden className="size-3 shrink-0 text-chart-2" />
       ) : state === "failed" ? (
         <XIcon aria-hidden className="text-destructive size-3 shrink-0" />
       ) : (
@@ -45,7 +45,7 @@ export function AgentStatus({
           className={cn(
             "size-1.5 shrink-0 rounded-full motion-reduce:animate-none",
             state === "working"
-              ? "animate-pulse bg-blue-500 dark:bg-blue-400"
+              ? "animate-pulse bg-primary"
               : "border-foreground/35 border",
           )}
         />
