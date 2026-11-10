@@ -8,7 +8,6 @@ import poster from '@/assets/home-poster.png'
 import { HomeFeatures } from './HomeFeatures'
 import { HomeReleaseAnnouncements } from './HomeReleaseAnnouncements'
 import { RecentMeetings } from './RecentMeetings'
-import './home-page.css'
 
 const posterCopy = {
   'zh-CN': { description: '免费开源的实时翻译软件', action: '点个 Star', website: '官网' },

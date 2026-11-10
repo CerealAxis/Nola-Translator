@@ -96,7 +96,8 @@ src/
     available-models.ts      模型目录与选择回退
     bridge/                  NolaBridge 数据出口
     store/                   5 个领域 Store
-    theme/                   设计 token 与 CJK 字体
+    index.css                软件端样式入口（含独立窗口和 CJK 字体）
+    theme/product.css        三端共用的设计 token、控件和毛玻璃
     i18n/                    多语言字典
 
     components/
@@ -128,7 +129,6 @@ src/
 
     workbench.html           工作台独立入口
     workbench-entry.tsx
-    workbench-entry.css
     latency.html             延迟检测独立入口
     latency-entry.tsx
     screen.html              屏幕翻译独立入口
@@ -160,6 +160,7 @@ browser/
   version.json
   CHANGELOG.md
   extension/
+    styles.css              浏览器扩展样式入口（使用系统字体）
     providers.ts             Provider 配置
     provider-runtime.ts      请求调度
     translation-cache.ts     持久翻译缓存
@@ -186,6 +187,7 @@ docs/
   design-system/             设计系统规范与组件示例文档
   .vitepress/                站点配置
   media-src/                 演示及截图素材
+    vis/design-demo.css      文档组件预览样式入口（含 CJK 字体）
   scripts/                   文档构建脚本
   public/                    静态资源
   PRD/                       内部需求与架构文档
@@ -203,8 +205,7 @@ skills/                      项目 Skills
 **工作台**
 
 - 工作台窗口由 `src/main/workbench.ts` 注册。
-- 独立加载 `workbench.html`、`workbench-entry.tsx`、`workbench-entry.css`。
-- 不加载主页面的 `index.css` 或 Nola 产品主题。
+- 独立加载 `workbench.html` 和 `workbench-entry.tsx`，通过软件端的 `index.css` 加载主题及工作台样式。
 - 官方 Elements 源码位于 `components/assistant-ui/native/`。
 - Agent 界面、原生工具卡片及设置分别由 `NativeAgentSurface.tsx`、`native-agent-tools.tsx`、`NativeAgentSettings.tsx` 管理。
 - 旧聊天组件、旧侧栏和旧工作区组件已移除，不应重新依赖。

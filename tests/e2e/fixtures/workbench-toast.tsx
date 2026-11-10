@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { showToast, ToastProvider } from '@/components/ui/toast'
 import { MermaidZoom } from '@/components/assistant-ui/native/mermaid-diagram'
 import '../../../src/renderer/index.css'
-import '../../../src/renderer/workbench-entry.css'
 
 const kind = new URLSearchParams(location.search).get('case') ?? 'toast'
 const image = 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22480%22%20height=%22320%22%20viewBox=%220%200%20480%20320%22%3E%3Crect%20width=%22480%22%20height=%22320%22%20fill=%22%232563eb%22/%3E%3C/svg%3E'

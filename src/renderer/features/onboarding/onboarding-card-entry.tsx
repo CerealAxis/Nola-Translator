@@ -1,4 +1,4 @@
-import './onboarding-card-entry.css'
+import '@/index.css'
 import '@/theme/desktop-material'
 import { StrictMode, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'

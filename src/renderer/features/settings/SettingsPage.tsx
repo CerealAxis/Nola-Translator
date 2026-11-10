@@ -25,7 +25,6 @@ import { DeveloperTab } from './tabs/DeveloperTab'
 import { ShortcutsTab } from './tabs/ShortcutsTab'
 import { GlossaryTab } from './glossary/GlossaryTab'
 import { SETTINGS_NAVIGATION } from './settingsNavigation'
-import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
 

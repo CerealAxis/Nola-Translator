@@ -19,7 +19,7 @@ editLink: false
 
 <figure>
 
-<demo react="spacing-vertical.tsx" :reactFiles="['spacing-vertical.tsx', '../figures/Foundations.tsx', '../figures/Foundations.css']" />
+<demo react="spacing-vertical.tsx" :reactFiles="['spacing-vertical.tsx', '../figures/Foundations.tsx']" />
 
 <figcaption>小、中、大三档纵向间距。</figcaption>
 </figure>
@@ -35,7 +35,7 @@ editLink: false
 
 <figure>
 
-<demo react="spacing-separator.tsx" :reactFiles="['spacing-separator.tsx', '../figures/Foundations.tsx', '../figures/Foundations.css']" />
+<demo react="spacing-separator.tsx" :reactFiles="['spacing-separator.tsx', '../figures/Foundations.tsx']" />
 
 <figcaption>分隔线划开不同的信息组。</figcaption>
 </figure>
@@ -55,7 +55,7 @@ editLink: false
 
 <figure>
 
-<demo react="spacing-horizontal.tsx" :reactFiles="['spacing-horizontal.tsx', '../figures/Foundations.tsx', '../figures/Foundations.css']" />
+<demo react="spacing-horizontal.tsx" :reactFiles="['spacing-horizontal.tsx', '../figures/Foundations.tsx']" />
 
 <figcaption>分栏中的字段按组排列。</figcaption>
 </figure>
@@ -71,7 +71,7 @@ editLink: false
 
 <figure>
 
-<demo react="spacing-inline.tsx" :reactFiles="['spacing-inline.tsx', '../figures/Foundations.tsx', '../figures/Foundations.css']" />
+<demo react="spacing-inline.tsx" :reactFiles="['spacing-inline.tsx', '../figures/Foundations.tsx']" />
 
 <figcaption>组件内部的间距也有亲疏。</figcaption>
 </figure>

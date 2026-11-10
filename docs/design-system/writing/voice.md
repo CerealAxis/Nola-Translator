@@ -40,7 +40,7 @@ editLink: false
 
 <figure>
 
-<demo react="writing-fields.tsx" :reactFiles="['writing-fields.tsx','../figures/WritingExamples.tsx','../figures/WritingExamples.css']" />
+<demo react="writing-fields.tsx" :reactFiles="['writing-fields.tsx','../figures/WritingExamples.tsx']" />
 
 <figcaption>标签标明对象，示例提示格式，说明保留填写条件。</figcaption>
 

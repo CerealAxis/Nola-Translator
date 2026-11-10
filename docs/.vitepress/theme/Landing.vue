@@ -19,7 +19,10 @@ onMounted(async () => {
   root = createRoot(host.value)
   render = () => root?.render(createElement(LandingPage, {
     locale: props.locale ?? 'zh-CN', base: withBase('/'), dark: isDark.value,
-    onToggleTheme: () => { isDark.value = !isDark.value },
+    onToggleTheme: () => {
+      isDark.value = !isDark.value
+      render?.()
+    },
   }))
   render()
 })

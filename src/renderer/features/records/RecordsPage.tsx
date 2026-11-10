@@ -21,7 +21,6 @@ import { ExportDialog } from './ExportDialog'
 import { RecordDeleteDialog } from './RecordDeleteDialog'
 import { RecordsTable } from './RecordsTable'
 import { clampPage, matches, pageNumbers, sortByEndTime } from './recordLogic'
-import '../home/home-records.css'
 
 const PAGE_SIZES = [10, 20, 50, 100]
 const DEFAULT_PAGE_SIZE = 20

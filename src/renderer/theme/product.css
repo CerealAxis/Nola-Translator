@@ -1,6 +1,4989 @@
-@import './index.css';
-@import './nola-theme.css';
-@import './nola-glass.css';
+@layer theme, base, components, utilities;
+
+/* ===== 浅色语义变量 ===== */
+
+@layer base {
+  /* DESIGN v3: both schemes declare the same semantic token set. */
+  :root,
+  :host,
+  [data-theme="light"] {
+    color-scheme: light;
+    --primary: oklch(60% 0.22 257);
+    --primary-foreground: oklch(99% 0.002 255);
+    --background: oklch(97.8% 0.014 255);
+    --surface: oklch(99.6% 0.004 255);
+    --surface-secondary: oklch(97.4% 0.012 255);
+    --surface-tertiary: oklch(94.4% 0.024 255);
+    --foreground: oklch(22.5% 0.047 261);
+    --muted: oklch(57.5% 0.046 259);
+    --border: oklch(92.3% 0.026 255);
+    --accent: oklch(60% 0.22 257);
+    --accent-foreground: oklch(99% 0.002 255);
+    --field-background: oklch(99.6% 0.004 255);
+    --field-foreground: var(--foreground);
+    --field-placeholder: var(--muted);
+    --field-border: var(--border);
+    --field-border-focus: var(--accent);
+    --ring-offset-width: 0;
+    --separator: oklch(95.2% 0.013 255);
+    --link: var(--accent);
+    --focus: var(--accent);
+    --success: oklch(71% 0.19 155);
+    --success-foreground: var(--foreground);
+    --warning: oklch(73% 0.16 65);
+    --warning-foreground: var(--foreground);
+    --danger: oklch(64% 0.21 23);
+    --danger-foreground: var(--accent-foreground);
+    --info: var(--accent);
+    --info-foreground: var(--accent-foreground);
+    --default: oklch(94.4% 0.024 255);
+    --default-foreground: var(--foreground);
+    --segment: oklch(97.4% 0.012 255);
+    --segment-foreground: var(--foreground);
+    --backdrop: rgba(22,35,62,0.35);
+    --background-inverse: var(--foreground);
+    --overlay: oklch(99.6% 0.004 255);
+    --overlay-foreground: var(--foreground);
+    --overlay-shadow: 0 12px 36px rgba(35,72,125,0.14);
+    --surface-shadow: 0 2px 10px rgba(35,72,125,0.04);
+    --field-shadow: 0 1px 2px rgba(35,72,125,0.025);
+    --color-blue: var(--accent);
+    --color-purple: oklch(60% 0.24 298);
+    --color-orange: oklch(67% 0.19 48);
+    --color-emerald: oklch(76% 0.15 170);
+    --color-accent-soft: color-mix(in oklch, var(--accent) 12%, var(--surface));
+    --nola-primary-gradient: linear-gradient(105deg, oklch(60% 0.22 257), oklch(71% 0.16 257));
+  }
+}
+
+/* ===== 深色语义变量 ===== */
+
+@layer base {
+  /* DESIGN v3: both schemes declare the same semantic token set. */
+  .dark,
+:host([data-theme="dark"]),
+[data-theme="dark"] {
+    color-scheme: dark;
+    --primary: oklch(70% 0.16 257);
+    --primary-foreground: oklch(99% 0.002 255);
+    --background: oklch(21% 0.039 259);
+    --surface: oklch(27% 0.044 258);
+    --surface-secondary: oklch(31% 0.048 258);
+    --surface-tertiary: oklch(36% 0.051 258);
+    --foreground: oklch(96% 0.014 255);
+    --muted: oklch(74% 0.04 258);
+    --border: oklch(37% 0.05 258);
+    --accent: oklch(70% 0.16 257);
+    --accent-foreground: oklch(99% 0.002 255);
+    --field-background: oklch(27% 0.044 258);
+    --field-foreground: var(--foreground);
+    --field-placeholder: var(--muted);
+    --field-border: var(--border);
+    --field-border-focus: var(--accent);
+    --ring-offset-width: 0;
+    --separator: oklch(32% 0.044 258);
+    --link: var(--accent);
+    --focus: var(--accent);
+    --success: oklch(76% 0.16 157);
+    --success-foreground: var(--foreground);
+    --warning: oklch(80% 0.15 75);
+    --warning-foreground: var(--foreground);
+    --danger: oklch(72% 0.18 22);
+    --danger-foreground: var(--accent-foreground);
+    --info: var(--accent);
+    --info-foreground: var(--accent-foreground);
+    --default: oklch(36% 0.051 258);
+    --default-foreground: var(--foreground);
+    --segment: oklch(31% 0.048 258);
+    --segment-foreground: var(--foreground);
+    --backdrop: rgba(12,20,36,0.65);
+    --background-inverse: var(--foreground);
+    --overlay: oklch(27% 0.044 258);
+    --overlay-foreground: var(--foreground);
+    --overlay-shadow: 0 12px 36px rgba(10,20,40,0.32);
+    --surface-shadow: 0 2px 10px rgba(15,25,45,0.12);
+    --field-shadow: 0 1px 2px rgba(35,72,125,0.025);
+    --color-blue: var(--accent);
+    --color-purple: oklch(74% 0.17 298);
+    --color-orange: oklch(78% 0.14 48);
+    --color-emerald: oklch(80% 0.12 170);
+    --color-accent-soft: color-mix(in oklch, var(--accent) 12%, var(--surface));
+    --nola-primary-gradient: linear-gradient(105deg, oklch(70% 0.16 257), oklch(76% 0.12 257));
+  }
+}
+
+/* ===== Base UI 基础控件 ===== */
+
+/* shadcn Base UI semantic tokens are namespaced to avoid replacing existing Nola tokens. */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--foreground);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-tertiary: var(--surface-tertiary);
+  --color-overlay: var(--overlay);
+  --color-overlay-foreground: var(--overlay-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent);
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-foreground: var(--success-soft-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-soft-foreground: var(--danger);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted);
+  --color-border: var(--border);
+  --color-separator: var(--separator);
+  --color-focus: var(--focus);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --shadow-overlay: var(--overlay-shadow);
+  --shadow-surface: var(--surface-shadow);
+  --color-nola-ui-background: var(--nola-ui-background);
+  --color-nola-ui-backdrop: var(--backdrop);
+  --color-nola-ui-foreground: var(--nola-ui-foreground);
+  --color-nola-ui-card: var(--nola-ui-card);
+  --color-nola-ui-card-foreground: var(--nola-ui-card-foreground);
+  --color-nola-ui-popover: var(--nola-ui-popover);
+  --color-nola-ui-popover-foreground: var(--nola-ui-popover-foreground);
+  --color-nola-ui-primary: var(--nola-ui-primary);
+  --color-nola-ui-primary-foreground: var(--nola-ui-primary-foreground);
+  --color-nola-ui-secondary: var(--nola-ui-secondary);
+  --color-nola-ui-secondary-foreground: var(--nola-ui-secondary-foreground);
+  --color-nola-ui-muted: var(--nola-ui-muted);
+  --color-nola-ui-muted-foreground: var(--nola-ui-muted-foreground);
+  --color-nola-ui-accent: var(--nola-ui-accent);
+  --color-nola-ui-accent-foreground: var(--nola-ui-accent-foreground);
+  --color-nola-ui-destructive: var(--nola-ui-destructive);
+  --color-nola-ui-border: var(--nola-ui-border);
+  --color-nola-ui-input: var(--nola-ui-input);
+  --color-nola-ui-field-background: var(--nola-ui-field-background);
+  --color-nola-ui-ring: var(--nola-ui-ring);
+  --color-nola-ui-success: var(--nola-ui-success);
+  --color-nola-ui-warning: var(--nola-ui-warning);
+  --color-nola-ui-info: var(--nola-ui-info);
+  --radius-nola-ui-sm: var(--nola-ui-radius-sm);
+  --radius-nola-ui-md: var(--nola-ui-radius-md);
+  --radius-nola-ui-lg: var(--nola-ui-radius-lg);
+  --radius-nola-ui-xl: var(--nola-ui-radius-xl);
+}
+
+:root,
+:host,
+[data-theme="light"] {
+  --nola-ui-background: var(--background);
+  --nola-ui-foreground: var(--foreground);
+  --nola-ui-card: var(--surface);
+  --nola-ui-card-foreground: var(--surface-foreground, var(--foreground));
+  --nola-ui-popover: var(--overlay);
+  --nola-ui-popover-foreground: var(--overlay-foreground);
+  --nola-ui-primary: var(--primary);
+  --nola-ui-primary-foreground: var(--primary-foreground);
+  --nola-ui-secondary: var(--surface-secondary);
+  --nola-ui-secondary-foreground: var(--surface-secondary-foreground, var(--foreground));
+  --nola-ui-muted: var(--surface-secondary);
+  --nola-ui-muted-foreground: var(--muted);
+  --nola-ui-accent: var(--accent-soft);
+  --nola-ui-accent-foreground: var(--foreground);
+  --nola-ui-destructive: var(--danger);
+  --nola-ui-border: var(--border);
+  --nola-ui-input: var(--field-border);
+  --nola-ui-field-background: var(--field-background);
+  --nola-ui-ring: var(--focus);
+  --nola-ui-success: var(--success);
+  --nola-ui-warning: var(--warning);
+  --nola-ui-info: var(--info);
+  --nola-ui-radius-sm: var(--radius-sm);
+  --nola-ui-radius-md: var(--radius-md);
+  --nola-ui-radius-lg: var(--radius-lg);
+  --nola-ui-radius-xl: var(--radius-xl);
+}
+
+.dark,
+[data-theme="dark"] {
+  --nola-ui-background: var(--background);
+  --nola-ui-foreground: var(--foreground);
+  --nola-ui-card: var(--surface);
+  --nola-ui-card-foreground: var(--surface-foreground, var(--foreground));
+  --nola-ui-popover: var(--overlay);
+  --nola-ui-popover-foreground: var(--overlay-foreground);
+  --nola-ui-primary: var(--primary);
+  --nola-ui-primary-foreground: var(--primary-foreground);
+  --nola-ui-secondary: var(--surface-secondary);
+  --nola-ui-secondary-foreground: var(--surface-secondary-foreground, var(--foreground));
+  --nola-ui-muted: var(--surface-secondary);
+  --nola-ui-muted-foreground: var(--muted);
+  --nola-ui-accent: var(--accent-soft);
+  --nola-ui-accent-foreground: var(--foreground);
+  --nola-ui-destructive: var(--danger);
+  --nola-ui-border: var(--border);
+  --nola-ui-input: var(--field-border);
+  --nola-ui-field-background: var(--field-background);
+  --nola-ui-ring: var(--focus);
+  --nola-ui-success: var(--success);
+  --nola-ui-warning: var(--warning);
+  --nola-ui-info: var(--info);
+  --nola-ui-radius-sm: var(--radius-sm);
+  --nola-ui-radius-md: var(--radius-md);
+  --nola-ui-radius-lg: var(--radius-lg);
+  --nola-ui-radius-xl: var(--radius-xl);
+}
+
+@layer components {
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 0;
+    height: var(--field-control-height);
+    min-height: 0;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: var(--nola-ui-radius-lg);
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 150ms var(--ease-nola), background-color 150ms var(--ease-nola), border-color 150ms var(--ease-nola), box-shadow 150ms var(--ease-nola);
+  }
+  .button:focus-visible,
+  [data-slot="input"].input:focus-visible,
+  .nola-dialog-content :is(button, [href], input, select, textarea, [tabindex]):focus-visible,
+  .nola-toast :is(button, [href], input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--nola-ui-ring);
+    outline-offset: 2px;
+  }
+  .button:disabled,
+  .button[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.52;
+  }
+  .button--primary {
+    color: var(--nola-ui-primary-foreground);
+    background: var(--nola-ui-primary);
+  }
+  .button--primary:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: color-mix(in oklch, var(--nola-ui-primary) 80%, transparent);
+  }
+  .button--secondary {
+    color: var(--nola-ui-foreground);
+    border-color: var(--nola-ui-border);
+    background: var(--surface-tertiary);
+  }
+  .button--secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: color-mix(in oklch, var(--surface-tertiary) 88%, var(--foreground));
+  }
+  .button--outline {
+    color: var(--nola-ui-foreground);
+    border-color: var(--nola-ui-border);
+    background: transparent;
+  }
+  .button--outline:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--nola-ui-accent);
+  }
+  .button--tertiary {
+    color: var(--nola-ui-foreground);
+    background: transparent;
+  }
+  .button--tertiary:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--nola-ui-accent);
+  }
+  .button--danger {
+    color: var(--nola-ui-destructive);
+    background: color-mix(in oklch, var(--nola-ui-destructive) 10%, transparent);
+  }
+  .button--danger:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: color-mix(in oklch, var(--nola-ui-destructive) 20%, transparent);
+  }
+  .button--sm {
+    height: 28px;
+    min-height: 28px;
+    padding-inline: 10px;
+    font-size: 0.8rem;
+  }
+  .button--icon {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+  }
+  .button svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+  .label, [data-slot="label"].nola-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--nola-ui-foreground);
+  }
+  .card {
+    --card-spacing: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--card-spacing);
+    min-width: 0;
+    overflow: hidden;
+    padding-block: var(--card-spacing);
+    border: 1px solid var(--nola-ui-border);
+    border-radius: var(--radius-xl);
+    background: var(--nola-ui-card);
+    color: var(--nola-ui-card-foreground);
+    font: var(--font-body);
+  }
+  .card[data-size="sm"] {
+    --card-spacing: var(--space-2);
+  }
+  .card:has(> .card__footer) {
+    padding-bottom: 0;
+  }
+  .card:has(> img:first-child) {
+    padding-top: 0;
+  }
+  .card > img {
+    width: 100%;
+    object-fit: cover;
+  }
+  .card__header {
+    display: grid;
+    grid-auto-rows: min-content;
+    align-items: start;
+    gap: calc(var(--space-1) / 2);
+    min-width: 0;
+    padding-inline: var(--card-spacing);
+  }
+  .card__header:has(> .card__action) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .card__header:has(> .card__description) {
+    grid-template-rows: auto auto;
+  }
+  .card__title {
+    min-width: 0;
+    margin: 0;
+    font: var(--font-title-3, var(--font-title));
+    overflow-wrap: anywhere;
+  }
+  .card[data-size="sm"] .card__title {
+    font: var(--font-body-strong);
+  }
+  .card__description {
+    min-width: 0;
+    color: var(--muted-foreground, var(--nola-ui-muted-foreground));
+    font: var(--font-caption);
+    overflow-wrap: anywhere;
+  }
+  .card__action {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: start;
+    justify-self: end;
+  }
+  .card__content {
+    min-width: 0;
+    padding-inline: var(--card-spacing);
+  }
+  .card__footer {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--card-spacing);
+    border-top: 1px solid var(--nola-ui-border);
+    background: var(--surface-secondary);
+  }
+  .nola-dialog-content {
+    position: fixed;
+    inset: 50% auto auto 50%;
+    z-index: var(--z-overlay);
+    display: flex;
+    flex-direction: column;
+    width: min(560px, calc(100vw - var(--space-4)));
+    max-height: min(82dvh, 760px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: var(--space-3);
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--nola-ui-border);
+    border-radius: var(--nola-ui-radius-xl);
+    color: var(--nola-ui-foreground);
+    background: var(--nola-ui-popover);
+    box-shadow: var(--overlay-shadow);
+  }
+  .nola-dialog-content::-webkit-scrollbar {
+    display: none;
+  }
+  .nola-dialog-header {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-1) / 2);
+    margin-bottom: 0;
+    padding-inline: 0;
+  }
+  .nola-dialog-header [data-slot="dialog-description"] {
+    margin: 0;
+  }
+  .nola-dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-top: 0;
+  }
+  .nola-dialog-close {
+    position: absolute;
+    inset-block-start: var(--space-2);
+    inset-inline-end: var(--space-2);
+    z-index: var(--z-sticky);
+    width: var(--field-control-height);
+    min-width: var(--field-control-height);
+    height: var(--field-control-height);
+    min-height: var(--field-control-height);
+    border-radius: var(--radius-xl);
+  }
+  .nola-toast-viewport {
+    position: fixed;
+    z-index: var(--z-toast);
+    inset: auto 20px 20px auto;
+    width: min(420px, calc(100vw - 32px));
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    list-style: none;
+    outline: none;
+    pointer-events: none;
+  }
+  .nola-toast {
+    --nola-toast-gap: 12px;
+    --nola-toast-peek: 12px;
+    --nola-toast-height: var(--toast-frontmost-height, var(--toast-height));
+    --nola-toast-scale: max(0, calc(1 - var(--toast-index) * 0.1));
+    --nola-toast-shrink: calc(1 - var(--nola-toast-scale));
+    --nola-toast-offset-y: calc(var(--toast-offset-y) * -1 + var(--toast-index) * var(--nola-toast-gap) * -1 + var(--toast-swipe-movement-y));
+    position: absolute;
+    inset: auto 0 0 auto;
+    z-index: calc(var(--z-toast) - var(--toast-index));
+    display: block;
+    transform: translateX(var(--toast-swipe-movement-x)) translateY(calc(var(--toast-swipe-movement-y) - var(--toast-index) * var(--nola-toast-peek) - var(--nola-toast-shrink) * var(--nola-toast-height))) scale(var(--nola-toast-scale));
+    transform-origin: bottom;
+    height: var(--nola-toast-height);
+    width: 100%;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--nola-ui-border);
+    border-radius: var(--nola-ui-radius-xl);
+    color: var(--nola-ui-foreground);
+    background: var(--nola-ui-popover);
+    box-shadow: var(--overlay-shadow);
+    outline: none;
+    pointer-events: auto;
+    will-change: transform;
+    transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1), opacity 500ms, height 150ms;
+  }
+  .nola-toast::after {
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-start: 0;
+    width: 100%;
+    height: calc(var(--nola-toast-gap) + 1px);
+    content: '';
+  }
+  .nola-toast[data-expanded] {
+    height: var(--toast-height);
+    transform: translateX(var(--toast-swipe-movement-x)) translateY(var(--nola-toast-offset-y));
+  }
+  .nola-toast[data-limited] {
+    opacity: 0;
+  }
+  .nola-toast[data-starting-style] {
+    transform: translateY(150%);
+  }
+  .nola-toast[data-ending-style]:not([data-limited]):not([data-swipe-direction]) {
+    transform: translateY(150%);
+  }
+  .nola-toast[data-ending-style][data-swipe-direction="down"] {
+    transform: translateY(calc(var(--toast-swipe-movement-y) + 150%));
+  }
+  .nola-toast[data-ending-style][data-swipe-direction="left"] {
+    transform: translateX(calc(var(--toast-swipe-movement-x) - 150%)) translateY(var(--nola-toast-offset-y));
+  }
+  .nola-toast[data-ending-style][data-swipe-direction="right"] {
+    transform: translateX(calc(var(--toast-swipe-movement-x) + 150%)) translateY(var(--nola-toast-offset-y));
+  }
+  .nola-toast[data-ending-style][data-swipe-direction="up"] {
+    transform: translateY(calc(var(--toast-swipe-movement-y) - 150%));
+  }
+  .nola-toast-content {
+    display: flex;
+    height: 100%;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    overflow: hidden;
+    padding: var(--space-2);
+    transition: opacity 250ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .nola-toast-content[data-behind] {
+    opacity: 0;
+  }
+  .nola-toast-content[data-expanded] {
+    opacity: 1;
+  }
+  .nola-toast-copy {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  .nola-toast-title {
+    color: var(--nola-ui-foreground);
+    overflow-wrap: anywhere;
+  }
+  .nola-toast-description {
+    color: var(--nola-ui-muted-foreground);
+    overflow-wrap: anywhere;
+  }
+  .nola-toast-action {
+    flex: none;
+  }
+  .nola-toast-icon {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    color: var(--nola-ui-info);
+  }
+  .nola-toast[data-type="success"] .nola-toast-icon {
+    color: var(--nola-ui-success);
+  }
+  .nola-toast[data-type="warning"] .nola-toast-icon {
+    color: var(--nola-ui-warning);
+  }
+  .nola-toast[data-type="error"] .nola-toast-icon {
+    color: var(--nola-ui-destructive);
+  }
+  .nola-toast[data-type="loading"] .nola-toast-icon {
+    color: var(--nola-ui-primary);
+  }
+  .nola-toast-icon-loading {
+    animation: nola-toast-spin 1s linear infinite;
+  }
+  @keyframes nola-toast-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .nola-toast-close.button {
+    flex: none;
+    width: var(--field-control-height);
+    min-width: var(--field-control-height);
+    height: var(--field-control-height);
+    min-height: var(--field-control-height);
+    border-radius: var(--radius-xl);
+    color: var(--nola-ui-muted-foreground);
+  }
+  .nola-toast-close.button:hover:not(:disabled):not([aria-disabled="true"]) {
+    color: var(--nola-ui-foreground);
+    background: transparent;
+  }
+  @media (max-width: 600px) {
+    .nola-toast-viewport {
+      inset: auto 12px 12px;
+      width: auto;
+    }
+    .nola-toast-content {
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .nola-toast-action {
+      margin-inline-start: auto;
+    }
+    html[data-overlay-toast="true"] .nola-toast-viewport {
+      inset: auto 20px 20px auto;
+      width: min(420px, calc(100vw - 32px));
+    }
+    html[data-overlay-toast="true"] .nola-toast-content {
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+    html[data-overlay-toast="true"] .nola-toast-action {
+      margin-inline-start: 0;
+    }
+  }
+}
+
+.nola-dialog-content {
+  font: var(--font-body);
+  color: var(--nola-ui-card-foreground);
+  background: var(--nola-ui-card);
+  border-radius: var(--nola-ui-radius-xl);
+}
+
+.nola-dialog-content.card[data-slot="dialog-content"] {
+  --card-spacing: var(--space-2);
+  gap: var(--card-spacing);
+  padding: var(--card-spacing);
+}
+
+.nola-dialog-content.card[data-slot="dialog-content"]:has(> .nola-dialog-footer) {
+  padding-block-end: 0;
+}
+
+.nola-dialog-content.card > :is(.card__header, .card__content) {
+  padding-inline: 0;
+}
+
+.nola-dialog-content.card > .nola-dialog-header {
+  margin: 0;
+  gap: var(--space-1);
+}
+
+.nola-dialog-content.card:has(> .nola-dialog-close) > :is(.nola-dialog-header, .card__header) {
+  padding-inline-end: var(--field-control-height);
+}
+
+.nola-dialog-content.card p {
+  margin-block: 0;
+}
+
+.nola-dialog-content.card .nola-dialog-header > p {
+  color: var(--nola-ui-muted-foreground);
+}
+
+.nola-dialog-content :is([data-slot="dialog-title"], .nola-title) {
+  margin: 0;
+  color: var(--nola-ui-card-foreground);
+  font: var(--font-title-3, var(--font-title));
+}
+
+.nola-dialog-content [data-slot="dialog-description"] {
+  color: var(--nola-ui-muted-foreground);
+}
+
+.nola-dialog-content.card[data-slot="dialog-content"] > .nola-dialog-footer {
+  position: relative;
+  margin-inline: calc(var(--card-spacing) * -1);
+  margin-block-start: 0;
+  padding: var(--card-spacing);
+  border-top: 1px solid var(--nola-ui-border);
+  background: var(--surface-secondary);
+}
+
+.nola-dialog-close.button,
+.nola-dialog-close.button:hover:not(:disabled):not([aria-disabled="true"]),
+.nola-dialog-close.button:active:not(:disabled):not([aria-disabled="true"]),
+.nola-dialog-close.button[aria-expanded="true"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.nola-toast-close.button,
+.nola-toast-close.button:hover:not(:disabled):not([aria-disabled="true"]),
+.nola-toast-close.button:active:not(:disabled):not([aria-disabled="true"]),
+.nola-toast-close.button[aria-expanded="true"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.nola-dialog-content .button {
+  box-sizing: border-box;
+  height: var(--field-control-height);
+  min-height: var(--field-control-height);
+}
+
+.nola-dialog-content :is([data-slot="dialog-footer"], .nola-dialog-footer) .button {
+  padding-inline: var(--space-2);
+  border-radius: var(--nola-ui-radius-xl);
+  font: var(--font-body-strong);
+}
+
+.nola-toast .button {
+  box-sizing: border-box;
+  height: var(--field-control-height);
+  min-height: var(--field-control-height);
+}
+
+@layer components {
+  .select {
+    min-width: 0;
+  }
+  .select__trigger, .autocomplete__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1);
+    width: 100%;
+    min-width: 0;
+    height: var(--field-control-height);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--field-border);
+    border-radius: var(--field-radius);
+    background: var(--field-background);
+    color: var(--nola-ui-foreground);
+    font: var(--font-body);
+    white-space: nowrap;
+    outline: none;
+    user-select: none;
+  }
+  .select__trigger[data-size="sm"] {
+    height: var(--space-4);
+    padding-inline: var(--space-1);
+  }
+  .select__trigger:hover:not(:disabled) {
+    border-color: var(--field-border-focus);
+  }
+  .select__trigger[data-placeholder] {
+    color: var(--field-placeholder);
+  }
+  .select__value, .autocomplete__value {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: start;
+  }
+  .select__indicator, .select__indicator svg, .select__trigger > svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--nola-ui-muted-foreground);
+  }
+  .select__popover, .dropdown__popover {
+    min-width: var(--anchor-width, 144px);
+    max-height: var(--available-height, 320px);
+    overflow: auto;
+    padding: 4px;
+    border-radius: var(--nola-ui-radius-lg);
+    background: var(--nola-ui-popover);
+    color: var(--nola-ui-popover-foreground);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1), 0 0 0 1px color-mix(in oklch, var(--nola-ui-foreground) 10%, transparent);
+    outline: none;
+  }
+  .select__popover {
+    width: var(--anchor-width);
+    min-width: min(calc(var(--space-5) * 6), calc(100vi - var(--space-4)));
+    max-width: var(--available-width, calc(100vi - var(--space-4)));
+    max-height: min(var(--available-height, 320px), calc(var(--space-5) * 8));
+    overflow-x: hidden;
+    padding: calc(var(--space-1) / 2);
+    border: 1px solid var(--border);
+    background: var(--overlay);
+    color: var(--overlay-foreground);
+    box-shadow: var(--overlay-shadow);
+  }
+  .select__group {
+    min-width: 0;
+  }
+  .select__field-label {
+    display: block;
+    font: var(--font-body-strong);
+    color: var(--foreground);
+  }
+  .select__group-label {
+    padding: var(--space-1);
+    font: var(--font-label);
+    color: var(--nola-ui-muted-foreground);
+  }
+  .select__popover .select__item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: var(--field-control-height);
+    padding: var(--space-1) var(--space-5) var(--space-1) var(--space-2);
+    border-radius: var(--radius-md);
+    font: var(--font-body);
+    outline: none;
+    cursor: default;
+    user-select: none;
+  }
+  .select__item-text {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: var(--space-1);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .select__item[data-selected] {
+    background: var(--accent-soft);
+    color: var(--foreground);
+  }
+  .select__item[data-highlighted] {
+    background: var(--selection-neutral);
+    color: var(--foreground);
+  }
+  .select__item[data-disabled] {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .select__item-indicator {
+    position: absolute;
+    inset-inline-end: var(--space-2);
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+  }
+  .select__item svg {
+    width: var(--space-2);
+    height: var(--space-2);
+    flex: none;
+  }
+  .select__popover,
+  .dropdown__popover,
+  [data-slot="select-content"] {
+    border-radius: var(--nola-ui-radius-lg);
+    scrollbar-width: none;
+  }
+  .select__popover::-webkit-scrollbar,
+  .dropdown__popover::-webkit-scrollbar,
+  [data-slot="select-content"]::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  .list-box-item, .nola-menu-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 4px 8px;
+    border-radius: var(--nola-ui-radius-md);
+    font-size: 14px;
+    line-height: 20px;
+    cursor: default;
+    outline: none;
+    user-select: none;
+  }
+  .list-box-item[data-highlighted], .nola-menu-item[data-highlighted] {
+    background: var(--nola-ui-accent);
+    color: var(--nola-ui-accent-foreground);
+  }
+  .list-box-item > :last-child:not(:first-child), .nola-menu-item > :last-child:not(:first-child) {
+    margin-inline-start: auto;
+  }
+  .list-box-item svg, .nola-menu-item svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+  .list-box-item[data-disabled], .nola-menu-item[data-disabled] {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .switch {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 9999px;
+    background: var(--nola-ui-input);
+    width: 32px;
+    height: 18.4px;
+    outline: none;
+    transition: background-color 150ms, box-shadow 150ms;
+  }
+  .switch__control {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+  }
+  .switch__thumb {
+    display: block;
+    pointer-events: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: var(--nola-ui-background);
+    transform: translateX(0);
+    transition: transform 150ms;
+  }
+  .switch[data-checked], .switch[aria-checked="true"] {
+    background: var(--nola-ui-primary);
+  }
+  .switch[data-checked] .switch__thumb, .switch[aria-checked="true"] .switch__thumb {
+    transform: translateX(14px);
+  }
+  .switch::after {
+    content: '';
+    position: absolute;
+    inset: -8px -12px;
+  }
+  .slider {
+    width: 100%;
+    min-width: 0;
+  }
+  .slider__track {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--nola-ui-muted);
+    user-select: none;
+  }
+  .slider__fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--nola-ui-primary);
+    user-select: none;
+  }
+  .slider__thumb {
+    display: block;
+    width: 12px;
+    height: 12px;
+    flex: none;
+    border: 1px solid var(--nola-ui-ring);
+    border-radius: 9999px;
+    background: var(--surface);
+    outline: none;
+    transition: box-shadow 150ms;
+  }
+  .slider__thumb::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+  .slider__thumb:hover, .slider__thumb:focus-visible, .slider__thumb:active {
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--nola-ui-ring) 50%, transparent);
+  }
+  .number-field {
+    min-width: 0;
+  }
+  .number-field__group {
+    display: flex;
+    align-items: center;
+    height: var(--field-control-height);
+    border: 1px solid var(--nola-ui-input);
+    border-radius: var(--field-radius);
+    overflow: hidden;
+  }
+  .number-field__input {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    padding: 4px 10px;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--nola-ui-foreground);
+    font-size: 14px;
+  }
+  .number-field__group:focus-within {
+    border-color: var(--nola-ui-ring);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--nola-ui-ring) 50%, transparent);
+  }
+  .nola-segmented {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--space-1) / 4);
+    width: fit-content;
+    max-width: 100%;
+    min-width: 0;
+    min-height: var(--field-control-height);
+    padding: calc(var(--space-1) / 2);
+    border-radius: var(--radius-xl);
+    background: var(--default);
+  }
+  .toggle-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 32px;
+    min-width: 32px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--nola-ui-radius-lg);
+    outline: none;
+    background: transparent;
+    color: var(--nola-ui-foreground);
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background-color 150ms, box-shadow 150ms;
+  }
+  .toggle-button:hover, .toggle-button[data-pressed], .toggle-button[aria-pressed="true"] {
+    background: var(--nola-ui-muted);
+  }
+  .toggle-button svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+  .nola-segmented .toggle-button {
+    flex: 1;
+    min-width: 0;
+    height: var(--space-4);
+    padding-inline: var(--space-2);
+    border-radius: var(--radius-xl);
+    color: var(--nola-ui-muted-foreground);
+    font: var(--font-caption);
+    font-weight: 500;
+  }
+  .nola-segmented .toggle-button:hover {
+    background: color-mix(in oklch, var(--foreground) 7%, transparent);
+  }
+  .nola-segmented .toggle-button:is([data-pressed], [aria-pressed="true"], [data-selected="true"]) {
+    background: var(--segment);
+    color: var(--segment-foreground);
+    box-shadow: var(--shadow-surface);
+  }
+  .tabs__list {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--space-1) / 4);
+    width: fit-content;
+    max-width: 100%;
+    min-height: var(--field-control-height);
+    padding: calc(var(--space-1) / 2);
+    border-radius: var(--radius-xl);
+    background: var(--default);
+    color: var(--nola-ui-muted-foreground);
+  }
+  .tabs__list[data-orientation="vertical"] {
+    flex-direction: column;
+    height: fit-content;
+  }
+  .tabs__tab {
+    position: relative;
+    display: inline-flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    min-width: 0;
+    min-height: var(--space-4);
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-xl);
+    outline: none;
+    color: var(--nola-ui-muted-foreground);
+    font: var(--font-control, var(--font-label));
+    white-space: nowrap;
+    transition: color 150ms, background-color 150ms;
+  }
+  .tabs__tab:hover {
+    color: var(--nola-ui-foreground);
+  }
+  .tabs__tab:hover {
+    background: color-mix(in oklch, var(--foreground) 7%, transparent);
+  }
+  .tabs__tab[data-active], .tabs__tab[aria-selected="true"] {
+    background: var(--segment);
+    color: var(--segment-foreground);
+    box-shadow: var(--shadow-surface);
+  }
+  .tabs__tab svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+  .tabs__panel {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    outline: none;
+  }
+  .tabs__indicator {
+    pointer-events: none;
+  }
+  .table-root {
+    width: 100%;
+    min-width: 0;
+  }
+  .table__scroll-container {
+    position: relative;
+    width: 100%;
+    overflow-x: auto;
+  }
+  .table__content {
+    width: 100%;
+    border-collapse: collapse;
+    caption-side: bottom;
+    font-size: 14px;
+  }
+  .table__header tr, .table__row {
+    border-bottom: 1px solid var(--nola-ui-border);
+  }
+  .table__body > tr:last-child {
+    border-bottom: 0;
+  }
+  .table__row {
+    transition: background-color 150ms;
+  }
+  .table__row:hover {
+    background: color-mix(in oklch, var(--nola-ui-muted) 50%, transparent);
+  }
+  .table__row[data-selected="true"] {
+    background: var(--nola-ui-muted);
+  }
+  .table__column {
+    height: 40px;
+    padding: 0 8px;
+    text-align: start;
+    vertical-align: middle;
+    color: var(--nola-ui-foreground);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .table__cell {
+    padding: 8px;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .table__column:has([role="checkbox"]), .table__cell:has([role="checkbox"]) {
+    padding-inline-end: 0;
+  }
+  .select__trigger:focus-visible, .autocomplete__trigger:focus-visible, .switch:focus-visible, .toggle-button:focus-visible, .tabs__tab:focus-visible {
+    border-color: var(--nola-ui-ring);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--nola-ui-ring) 50%, transparent);
+    outline: none;
+  }
+  :is(.select__trigger, .autocomplete__trigger, .switch, .slider, .number-field, .toggle-button, .tabs__tab):is(:disabled, [data-disabled], [aria-disabled="true"]) {
+    pointer-events: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  :is(.select__trigger, .autocomplete__trigger, .switch, .number-field__input)[aria-invalid="true"] {
+    border-color: var(--nola-ui-destructive);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--nola-ui-destructive) 20%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .switch, .switch__thumb, .toggle-button, .tabs__tab, .table__row, .slider__thumb {
+      transition: none;
+    }
+  }
+}
+
+/* ===== 排版 ===== */
+
+@layer base {
+  :root,
+:host {
+    --font-cjk-fallback: 'Noto Sans SC';
+    /* A surface may override the font stack independently of its color theme. */
+    --font-ui: var(--nola-font-family, var(--font-cjk-fallback), sans-serif);
+    --font-sans: var(--font-ui);
+    --font-serif: var(--font-ui);
+    --font-mono: var(--font-ui);
+    /* Shared baseline for the two-column transcript (14 x 1.65). Consumed by
+     .nola-baseline-pair in index.css so both columns land on one grid. */
+    --nola-baseline: 23.1px;
+    /* CJK <-> Latin gap. 1/4 em, applied by `text-autospace` where supported. */
+    --nola-autospace: 0.25em;
+  }
+  :root:lang(zh-TW) {
+    --font-cjk-fallback: 'Noto Sans TC';
+  }
+  :root:lang(zh-HK) {
+    --font-cjk-fallback: 'Noto Sans HK';
+  }
+  :root:lang(ko) {
+    --font-cjk-fallback: 'Noto Sans KR';
+  }
+  :root:lang(ja) {
+    --font-cjk-fallback: 'Noto Sans JP';
+  }
+  /* --- Utility classes -------------------------------------------------------- */
+  .nola-display,
+.nola-title,
+.nola-subtitle,
+.nola-body,
+.nola-body-strong,
+.nola-caption,
+.nola-micro,
+.nola-mono {
+    margin: 0;
+    text-wrap: pretty;
+  }
+  .nola-display {
+    font: var(--nola-text-display);
+    /* The ONLY step allowed negative tracking, and only because it is >= 20px. */
+    letter-spacing: -0.01em;
+  }
+  .nola-title {
+    font: var(--nola-text-title);
+  }
+  .nola-subtitle {
+    font: var(--nola-text-subtitle);
+  }
+  .nola-body {
+    font: var(--nola-text-body);
+  }
+  .nola-body-strong {
+    font: var(--nola-text-body-strong);
+  }
+  .nola-caption {
+    font: var(--nola-text-caption);
+    color: var(--nola-ui-muted-foreground);
+  }
+  .nola-micro {
+    font: var(--nola-text-micro);
+    color: var(--nola-ui-muted-foreground);
+  }
+  .nola-mono {
+    font: var(--nola-text-mono);
+    /* Re-assert after the shorthand: `font:` resets font-variant-numeric. */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+  /* Every number in the app — timer, duration, row index, file size, byte count,
+   score, ratio — must use tabular figures, or digits jitter as they tick. */
+  .nola-num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+  /* --- CJK letter-spacing guard -----------------------------------------------
+   Negative tracking is tuned for Latin sidebearings. Chinese glyphs already sit
+   edge-to-edge in a full-width em box, so -0.01em closes the gaps between
+   characters and visibly damages the glyph face. Rule: negative letter-spacing
+   is Latin-only; CJK-dominant text uses `normal` at EVERY size. Apply .nola-cjk
+   directly, or rely on the :lang() rules when the DOM carries a lang attribute
+   (the i18n layer is expected to set it). */
+  .nola-cjk,
+:lang(zh),
+:lang(zh-Hans),
+:lang(zh-Hant),
+:lang(ko),
+:lang(ja) {
+    letter-spacing: normal;
+  }
+  /* --- Mixed CJK / Latin spacing ----------------------------------------------
+   `text-autospace` inserts a 1/4 em gap at every CJK <-> Latin boundary, which
+   is what makes "3 个模型" read as two words. Progressive enhancement: browsers
+   without support render with no gap, i.e. today's behaviour. */
+  @supports (text-autospace: normal) {
+    .nola-mix,
+  .nola-body,
+  .nola-caption,
+  .nola-title,
+  .nola-subtitle,
+  .nola-display {
+      text-autospace: normal;
+    }
+    /* Mixed-script text still cannot take negative tracking, same reason. */
+    .nola-mix {
+      letter-spacing: normal;
+    }
+  }
+}
+
+/* ===== 动效 ===== */
+
+@layer base {
+  /* =============================================================================
+   Nola Translator — Motion
+   -----------------------------------------------------------------------------
+   Imported into @layer base.
+   ========================================================================== */
+  :root,
+:host {
+    --dur-micro: 120ms;
+    /* hover / press / colour / focus ring */
+    --dur-enter: 200ms;
+    /* menu, modal, drawer, toast entering */
+    --dur-exit: 120ms;
+    /* exiting */
+    --dur-page: 160ms;
+    /* route change */
+    /* Shared easing for product transitions. */
+    --ease-nola: cubic-bezier(0.32, 0.72, 0, 1);
+    --press-scale: 0.96;
+  }
+  /* ============================ Press feedback ============================== */
+  .nola-press {
+    transition: transform 80ms var(--ease-nola);
+    will-change: transform;
+  }
+  .nola-press:active {
+    transform: scale(var(--press-scale));
+  }
+  .nola-press:disabled,
+.nola-press[aria-disabled="true"] {
+    transform: none;
+    transition: none;
+  }
+  /* ============================ Overlay enter / exit ======================== */
+  /* Menu / popover / tooltip: rises from just above its anchor and grows a hair. */
+  .nola-overlay-enter {
+    animation: nola-overlay-in var(--dur-enter) var(--ease-nola) both;
+  }
+  .nola-overlay-exit {
+    animation: nola-overlay-out var(--dur-exit) var(--ease-nola) both;
+  }
+  @keyframes nola-overlay-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes nola-overlay-out {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+  }
+  /* Dialog: travels further and scales from further out — a modal is a bigger
+   object than a menu, so it earns a larger travel distance. */
+  .nola-modal-enter {
+    animation: nola-modal-in var(--dur-enter) var(--ease-nola) both;
+  }
+  .nola-modal-exit {
+    animation: nola-modal-out var(--dur-exit) var(--ease-nola) both;
+  }
+  @keyframes nola-modal-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes nola-modal-out {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+    }
+  }
+  /* ============================ Route transition ============================ */
+  /* Desktop app: a sliding page reads as a cheap web transition. Fade only. */
+  .nola-page-enter {
+    animation: nola-page-in var(--dur-page) var(--ease-nola) both;
+  }
+  @keyframes nola-page-in {
+    from {
+      opacity: 0.85;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .nola-route-view {
+    min-height: 0;
+    min-width: 0;
+    flex: 1;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  /* ============================ List row insert ============================= */
+  /* Opacity only. The other rows must not move — a reflowing list while the
+   user is reading it is the classic desktop-app jank tell. */
+  .nola-row-enter {
+    animation: nola-row-in var(--dur-enter) var(--ease-nola) both;
+  }
+  @keyframes nola-row-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  /* ============================ Caption insert ============================== */
+  /* One new caption line nudges up 4px. This is the single most-repeated
+   animation in the app, so it stays under 5px and never bounces. */
+  .nola-caption-enter {
+    animation: nola-caption-in var(--dur-enter) var(--ease-nola) both;
+  }
+  @keyframes nola-caption-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  /* ============================ Looping indicators ========================== */
+  /* Exactly two infinite animations are allowed in the whole app, and both are
+   state indicators rather than decoration. Both are pausable. */
+  .nola-tick {
+    animation: nola-tick-breathe 400ms var(--ease-nola) infinite alternate;
+  }
+  @keyframes nola-tick-breathe {
+    from {
+      opacity: 0.85;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .nola-live-dot {
+    animation: nola-live-pulse 1600ms var(--ease-nola) infinite;
+  }
+  @keyframes nola-live-pulse {
+    0%,
+  100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.55;
+      transform: scale(1.15);
+    }
+  }
+  .nola-tick[data-paused="true"],
+.nola-live-dot[data-paused="true"] {
+    animation: none;
+  }
+  .nola-live-dot[data-paused="true"] {
+    opacity: 1;
+    transform: scale(1);
+  }
+  /* ============================ Menu item hover ============================= */
+  /*
+ * One marker per state — hover
+ * and keyboard focus use the background, selection uses background + accent
+ * text + the selection checkmark.
+ *
+ * Selection uses `[data-selected]`; Base UI menu items also expose
+ * `[data-highlighted]` for pointer and keyboard navigation.
+ */
+  .nola-menu-item {
+    background-color: transparent;
+    transition: background-color var(--dur-micro) var(--ease-nola);
+  }
+  .nola-menu-item:hover,
+.nola-menu-item[data-hovered="true"],
+.nola-menu-item[data-highlighted="true"],
+.nola-menu-item:focus-visible,
+.nola-menu-item[data-focus-visible="true"] {
+    background-color: var(--surface-tertiary);
+  }
+  /* Selection: background to accent-soft, text to accent (DESIGN §8). */
+  .nola-menu-item[data-selected="true"] {
+    background-color: var(--accent-soft);
+    color: var(--primary);
+  }
+  /* =============================================================================
+   REDUCED MOTION — two independent channels, BOTH required:
+     1. @media (prefers-reduced-motion: reduce)  — the OS setting
+     2. html[data-reduce-motion='true']          — the in-app toggle
+   An in-app preference must work even when the OS says nothing, and vice versa.
+   Durations collapse to 0.01ms rather than 0s: a zero-duration transition can
+   skip its end callback, which would strand exit animations in their start
+   state and leave overlays stuck on screen.
+   ============================================================================= */
+  @media (prefers-reduced-motion: reduce) {
+    :root,
+  :host {
+      --dur-micro: 0.01ms;
+      --dur-enter: 0.01ms;
+      --dur-exit: 0.01ms;
+      --dur-page: 0.01ms;
+    }
+    .nola-tick,
+  .nola-live-dot {
+      animation: none;
+    }
+    .nola-live-dot {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  html[data-reduce-motion="true"],
+:host([data-reduce-motion="true"]) {
+    --dur-micro: 0.01ms;
+    --dur-enter: 0.01ms;
+    --dur-exit: 0.01ms;
+    --dur-page: 0.01ms;
+  }
+  html[data-reduce-motion="true"] .nola-tick,
+html[data-reduce-motion="true"] .nola-live-dot {
+    animation: none;
+  }
+  html[data-reduce-motion="true"] .nola-live-dot {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ===== 悬浮字幕及其预览 ===== */
+
+/*
+ * The overlay document must have NO root background.
+ *
+ * The caption window is a physically transparent window: only a page that
+ * paints nothing leaves the corners genuinely empty. `src/renderer/index.css`
+ * gives `body` `background: var(--background)` — the main window's opaque theme
+ * colour — and the overlay loads the same `index.html`, so that fill covers the
+ * whole window rectangle. The card has 16px rounded corners and the window
+ * rectangle is square, so the four triangles between them leak the body's
+ * colour and the overlay reads as a square plate behind a round card.
+ *
+ * Only `body` needs clearing; `html` already measures transparent. The scope is
+ * `html.is-overlay` because the main window does want a themed background and
+ * the two must not affect each other. `theme-boot.js` sets that class when
+ * `?overlay=1`, before `<body>` is parsed.
+ */
+
+html.is-overlay body {
+  background: transparent;
+}
+
+.nola-caption-menu-trigger {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+/* The invisible anchor occupies the same screen rectangle as the original pill. */
+
+.nola-overlay-menu-surface .nola-caption-menu-trigger {
+  position: absolute;
+  left: var(--nola-menu-trigger-x);
+  top: var(--space-2);
+  width: var(--nola-menu-trigger-width);
+  height: var(--nola-menu-trigger-height);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nola-overlay-menu-surface[data-placement="top"] .nola-caption-menu-trigger {
+  top: auto;
+  bottom: var(--space-2);
+}
+
+.nola-overlay-menu-surface .nola-caption-menu-trigger > button {
+  width: 100%;
+  height: 100%;
+}
+
+.nola-overlay-menu-surface .nola-caption-controls {
+  position: static;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.nola-overlay-menu-surface .nola-caption-mic {
+  display: none;
+}
+
+.nola-overlay-confirm-surface {
+  -webkit-app-region: no-drag;
+  /* The positioned popup must paint above Base UI's fixed pointer-dismissal layer. */
+  position: fixed;
+  inset: 0;
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  place-items: center;
+  outline: none;
+}
+
+.nola-overlay-confirm-surface .nola-confirm-dialog button {
+  -webkit-app-region: no-drag;
+}
+
+/* Pointer input belongs to the caption document; a new menu document otherwise treats auto-focus as keyboard input. */
+
+html[data-overlay-menu-input="pointer"] .nola-caption-menu .nola-menu-item {
+  outline: none;
+  box-shadow: none;
+}
+
+.nola-overlay-window {
+  box-sizing: border-box;
+  /*
+   * 6px inset on every side, so the rounded corners stop short of the window
+   * edge. With the card at 100% the corner's 1px antialiased edge lands exactly
+   * on the window boundary and DWM cuts it, and the box-shadow falls entirely
+   * outside the window and is clipped away. The inset also gives the shadow
+   * somewhere to land instead of leaking back over the corners.
+   *
+   * `src/main/windows.ts` mirrors this value as `OVERLAY_CARD_INSET` and adds
+   * it to the minimum height, because `minHeight` pins the window rectangle
+   * while the card only gets the content box. The window itself does not
+   * shrink, so every track still gets its first line at the new minimum.
+   *
+   * The same 6px also caps the shadow's blur radius — see the card rule below.
+   */
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  /* Nothing sets `--nola-card-anchor` today, so the card is pinned to the top. */
+  justify-content: var(--nola-card-anchor, flex-start);
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+/*
+ * The shadow is a fixed rgba(0,0,0,.45) rather than currentColor: a glass card
+ * sits on arbitrary content, and tinting the shadow with the theme colour
+ * leaves a dirty edge on a light desktop. Its job is to lift the card off the
+ * background, not to colour it.
+ *
+ * The blur radius is bounded by the 6px inset above rather than chosen freely: a
+ * large blur either falls outside the window and is clipped away, or leaks back
+ * through the inset and dirties the corners, so the whole shadow has to fit
+ * inside 6px — here 1px offset + 3px blur.
+ */
+
+.nola-caption-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--overlay-background-color) var(--overlay-background-alpha), transparent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  color: #f5f5f5;
+  /*
+   * The unconfirmed tail of a translation is muted against the overlay's own
+   * palette. The app theme's `--muted` follows the workspace's light/dark
+   * setting, which this window does not follow, so on a light card it would
+   * leave the tail lighter than the text around it.
+   */
+  --muted: color-mix(in oklab, var(--overlay-translation-color, #eceff4) 62%, transparent);
+}
+
+/* Unlocked is the drag region; locking is exactly "let me not move this". */
+
+.nola-caption-card[data-locked="false"] {
+  -webkit-app-region: drag;
+}
+
+.nola-caption-card[data-locked="false"],
+.nola-caption-card[data-locked="false"] * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* A locked caption window can select text; selection moves the native region out of drag mode. */
+
+.nola-caption-card[data-text-selected="true"] {
+  -webkit-app-region: no-drag;
+}
+
+/* A confirmation must be clickable across the whole window, including unlocked drag regions. */
+
+.nola-caption-card[data-confirm-open="true"] {
+  -webkit-app-region: no-drag;
+}
+
+/* Zero background opacity means bare text over someone else's video: drop the fill and the shadow, and let a text outline carry legibility. */
+
+.nola-caption-card[data-transparent="true"] {
+  background: transparent;
+  box-shadow: none;
+}
+
+.nola-caption-card[data-transparent="true"] .nola-caption-entry {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Caption stage ─────────────────────────────────────────────────────── */
+
+/* Controls float above the captions, so the stage reserves no text space for them. */
+
+.nola-caption-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 0;
+  padding: 8px 22px;
+  overflow: hidden;
+}
+
+/* Opacity-aware, tinted gradients keep toolbar buttons distinct over busy captions. */
+
+.nola-caption-scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: var(--z-caption-scrim);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.nola-caption-scrim[data-edge="top"] {
+  top: 0;
+  height: max(60px, 25%);
+  background: linear-gradient(to bottom, var(--overlay-scrim-color), transparent);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+
+.nola-caption-scrim[data-edge="bottom"] {
+  bottom: 0;
+  height: max(60px, 25%);
+  background: linear-gradient(to top, var(--overlay-scrim-color), transparent);
+  border-bottom-right-radius: inherit;
+  border-bottom-left-radius: inherit;
+}
+
+.nola-caption-card[data-hover="true"] .nola-caption-scrim,
+.nola-caption-card:hover .nola-caption-scrim {
+  opacity: 1;
+}
+
+.nola-caption-card[data-locked="true"] .nola-caption-scrim[data-edge="bottom"] {
+  opacity: 0;
+}
+
+.nola-caption-track {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Tracks split the available height evenly; font size and line height set the typography, not the share. */
+
+.nola-caption-track[data-kind="source"] {
+  color: var(--overlay-source-color, #f7f7f7);
+  font-size: var(--overlay-font-size, 17px);
+  font-weight: var(--overlay-font-weight, 500);
+  line-height: var(--overlay-line-height, 1.3);
+}
+
+.nola-caption-track[data-kind="translation"] {
+  color: var(--overlay-translation-color, #eceff4);
+  font-size: var(--overlay-translation-font-size, 16px);
+  font-weight: var(--overlay-translation-font-weight, 400);
+  line-height: var(--overlay-translation-line-height, 1.35);
+}
+
+.nola-caption-translations {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/*
+ * One unbroken text stream that fills the track from the top and then scrolls
+ * upward as sentences are appended. A one-line track slides each revision out;
+ * a taller one drops lines off the top.
+ */
+
+.nola-caption-track-flow {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Keep transcript hit-testing available inside the otherwise draggable card. */
+
+.nola-caption-track:not(.pointer-events-none) .nola-caption-entry,
+.nola-caption-track-sentence {
+  -webkit-app-region: no-drag;
+}
+
+/* Caption text remains part of the draggable surface until the window is locked. */
+
+.nola-caption-card[data-locked="false"] .nola-caption-track:not(.pointer-events-none) .nola-caption-entry,
+.nola-caption-card[data-locked="false"] .nola-caption-track-sentence,
+.nola-caption-card[data-locked="false"] .nola-caption-segment {
+  -webkit-app-region: drag;
+}
+
+.nola-caption-track-content {
+  transition: transform 320ms cubic-bezier(0.22, 0.7, 0.2, 1);
+  will-change: transform;
+}
+
+/* Each sentence stays its own node so the text wraps and scrolls as one block. */
+
+.nola-caption-segment {
+  display: inline;
+  -webkit-app-region: no-drag;
+}
+
+/*
+ * Sentence mode: each entry is its own block, so overflow is clipped vertically
+ * rather than faded as it is in rolling mode. Height is left to the content and
+ * only capped at the track.
+ */
+
+.nola-caption-track-sentence {
+  height: auto;
+  max-height: 100%;
+  overflow: hidden auto;
+  scrollbar-width: none;
+}
+
+/* Both bilingual tracks scroll to the newest sentence in code, so their browser scrollbars add no useful control. */
+
+.nola-caption-track-sentence::-webkit-scrollbar {
+  display: none;
+}
+
+.nola-caption-track-sentence .nola-caption-track-content {
+  transform: none !important;
+}
+
+/*
+ * `color: inherit` and `line-height: inherit` are required: the global `p` rule
+ * pins every paragraph to the muted text colour and 1.55 leading, which would
+ * make the track colour and the `1lh` used by the height split disagree.
+ */
+
+.nola-caption-entry {
+  margin: 0;
+  color: inherit;
+  line-height: inherit;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+/*
+ * Source sentences enter as blocks. Translation revisions animate their changed
+ * spans independently, keeping already displayed text at its settled opacity.
+ */
+
+.nola-caption-track-sentence .nola-caption-entry {
+  margin-bottom: 6px;
+  animation: nola-caption-entry-in 220ms cubic-bezier(0.22, 0.7, 0.2, 1) both;
+}
+
+.nola-caption-track[data-kind="translation"] .nola-caption-track-sentence .nola-caption-entry {
+  animation: none;
+}
+
+.nola-caption-change[data-entering="true"] {
+  animation: nola-caption-change-in var(--dur-enter) var(--ease-nola) both;
+}
+
+@keyframes nola-caption-change-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes nola-caption-entry-in {
+  from {
+    opacity: 0;
+    transform: translateY(28%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * Reduced motion goes through both channels (`@media` plus an `html`
+ * attribute), matching the convention in motion.css. The duration is `0.01ms`
+ * rather than `0s`: a zero-length transition skips its end callback, which
+ * wedges the overlay.
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  .nola-caption-track-content {
+    transition-duration: 0.01ms;
+  }
+  .nola-caption-track-sentence .nola-caption-entry {
+    animation: none;
+  }
+}
+
+html[data-reduce-motion="true"] .nola-caption-track-content {
+  transition-duration: 0.01ms;
+}
+
+html[data-reduce-motion="true"] .nola-caption-track-sentence .nola-caption-entry {
+  animation: none;
+}
+
+/*
+ * Fully hidden at rest, with `pointer-events: none` so the pointer cannot land
+ * on an invisible button. On hover it fades in and settles from 4px above —
+ * it was always there, just concealed.
+ */
+
+.nola-caption-card .nola-caption-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: var(--z-caption-actions);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+/*
+ * Pointer hover reaches this row through CSS and the raw-coordinate state from
+ * `OverlayRoot`. Keyboard focus also reveals it, but only in keyboard modality:
+ * a mouse press leaves DOM focus on a pill after the pointer has gone, and plain
+ * `:focus-within` would strand the whole chrome on screen.
+ */
+
+.nola-caption-card[data-hover="true"] .nola-caption-actions,
+.nola-caption-card:hover .nola-caption-actions,
+.nola-caption-card:has(:focus-visible) .nola-caption-actions,
+.nola-caption-card:has([data-focus-visible="true"]) .nola-caption-actions {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/*
+ * Translucent white fill rather than solid: it reads as a thin haze over dark
+ * glass and as frost over light glass — a button in both cases, not a hole.
+ */
+
+.nola-caption-card .nola-caption-action {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nola-caption-card .nola-caption-action:hover,
+.nola-caption-card .nola-caption-action:focus-visible {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.nola-caption-card .nola-caption-action > svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* An active action (pin / lock / position) is marked with a bright blue rather than a fill, because the fill already means "clickable". */
+
+.nola-caption-card .nola-caption-action[data-active="true"] {
+  color: #7fb0ff;
+}
+
+/* A 1px rule between rows of identical round buttons, so "these are two different things" reads at a glance. */
+
+.nola-caption-card .nola-caption-divider {
+  width: 1px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 0 2px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* The microphone uses a visible filled control that inverts while recording. */
+
+.nola-caption-card .nola-caption-mic {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0;
+  margin-right: 14px;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nola-caption-card .nola-caption-mic:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/*
+ * A sibling of `.nola-caption-controls`, not a child: the control bar is
+ * opacity:0 until hover, and a failure is reported exactly when the pointer has
+ * just moved away, so nesting it there would hide the very message it exists to
+ * show. `bottom: 40px` clears the control bar's 10–36px.
+ *
+ * The colours are hard-coded rather than drawn from the overlay palette: this
+ * chip sits on someone else's video, where no theme value guarantees a legible
+ * line of small text.
+ */
+
+.nola-caption-card .nola-caption-notice {
+  position: absolute;
+  right: 10px;
+  bottom: 40px;
+  left: 10px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.nola-caption-card .nola-caption-notice__text {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+/*
+ * Loading shows a spinner, not the recording fill: the inverted fill already
+ * means "the mic is live", and two states must not share one visual.
+ */
+
+.nola-caption-card .nola-caption-mic[data-loading="true"] {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.nola-caption-card .nola-caption-mic[data-loading="true"] > svg {
+  width: 15px;
+  height: 15px;
+}
+
+.nola-caption-card .nola-caption-mic[data-active="true"] {
+  background: #fff;
+  color: #17181a;
+}
+
+.nola-caption-card .nola-caption-mic:disabled,
+.nola-caption-card .nola-caption-mic[data-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.nola-caption-card .nola-caption-mic > svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Text and icon actions share the same large corner radius. */
+
+/* ── Control bar pill ──────────────────────────────────────────────────── */
+
+/*
+ * The language list is longer than the caption window, so it scrolls — the Menu
+ * carries `maxHeight` and `.nola-caption-menu-list` is the element that acts on
+ * it. A hairline thumb is what communicates that: with the scrollbar hidden, a
+ * clipped list reads as a complete one, and the languages below the fold are
+ * reachable only by someone who already suspects the wheel works.
+ */
+
+.nola-caption-menu {
+  /* The popover overlaps an unlocked card's drag region, so it must opt out
+     before Chromium can deliver its presses and wheel events to the menu. */
+  -webkit-app-region: no-drag;
+  min-width: 168px;
+  max-width: 260px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--overlay);
+  color: var(--overlay-foreground);
+  box-shadow: var(--overlay-shadow);
+  outline: none;
+}
+
+.nola-caption-menu-list {
+  -webkit-app-region: no-drag;
+  /* Base UI focuses the list itself; item highlights carry keyboard navigation. */
+  outline: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.26) transparent;
+  padding: calc(var(--space-1) / 2);
+  border-radius: var(--radius-lg);
+}
+
+/* Match the settings Select's row height and label spacing. */
+
+.nola-caption-menu .nola-menu-item {
+  width: 100%;
+  min-height: var(--field-control-height);
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  font: var(--font-body);
+}
+
+.nola-caption-menu-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nola-caption-menu-list::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.nola-caption-menu-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/*
+ * Drawn here rather than with `AlertDialog`, whose backdrop is
+ * `position: fixed; inset: 0`: on a short transparent window that covers the
+ * whole viewport and buries the Close button. Absolutely positioning this layer
+ * inside the card covers only the card, so the dialog stays clickable and the
+ * glass still shows through around it.
+ *
+ * The colours are hard-coded rather than themed, for the same reason as the other
+ * controls here: over dark glass a theme variable would resolve to "light theme,
+ * dark glass, black text on white".
+ */
+
+.nola-confirm-layer {
+  -webkit-app-region: no-drag;
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: grid;
+  place-items: center;
+  /* A translucent white haze: it settles the captions below so the confirmation
+     reads, without turning the whole glass into an opaque block. */
+  background: rgb(9 10 12 / 0.72);
+  border-radius: 16px;
+}
+
+.nola-confirm-layer button {
+  -webkit-app-region: no-drag;
+}
+
+.nola-confirm-dialog {
+  display: flex;
+  width: min(300px, calc(100% - 32px));
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-xl);
+  background: #17181a;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.5);
+}
+
+.nola-confirm-title {
+  font: var(--font-title);
+  color: #f5f5f5;
+}
+
+.nola-confirm-text {
+  font: var(--font-body);
+  color: #b9bfc9;
+}
+
+.nola-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.nola-confirm-actions .button {
+  height: var(--field-control-height);
+  min-height: var(--field-control-height);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-xl);
+  font: var(--font-body-strong);
+}
+
+.nola-caption-card .nola-caption-pill {
+  display: inline-flex;
+  height: 26px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.13);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+  transition: background-color 140ms ease;
+}
+
+.nola-caption-card .nola-caption-pill:hover,
+.nola-caption-card .nola-caption-pill[data-hovered="true"] {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.nola-caption-card .nola-caption-pill > svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Inset matches the action row, so both rows sit the same distance from the card edge. */
+
+.nola-caption-controls {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: var(--z-caption-actions);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 26px;
+  -webkit-app-region: no-drag;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.nola-caption-controls-row {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.nola-caption-card .nola-caption-controls-row > .nola-caption-mic {
+  flex: 0 0 auto;
+}
+
+.nola-caption-card .nola-caption-controls-row > .nola-caption-menu-trigger[data-overflow-hidden] {
+  position: absolute;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Toolbar labels are controls, not transcript text that should join a drag selection. */
+
+.nola-caption-card .nola-caption-actions,
+.nola-caption-card .nola-caption-controls {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.nola-caption-card[data-hover="true"] .nola-caption-controls,
+.nola-caption-card:hover .nola-caption-controls,
+.nola-caption-card:has(:focus-visible) .nola-caption-controls,
+.nola-caption-card:has([data-focus-visible="true"]) .nola-caption-controls {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.nola-caption-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  width: min(760px, 94%);
+  min-height: 152px;
+  padding: 8px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  text-align: left;
+  background: color-mix(in srgb, var(--preview-background-color, #0d0e10) var(--preview-background-alpha, 96%), transparent);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.nola-caption-preview[data-transparent-background="true"] {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/*
+ * Mirrors the card's `.nola-caption-stage`, including its `gap`: the two tracks
+ * split the text area evenly and each starts at the top of its own half, so the
+ * translation lands near the vertical centre instead of running on directly under
+ * the source.
+ */
+
+.nola-caption-preview__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.nola-caption-preview__scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: var(--z-caption-scrim);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.nola-caption-preview:hover .nola-caption-preview__scrim {
+  opacity: 1;
+}
+
+.nola-caption-preview__scrim[data-edge="top"] {
+  top: 0;
+  height: max(60px, 25%);
+  background: linear-gradient(to bottom, var(--preview-scrim-color, #45484f), transparent);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+
+.nola-caption-preview__scrim[data-edge="bottom"] {
+  bottom: 0;
+  height: max(60px, 25%);
+  background: linear-gradient(to top, var(--preview-scrim-color, #45484f), transparent);
+  border-bottom-right-radius: inherit;
+  border-bottom-left-radius: inherit;
+}
+
+/*
+ * Both rows reveal on hover exactly as the real card's
+ * `.nola-caption-actions` / `.nola-caption-controls` do, so the preview shows
+ * the resting state a live window actually has: captions alone on the glass.
+ * The preview is neither a drag region nor focusable, so plain `:hover` is the
+ * whole trigger — no pointer hit-testing is needed here.
+ */
+
+.nola-caption-preview__actions {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: var(--z-caption-actions);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #c7c9cd;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.nola-caption-preview:hover .nola-caption-preview__actions {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.nola-caption-preview__actions svg {
+  width: 20px;
+  height: 20px;
+  padding: 3px;
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.nola-caption-preview__actions i {
+  height: 15px;
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.nola-caption-preview__controls {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: var(--z-caption-actions);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 22px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.nola-caption-preview:hover .nola-caption-preview__controls {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.nola-caption-preview__mic,
+.nola-caption-preview__pill {
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.nola-caption-preview__mic {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 8px;
+}
+
+.nola-caption-preview__mic svg {
+  width: 12px;
+  height: 12px;
+}
+
+.nola-caption-preview__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 9px;
+}
+
+.nola-caption-preview__pill svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Even share of the text area, matching `.nola-caption-track` and
+   `.nola-caption-translations`; font size and line height set the typography,
+   not the share. `flex-basis: 0` also covers the single-language case, where the
+   one rendered track fills the whole area as it does on the real stage. The gap
+   belongs to the parent, so neither rule below keeps a `margin-bottom`. */
+
+.nola-caption-preview__source,
+.nola-caption-preview__translation {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  text-wrap: wrap;
+}
+
+.nola-caption-preview__source {
+  color: var(--preview-source-color, #f7f7f7);
+  font-size: var(--preview-font-size, 17px);
+  font-weight: var(--preview-font-weight, 500);
+  line-height: var(--preview-line-height, 1.3);
+}
+
+.nola-caption-preview__translation {
+  color: var(--preview-translation-color, #eceff4);
+  font-size: var(--preview-translation-font-size, 16px);
+  font-weight: var(--preview-translation-font-weight, 400);
+  line-height: var(--preview-translation-line-height, 1.35);
+}
+
+/* The card treats a light scheme by flipping the control fills, so the preview
+   needs the same set. */
+
+.nola-caption-preview[data-color-scheme="light"] .nola-caption-preview__mic,
+.nola-caption-preview[data-color-scheme="light"] .nola-caption-preview__pill {
+  color: #33363b;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.nola-caption-preview[data-color-scheme="light"] .nola-caption-preview__actions {
+  color: #4a5160;
+}
+
+.nola-caption-preview[data-color-scheme="light"] .nola-caption-preview__actions svg {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.nola-caption-card[data-scheme="light"] {
+  color: #26282b;
+}
+
+/*
+ * Hairline edge plus a *heavier* shadow. A small shadow lifts a dark card off the
+ * picture on its own; on a light desktop it is the 1px `rgba(0,0,0,.08)` hairline
+ * that separates the edge from the background, and the shadow only adds lift.
+ * `:not([data-transparent='true'])` is load-bearing: with the fill at zero a
+ * hairline and a shadow would draw an outline around nothing.
+ *
+ * The blur is bounded by the 6px inset above, exactly as on the dark scheme — a
+ * larger one either gets clipped by the window or leaks back through the inset
+ * and dirties the corners. 5px is heavier than the dark scheme's 3px, keeping the
+ * "light reads heavier" intent, and 1px offset + 5px blur exactly fills the inset.
+ */
+
+.nola-caption-card[data-scheme="light"]:not([data-transparent="true"]) {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+}
+
+/*
+ * The control fill flips with the glass: translucent white on dark, translucent
+ * black on light, where white-on-white would disappear entirely.
+ */
+
+.nola-caption-card[data-scheme="light"] .nola-caption-action,
+.nola-caption-card[data-scheme="light"] .nola-caption-pill,
+.nola-caption-card[data-scheme="light"] .nola-caption-mic {
+  color: #33363b;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.nola-caption-card[data-scheme="light"] .nola-caption-action:hover,
+.nola-caption-card[data-scheme="light"] .nola-caption-pill:hover,
+.nola-caption-card[data-scheme="light"] .nola-caption-mic:hover {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.nola-caption-card[data-scheme="light"] .nola-caption-mic[data-active="true"] {
+  color: #fff;
+  background: #1b1b1b;
+}
+
+/* The same hue as the dark scheme's active blue, one step darker: the dark
+   scheme's value does not hold its contrast on light glass. */
+
+.nola-caption-card[data-scheme="light"] .nola-caption-action[data-active="true"] {
+  color: #1d5fa8;
+}
+
+@layer components {
+  .nola-overlay-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    container-type: inline-size;
+  }
+  .nola-overlay-page > .card:not(.nola-settings-card) {
+    --card-spacing: calc(var(--space-2) + var(--space-1) / 2);
+    gap: var(--space-1);
+  }
+  .nola-overlay-preview {
+    min-width: 0;
+  }
+  .nola-overlay-stage {
+    min-height: 260px;
+    display: grid;
+    place-items: end center;
+    margin-inline: var(--card-spacing);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, color-mix(in oklch, var(--accent) 13%, transparent), transparent 58%), var(--surface-secondary);
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 800px) {
+  .nola-overlay-stage {
+    min-height: 280px;
+    padding: 20px 16px;
+  }
+}
+
+@media (max-height: 700px) {
+  .nola-overlay-stage {
+    min-height: 240px;
+    padding: 16px;
+  }
+}
+
+/* ===== 层级 ===== */
+
+@layer utilities {
+  /* =============================================================================
+   Nola Translator — Z-index ladder
+   -----------------------------------------------------------------------------
+   Imported from ./index.css with `layer(utilities)`, Tailwind's highest layer,
+   so these classes win over component defaults. The explicit @layer utilities
+   below keeps the file safe to import standalone.
+   ========================================================================== */
+  :root,
+:host {
+    --z-base: 0;
+    /* normal content flow */
+    --z-sticky: 20;
+    /* sticky toolbars, record table headers */
+    --z-caption-scrim: 10;
+    /* overlay card's top/bottom fade scrims */
+    --z-caption-actions: 30;
+    /* overlay card's hover action + control rows */
+    --z-dropdown: 40;
+    /* Dropdown / Select / Popover / Combobox */
+    --z-overlay: 60;
+    /* Modal / AlertDialog / Drawer */
+    --z-popup: 65;
+    /* Portalled field popups must remain above their parent dialog. */
+    --z-onboarding: 70;
+    /* Interactive lessons must remain above the real modal they explain. */
+    --z-toast: 80;
+    /* Toast */
+    --z-titlebar-drag: 100;
+    /* Electron titlebar drag region */
+  }
+  @layer utilities {
+    .z-base {
+      z-index: var(--z-base);
+    }
+    .z-sticky {
+      z-index: var(--z-sticky);
+    }
+    /*
+   * The overlay window is its own top-level document, so its dropdowns portal at
+   * the window root and still need a rung above the caption card.
+   */
+    .z-caption-scrim {
+      z-index: var(--z-caption-scrim);
+    }
+    .z-caption-actions {
+      z-index: var(--z-caption-actions);
+    }
+    .z-dropdown {
+      z-index: var(--z-dropdown);
+    }
+    .z-overlay {
+      z-index: var(--z-overlay);
+    }
+    .z-popup {
+      z-index: var(--z-popup);
+    }
+    .z-onboarding {
+      z-index: var(--z-onboarding);
+    }
+    .z-toast {
+      z-index: var(--z-toast);
+    }
+    .z-titlebar-drag {
+      z-index: var(--z-titlebar-drag);
+    }
+  }
+}
+
+/* ===== 扩展界面尺寸 ===== */
+
+@layer base {
+  :root,
+  :host {
+    --browser-panel-width: 288px;
+    --browser-caption-line-height: 1.4;
+    --browser-caption-background-mix: 78%;
+    /* Neutral black on purpose: the theme's own dark surface tokens carry a cool blue cast that
+       reads as tinted once it is composited over a video frame. */
+    --browser-caption-fill: oklch(0% 0 0);
+    --browser-field-border-width: 1px;
+  }
+}
+
+/* ===== 公共变量与工具类 ===== */
+
+/* =============================================================================
+   GLOBAL NON-COLOUR TOKENS — shared by both themes.
+   Anything that differs between light and dark lives in nola-light/nola-dark.
+   ========================================================================== */
+
+@layer base {
+  :root,
+  :host {
+    --nola-rem: 1rem;
+    --selection-neutral: color-mix(in oklch, var(--surface) 90%, var(--foreground));
+    /* --- Spacing scale -------------------------------------------------------
+       Per DESIGN.MD spacing and geometry. 8 steps on an 8px base. */
+    --space-1: 8px;
+    --space-2: 16px;
+    --space-3: 24px;
+    --space-4: 32px;
+    --space-5: 40px;
+    --field-control-height: var(--space-5);
+    --space-6: 48px;
+    --space-7: 64px;
+    --space-8: 80px;
+    /* --- Radius scale --------------------------------------------------------
+       Per DESIGN.MD spacing and geometry. */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 24px;
+    --radius-full: 9999px;
+    --radius: var(--radius-md);
+    --field-radius: var(--radius-md);
+    --surface-foreground: var(--foreground);
+    --surface-secondary-foreground: var(--foreground);
+    --surface-tertiary-foreground: var(--foreground);
+    --shadow-surface: var(--surface-shadow);
+    --accent-soft: color-mix(in oklab, var(--accent) 15%, transparent);
+    --success-soft: color-mix(in oklab, var(--success) 15%, transparent);
+    --warning-soft: color-mix(in oklab, var(--warning) 15%, transparent);
+    --danger-soft: color-mix(in oklab, var(--danger) 15%, transparent);
+    --success-soft-foreground: color-mix(in oklab, var(--success) 80%, var(--foreground) 60%);
+    /* --- Shadow scale --------------------------------------------------------
+       Per DESIGN.MD spacing and geometry. Light mode is based on slate-900 (15, 23, 42). */
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -1px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
+    /* Product geometry stays independent of the component library. */
+    /* Legacy spacing names, kept as aliases of the scale above. */
+    --nola-space-1: var(--space-1);
+    --nola-space-2: var(--space-2);
+    --nola-space-3: var(--space-3);
+    --nola-space-4: var(--space-4);
+    --nola-space-5: var(--space-5);
+    --nola-space-6: var(--space-6);
+    --nola-space-7: var(--space-7);
+    --nola-space-8: var(--space-8);
+    /* Legacy radius aliases used by product surfaces. */
+    --nola-r-sm: var(--radius-sm);
+    --nola-r-md: var(--radius-md);
+    --nola-r-lg: var(--radius-xl);
+    --nola-r-pill: var(--radius-full);
+  }
+  /* Dark mode halves the shadow alpha and keeps the geometry. */
+  .dark,
+  [data-theme="dark"],
+  :host([data-theme="dark"]) {
+    --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+    --success-soft: color-mix(in oklab, var(--success) 12%, transparent);
+    --warning-soft: color-mix(in oklab, var(--warning) 12%, transparent);
+    --danger-soft: color-mix(in oklab, var(--danger) 12%, transparent);
+    --success-soft-foreground: color-mix(in oklab, var(--success) 80%, var(--foreground) 30%);
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.025);
+    --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
+    --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.05), 0 4px 6px -2px rgba(15, 23, 42, 0.025);
+  }
+}
+
+/* =============================================================================
+   SEMANTIC APPLICATION CLASSES
+   @layer components: Tailwind utilities (layer `utilities`) still override
+   every one of these, so components can be nudged with a plain utility class
+   instead of accumulating specificity.
+   ========================================================================== */
+
+@layer components {
+  .nola-card {
+    background-color: var(--surface);
+    color: var(--surface-foreground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--surface-shadow);
+  }
+  .nola-panel {
+    background-color: var(--surface-secondary);
+    color: var(--surface-secondary-foreground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--surface-shadow);
+  }
+  /* One container with hairline dividers between rows. Giving every row its own
+     card means N borders and a wall of boxes instead of a readable set. */
+  .nola-list {
+    background-color: var(--surface);
+    color: var(--surface-foreground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .nola-list > * + * {
+    border-top: 1px solid var(--separator);
+  }
+  /* Fallback for Tailwind's scrollbar-thin: the standard scrollbar-color plus the
+     WebKit pseudo-elements, so Electron honours both paths. */
+  .nola-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 22%, transparent) transparent;
+  }
+  .nola-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .nola-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .nola-scrollbar::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklch, var(--foreground) 22%, transparent);
+    background-clip: content-box;
+    /* Transparent border + content-box clip = a slim thumb with hit area. */
+    border: 3px solid transparent;
+    border-radius: var(--radius-full);
+  }
+  .nola-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--foreground) 34%, transparent);
+  }
+  .nola-drag {
+    -webkit-app-region: drag;
+  }
+  /* An interactive child of a drag region must opt back out, or the drag region
+     swallows it and the control cannot be clicked. */
+  .nola-no-drag {
+    -webkit-app-region: no-drag;
+  }
+  /* Reading measure for transcript lines. 34em at 14px is ~32-42 Han characters
+     per line, the comfortable reading window for CJK; without it a long
+     transcription line runs the full window width. */
+  .nola-measure {
+    max-width: 34em;
+  }
+  /* The two-column transcript (source | translation). Row N of the left column
+     has to line up with row N of the right one across the divider, so both sides
+     are forced onto one identical line box and each row is pinned to a whole
+     multiple of it. */
+  .nola-baseline-pair {
+    --nola-baseline: 23.1px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+  .nola-baseline-pair > * {
+    min-width: 0;
+    line-height: var(--nola-baseline);
+  }
+  .nola-baseline-pair > * + * {
+    border-left: 1px solid var(--separator);
+  }
+  /* A paired row: exactly two line boxes tall, so the divider never lands
+     mid-line on either side. */
+  .nola-baseline-row {
+    min-height: calc(var(--nola-baseline) * 2);
+  }
+}
+
+@layer utilities {
+  .dropdown__trigger {
+    display: inline-flex;
+  }
+  .select__value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+*, *::before, *::after {
+  scrollbar-width: none !important;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* ===== 产品主题 ===== */
+
+:root,
+:host {
+  color-scheme: light;
+  --background: oklch(0.9700 0.0029 264.5420);
+  --foreground: oklch(0.1801 0.0191 255.7673);
+  --card: oklch(1.0000 0 0);
+  --card-foreground: oklch(0.1801 0.0191 255.7673);
+  --popover: oklch(1.0000 0 0);
+  --popover-foreground: oklch(0.1801 0.0191 255.7673);
+  --primary: oklch(0.6007 0.1903 257.9419);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.9394 0.0046 258.3251);
+  --secondary-foreground: oklch(0.2786 0.0211 257.2774);
+  --muted: oklch(0.9504 0.0042 236.4983);
+  --muted-foreground: oklch(0.4789 0.0204 256.3497);
+  --accent: oklch(0.9209 0.0294 257.7666);
+  --accent-foreground: oklch(0.3232 0.1376 260.7577);
+  --destructive: oklch(0.6207 0.2203 24.8903);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.8994 0.0064 255.4779);
+  --input: oklch(0.9205 0.0052 247.8807);
+  --ring: oklch(0.6007 0.1903 257.9419);
+  --chart-1: oklch(0.6007 0.1903 257.9419);
+  --chart-2: oklch(0.6369 0.1247 171.0112);
+  --chart-3: oklch(0.5495 0.2003 300.1164);
+  --chart-4: oklch(0.6806 0.1901 45.0513);
+  --chart-5: oklch(0.6198 0.2297 5.1656);
+  --sidebar: oklch(0.9504 0.0042 236.4983);
+  --sidebar-foreground: oklch(0.1801 0.0191 255.7673);
+  --sidebar-primary: oklch(0.6007 0.1903 257.9419);
+  --sidebar-primary-foreground: oklch(1.0000 0 0);
+  --sidebar-accent: oklch(0.9209 0.0294 257.7666);
+  --sidebar-accent-foreground: oklch(0.3232 0.1376 260.7577);
+  --sidebar-border: oklch(0.8994 0.0064 255.4779);
+  --sidebar-ring: oklch(0.6007 0.1903 257.9419);
+  --radius: calc(var(--nola-rem) * 0.875);
+  --shadow-2xs: 0 2px 28px 0 hsl(214.7368 10.8571% 34.3137% / 0.05);
+  --shadow-xs: 0 2px 28px 0 hsl(214.7368 10.8571% 34.3137% / 0.05);
+  --shadow-sm: 0 2px 28px 0 hsl(214.7368 10.8571% 34.3137% / 0.10), 0 1px 2px -1px hsl(214.7368 10.8571% 34.3137% / 0.10);
+  --shadow: 0 2px 28px 0 hsl(214.7368 10.8571% 34.3137% / 0.10), 0 1px 2px -1px hsl(214.7368 10.8571% 34.3137% / 0.10);
+  --shadow-md: 0 2px 28px 0 hsl(214.7368 10.8571% 34.3137% / 0.10), 0 2px 4px -1px hsl(214.7368 10.8571% 34.3137% / 0.10);
+  --shadow-lg: 0 2px 28px 0 hsl(214.7368 10.8571% 34.3137% / 0.10), 0 4px 6px -1px hsl(214.7368 10.8571% 34.3137% / 0.10);
+  --shadow-xl: 0 2px 28px 0 hsl(214.7368 10.8571% 34.3137% / 0.10), 0 8px 10px -1px hsl(214.7368 10.8571% 34.3137% / 0.10);
+  --shadow-2xl: 0 2px 28px 0 hsl(214.7368 10.8571% 34.3137% / 0.25);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --window: var(--muted);
+  --surface: var(--card);
+  --surface-secondary: var(--window);
+  --surface-tertiary: var(--secondary);
+  --default: var(--window);
+  --separator: var(--border);
+  --surface-foreground: var(--card-foreground);
+  --surface-secondary-foreground: var(--foreground);
+  --surface-tertiary-foreground: var(--secondary-foreground);
+  --field-background: var(--card);
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted-foreground);
+  --field-border: var(--input);
+  --field-border-focus: var(--ring);
+  --field-radius: var(--radius-md);
+  --field-shadow: var(--shadow-2xs);
+  --focus: var(--ring);
+  --link: var(--primary);
+  --selection-neutral: var(--muted);
+  --accent-soft: var(--accent);
+  --color-accent-soft: var(--accent);
+  --segment: var(--card);
+  --segment-foreground: var(--foreground);
+  --backdrop: color-mix(in srgb, var(--foreground) 40%, transparent);
+  --background-inverse: var(--foreground);
+  --primary-hover: color-mix(in srgb, var(--primary) 88%, var(--foreground));
+  --primary-active: color-mix(in srgb, var(--primary) 78%, var(--foreground));
+  --danger: var(--destructive);
+  --danger-foreground: var(--destructive-foreground);
+  --info: var(--primary);
+  --info-foreground: var(--primary-foreground);
+  --color-blue: var(--chart-1);
+  --color-emerald: var(--chart-2);
+  --color-purple: var(--chart-3);
+  --color-orange: var(--chart-4);
+  --overlay: var(--popover);
+  --overlay-foreground: var(--popover-foreground);
+  --overlay-shadow: var(--shadow-lg);
+  --surface-shadow: var(--shadow-xs);
+  --success: var(--chart-2);
+  --warning: var(--chart-4);
+  --nola-ui-background: var(--background);
+  --nola-ui-foreground: var(--foreground);
+  --nola-ui-card: var(--card);
+  --nola-ui-card-foreground: var(--card-foreground);
+  --nola-ui-primary: var(--primary);
+  --nola-ui-primary-foreground: var(--primary-foreground);
+  --nola-ui-popover: var(--popover);
+  --nola-ui-popover-foreground: var(--popover-foreground);
+  --nola-ui-secondary: var(--secondary);
+  --nola-ui-secondary-foreground: var(--secondary-foreground);
+  --nola-ui-destructive: var(--destructive);
+  --nola-ui-input: var(--input);
+  --nola-ui-field-background: var(--field-background);
+  --nola-ui-info: var(--info);
+  --nola-ui-success: var(--success);
+  --nola-ui-warning: var(--warning);
+  --nola-ui-muted: var(--muted);
+  --nola-ui-muted-foreground: var(--muted-foreground);
+  --nola-ui-accent: var(--accent);
+  --nola-ui-accent-foreground: var(--accent-foreground);
+  --nola-ui-border: var(--border);
+  --nola-ui-ring: var(--ring);
+  --nola-ui-radius-sm: var(--radius-sm);
+  --nola-ui-radius-xl: var(--radius-xl);
+  --nola-ui-radius-md: var(--radius-md);
+  --nola-ui-radius-lg: var(--radius-lg);
+  --font-display: 600 calc(var(--nola-rem) * 2)/1.25 var(--font-ui);
+  --font-h1: var(--font-display);
+  --font-h2: 600 calc(var(--nola-rem) * 1.5)/1.3 var(--font-ui);
+  --font-title: 600 calc(var(--nola-rem) * 1.25)/1.4 var(--font-ui);
+  --font-title-3: 600 calc(var(--nola-rem) * 1.0625)/1.4 var(--font-ui);
+  --font-body: 400 calc(var(--nola-rem) * 0.9375)/1.55 var(--font-ui);
+  --font-body-strong: 600 calc(var(--nola-rem) * 0.9375)/1.55 var(--font-ui);
+  --nola-text-display: var(--font-display);
+  --nola-text-title: var(--font-title);
+  --nola-text-subtitle: var(--font-body-strong);
+  --nola-text-body: var(--font-body);
+  --nola-text-body-strong: var(--font-body-strong);
+  --nola-text-caption: var(--font-caption);
+  --nola-text-micro: var(--font-label);
+  --nola-text-mono: 400 calc(var(--nola-rem) * 0.8125)/1.5 var(--font-mono);
+  --font-label: 550 calc(var(--nola-rem) * 0.875)/1.5 var(--font-ui);
+  --font-caption: 400 calc(var(--nola-rem) * 0.8125)/1.5 var(--font-ui);
+  --font-control: 500 calc(var(--nola-rem) * 0.875)/1.5 var(--font-ui);
+  --field-control-height: calc(var(--nola-rem) * 2.25);
+  --panel-padding: calc(var(--nola-rem) * 1.25);
+  --field-gap: calc(var(--nola-rem) * 0.875);
+  color: var(--foreground);
+}
+
+:root:is(.dark, [data-theme="dark"]),
+:host([data-theme="dark"]) {
+  color-scheme: dark;
+  --background: oklch(0.1492 0.0093 263.9667);
+  --foreground: oklch(0.9602 0.0034 247.8587);
+  --card: oklch(0.1993 0.0111 260.6610);
+  --card-foreground: oklch(0.9602 0.0034 247.8587);
+  --popover: oklch(0.2298 0.0107 260.6838);
+  --popover-foreground: oklch(0.9602 0.0034 247.8587);
+  --primary: oklch(0.6496 0.1885 257.7207);
+  --primary-foreground: oklch(0.1205 0.0097 252.8876);
+  --secondary: oklch(0.2411 0.0097 248.2290);
+  --secondary-foreground: oklch(0.9008 0.0105 247.9427);
+  --muted: oklch(0.2207 0.0091 255.6084);
+  --muted-foreground: oklch(0.6806 0.0194 245.5027);
+  --accent: oklch(0.2804 0.0598 257.7090);
+  --accent-foreground: oklch(0.8435 0.0803 251.0277);
+  --destructive: oklch(0.6789 0.2096 21.9475);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.2800 0.0102 260.7048);
+  --input: oklch(0.2800 0.0102 260.7048);
+  --ring: oklch(0.6496 0.1885 257.7207);
+  --chart-1: oklch(0.6496 0.1885 257.7207);
+  --chart-2: oklch(0.6943 0.1346 171.9868);
+  --chart-3: oklch(0.6203 0.1997 300.1454);
+  --chart-4: oklch(0.7171 0.1878 45.3388);
+  --chart-5: oklch(0.6604 0.2297 5.1368);
+  --sidebar: oklch(0.1808 0.0095 255.6419);
+  --sidebar-foreground: oklch(0.9602 0.0034 247.8587);
+  --sidebar-primary: oklch(0.6496 0.1885 257.7207);
+  --sidebar-primary-foreground: oklch(0.1205 0.0097 252.8876);
+  --sidebar-accent: oklch(0.2804 0.0598 257.7090);
+  --sidebar-accent-foreground: oklch(0.8435 0.0803 251.0277);
+  --sidebar-border: oklch(0.2594 0.0104 260.6979);
+  --sidebar-ring: oklch(0.6496 0.1885 257.7207);
+  --radius: calc(var(--nola-rem) * 1.5);
+  --shadow-2xs: 0 4px 40px 0 hsl(0 0% 0% / 0.23);
+  --shadow-xs: 0 4px 40px 0 hsl(0 0% 0% / 0.23);
+  --shadow-sm: 0 4px 40px 0 hsl(0 0% 0% / 0.45), 0 1px 2px -1px hsl(0 0% 0% / 0.45);
+  --shadow: 0 4px 40px 0 hsl(0 0% 0% / 0.45), 0 1px 2px -1px hsl(0 0% 0% / 0.45);
+  --shadow-md: 0 4px 40px 0 hsl(0 0% 0% / 0.45), 0 2px 4px -1px hsl(0 0% 0% / 0.45);
+  --shadow-lg: 0 4px 40px 0 hsl(0 0% 0% / 0.45), 0 4px 6px -1px hsl(0 0% 0% / 0.45);
+  --shadow-xl: 0 4px 40px 0 hsl(0 0% 0% / 0.45), 0 8px 10px -1px hsl(0 0% 0% / 0.45);
+  --shadow-2xl: 0 4px 40px 0 hsl(0 0% 0% / 1.13);
+}
+
+[data-slot="card"] {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--surface-shadow);
+}
+
+body {
+  font: var(--font-body);
+}
+
+:is(button:not(:where(.select__trigger)), [data-slot="button"]) {
+  border-radius: var(--radius-xl);
+}
+
+[data-slot="button"] {
+  font: var(--font-control);
+}
+
+.nola-toast-title {
+  font: var(--font-control);
+}
+
+.nola-toast-description {
+  font: var(--font-caption);
+}
+
+[data-slot="button"][data-variant="default"] {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+[data-slot="button"][data-variant="secondary"]:not([data-size^="icon"]),
+[data-slot="button"][data-variant="outline"] {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--surface);
+}
+
+[data-slot="button"][data-variant="secondary"]:not([data-size^="icon"]) {
+  background: var(--window);
+}
+
+[data-slot="button"]:hover:not(:disabled, [aria-disabled="true"]) {
+  filter: brightness(0.97);
+}
+
+[data-slot="button"]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+[data-slot="alert"][data-variant="default"] {
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+[data-slot="kbd"] {
+  color: var(--muted-foreground);
+  background: var(--muted);
+}
+
+[data-slot="tooltip-content"] {
+  color: var(--card);
+  background: var(--foreground);
+  font: var(--font-caption);
+}
+
+[data-slot="tooltip-arrow"] {
+  background: var(--foreground);
+  fill: var(--foreground);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-heading: var(--font-sans);
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+  --color-nola-ui-backdrop: var(--backdrop);
+  --color-accent-soft-foreground: var(--accent-foreground);
+  --color-nola-ui-background: var(--nola-ui-background);
+  --color-nola-ui-foreground: var(--nola-ui-foreground);
+  --color-nola-ui-primary: var(--nola-ui-primary);
+  --color-nola-ui-primary-foreground: var(--nola-ui-primary-foreground);
+  --color-nola-ui-secondary: var(--nola-ui-secondary);
+  --color-nola-ui-secondary-foreground: var(--nola-ui-secondary-foreground);
+  --color-nola-ui-muted: var(--nola-ui-muted);
+  --color-nola-ui-muted-foreground: var(--nola-ui-muted-foreground);
+  --color-nola-ui-popover: var(--nola-ui-popover);
+  --color-nola-ui-popover-foreground: var(--nola-ui-popover-foreground);
+  --color-nola-ui-border: var(--nola-ui-border);
+  --color-nola-ui-ring: var(--nola-ui-ring);
+  --color-nola-ui-destructive: var(--nola-ui-destructive);
+}
+
+/* 标题栏和导航保持清晰的实色层次，强调色用于当前导航项。 */
+
+.nola-app-shell {
+  background: var(--background);
+}
+
+.nola-sidebar {
+  border-inline-end-color: var(--sidebar-border);
+  color: var(--sidebar-foreground);
+  background: var(--sidebar);
+}
+
+.nola-nav-button[data-active="true"] {
+  color: var(--sidebar-accent-foreground);
+  background: var(--sidebar-accent);
+  box-shadow: none;
+}
+
+.nola-nav-button[data-active="false"]:hover {
+  background: var(--secondary);
+}
+
+:where([data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"], .nola-dialog-content, .dropdown__popover,
+  .select__popup, .popover__popup) {
+  color: var(--popover-foreground);
+  background-color: var(--popover);
+}
+
+.nola-glass-popup {
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--overlay-shadow);
+}
+
+::selection {
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+
+/* ===== 毛玻璃 ===== */
+
+:root,
+:host {
+  --nola-glass-blur: 18px;
+  --nola-glass-opacity: 58%;
+  --nola-glass-saturation: 165%;
+  --nola-glass-dark-opacity: 0%;
+  --nola-glass-filter: blur(var(--nola-glass-blur)) saturate(var(--nola-glass-saturation)) contrast(105%);
+  --nola-glass-filter-strong: blur(calc(var(--nola-glass-blur) * 1.55)) saturate(var(--nola-glass-saturation)) contrast(105%);
+  --nola-glass-control-filter: blur(calc(var(--nola-glass-blur) * 0.67)) saturate(var(--nola-glass-saturation));
+  --nola-glass-input-filter: blur(calc(var(--nola-glass-blur) * 0.55)) saturate(var(--nola-glass-saturation));
+  --nola-glass-base-opacity: min(100%, calc(var(--nola-glass-opacity) + var(--nola-glass-dark-opacity)));
+  --nola-glass-thin-opacity: max(20%, calc(var(--nola-glass-base-opacity) - 22%));
+  --nola-glass-control-opacity: min(100%, calc(var(--nola-glass-base-opacity) + 15%));
+  --nola-glass-fill: color-mix(in srgb, var(--card) var(--nola-glass-base-opacity), transparent);
+  --nola-glass-fill-thin: color-mix(in srgb, var(--card) var(--nola-glass-thin-opacity), transparent);
+  --nola-glass-fill-strong: color-mix(in srgb, var(--popover) min(100%, calc(var(--nola-glass-base-opacity) + 18%)), transparent);
+  --nola-glass-tint: color-mix(in srgb, var(--primary) 13%, transparent);
+  --nola-glass-highlight: rgb(255 255 255 / 43%);
+  --nola-glass-highlight-soft: rgb(255 255 255 / 14%);
+  --nola-glass-stroke: rgb(255 255 255 / 70%);
+  --nola-glass-stroke-bottom: rgb(255 255 255 / 18%);
+  --nola-glass-depth: 0 14px 38px rgb(31 49 84 / 14%), 0 3px 9px rgb(31 49 84 / 7%);
+  --nola-glass-depth-hover: 0 19px 45px rgb(31 49 84 / 19%), 0 5px 13px rgb(31 49 84 / 9%);
+  --nola-glass-inner: inset 0 1px 0 rgb(255 255 255 / 66%), inset 0 -1px 0 rgb(255 255 255 / 11%);
+  --nola-glass-control-fill: color-mix(in srgb, var(--card) var(--nola-glass-control-opacity), transparent);
+  --nola-glass-control-hover: color-mix(in srgb, var(--card) min(100%, calc(var(--nola-glass-control-opacity) + 15%)), transparent);
+  --nola-glass-surface: radial-gradient(105% 90% at 12% -16%, var(--nola-glass-highlight) 0%, transparent 60%),
+    linear-gradient(165deg, var(--nola-glass-highlight-soft) 0%, transparent 52%, rgb(255 255 255 / 3%) 100%),
+    var(--nola-glass-fill);
+  --nola-glass-surface-strong: radial-gradient(100% 75% at 10% -10%, var(--nola-glass-highlight) 0%, transparent 67%),
+    linear-gradient(175deg, var(--nola-glass-highlight-soft), transparent 70%),
+    var(--nola-glass-fill-strong);
+}
+
+:root:is(.dark, [data-theme="dark"]),
+:host([data-theme="dark"]) {
+  --nola-glass-dark-opacity: 4%;
+  --nola-glass-tint: color-mix(in srgb, var(--primary) 17%, transparent);
+  --nola-glass-highlight: rgb(255 255 255 / 11%);
+  --nola-glass-highlight-soft: rgb(255 255 255 / 5%);
+  --nola-glass-stroke: rgb(255 255 255 / 22%);
+  --nola-glass-stroke-bottom: rgb(255 255 255 / 7%);
+  --nola-glass-depth: 0 16px 46px rgb(0 0 0 / 37%), 0 3px 12px rgb(0 0 0 / 20%);
+  --nola-glass-depth-hover: 0 20px 52px rgb(0 0 0 / 47%), 0 5px 15px rgb(0 0 0 / 24%);
+  --nola-glass-inner: inset 0 1px 0 rgb(255 255 255 / 19%), inset 0 -1px 0 rgb(0 0 0 / 13%);
+}
+
+/* 外观偏好默认启用。系统要求实色或浏览器不支持背景模糊时，显示基础主题。 */
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  @media not ((prefers-contrast: more) or (forced-colors: active) or (prefers-reduced-transparency: reduce)) {
+    :is(:root, .nola-extension):not([data-nola-glass="off"]) {
+      & :is(
+        .nola-glass,
+        .nola-glass-popup,
+        .card,
+        .nola-dialog-content,
+        .nola-toast,
+        .popover__popup,
+        .select__popup,
+        .dropdown__popover,
+        [data-slot="dropdown-menu-content"],
+        [data-slot="tooltip-content"],
+        [data-slot="popover-content"],
+        [data-slot="combobox-content"],
+        [data-slot="dialog-content"],
+        [data-slot="alert-dialog-content"],
+        [data-slot="card"],
+        [data-slot="composer-bar"],
+        [data-slot="composer-menu"],
+        [data-slot="alert"],
+        [data-slot="command"],
+        [data-slot="select-content"]
+      ) {
+        background: var(--nola-glass-surface);
+        border: 1px solid var(--nola-glass-stroke);
+        box-shadow: var(--nola-glass-inner), var(--nola-glass-depth);
+        -webkit-backdrop-filter: var(--nola-glass-filter);
+        backdrop-filter: var(--nola-glass-filter);
+        background-clip: padding-box;
+      }
+      & .nola-home :is(.nola-entry, .nola-home-hero) {
+        background: var(--nola-home-wash), var(--nola-glass-surface);
+        border-color: color-mix(in oklab, var(--entry-tone, var(--primary)) 32%, var(--nola-glass-stroke));
+      }
+      /* 浮层底色更厚，叠在其它控件上时仍能清楚阅读。 */
+      & :is(.nola-dialog-content, .popover__popup, .select__popup, .dropdown__popover,
+        [data-slot="dialog-content"], [data-slot="alert-dialog-content"], [data-slot="tooltip-content"],
+        [data-slot="popover-content"], [data-slot="dropdown-menu-content"], [data-slot="select-content"],
+        [data-slot="combobox-content"], [data-slot="composer-menu"], .nola-glass-popup) {
+        background: var(--nola-glass-surface-strong);
+        backdrop-filter: var(--nola-glass-filter-strong);
+      }
+      & .nola-glass-paper {
+        background: var(--nola-glass-surface);
+        backdrop-filter: var(--nola-glass-filter);
+      }
+      & .nola-glass-field {
+        backdrop-filter: var(--nola-glass-input-filter);
+      }
+      & .nola-glass-field:where(:not(:hover, :focus, [data-active], [aria-selected="true"])) {
+        background-color: color-mix(in srgb, var(--muted) var(--nola-glass-control-opacity), transparent);
+      }
+      & .nola-glass {
+        border-radius: var(--radius, 14px);
+        color: var(--foreground);
+      }
+      & :is(.sidebar, .settings-nav, [data-slot="sidebar-inner"], [data-sidebar="sidebar"]) {
+        background: linear-gradient(150deg, var(--nola-glass-highlight), transparent 70%),
+          color-mix(in srgb, var(--background) var(--nola-glass-base-opacity), transparent);
+        border-color: var(--nola-glass-stroke-bottom);
+        box-shadow: var(--nola-glass-inner);
+        -webkit-backdrop-filter: var(--nola-glass-filter);
+        backdrop-filter: var(--nola-glass-filter);
+      }
+      & .nola-shell-layout > [data-slot="sidebar-inset"] {
+        background: color-mix(in srgb, var(--background) var(--nola-glass-base-opacity), transparent);
+        backdrop-filter: var(--nola-glass-filter);
+      }
+      /* 复用组件的实体表面，保留选中、错误和禁用状态自身的语义色。 */
+      & :is([data-slot="table-container"], .nola-records-table__container,
+        .nola-titlebar:not(:where(.nola-shell-content > .nola-titlebar))) {
+        background-color: var(--nola-glass-fill-thin);
+        backdrop-filter: var(--nola-glass-control-filter);
+      }
+      & :is([data-slot="table-header"], [data-slot="table-footer"], [data-slot="empty-icon"],
+        [data-slot="avatar-fallback"], [data-slot="kbd"], .slider__track) {
+        background-color: color-mix(in srgb, var(--muted) var(--nola-glass-control-opacity), transparent);
+      }
+      & .nola-home__recent .nola-records-table th {
+        background: color-mix(in srgb, var(--muted) var(--nola-glass-control-opacity), transparent);
+      }
+      & :is([data-slot="switch"], .checkbox, .slider__thumb) {
+        box-shadow: var(--nola-glass-inner);
+        backdrop-filter: var(--nola-glass-control-filter);
+      }
+      & .nola-glass--thin {
+        background: linear-gradient(145deg, var(--nola-glass-highlight-soft), transparent 52%),
+          var(--nola-glass-fill-thin);
+        box-shadow: var(--nola-glass-inner), 0 5px 16px rgb(0 0 0 / 7%);
+      }
+      & .nola-glass--strong {
+        background: var(--nola-glass-surface-strong);
+        -webkit-backdrop-filter: var(--nola-glass-filter-strong);
+        backdrop-filter: var(--nola-glass-filter-strong);
+      }
+      & .nola-glass--tinted {
+        background: linear-gradient(145deg, var(--nola-glass-highlight-soft), transparent 65%),
+          linear-gradient(0deg, var(--nola-glass-tint), var(--nola-glass-tint)),
+          var(--nola-glass-fill);
+      }
+      & .nola-glass--sidebar {
+        background: linear-gradient(130deg, var(--nola-glass-highlight-soft), transparent 64%),
+          var(--nola-glass-fill-thin);
+        border-color: var(--nola-glass-stroke-bottom);
+        box-shadow: var(--nola-glass-inner);
+      }
+      & [data-slot="composer-bar"][data-drag-active] {
+        background: var(--accent);
+      }
+      & [data-slot="tooltip-arrow"] {
+        background: var(--nola-glass-fill-strong);
+        fill: var(--nola-glass-fill-strong);
+      }
+      & [data-slot="tooltip-content"] {
+        color: var(--popover-foreground);
+      }
+      & .card:not(:where(.nola-entry)) .card__footer {
+        background: color-mix(in srgb, var(--card) 17%, transparent);
+        border-top: 1px solid var(--nola-glass-stroke-bottom);
+      }
+      & :is(.tabs__list, [data-slot="tabs-list"], [data-slot="toggle-group"]):not([data-variant="line"], .settings-nav *) {
+        background: var(--default);
+        border: 1px solid var(--nola-glass-stroke);
+        box-shadow: var(--nola-glass-inner), 0 2px 9px rgb(0 0 0 / 5%);
+        -webkit-backdrop-filter: var(--nola-glass-filter);
+        backdrop-filter: var(--nola-glass-filter);
+      }
+      & :is(
+        .tabs__tab[data-active],
+        .tabs__tab[aria-selected="true"],
+        [data-slot="tabs-trigger"][data-state="active"],
+        [data-slot="toggle-group-item"]:is([data-pressed], [aria-pressed="true"])
+      ):not([data-variant="line"] *, .settings-nav *) {
+        background: var(--nola-glass-control-hover);
+        box-shadow: var(--nola-glass-inner), 0 2px 8px rgb(0 0 0 / 8%);
+      }
+      & :is(
+        .input,
+        .select__trigger,
+        textarea:where(:not([data-slot="composer-input"], [data-slot="input-group-control"])),
+        [data-slot="input"],
+        [data-slot="textarea"],
+        [data-slot="input-group"],
+        [data-slot="select-trigger"],
+        .search-field__group,
+        .number-field__group
+      ):not(:where([data-slot="input-group"] *)) {
+        background: var(--nola-glass-control-fill);
+        -webkit-backdrop-filter: var(--nola-glass-input-filter);
+        backdrop-filter: var(--nola-glass-input-filter);
+      }
+      & :is(.input, .select__trigger, textarea:not([data-slot="composer-input"]), [data-slot="input"], [data-slot="textarea"]):not(:where([data-slot="input-group-control"])):focus-visible {
+        border-color: var(--ring);
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+      }
+      & :is(
+        .button[data-variant="secondary"]:not([data-size^="icon"]),
+        .button[data-variant="outline"]:not([data-size^="icon"]),
+        [data-slot="button"][data-variant="secondary"]:not([data-size^="icon"]),
+        [data-slot="button"][data-variant="outline"]:not([data-size^="icon"])
+      ):not(:where(.nola-home-poster *)) {
+        background: var(--nola-glass-control-fill);
+        border-color: var(--nola-glass-stroke);
+        box-shadow: var(--nola-glass-inner), 0 3px 12px rgb(0 0 0 / 6%);
+        -webkit-backdrop-filter: var(--nola-glass-control-filter);
+        backdrop-filter: var(--nola-glass-control-filter);
+      }
+      & :is(
+        .button[data-variant="secondary"]:not([data-size^="icon"]),
+        .button[data-variant="outline"]:not([data-size^="icon"]),
+        [data-slot="button"][data-variant="secondary"]:not([data-size^="icon"]),
+        [data-slot="button"][data-variant="outline"]:not([data-size^="icon"])
+      ):hover:not(:disabled, [aria-disabled="true"], :where(.nola-home-poster *)) {
+        background: var(--nola-glass-control-hover);
+        box-shadow: var(--nola-glass-inner), 0 5px 17px rgb(0 0 0 / 9%);
+      }
+      & :is(.button[data-variant="default"], [data-slot="button"][data-variant="default"]):not(:where(.nola-sidebar *, .nola-home-poster *)) {
+        background: linear-gradient(160deg, rgb(255 255 255 / 18%) 0%, transparent 70%),
+          color-mix(in srgb, var(--primary) clamp(87%, calc(var(--nola-glass-base-opacity) + 35%), 100%), transparent);
+        border: 1px solid color-mix(in srgb, var(--primary-foreground) 17%, transparent);
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 23%),
+                    0 4px 16px color-mix(in srgb, var(--primary) 25%, transparent);
+        -webkit-backdrop-filter: var(--nola-glass-control-filter);
+        backdrop-filter: var(--nola-glass-control-filter);
+      }
+      & :is(.button[data-variant="default"], [data-slot="button"][data-variant="default"]):hover:not(:disabled, [aria-disabled="true"], :where(.nola-sidebar *, .nola-home-poster *)) {
+        background: linear-gradient(160deg, rgb(255 255 255 / 20%), transparent 70%),
+          color-mix(in srgb, var(--primary) 100%, transparent);
+      }
+      & :is(.button, [data-slot="button"])[data-variant="destructive"] {
+        box-shadow: var(--nola-glass-inner);
+        backdrop-filter: var(--nola-glass-control-filter);
+      }
+      & :is(.button, [data-slot="button"])[data-glass="tinted"] {
+        background: color-mix(in srgb, var(--primary) clamp(83%, calc(var(--nola-glass-base-opacity) + 31%), 100%), transparent);
+        color: var(--primary-foreground);
+        border: 1px solid color-mix(in srgb, var(--primary-foreground) 26%, transparent);
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%), 0 4px 18px color-mix(in srgb, var(--primary) 27%, transparent);
+        -webkit-backdrop-filter: var(--nola-glass-control-filter);
+        backdrop-filter: var(--nola-glass-control-filter);
+      }
+      & :is(.button, [data-slot="button"])[data-glass="tinted"]:hover:not(:disabled, [aria-disabled="true"]) {
+        background: color-mix(in srgb, var(--primary) 95%, transparent);
+      }
+      & .nola-glass--interactive {
+        transition: transform 180ms cubic-bezier(0.2, 0.7, 0.25, 1),
+                    box-shadow 180ms ease, border-color 180ms ease;
+      }
+      & .nola-glass--interactive:hover {
+        transform: translateY(-1px);
+        border-color: color-mix(in srgb, var(--primary) 24%, var(--nola-glass-stroke));
+        box-shadow: var(--nola-glass-inner), var(--nola-glass-depth-hover);
+      }
+      & .nola-glass--interactive:active {
+        transform: translateY(0);
+      }
+      & .nola-glass--interactive:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 3px;
+      }
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nola-glass--interactive {
+    transition: none;
+  }
+  .nola-glass--interactive:hover,
+  .nola-glass--interactive:active {
+    transform: none;
+  }
+}
+
+/* ===== 公共控件补充样式 ===== */
+
+/* Dismiss icons stay unfilled in every state, including independent renderer themes. */
+
+:is(button, [role="button"]):has(> svg.lucide-x) {
+  background: none !important;
+  border-color: transparent !important;
+}
+
+/* Caption recording controls keep their state fill so the pause icon stays visible. */
+
+[data-slot="button"][data-size^="icon"]:not([data-variant="nav"]):not(.nola-color-picker__preset):not(.nola-caption-mic) {
+  background: none !important;
+  border-color: transparent !important;
+}
+
+[data-slot="button"][data-size^="icon"][data-variant="default"] {
+  color: var(--foreground) !important;
+}
+
+.nola-color-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: min(calc(var(--space-8) * 3 + var(--space-6)), calc(100vw - var(--space-4)));
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--overlay);
+  color: var(--foreground);
+  box-shadow: var(--shadow-lg);
+}
+
+.nola-color-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-color: transparent;
+  background: transparent;
+}
+
+.nola-color-picker__trigger:hover {
+  background: var(--surface-secondary);
+}
+
+.nola-color-picker__swatch {
+  width: var(--space-3);
+  height: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.nola-color-picker__area {
+  position: relative;
+  height: calc(var(--space-7) * 2);
+  border-radius: var(--radius-md);
+  background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent), var(--picker-hue);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.nola-color-picker__cursor, .nola-color-picker__hue-thumb {
+  width: var(--space-2);
+  height: var(--space-2);
+  border: 2px solid #fff;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px #000;
+}
+
+.nola-color-picker__cursor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.nola-color-picker__hue-control {
+  display: flex;
+  align-items: center;
+  min-height: var(--space-3);
+  touch-action: none;
+}
+
+.nola-color-picker__hue-track {
+  position: relative;
+  width: 100%;
+  height: var(--space-1);
+  border-radius: var(--radius-full);
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+
+.nola-color-picker__hue-thumb {
+  background: var(--surface);
+}
+
+.nola-color-picker__hue-thumb:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.nola-color-picker__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.nola-color-picker__preset {
+  width: var(--space-4);
+  height: var(--space-4);
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+}
+
+:root[data-magicui-theme-vt]::view-transition-old(root),
+:root[data-magicui-theme-vt]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+:root[data-magicui-theme-vt]::view-transition-new(root) {
+  clip-path: var(--magicui-theme-vt-clip-from);
+}
+
+.nola-language-direction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  width: 100%;
+}
+
+.nola-workspace-field.nola-language-pair-field {
+  flex-basis: 100%;
+}
+
+.nola-language-trigger {
+  min-width: 0;
+  width: 100%;
+}
+
+.nola-language-trigger[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+
+.nola-language-popup {
+  display: flex;
+  flex-direction: column;
+  width: max(var(--anchor-width), calc(var(--space-8) * 3));
+  max-width: calc(100vi - var(--space-4));
+  max-height: min(var(--available-height), calc(var(--space-8) * 5));
+  overflow: hidden;
+}
+
+.nola-language-popup > .input {
+  flex: none;
+  width: 100%;
+  margin-bottom: var(--space-1);
+}
+
+.nola-language-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.nola-language-empty {
+  color: var(--nola-ui-muted-foreground);
+  font: var(--font-caption);
+}
+
+.nola-language-empty:not(:empty) {
+  padding: var(--space-2);
+}
+
+.nola-language-popup .select__item[data-highlighted], .nola-language-popup .select__item[data-selected] {
+  background: var(--selection-neutral);
+  color: var(--foreground);
+}
+
+/* ===== Agent 生成式组件 ===== */
+
+@layer components {
+  [data-aui] {
+    box-sizing: border-box;
+  }
+  [data-aui="header"] {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  [data-aui="text"] {
+    line-height: 1.5;
+  }
+  [data-aui="caption"] {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+  }
+  [data-aui="text"][data-aui-size="sm"], [data-aui="header"][data-aui-size="sm"] {
+    font-size: 0.75rem;
+  }
+  [data-aui="text"][data-aui-size="md"], [data-aui="header"][data-aui-size="md"] {
+    font-size: 0.875rem;
+  }
+  [data-aui="text"][data-aui-size="lg"], [data-aui="header"][data-aui-size="lg"] {
+    font-size: 1.125rem;
+  }
+  [data-aui="text"][data-aui-size="xl"], [data-aui="header"][data-aui-size="xl"] {
+    font-size: 1.25rem;
+  }
+  [data-aui="text"][data-aui-size="2xl"], [data-aui="header"][data-aui-size="2xl"] {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  [data-aui="text"][data-aui-size="3xl"], [data-aui="header"][data-aui-size="3xl"] {
+    font-size: 2.25rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  [data-aui="text"][data-aui-weight="normal"] {
+    font-weight: 400;
+  }
+  [data-aui="text"][data-aui-weight="medium"] {
+    font-weight: 500;
+  }
+  [data-aui="text"][data-aui-weight="semibold"] {
+    font-weight: 600;
+  }
+  [data-aui="text"][data-aui-weight="bold"] {
+    font-weight: 700;
+  }
+  [data-aui="text"][data-aui-color="emphasis"] {
+    color: var(--foreground);
+  }
+  [data-aui="text"][data-aui-color="secondary"] {
+    color: color-mix(in oklab, currentColor 62%, transparent);
+  }
+  [data-aui="text"][data-aui-color="alpha-70"] {
+    color: color-mix(in oklab, var(--foreground) 70%, transparent);
+  }
+  [data-aui="text"][data-aui-color="white"] {
+    color: white;
+  }
+  [data-aui="text"][data-aui-color="white-70"] {
+    color: color-mix(in oklab, white 70%, transparent);
+  }
+  [data-aui="text"][data-aui-color="white-50"] {
+    color: color-mix(in oklab, white 50%, transparent);
+  }
+  [data-aui="fact"] {
+    margin: 0;
+  }
+  [data-aui="fact-label"] {
+    margin: 0;
+    font-size: 0.75rem;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+  }
+  [data-aui="fact-value"] {
+    margin: 0;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+  }
+  [data-aui="row"] > [data-aui="fact"] > [data-aui="fact-value"] {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  [data-aui="card"] [data-aui="row"] > [data-aui="fact"] > [data-aui="fact-value"] {
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+  [data-aui="fact-delta"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    margin: 0 0 0 0.375rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    vertical-align: middle;
+  }
+  [data-aui="fact-delta"][data-aui-tone="good"] {
+    background-color: color-mix(in oklab, var(--aui-success) 15%, transparent);
+    color: color-mix(in oklab, var(--aui-success) 55%, currentColor);
+  }
+  [data-aui="fact-delta"][data-aui-tone="bad"] {
+    background-color: color-mix(in oklab, var(--destructive) 15%, transparent);
+    color: color-mix(in oklab, var(--destructive) 55%, currentColor);
+  }
+  [data-aui="fact-delta"][data-aui-tone="neutral"] {
+    background-color: var(--secondary);
+    color: var(--secondary-foreground);
+  }
+  [data-aui="button"], [data-aui="card-confirm"], [data-aui="card-cancel"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    height: var(--aui-control-height, 2.5rem);
+    padding: 0 var(--aui-button-padding-x, 1.25rem);
+    border-radius: calc(var(--radius) - 2px);
+    font-size: var(--aui-control-font-size, 0.875rem);
+    font-weight: 500;
+    border: 1px solid transparent;
+    cursor: pointer;
+    background-color: var(--secondary);
+    color: var(--secondary-foreground);
+    transition: background-color 0.15s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  [data-aui="button"]:focus-visible, [data-aui="card-confirm"]:focus-visible, [data-aui="card-cancel"]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  [data-aui="button"][data-aui-style="primary"], [data-aui="card-confirm"] {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+  [data-aui="button"][data-aui-style="primary"]:hover, [data-aui="card-confirm"]:hover {
+    background-color: color-mix(in oklab, var(--primary) 90%, transparent);
+  }
+  [data-aui="button"][data-aui-style="secondary"] {
+    background-color: var(--secondary);
+    color: var(--secondary-foreground);
+  }
+  [data-aui="button"][data-aui-style="secondary"]:hover {
+    background-color: color-mix(in oklab, var(--secondary) 90%, transparent);
+  }
+  [data-aui="button"][data-aui-style="outline"] {
+    background-color: transparent;
+    color: var(--foreground);
+    border-color: color-mix(in oklab, var(--border) 60%, transparent);
+  }
+  [data-aui="button"][data-aui-style="outline"]:hover {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+  }
+  [data-aui="button"][data-aui-style="ghost"], [data-aui="card-cancel"] {
+    background-color: transparent;
+    color: var(--foreground);
+  }
+  [data-aui="button"][data-aui-style="ghost"]:hover, [data-aui="card-cancel"]:hover {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+  }
+  [data-aui="button"][data-aui-style="danger"] {
+    background-color: var(--destructive);
+    color: var(--primary-foreground);
+  }
+  [data-aui="button"][data-aui-style="danger"]:hover {
+    background-color: color-mix(in oklab, var(--destructive) 90%, transparent);
+  }
+  [data-aui="button"][data-aui-state="pending"] {
+    background-color: color-mix(in oklab, var(--secondary) 72%, transparent);
+    font-variant-numeric: tabular-nums;
+  }
+  [data-aui="button-undo-status"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  [data-aui="button"][data-aui-block] {
+    width: 100%;
+  }
+  [data-aui="select"], [data-aui="input"], [data-aui="datepicker"] {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: var(--aui-control-height, 2.5rem);
+    padding: 0 var(--aui-field-padding-x, 0.875rem);
+    border-radius: calc(var(--radius) - 2px);
+    border: 1px solid var(--input);
+    background-color: transparent;
+    font-size: var(--aui-control-font-size, 0.875rem);
+    color: var(--foreground);
+  }
+  [data-aui="datepicker"] {
+    max-width: 100%;
+  }
+  [data-aui="input"][data-aui-multiline] {
+    height: auto;
+    min-height: 2.5rem;
+    padding: 0.625rem var(--aui-field-padding-x, 0.875rem);
+    line-height: 1.5;
+    resize: vertical;
+  }
+  [data-aui="input"]::placeholder {
+    color: color-mix(in oklab, currentColor 45%, transparent);
+  }
+  [data-aui="select"]:focus-visible, [data-aui="input"]:focus-visible, [data-aui="datepicker"]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  [data-aui="slider-field"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+  [data-aui="slider-label"] {
+    font-size: var(--aui-control-font-size, 0.875rem);
+    font-weight: 500;
+  }
+  [data-aui="slider"] {
+    width: 100%;
+    height: 1.25rem;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--foreground);
+    appearance: none;
+    background-color: transparent;
+  }
+  [data-aui="slider"]::-webkit-slider-runnable-track {
+    height: 0.25rem;
+    border-radius: 9999px;
+    background-color: var(--foreground);
+  }
+  [data-aui="slider"]::-moz-range-track {
+    height: 0.25rem;
+    border-radius: 9999px;
+    background-color: var(--foreground);
+  }
+  [data-aui="slider"]::-webkit-slider-thumb {
+    width: 1rem;
+    height: 1rem;
+    margin-top: -0.375rem;
+    border-radius: 9999px;
+    appearance: none;
+    background-color: var(--foreground);
+  }
+  [data-aui="slider"]::-moz-range-thumb {
+    width: 1rem;
+    height: 1rem;
+    border: 0;
+    border-radius: 9999px;
+    background-color: var(--foreground);
+  }
+  [data-aui="slider"]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  [data-aui="slider-value"] {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+  }
+  [data-aui="checkbox"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+  [data-aui="radiogroup-option"], [data-aui="checkboxgroup-option"] {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+  [data-aui="option-content"] {
+    display: flex;
+    flex-direction: column;
+  }
+  [data-aui="option-description"] {
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+  }
+  [data-aui="checkbox"] input, [data-aui="radiogroup-option"] input, [data-aui="checkboxgroup-option"] input {
+    accent-color: var(--primary);
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    cursor: pointer;
+  }
+  [data-aui="radiogroup-option"] input, [data-aui="checkboxgroup-option"] input {
+    margin-top: 0.125rem;
+  }
+  [data-aui="checkbox"][data-aui-variant="switch"] input {
+    width: 2.25rem;
+    height: 1.25rem;
+    border: 0;
+    border-radius: 9999px;
+    appearance: none;
+    background-color: color-mix(in oklab, var(--foreground) 30%, transparent);
+    transition: background-color 0.15s ease;
+  }
+  [data-aui="checkbox"][data-aui-variant="switch"] input::before {
+    content: "";
+    display: block;
+    width: 1rem;
+    height: 1rem;
+    margin: 0.125rem;
+    border-radius: 9999px;
+    background-color: var(--background);
+    transition: transform 0.15s ease;
+  }
+  [data-aui="checkbox"][data-aui-variant="switch"] input:checked {
+    background-color: var(--foreground);
+  }
+  [data-aui="checkbox"][data-aui-variant="switch"] input:checked::before {
+    transform: translateX(1rem);
+  }
+  [data-aui="checkbox"] input:focus-visible, [data-aui="radiogroup-option"] input:focus-visible, [data-aui="checkboxgroup-option"] input:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  [data-aui="radiogroup"], [data-aui="checkboxgroup"] {
+    border: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  [data-aui="checkboxgroup-progress"] {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+  }
+  [data-aui="checkboxgroup-progress-track"] {
+    flex: 1;
+    height: 0.375rem;
+    border-radius: 9999px;
+    background-color: color-mix(in oklab, var(--foreground) 10%, transparent);
+    overflow: hidden;
+  }
+  [data-aui="checkboxgroup-progress-fill"] {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background-color: var(--primary);
+    transition: width 0.2s ease;
+  }
+  fieldset[data-aui="answered"] {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-inline-size: 0;
+  }
+  fieldset[data-aui="answered"] [data-aui="button"], fieldset[data-aui="answered"] [data-aui="card-confirm"], fieldset[data-aui="answered"] [data-aui="card-cancel"], fieldset[data-aui="answered"] [data-aui="select"], fieldset[data-aui="answered"] [data-aui="input"], fieldset[data-aui="answered"] [data-aui="datepicker"], fieldset[data-aui="answered"] [data-aui="checkbox"], fieldset[data-aui="answered"] [data-aui="radiogroup-option"], fieldset[data-aui="answered"] [data-aui="checkboxgroup-option"] {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  [data-aui="root"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    margin-block: 0.875rem;
+  }
+  [data-gf-spec], [data-gf-widget] {
+    margin-block: 0.875rem;
+  }
+  [data-aui="root"]:empty {
+    display: none;
+  }
+  [data-aui="card"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: var(--aui-card-padding, 1rem 1.125rem);
+    border-radius: var(--radius);
+    background-color: var(--aui-panel, color-mix(in oklab, var(--foreground) 4%, transparent));
+  }
+  [data-aui="card"] [data-aui="card"] {
+    --aui-card-padding: 0;
+    border-radius: 0;
+    background-color: transparent;
+  }
+  [data-aui="card"][data-aui-surface], [data-aui="carousel"] [data-aui="card"] {
+    --aui-card-padding: 1.25rem;
+    background-color: var(--card);
+    color: var(--card-foreground);
+    border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+    border-radius: var(--radius);
+    box-shadow: none;
+  }
+  [data-aui="card-title"] {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  [data-aui="card-footer"] {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  }
+  [data-aui-padding="0"] {
+    padding: 0;
+  }
+  [data-aui-padding="1"] {
+    padding: calc(1 * 4px);
+  }
+  [data-aui-padding="2"] {
+    padding: calc(2 * 4px);
+  }
+  [data-aui-padding="3"] {
+    padding: calc(3 * 4px);
+  }
+  [data-aui-padding="4"] {
+    padding: calc(4 * 4px);
+  }
+  [data-aui-padding="5"] {
+    padding: calc(5 * 4px);
+  }
+  [data-aui-padding="6"] {
+    padding: calc(6 * 4px);
+  }
+  [data-aui-padding="7"] {
+    padding: calc(7 * 4px);
+  }
+  [data-aui-padding="8"] {
+    padding: calc(8 * 4px);
+  }
+  [data-aui="row"] {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+  [data-aui="col"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+  [data-aui="form"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0;
+  }
+  [data-aui="spacer"] {
+    flex: 1;
+  }
+  [data-aui="row"][data-aui-align="start"], [data-aui="col"][data-aui-align="start"] {
+    align-items: flex-start;
+  }
+  [data-aui="row"][data-aui-align="center"], [data-aui="col"][data-aui-align="center"] {
+    align-items: center;
+  }
+  [data-aui="row"][data-aui-align="end"], [data-aui="col"][data-aui-align="end"] {
+    align-items: flex-end;
+  }
+  [data-aui="row"][data-aui-justify="start"] {
+    justify-content: flex-start;
+  }
+  [data-aui="row"][data-aui-justify="center"] {
+    justify-content: center;
+  }
+  [data-aui="row"][data-aui-justify="end"] {
+    justify-content: flex-end;
+  }
+  [data-aui="row"][data-aui-justify="between"] {
+    justify-content: space-between;
+  }
+  [data-aui-gap="0"] {
+    gap: 0;
+  }
+  [data-aui-gap="1"] {
+    gap: calc(1 * 4px);
+  }
+  [data-aui-gap="2"] {
+    gap: calc(2 * 4px);
+  }
+  [data-aui-gap="3"] {
+    gap: calc(3 * 4px);
+  }
+  [data-aui-gap="4"] {
+    gap: calc(4 * 4px);
+  }
+  [data-aui-gap="5"] {
+    gap: calc(5 * 4px);
+  }
+  [data-aui-gap="6"] {
+    gap: calc(6 * 4px);
+  }
+  [data-aui-gap="7"] {
+    gap: calc(7 * 4px);
+  }
+  [data-aui-gap="8"] {
+    gap: calc(8 * 4px);
+  }
+  [data-aui="box"] {
+    display: block;
+  }
+  [data-aui="icon"] {
+    display: inline-block;
+    vertical-align: -0.125em;
+    flex-shrink: 0;
+  }
+  [data-aui="alert"] {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: var(--radius);
+    padding: 0.75rem 0.875rem;
+  }
+  [data-aui="alert"][data-aui-tone="info"] {
+    border-color: color-mix(in oklab, var(--primary) 45%, transparent);
+    background-color: color-mix(in oklab, var(--primary) 8%, transparent);
+  }
+  [data-aui="alert"][data-aui-tone="success"] {
+    border-color: color-mix(in oklab, var(--aui-success) 45%, transparent);
+    background-color: color-mix(in oklab, var(--aui-success) 8%, transparent);
+  }
+  [data-aui="alert"][data-aui-tone="warning"] {
+    border-color: color-mix(in oklab, var(--aui-warning) 45%, transparent);
+    background-color: color-mix(in oklab, var(--aui-warning) 8%, transparent);
+  }
+  [data-aui="alert"][data-aui-tone="danger"] {
+    border-color: color-mix(in oklab, var(--destructive) 45%, transparent);
+    background-color: color-mix(in oklab, var(--destructive) 8%, transparent);
+  }
+  [data-aui="alert-title"] {
+    margin: 0 0 0.25rem 0;
+    font-weight: 500;
+  }
+  [data-aui="alert-desc"] {
+    margin: 0;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+    font-size: 0.8125rem;
+  }
+  [data-aui="table"] {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  [data-aui="table-col"] {
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  }
+  [data-aui="table"] td {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+  }
+  [data-aui="table-col"][data-aui-align="end"], [data-aui="table"] td[data-aui-align="end"] {
+    text-align: end;
+  }
+  [data-aui="table-sort"] {
+    appearance: none;
+    padding: 0;
+    border: 0;
+    background-color: transparent;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    line-height: inherit;
+    text-align: inherit;
+    cursor: pointer;
+  }
+  [data-aui="table-sort-direction"] {
+    margin: 0 0 0 0.25rem;
+  }
+  [data-aui="table-sort"]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  [data-aui="table"] tbody tr:not(:last-child) td {
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  }
+  [data-aui="chart"] {
+    display: block;
+    width: 100%;
+    height: 3rem;
+    color: var(--chart-1);
+  }
+  [data-aui="chart"] polyline, [data-aui="chart"] polygon {
+    stroke-width: 1.5;
+  }
+  [data-aui="chart-zero"] {
+    stroke: var(--muted-foreground);
+    stroke-opacity: 0.5;
+  }
+  [data-aui="chart"][data-aui-color] [data-aui="chart-series"]:only-child {
+    color: inherit;
+  }
+  [data-aui="chart"][data-aui-color="emphasis"] {
+    color: var(--foreground);
+  }
+  [data-aui="chart"][data-aui-color="secondary"] {
+    color: color-mix(in oklab, currentColor 62%, transparent);
+  }
+  [data-aui="chart"][data-aui-color="alpha-70"] {
+    color: color-mix(in oklab, var(--foreground) 70%, transparent);
+  }
+  [data-aui="chart"][data-aui-color="white"] {
+    color: white;
+  }
+  [data-aui="chart"][data-aui-color="white-70"] {
+    color: color-mix(in oklab, white 70%, transparent);
+  }
+  [data-aui="chart"][data-aui-color="white-50"] {
+    color: color-mix(in oklab, white 50%, transparent);
+  }
+  [data-aui="chart-frame"] {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.25rem;
+  }
+  [data-aui="chart-frame"] > [data-aui="chart-ticks"] {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: right;
+  }
+  [data-aui="chart-frame"] > [data-aui="chart-ticks"], [data-aui="chart-frame"] > [data-aui="chart-xlabels"] {
+    font-size: 0.6875rem;
+    color: var(--muted-foreground);
+  }
+  [data-aui="chart-frame"] > svg[data-aui="chart"] {
+    grid-column: 2;
+    grid-row: 1;
+    height: 6.5rem;
+  }
+  [data-aui="chart-frame"] > [data-aui="chart-xlabels"] {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    justify-content: space-between;
+  }
+  [data-aui="chart-frame"] > [data-aui="chart-legend"] {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+  }
+  [data-aui="chart-legend-item"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  [data-aui="chart-legend-swatch"] {
+    display: inline-block;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: calc(var(--radius) - 4px);
+    background-color: var(--aui-series-color, currentColor);
+  }
+  [data-aui="chart-series"][data-aui-series="0"] {
+    color: var(--chart-1);
+  }
+  [data-aui="chart-series"][data-aui-series="1"] {
+    color: var(--chart-2);
+  }
+  [data-aui="chart-series"][data-aui-series="2"] {
+    color: var(--chart-3);
+  }
+  [data-aui="chart-series"][data-aui-series="3"] {
+    color: var(--chart-4);
+  }
+  [data-aui="chart-series"][data-aui-series="4"] {
+    color: var(--chart-5);
+  }
+  [data-aui="chart-legend-item"][data-aui-series="0"] {
+    --aui-series-color: var(--chart-1);
+  }
+  [data-aui="chart-legend-item"][data-aui-series="1"] {
+    --aui-series-color: var(--chart-2);
+  }
+  [data-aui="chart-legend-item"][data-aui-series="2"] {
+    --aui-series-color: var(--chart-3);
+  }
+  [data-aui="chart-legend-item"][data-aui-series="3"] {
+    --aui-series-color: var(--chart-4);
+  }
+  [data-aui="chart-legend-item"][data-aui-series="4"] {
+    --aui-series-color: var(--chart-5);
+  }
+  [data-aui="chart-series"][data-aui-color="emphasis"] {
+    color: var(--foreground);
+  }
+  [data-aui="chart-legend-item"][data-aui-color="emphasis"] {
+    --aui-series-color: var(--foreground);
+  }
+  [data-aui="chart-series"][data-aui-color="secondary"] {
+    color: color-mix(in oklab, var(--foreground) 62%, transparent);
+  }
+  [data-aui="chart-legend-item"][data-aui-color="secondary"] {
+    --aui-series-color: color-mix(in oklab, var(--foreground) 62%, transparent);
+  }
+  [data-aui="chart-series"][data-aui-color="alpha-70"] {
+    color: color-mix(in oklab, var(--foreground) 70%, transparent);
+  }
+  [data-aui="chart-legend-item"][data-aui-color="alpha-70"] {
+    --aui-series-color: color-mix(in oklab, var(--foreground) 70%, transparent);
+  }
+  [data-aui="chart-series"][data-aui-color="white"] {
+    color: white;
+  }
+  [data-aui="chart-legend-item"][data-aui-color="white"] {
+    --aui-series-color: white;
+  }
+  [data-aui="chart-series"][data-aui-color="white-70"] {
+    color: color-mix(in oklab, white 70%, transparent);
+  }
+  [data-aui="chart-legend-item"][data-aui-color="white-70"] {
+    --aui-series-color: color-mix(in oklab, white 70%, transparent);
+  }
+  [data-aui="chart-series"][data-aui-color="white-50"] {
+    color: color-mix(in oklab, white 50%, transparent);
+  }
+  [data-aui="chart-legend-item"][data-aui-color="white-50"] {
+    --aui-series-color: color-mix(in oklab, white 50%, transparent);
+  }
+  [data-aui="carousel-frame"] {
+    min-width: 0;
+  }
+  [data-aui="carousel"] {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    scrollbar-width: thin;
+  }
+  [data-aui="carousel"]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  [data-aui="carousel-slide"] {
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+    min-width: 14rem;
+  }
+  [data-aui="carousel-controls"] {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    margin: 0.5rem 0 0;
+  }
+  [data-aui="carousel-prev"], [data-aui="carousel-next"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: calc(var(--radius) - 2px);
+    appearance: none;
+    background-color: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  [data-aui="carousel-prev"]:hover, [data-aui="carousel-next"]:hover {
+    background-color: var(--muted);
+  }
+  [data-aui="carousel-prev"]:focus-visible, [data-aui="carousel-next"]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  [data-aui="carousel-prev"]:disabled, [data-aui="carousel-next"]:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-aui="carousel"] {
+      scroll-behavior: auto;
+    }
+    [data-aui="checkbox"][data-aui-variant="switch"] input, [data-aui="checkbox"][data-aui-variant="switch"] input::before {
+      transition: none;
+    }
+    [data-aui="button"][data-aui-state="pending"] {
+      transition: none;
+    }
+    [data-aui="checkboxgroup-progress-fill"] {
+      transition: none;
+    }
+  }
+  [data-aui="listview"] {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  [data-aui="listview-item"] + [data-aui="listview-item"] {
+    border-top: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  }
+  [data-aui="listview-item-trigger"] {
+    padding: 0.75rem 0.875rem;
+    border-radius: calc(var(--radius) - 2px);
+    cursor: pointer;
+  }
+  [data-aui="listview-item-trigger"]:hover {
+    background-color: color-mix(in oklab, var(--muted) 50%, transparent);
+  }
+  [data-aui="listview-item-trigger"] > button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
+  [data-aui="tabs"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  [data-aui="tabs-list"] {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  }
+  [data-aui="tabs-tab"] {
+    appearance: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.5rem 0.75rem;
+    background: transparent;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  [data-aui="tabs-tab"]:hover {
+    color: inherit;
+  }
+  [data-aui="tabs-tab"][aria-selected="true"] {
+    color: inherit;
+    border-bottom-color: currentColor;
+  }
+  [data-aui="tabs-tab"]:focus-visible, [data-aui="tabs-panel"]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: calc(var(--radius) - 4px);
+  }
+  [data-aui="steps"], [data-aui="timeline"] {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  [data-aui="steps"] {
+    counter-reset: aui-step;
+  }
+  [data-aui="steps-item"] {
+    position: relative;
+    min-height: 1.5rem;
+    padding-inline-start: 2.25rem;
+    counter-increment: aui-step;
+  }
+  [data-aui="steps-item"]::before {
+    content: counter(aui-step);
+    position: absolute;
+    top: 0;
+    inset-inline-start: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 9999px;
+    background-color: var(--muted);
+    color: var(--foreground);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  [data-aui="timeline-item"] {
+    position: relative;
+    padding-inline-start: 1.5rem;
+  }
+  [data-aui="timeline-item"]::before {
+    content: "";
+    position: absolute;
+    top: 0.4375rem;
+    inset-inline-start: 0.25rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: currentColor;
+  }
+  [data-aui="steps-item"]:not(:last-child)::after, [data-aui="timeline-item"]:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    bottom: -0.875rem;
+    width: 1px;
+    background-color: color-mix(in oklab, var(--border) 60%, transparent);
+  }
+  [data-aui="steps-item"]:not(:last-child)::after {
+    top: 1.875rem;
+    inset-inline-start: 0.75rem;
+  }
+  [data-aui="timeline-item"]:not(:last-child)::after {
+    top: 1.125rem;
+    inset-inline-start: 0.5rem;
+  }
+  [data-aui="steps-title"], [data-aui="timeline-title"] {
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  [data-aui="steps-detail"], [data-aui="timeline-detail"] {
+    margin-top: 0.125rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: color-mix(in oklab, currentColor 70%, transparent);
+  }
+  [data-aui="timeline-time"] {
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+  }
+  [data-aui="citation"] {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+    border-radius: calc(var(--radius) - 2px);
+  }
+  [data-aui="citation-source"] {
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+  }
+  [data-aui="citation-title"] {
+    color: inherit;
+    font-weight: 500;
+    line-height: 1.4;
+    text-decoration: none;
+  }
+  a[data-aui="citation-title"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: calc(var(--radius) - 2px);
+  }
+  a[data-aui="citation-title"]:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  a[data-aui="citation-title"]:focus-visible {
+    outline: none;
+  }
+  a[data-aui="citation-title"]:focus-visible::after {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  [data-aui="citation-snippet"] {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: color-mix(in oklab, currentColor 70%, transparent);
+  }
+  [data-aui="divider"] {
+    border: none;
+    border-top: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+    margin: 0.75rem 0;
+  }
+  [data-aui="divider"][data-aui-flush] {
+    margin: 0;
+  }
+  [data-aui="card"] > [data-aui="divider"] {
+    margin: 0;
+  }
+  [data-aui="diagram"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin: 0;
+  }
+  [data-aui="diagram-code"] {
+    margin: 0;
+    padding: 0.75rem 0.875rem;
+    overflow-x: auto;
+    border-radius: calc(var(--radius) - 2px);
+    background-color: color-mix(in oklab, var(--muted) 60%, transparent);
+    font-family: var(--font-ui);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+  [data-aui="diagram-title"] {
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+  }
+  ol[data-aui="map"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  [data-aui="map-place-label"] {
+    color: inherit;
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  [data-aui="map-place-detail"] {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: color-mix(in oklab, currentColor 70%, transparent);
+  }
+  [data-aui="image"] {
+    max-width: 100%;
+    display: block;
+    border-radius: calc(var(--radius) - 2px);
+  }
+  [data-aui="image"][data-aui-size="sm"] {
+    max-width: 8rem;
+  }
+  [data-aui="image"][data-aui-size="md"] {
+    max-width: 16rem;
+  }
+  [data-aui="image"][data-aui-size="lg"] {
+    max-width: 24rem;
+  }
+  [data-aui="image"][data-aui-round] {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    object-fit: cover;
+    aspect-ratio: 1 / 1;
+  }
+  [data-aui="image"][data-aui-round][data-aui-size="sm"] {
+    width: 2rem;
+    height: 2rem;
+  }
+  [data-aui="image"][data-aui-round][data-aui-size="md"] {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+  [data-aui="image"][data-aui-round][data-aui-size="lg"] {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+  [data-aui="row"] > [data-aui="image"]:not([data-aui-size="sm"], [data-aui-sized], [data-aui-round]) {
+    flex: 1 1 0;
+    min-width: max(5rem, 22%);
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+  }
+  [data-aui="row"] > [data-aui="image"]:first-child:nth-last-child(n+4):not([data-aui-size="sm"], [data-aui-sized], [data-aui-round]), [data-aui="row"] > [data-aui="image"]:first-child:nth-last-child(n+4) ~ [data-aui="image"]:not([data-aui-size="sm"], [data-aui-sized], [data-aui-round]) {
+    min-width: 0;
+  }
+  [data-aui="row"] > [data-aui="image"][data-aui-size="sm"]:not([data-aui-round]) {
+    flex: none;
+    width: 4.5rem;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+  }
+  [data-aui="markdown"] {
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+  [data-aui="markdown"] p {
+    margin: 0 0 0.5rem 0;
+  }
+  [data-aui="markdown"] p:last-child {
+    margin-bottom: 0;
+  }
+  [data-aui="markdown"] a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  [data-aui="markdown"] code {
+    font-size: 0.8125em;
+    background-color: color-mix(in oklab, var(--muted) 60%, transparent);
+    padding: 0.125rem 0.375rem;
+    border-radius: calc(var(--radius) - 4px);
+    font-family: var(--font-ui);
+  }
+  [data-aui="markdown"] pre {
+    background-color: color-mix(in oklab, var(--muted) 60%, transparent);
+    padding: 0.75rem;
+    border-radius: calc(var(--radius) - 2px);
+    overflow-x: auto;
+  }
+  [data-aui="markdown"] pre code {
+    background-color: transparent;
+    padding: 0;
+  }
+  [data-aui="markdown"] ul, [data-aui="markdown"] ol {
+    padding-left: 1.25rem;
+  }
+  [data-aui="markdown"] ol {
+    list-style-type: decimal;
+  }
+  [data-aui="markdown"] ul {
+    list-style-type: disc;
+  }
+  [data-aui="markdown"] li {
+    margin: 0.25rem 0;
+  }
+  [data-aui="markdown"] h1, [data-aui="markdown"] h2, [data-aui="markdown"] h3 {
+    margin: 0.75em 0 0.25em;
+    font-weight: 600;
+  }
+  [data-aui="markdown"] h1 {
+    font-size: 1.125em;
+  }
+  [data-aui="markdown"] h2 {
+    font-size: 1.0625em;
+  }
+  [data-aui="markdown"] h3 {
+    font-size: 1em;
+  }
+  [data-aui="markdown"] blockquote {
+    border-left: 2px solid color-mix(in oklab, var(--border) 60%, transparent);
+    padding-left: 0.75rem;
+    color: color-mix(in oklab, currentColor 62%, transparent);
+    margin: 0.5em 0;
+  }
+  [data-aui="markdown"] table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    margin: 0.5rem 0;
+    font-size: 0.8125rem;
+  }
+  [data-aui="markdown"] th, [data-aui="markdown"] td {
+    padding: 0.375rem 0.75rem;
+    vertical-align: top;
+  }
+  [data-aui="markdown"] th:not([align]), [data-aui="markdown"] td:not([align]) {
+    text-align: start;
+  }
+  [data-aui="markdown"] th {
+    font-weight: 500;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  }
+  [data-aui="markdown"] tbody tr:not(:last-child) td {
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  }
+  [data-aui="badge"] {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    background-color: var(--muted);
+    color: color-mix(in oklab, currentColor 62%, transparent);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  [data-aui="row"][data-aui-align="start"] > [data-aui="badge"], [data-aui="col"][data-aui-align="start"] > [data-aui="badge"] {
+    align-self: flex-start;
+  }
+  [data-aui="row"][data-aui-align="center"] > [data-aui="badge"], [data-aui="col"][data-aui-align="center"] > [data-aui="badge"] {
+    align-self: center;
+  }
+  [data-aui="row"][data-aui-align="end"] > [data-aui="badge"], [data-aui="col"][data-aui-align="end"] > [data-aui="badge"] {
+    align-self: flex-end;
+  }
+  [data-aui="badge"][data-aui-variant="info"] {
+    background-color: color-mix(in oklab, var(--primary) 15%, transparent);
+    color: var(--primary);
+  }
+  [data-aui="card"][data-aui-background][data-aui-surface] [data-aui="badge"]:not([data-aui-variant="info"]):not([data-aui-variant="success"]):not([data-aui-variant="warning"]):not([data-aui-variant="danger"]) {
+    background-color: var(--muted);
+    color: var(--secondary-foreground);
+  }
+  [data-aui="card"][data-aui-background][data-aui-surface] [data-aui="badge"][data-aui-variant="info"] {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+  [data-aui="badge"][data-aui-variant="success"] {
+    background-color: color-mix(in oklab, var(--aui-success) 15%, transparent);
+    color: color-mix(in oklab, var(--aui-success) 55%, currentColor);
+  }
+  [data-aui="badge"][data-aui-variant="warning"] {
+    background-color: color-mix(in oklab, var(--aui-warning) 15%, transparent);
+    color: color-mix(in oklab, var(--aui-warning) 55%, currentColor);
+  }
+  [data-aui="badge"][data-aui-variant="danger"] {
+    background-color: color-mix(in oklab, var(--destructive) 15%, transparent);
+    color: color-mix(in oklab, var(--destructive) 55%, currentColor);
+  }
+}
+
+/* ===== 深色变体 ===== */
 
 @custom-variant dark {
   &:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *) {

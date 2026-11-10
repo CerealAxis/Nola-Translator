@@ -33,7 +33,6 @@ import { notifyModelDownloadFailure, suppressNextDownloadStartNotice } from './M
 import { CloudModelCard, CloudModelDialog, cloudModelsOf, type CatalogCloudModel, type CatalogCloudModelId } from './CloudModels'
 import { MIMO_TTS_MODEL, REALTIME_S2S_MODELS } from '../../../shared/settings'
 import type { ModelGatewaySnapshot } from '../../../shared/model-gateway'
-import './models.css'
 
 export type ModelsTab = 'recommended' | 'installed' | 'search' | 'downloads'
 

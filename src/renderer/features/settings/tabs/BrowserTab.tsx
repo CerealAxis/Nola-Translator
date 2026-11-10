@@ -13,7 +13,6 @@ import { BROWSER_EXTENSION_VERSION, type BrowserKind, type BrowserIntegrationInf
 import chromeIcon from '@/assets/browsers/chrome.png'
 import edgeIcon from '@/assets/browsers/edge.png'
 import firefoxIcon from '@/assets/browsers/firefox.svg'
-import './browserSettings.css'
 
 const BROWSERS: readonly BrowserKind[] = ['chrome', 'edge', 'firefox']
 const BROWSER_ICONS: Record<BrowserKind, string> = { chrome: chromeIcon, edge: edgeIcon, firefox: firefoxIcon }

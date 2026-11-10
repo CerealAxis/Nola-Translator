@@ -9,7 +9,6 @@ import OpenAI from '@lobehub/icons/es/OpenAI/components/Mono'
 import Qwen from '@lobehub/icons/es/Qwen/components/Color'
 import MiMo from '@lobehub/icons/es/XiaomiMiMo/components/Mono'
 import { useEffect, useRef } from 'react'
-import './provider-icon-cloud.css'
 
 const providers = [
   { name: 'MiniMax', Mark: MiniMax },

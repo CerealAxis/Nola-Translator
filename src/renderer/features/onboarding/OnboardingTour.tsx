@@ -13,7 +13,6 @@ import { TOUR_STEPS } from './tourSteps'
 import type { OnboardingCardState } from '../../../shared/onboarding-card'
 import { TourLesson } from './TourLesson'
 import { closeTourDialog, findTourTarget, prepareTourStep } from './tourDriver'
-import './onboarding.css'
 
 export interface OnboardingTourProps {
   /** Website demos can opt into manual presentation without writing a first-run marker. */

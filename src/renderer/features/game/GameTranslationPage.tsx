@@ -23,7 +23,6 @@ import type { ScreenSource } from '../../../shared/screen-translation'
 import type { GameCommand, GameProfile, GameSnapshot } from '../../../shared/game-translation'
 import type { MeetingMeta } from '../../../shared/contracts'
 import { recordPath } from '@/routes'
-import './game.css'
 import { GlossarySelectionField } from '../settings/glossary/GlossarySelectionField'
 import { stripIpcErrorMessage } from '../../../shared/ipc-error'
 

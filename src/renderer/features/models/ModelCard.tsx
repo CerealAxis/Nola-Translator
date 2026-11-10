@@ -10,7 +10,6 @@ import { modelEngines, type InferenceEngine } from '../../../shared/model-engine
 
 import type { ReactNode } from 'react'
 import { Download, X } from 'lucide-react'
-import './models.css'
 
 import { resourceStateOf } from '@/bridge'
 import type { ResourceRecord, ResourceState } from '@/bridge'

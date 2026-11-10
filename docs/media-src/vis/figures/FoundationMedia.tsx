@@ -3,7 +3,6 @@ import Qwen from '@lobehub/icons/es/Qwen/components/Mono';
 import { ArrowDownToLine, Check, Copy, Globe, Search } from 'lucide-react';
 import nolaLogo from '../../../../assets/brand/nola-logo.svg';
 import { Button } from '@/components/ui/button';
-import './FoundationMedia.css';
 
 export function AppIconSizes() {
   return <div className="foundation-board fm-icon-appearances" data-scene="media-app-icons">

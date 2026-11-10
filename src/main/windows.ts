@@ -11,7 +11,7 @@ export const OVERLAY_MIN_WIDTH = 420
 
 /**
  * `.nola-caption-stage` vertical padding, from `padding: 8px 22px` in
- * `src/renderer/theme/caption-card.css`.
+ * `src/renderer/theme/product.css`.
  */
 const STAGE_VERTICAL_PADDING = 8 + 8
 

@@ -19,7 +19,7 @@ editLink: false
 
 <figure>
 
-<demo react="repetition-style.tsx" :reactFiles="['repetition-style.tsx', '../figures/Contrast.tsx', '../figures/Contrast.css']" />
+<demo react="repetition-style.tsx" :reactFiles="['repetition-style.tsx', '../figures/Contrast.tsx']" />
 
 <figcaption>同类任务卡沿用相同结构。</figcaption>
 </figure>
@@ -35,7 +35,7 @@ editLink: false
 
 <figure>
 
-<demo react="repetition-format.tsx" :reactFiles="['repetition-format.tsx', '../figures/Contrast.tsx', '../figures/Contrast.css']" />
+<demo react="repetition-format.tsx" :reactFiles="['repetition-format.tsx', '../figures/Contrast.tsx']" />
 
 <figcaption>字段名称和格式保持一致。</figcaption>
 </figure>

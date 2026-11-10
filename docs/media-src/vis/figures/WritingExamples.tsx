@@ -7,7 +7,6 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { Select, SelectGroup, SelectItem, SelectContent, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { closeToast, showToast, ToastProvider } from '@/components/ui/toast';
-import './WritingExamples.css';
 
 export function WritingFields() {
   const id = useId();

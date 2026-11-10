@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { closeToast, showToast } from '@/components/ui/toast';
-import './StayExamples.css';
 
 const records = [
   { id: 'a', name: '记录 A', detail: '需求整理' },

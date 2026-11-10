@@ -13,7 +13,6 @@ import { ScreenToolbar } from './ScreenToolbar'
 import { matchesScreenTextProbe } from '../../../shared/screen-visual-probe'
 import type { GameTranslationBridge } from '../../../shared/game-translation'
 import { GameOverlay } from '../game/GameOverlay'
-import './screen.css'
 
 export function ScreenWindowRoot({ api, gameApi }: { api: ScreenTranslationBridge; gameApi?: GameTranslationBridge }) {
   const query = new URLSearchParams(window.location.search)

@@ -1,6 +1,5 @@
 import type { CSSProperties } from 'react'
 import { AudioLines, Volume2 } from 'lucide-react'
-import './quick-interpretation-visual.css'
 
 const ringSizes = [78, 130, 182, 234]
 const signalLevels = [6, 12, 8, 17, 10, 14, 6]

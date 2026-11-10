@@ -2,27 +2,34 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { Accordion } from '@base-ui/react/accordion'
 import { Menu } from '@base-ui/react/menu'
-import { Tabs } from '@base-ui/react/tabs'
+import { AnimatedThemeToggler } from '../../../src/renderer/components/ui/animated-theme-toggler'
 import { Button } from '../../../src/renderer/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../src/renderer/components/ui/card'
-import { ArrowDown, ArrowUpRight, ChevronDown, Globe2, Monitor, Terminal, Apple, Mic, Captions, Video, Check, Github, Moon, Sun } from 'lucide-react'
+import { ArrowDown, ArrowUpRight, ChevronDown, Globe2, Monitor, Terminal, Check, Github, Sparkle, Star } from 'lucide-react'
 import { copy, downloadSources, downloadUrl, license, localeNames, localePath, repositoryUrl } from './content'
 import type { LandingCopy, Locale } from './content'
 import { autoLocaleNames, detectSiteLocale, localizedSitePath, readLocalePreference, saveLocalePreference } from './siteLocale'
+import { LandingFeatureSections } from './LandingFeatureSections'
+import { landingContent } from './landing-content'
 import type { LocalePreference } from './siteLocale'
 import chromeIcon from '../../../src/renderer/assets/browsers/chrome.png'
 import edgeIcon from '../../../src/renderer/assets/browsers/edge.png'
 import './landing.css'
 
-export interface LandingPageProps { locale: Locale; base: string; dark: boolean; onToggleTheme: () => void }
+export interface LandingPageProps {
+  locale: Locale
+  base: string
+  dark: boolean
+  onToggleTheme: () => void
+}
 export interface DemoFrameProps { locale: Locale; base: string; dark: boolean; text: LandingCopy['demo']; page?: string }
-export interface ProductPosterProps { locale: Locale; base: string; dark: boolean; kind: 'workspace' | 'overlay' | 'browser' | 'models'; label: string }
 
 export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPageProps) {
   const t = copy[locale]
+  const landing = landingContent[locale]
+  const themeLabel = dark ? t.nav.themeToLight : t.nav.themeToDark
   const site = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
-  const [scenario, setScenario] = useState('0')
   const [languagePreference, setLanguagePreference] = useState<LocalePreference>(readLocalePreference)
   const selectLanguage = (preference: LocalePreference) => {
     saveLocalePreference(preference)
@@ -38,6 +45,10 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
     sync()
     window.addEventListener('scroll', sync, { passive: true })
     const observer = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (entry.target.getAttribute('data-reveal') === 'section') {
+        entry.target.classList.toggle('is-offscreen', !entry.isIntersecting)
+        return
+      }
       if (entry.isIntersecting) { entry.target.classList.add('is-visible'); observer.unobserve(entry.target) }
     }), { threshold: .12 })
     site.current?.querySelectorAll('[data-reveal]').forEach(element => observer.observe(element))
@@ -58,7 +69,7 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
             </Menu.RadioGroup>
           </Menu.Popup></Menu.Positioner></Menu.Portal>
         </Menu.Root>
-        <Button variant="secondary" size="icon" className="site-theme" aria-label={dark ? t.nav.themeToLight : t.nav.themeToDark} onClick={onToggleTheme}>{dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}</Button>
+        <AnimatedThemeToggler className="site-theme site-theme--animated" theme={dark ? 'dark' : 'light'} aria-label={themeLabel} onThemeChange={onToggleTheme} />
       </div>
     </header>
     <main id="main">
@@ -73,52 +84,41 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
           </svg>
           <HeroPointerTrail />
         </div>
-        <div className="site-hero-copy">
-          <h1><span>Nola</span> Translator</h1>
-          <p className="site-hero-lede">{t.hero.subtitle}</p>
-          <DownloadButton text={t.hero.cta} menuLabel={t.nav.download} soon={t.platforms.soonLabel} />
+        <div className="site-hero-copy site-hero-copy--preview">
+          <h1 className="site-hero-wordmark">
+            <span className="site-hero-mark"><img src={`${base}nola-logo.svg`} alt="" /></span>
+            <span className="site-hero-title">
+              Nola Translator
+              <span className="site-hero-title-sparkles" aria-hidden="true">
+                <Sparkle /><Sparkle /><Sparkle /><Sparkle />
+              </span>
+            </span>
+          </h1>
+          <p className="site-hero-lede">{landing.heroSubtitle}</p>
+          <div className="site-hero-actions">
+            <DownloadButton locale={locale} text={t.final.cta} menuLabel={t.nav.download} soon={t.platforms.soonLabel} compact />
+            <a className="site-hero-star" href={repositoryUrl} target="_blank" rel="noopener noreferrer">
+              <Star aria-hidden="true" />{landing.star}
+            </a>
+          </div>
         </div>
         <div className="site-hero-demo"><DemoFrame locale={locale} base={base} dark={dark} text={t.demo} /></div>
       </section>
 
-      <section id="scenarios" className="site-scenarios site-shell site-section" data-reveal>
-        <div className="site-heading"><p className="site-kicker">NOLA, IN YOUR WORLD</p><h2>{t.demo.title}</h2><p>{t.demo.intro}</p></div>
-        <Tabs.Root value={scenario} onValueChange={(value: string) => setScenario(value)} className="site-scenario-tabs">
-          <Tabs.List className="tabs__list" aria-label={t.scenarios.title}>{t.demo.tabs.map((label, i) => <Tabs.Tab className="tabs__tab" value={String(i)} key={i}>{i === 0 ? <Mic aria-hidden="true" /> : i === 1 ? <Captions aria-hidden="true" /> : <Video aria-hidden="true" />}{label}</Tabs.Tab>)}</Tabs.List>
-          {t.scenarios.items.map((item, i) => <Tabs.Panel value={String(i)} key={i}>
-            <div className="site-scenario-panel">
-              <div className="site-scenario-copy"><span>{item.label}</span><h3>{item.title}</h3><p>{item.body}</p><Button variant="secondary" onClick={() => { document.getElementById('product')?.scrollIntoView({ behavior: 'smooth' }); window.dispatchEvent(new CustomEvent('nola-demo-page', { detail: ['workspace', 'overlay', 'video'][i] })) }}>{t.demo.expand}<ArrowUpRight aria-hidden="true" /></Button></div>
-              <ProductPoster locale={locale} base={base} dark={dark} kind={i === 0 ? 'workspace' : i === 1 ? 'overlay' : 'browser'} label={item.title} />
-            </div>
-          </Tabs.Panel>)}
-        </Tabs.Root>
-      </section>
+      <LandingFeatureSections locale={locale} />
 
-      <section className="site-features site-shell site-section">
-        <div className="site-heading" data-reveal><p className="site-kicker">MADE TO FIT YOUR DAY</p><h2>{t.scenarios.title}</h2><p>{t.scenarios.intro}</p></div>
-        {t.features.map((feature, i) => <article key={i} className={['site-feature', i % 2 === 1 && 'site-feature--reverse'].filter(Boolean).join(' ')} data-reveal>
-          <ProductPoster locale={locale} base={base} dark={dark} kind={(['workspace', 'overlay', 'browser', 'models'] as const)[i]} label={feature.title.replace('\n', '')} />
-          <div className="site-feature-copy"><span className="site-feature-number">0{i + 1} / NOLA TRANSLATOR</span><h3>{feature.title}</h3><p>{feature.body}</p><div className="site-tags">{feature.tags.map(tag => <span key={tag}><Check aria-hidden="true" />{tag}</span>)}</div></div>
-        </article>)}
-      </section>
-
-      <section className="site-language-section" data-reveal>
-        <div className="site-language-track" aria-hidden="true"><span>你好</span><span>Hello</span><span>こんにちは</span><span>안녕하세요</span><span>Hola</span><span>Bonjour</span><span>你好</span><span>Hello</span><span>こんにちは</span><span>안녕하세요</span><span>Hola</span><span>Bonjour</span></div>
-        <p>{t.hero.title}</p>
-      </section>
-
-      <section id="download" className="site-shell site-section site-downloads" data-reveal>
-        <div className="site-heading"><p className="site-kicker">TAKE NOLA WITH YOU</p><h2>{t.platforms.title}</h2><p>{t.platforms.intro}</p></div>
-        <div className="site-download-grid">
+      <section id="download" className="site-shell site-section site-downloads">
+        <div className="site-heading" data-reveal="section"><p className="site-kicker">{landing.downloadKicker}</p><h2>{t.platforms.title}</h2><p>{t.platforms.intro}</p></div>
+        <div className="site-download-grid" data-reveal="section">
           <DownloadCard icon={<Monitor aria-hidden="true" />} title={t.platforms.desktop} description={t.platforms.desktopBody}>
             <div className="site-download-art site-download-art--desktop"><img src={image('home')} loading="lazy" alt="" /></div>
-            <DownloadSourceButton label={t.nav.download} className="site-download-link"><WindowsIcon />Windows<ArrowDown aria-hidden="true" /></DownloadSourceButton>
-            <Button className="site-coming" variant="secondary" disabled><Apple aria-hidden="true" /><span>macOS</span><small>{t.platforms.soonLabel}</small></Button>
+            <DownloadSourceButton locale={locale} label={t.nav.download} className="site-download-link"><WindowsIcon />Windows<ArrowDown aria-hidden="true" /></DownloadSourceButton>
+            <Button className="site-coming" variant="secondary" disabled><AppleLogo /><span>macOS</span><small>{t.platforms.soonLabel}</small></Button>
           </DownloadCard>
           <DownloadCard icon={<Globe2 aria-hidden="true" />} title={t.platforms.browser} description={t.platforms.browserBody}>
             <div className="site-download-art site-download-art--browser"><img src={image('browser-scene')} loading="lazy" alt="" /></div>
-            <DownloadSourceButton label={t.nav.download} className="site-download-link"><img src={chromeIcon} alt="" />Chrome<ArrowDown aria-hidden="true" /></DownloadSourceButton>
-            <DownloadSourceButton label={t.nav.download} className="site-download-link site-download-link--secondary"><img src={edgeIcon} alt="" />Microsoft Edge<ArrowDown aria-hidden="true" /></DownloadSourceButton>
+            <DownloadSourceButton locale={locale} label={t.nav.download} className="site-download-link"><img src={chromeIcon} alt="" />Chrome<ArrowDown aria-hidden="true" /></DownloadSourceButton>
+            <DownloadSourceButton locale={locale} label={t.nav.download} className="site-download-link site-download-link--secondary"><img src={edgeIcon} alt="" />Microsoft Edge<ArrowDown aria-hidden="true" /></DownloadSourceButton>
           </DownloadCard>
           <DownloadCard icon={<Terminal aria-hidden="true" />} title={t.platforms.terminal} description={t.platforms.terminalBody}>
             <div className="site-download-art site-download-art--terminal" aria-hidden="true"><div><i /><i /><i /></div><p><span>❯</span> nola<span className="site-terminal-cursor">▏</span></p><small>Nola Translator</small></div>
@@ -135,7 +135,7 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
         </Accordion.Item>)}</Accordion.Root>
       </section>
 
-      <section className="site-final" data-reveal><div className="site-final-orb" aria-hidden="true" /><p className="site-kicker">NOLA TRANSLATOR</p><h2>{t.final.title}</h2><p>{t.final.body}</p><DownloadSourceButton label={t.nav.download} className="site-final-link"><WindowsIcon />{t.final.cta}<ArrowDown aria-hidden="true" /></DownloadSourceButton></section>
+      <section className="site-final" data-reveal><div className="site-final-orb" aria-hidden="true" /><p className="site-kicker">NOLA TRANSLATOR</p><h2>{t.final.title}</h2><p>{t.final.body}</p><DownloadSourceButton locale={locale} label={t.nav.download} className="site-final-link"><WindowsIcon />{t.final.cta}<ArrowDown aria-hidden="true" /></DownloadSourceButton></section>
     </main>
     <footer className="site-footer site-shell"><div><a className="site-brand" href={`${base}${localePath(locale).slice(1)}`}><img src={`${base}nola-logo.svg`} alt="" />Nola Translator</a><p>{t.footer.tagline}</p></div><nav aria-label={t.nav.menu}><a href={docUrl}>{t.nav.docs}</a><a href={downloadUrl}>{t.footer.releases}</a><a href={repositoryUrl}><Github aria-hidden="true" />GitHub</a></nav><div className="site-footer-bottom"><span>{t.footer.copyright}</span><a href={`${repositoryUrl}/blob/main/LICENSE`}>{license}</a></div></footer>
   </div>
@@ -143,6 +143,15 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
 
 function WindowsIcon() {
   return <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M1 3.6 8.3 2.6v7H1zm8.5-1.2L19 1v8.6H9.5zM1 10.8h7.3v7L1 16.8zm8.5 0H19v8.3l-9.5-1.2z" /></svg>
+}
+
+function AppleLogo() {
+  // Apple brand mark from Simple Icons.
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" />
+    </svg>
+  )
 }
 
 function HeroPointerTrail() {
@@ -217,49 +226,58 @@ function HeroPointerTrail() {
 }
 
 export interface DownloadSourceButtonProps {
+  locale: Locale
   children: ReactNode
   className: string
   label: string
+  compact?: boolean
 }
 
-export interface DownloadSourceMenuProps { label: string }
+export interface DownloadSourceMenuProps { label: string; locale: Locale }
 
-function DownloadSourceMenu({ label }: DownloadSourceMenuProps) {
+function DownloadSourceMenu({ label, locale }: DownloadSourceMenuProps) {
+  const names = locale === 'zh-CN'
+    ? { quark: '夸克网盘', baidu: '百度网盘' }
+    : locale.startsWith('zh-')
+      ? { quark: '夸克網盤', baidu: '百度網盤' }
+      : { quark: 'Quark', baidu: 'Baidu' }
+
   return <Menu.Group aria-label={label}>
     {downloadSources.map(source => <Menu.LinkItem key={source.id} href={source.url} target="_blank" rel="noopener noreferrer">
       {source.icon ? <img className="site-download-source-icon" src={`${import.meta.env.BASE_URL}${source.icon}`} alt="" /> : <Github aria-hidden="true" />}
-      <span>{source.name}</span>
+      <span>{source.id === 'github' ? source.name : names[source.id]}</span>
     </Menu.LinkItem>)}
   </Menu.Group>
 }
 
-function DownloadSourceButton({ children, className, label }: DownloadSourceButtonProps) {
+function DownloadSourceButton({ children, className, label, locale, compact }: DownloadSourceButtonProps) {
   return <Menu.Root>
     <Menu.Trigger render={<Button variant="secondary" />} className={className}>{children}</Menu.Trigger>
     <Menu.Portal><Menu.Positioner className="z-dropdown" side="bottom" sideOffset={4}>
-      <Menu.Popup className="site-download-menu" aria-label={label}><DownloadSourceMenu label={label} /></Menu.Popup>
+      <Menu.Popup className={compact ? 'site-download-menu site-download-menu--compact' : 'site-download-menu'} aria-label={label}><DownloadSourceMenu label={label} locale={locale} /></Menu.Popup>
     </Menu.Positioner></Menu.Portal>
   </Menu.Root>
 }
 
-export interface DownloadButtonProps { text: string; menuLabel: string; soon: string }
+export interface DownloadButtonProps { locale: Locale; text: string; menuLabel: string; soon: string; compact?: boolean }
 
-function DownloadButton({ text, menuLabel, soon }: DownloadButtonProps) {
+function DownloadButton({ locale, text, menuLabel, soon, compact }: DownloadButtonProps) {
   const anchor = useRef<HTMLDivElement>(null)
+  const menuClass = compact ? 'site-download-menu site-download-menu--compact' : 'site-download-menu'
   return <div className="site-download-button" ref={anchor}>
-    <DownloadSourceButton label={menuLabel} className="site-download-primary"><WindowsIcon />{text}</DownloadSourceButton>
+    <DownloadSourceButton locale={locale} label={menuLabel} className="site-download-primary" compact={compact}><WindowsIcon />{text}</DownloadSourceButton>
     <Menu.Root>
       <Menu.Trigger render={<Button size="icon" variant="secondary" />} className="site-download-trigger" aria-label={menuLabel}><ChevronDown aria-hidden="true" /></Menu.Trigger>
       <Menu.Portal><Menu.Positioner className="z-dropdown" anchor={anchor} side="bottom" sideOffset={4}>
-        <Menu.Popup className="site-download-menu" aria-label={menuLabel}>
+        <Menu.Popup className={menuClass} aria-label={menuLabel}>
           <Menu.Group>
             <Menu.SubmenuRoot>
               <Menu.SubmenuTrigger><WindowsIcon /><span>Windows</span><ChevronDown className="site-submenu-indicator" aria-hidden="true" /></Menu.SubmenuTrigger>
               <Menu.Portal><Menu.Positioner className="z-dropdown" side="right" align="start" sideOffset={4}>
-                <Menu.Popup className="site-download-menu" aria-label={menuLabel}><DownloadSourceMenu label={menuLabel} /></Menu.Popup>
+                <Menu.Popup className={menuClass} aria-label={menuLabel}><DownloadSourceMenu label={menuLabel} locale={locale} /></Menu.Popup>
               </Menu.Positioner></Menu.Portal>
             </Menu.SubmenuRoot>
-            <Menu.Item disabled><Apple aria-hidden="true" /><span>macOS</span><span className="site-menu-note">{soon}</span></Menu.Item>
+            <Menu.Item disabled><AppleLogo /><span>macOS</span><span className="site-menu-note">{soon}</span></Menu.Item>
           </Menu.Group>
         </Menu.Popup>
       </Menu.Positioner></Menu.Portal>
@@ -293,16 +311,6 @@ export function DemoFrame({ locale, base, dark, text, page = 'home' }: DemoFrame
       <iframe ref={frame} key={locale} src={`${base}demo/index.html?locale=${locale}&page=${page}&theme=${initialTheme}#/`} title={`Nola Translator — ${text.hint}`} style={{ visibility: ready ? 'visible' : 'hidden' }} />
       {!ready ? <div className="site-demo-loading"><img src={`${base}screenshots/${locale}/home${dark ? '-dark' : ''}.png`} alt="" /><span>{text.loading}</span></div> : null}
     </div>
-  </div>
-}
-
-export function ProductPoster({ locale, base, dark, kind, label }: ProductPosterProps) {
-  const page = kind === 'overlay' ? 'overlay-scene' : kind === 'browser' ? 'browser-scene' : kind
-  return <div className={`site-poster site-poster--${kind}`} role="img" aria-label={label}>
-    <div className="site-poster-orbit" aria-hidden="true" />
-    <div className="site-poster-window"><img src={`${base}screenshots/${locale}/${page}${dark ? '-dark' : ''}.png`} loading="lazy" alt="" /></div>
-    {kind === 'workspace' ? <div className="site-poster-caption" aria-hidden="true"><span>LIVE TRANSLATION</span><Mic /><i /><span>EN</span><ArrowUpRight /><span>{locale === 'en' ? 'ZH' : locale.startsWith('zh') ? 'ZH' : locale.toUpperCase()}</span></div> : null}
-    {kind === 'models' ? <div className="site-poster-chip" aria-hidden="true">llama.cpp<span>+</span>PyTorch</div> : null}
   </div>
 }
 

@@ -14,7 +14,6 @@ import type { ResourceRecord } from '../../../shared/contracts'
 import { modelEngines } from '../../../shared/model-engines'
 import { ImportHelp, ModelImportPanel } from './ModelImportPanel'
 import { OfflineTaskProgress } from './OfflineTaskProgress'
-import './offline.css'
 
 function bytes(value: number): string { return `${(value / 1024 ** 3).toFixed(2)} GB` }
 

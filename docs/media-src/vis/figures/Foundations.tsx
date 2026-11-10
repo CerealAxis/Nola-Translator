@@ -10,7 +10,6 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import './Foundations.css';
 
 function CheckBox({ label, checked = false, mixed = false }: { label: string; checked?: boolean; mixed?: boolean }) {
   return (

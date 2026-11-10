@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Heart, Languages, Sword } from 'lucide-react'
 import { useHomeVisualViewport } from './useHomeVisualMotion'
-import './game-manga-visuals.css'
 
 const questLines = [
   { source: '北の門で待っている。', translation: '我在北门等你。' },

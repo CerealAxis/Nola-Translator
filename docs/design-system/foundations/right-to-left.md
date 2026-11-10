@@ -16,7 +16,7 @@ editLink: false
 
 **让列表条目共享同一条对齐线。** 在 RTL 列表中，拉丁字母和阿拉伯文字的短名称都沿右侧对齐，便于逐项扫读。
 
-<demo react="foundation-environment-rtl.tsx" :reactFiles="['foundation-environment-rtl.tsx','../figures/FoundationEnvironment.tsx','../figures/FoundationEnvironment.css']" />
+<demo react="foundation-environment-rtl.tsx" :reactFiles="['foundation-environment-rtl.tsx','../figures/FoundationEnvironment.tsx']" />
 
 布局使用 `text-align: start`、`margin-inline` 和 `padding-inline` 等逻辑属性。已知语言的内容明确设置 `lang` 和 `dir`，来源不定的用户文本可用 `dir="auto"` 判断段落方向。
 
@@ -34,7 +34,7 @@ editLink: false
 
 **调整表示数值增长的控件。** RTL 滑块从右侧开始填充，最小值和最大值的标签随端点移动。由 Base UI 的方向上下文统一管理轨道、滑块和方向键行为。
 
-<demo react="foundation-environment-direction-controls.tsx" :reactFiles="['foundation-environment-direction-controls.tsx','../figures/FoundationEnvironment.tsx','../figures/FoundationEnvironment.css']" />
+<demo react="foundation-environment-direction-controls.tsx" :reactFiles="['foundation-environment-direction-controls.tsx','../figures/FoundationEnvironment.tsx']" />
 
 **调整按顺序导航的控件。** 返回、上一步和下一步随阅读顺序改变位置与箭头方向。RTL 界面的返回箭头指向右侧。
 

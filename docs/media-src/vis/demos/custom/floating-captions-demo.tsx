@@ -1,7 +1,5 @@
 import { DEFAULT_SETTINGS } from '@/bridge'
 import { OverlayCaptionPreview } from '@/features/overlay/OverlayCaptionPreview'
-import '@/theme/app.css'
-import '@/theme/caption-card.css'
 
 export default function FloatingCaptionsDemo() {
   return (

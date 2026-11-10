@@ -40,4 +40,4 @@ editLink: false
 
 区分界面语言、原文语言和译文语言。语言选择列表使用语言自身的名称。日期、数字、单位和货币遵循用户区域设置，预留翻译后的增长空间。验证状态色和符号在各地区仍传达同样的含义。
 
-<demo react="foundation-media-inclusion.tsx" :reactFiles="['foundation-media-inclusion.tsx','../figures/FoundationMedia.tsx','../figures/FoundationMedia.css']" />
+<demo react="foundation-media-inclusion.tsx" :reactFiles="['foundation-media-inclusion.tsx','../figures/FoundationMedia.tsx']" />

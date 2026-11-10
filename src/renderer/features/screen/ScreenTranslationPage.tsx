@@ -28,7 +28,6 @@ import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { defaultModelBinding, isModelEnabled } from '../../../shared/model-policy'
 import { screenConfigSchema, screenProcessingMode, screenTranslationModel, type ScreenCommand, type ScreenConfig, type ScreenSource, type ScreenSnapshot } from '../../../shared/screen-translation'
 import { layoutScreenOverlay } from './overlay-layout'
-import './screen.css'
 
 export function ScreenTranslationPage() {
   const { t } = useI18n()

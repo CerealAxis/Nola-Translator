@@ -22,7 +22,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ColorPicker } from '@/components/ui/color-picker'
 import { LANGUAGE_CODES } from '../../../shared/languages'
 import type { ComicConfig, ComicExportRequest, ComicImportRequest, ComicMaskStroke, ComicMutation, ComicProject, ComicProjectSummary, ComicRegion, ComicRunRequest } from '../../../shared/comic'
-import './comic.css'
 import { GlossarySelectionField } from '../settings/glossary/GlossarySelectionField'
 
 type RegionDraft = { pageId: string; region: ComicRegion; revision: number }

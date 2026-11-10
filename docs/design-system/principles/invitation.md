@@ -19,7 +19,7 @@ editLink: false
 
 <figure>
 
-<demo react="invitation-empty.tsx" :reactFiles="['invitation-empty.tsx', '../figures/Interactions.tsx', '../figures/Interactions.css']" />
+<demo react="invitation-empty.tsx" :reactFiles="['invitation-empty.tsx', '../figures/Interactions.tsx']" />
 
 <figcaption>空状态给出第一步操作。</figcaption>
 </figure>
@@ -39,7 +39,7 @@ editLink: false
 
 <figure>
 
-<demo react="invitation-hover.tsx" :reactFiles="['invitation-hover.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css']" />
+<demo react="invitation-hover.tsx" :reactFiles="['invitation-hover.tsx', '../figures/DynamicPatterns.tsx']" />
 
 <figcaption>悬停模板卡片，或按 Tab 聚焦卡片，查看“选择模板”入口。</figcaption>
 </figure>

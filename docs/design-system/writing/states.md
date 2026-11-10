@@ -42,7 +42,7 @@ editLink: false
 
 <figure>
 
-<demo react="writing-recovery.tsx" :reactFiles="['writing-recovery.tsx','../figures/WritingExamples.tsx','../figures/WritingExamples.css']" />
+<demo react="writing-recovery.tsx" :reactFiles="['writing-recovery.tsx','../figures/WritingExamples.tsx']" />
 
 <figcaption>Toast 写明任务、问题原因和恢复操作。</figcaption>
 

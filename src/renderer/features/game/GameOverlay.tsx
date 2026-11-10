@@ -4,7 +4,6 @@ import { stores, useStore } from '@/store'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import type { GameSnapshot, GameTranslationBridge } from '../../../shared/game-translation'
 import { CaptionTrack } from '../overlay/CaptionTrack'
-import './game.css'
 
 export function GameOverlay({ api, sessionId }: { api: Pick<GameTranslationBridge, 'snapshot' | 'onChanged'>; sessionId: string }) {
   const { t } = useI18n()

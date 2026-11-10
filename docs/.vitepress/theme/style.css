@@ -1,8 +1,5 @@
 @layer theme, base, components, utilities;
-@import '../../../src/renderer/theme/nola-light.css';
-@import '../../../src/renderer/theme/nola-dark.css';
-@import '../../../src/renderer/theme/typography.css';
-@import '../../../src/renderer/theme/z-index.css';
+@import "./site-theme.css";
 
 .shadcn-base-doc .vitepress-demo-plugin-preview > div {
   display: grid;

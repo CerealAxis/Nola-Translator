@@ -30,7 +30,7 @@ editLink: false
 
 <figure>
 
-<demo react="writing-actions.tsx" :reactFiles="['writing-actions.tsx','../figures/WritingExamples.tsx','../figures/WritingExamples.css']" />
+<demo react="writing-actions.tsx" :reactFiles="['writing-actions.tsx','../figures/WritingExamples.tsx']" />
 
 <figcaption>入口说明任务，标题沿用名称，按钮表达执行动作。</figcaption>
 

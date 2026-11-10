@@ -5,7 +5,6 @@ import { Slider } from '@base-ui/react/slider'
 import { Check, ChevronDown } from 'lucide-react'
 import { Button } from './button'
 import { Input } from './input'
-import './color-picker.css'
 
 export interface ColorPickerProps {
   label: string

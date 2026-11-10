@@ -4,7 +4,6 @@ import { useI18n } from '@/i18n'
 import { languageName, normalizeLanguage, type UiLanguage } from '../../../shared/languages'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import './language-direction.css'
 
 export function languageOptionLabel(code: string, locale: UiLanguage, includeNative = true): string {
   const normalized = normalizeLanguage(code)

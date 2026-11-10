@@ -1,9 +1,0 @@
-:root[data-magicui-theme-vt]::view-transition-old(root),
-:root[data-magicui-theme-vt]::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
-
-:root[data-magicui-theme-vt]::view-transition-new(root) {
-  clip-path: var(--magicui-theme-vt-clip-from);
-}

@@ -2,7 +2,6 @@ import { Check, CircleCheck, CircleX, Copy, Download, Ellipsis, TriangleAlert } 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import './FoundationAppearance.css';
 
 export function ColorPairs() {
   return <div className="foundation-board" data-scene="appearance-color">

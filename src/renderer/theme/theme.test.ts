@@ -6,12 +6,19 @@ import { describe, expect, it } from 'vitest'
 const here = dirname(fileURLToPath(import.meta.url))
 const read = (name: string) => readFileSync(join(here, name), 'utf8')
 
-const light = read('nola-light.css')
-const dark = read('nola-dark.css')
-const all = [light, dark, read('typography.css'), read('motion.css'), read('z-index.css'), read('index.css'), read('base-ui.css'), read('app.css')]
+const product = read('product.css')
+const section = (title: string, css = product) =>
+  css.split(`/* ===== ${title} ===== */\n`)[1].split(/\n\/\* ===== /)[0]
+const light = section('浅色语义变量')
+const dark = section('深色语义变量')
+const controls = section('Base UI 基础控件')
+const typography = section('排版')
+const motion = section('动效')
+const desktopLayout = section('桌面窗口与页面布局', read('../index.css'))
+const all = [light, dark, typography, motion, section('层级'), section('公共变量与工具类'), controls, desktopLayout]
 
 it('registers every status pill soft color without self references', () => {
-  const css = read('base-ui.css')
+  const css = controls
   for (const status of ['accent', 'success', 'warning', 'danger']) {
     expect(css).toContain(`--color-${status}-soft: var(--${status}-soft)`)
     expect(css).toContain(`--color-${status}-soft-foreground:`)
@@ -76,8 +83,8 @@ describe('设计硬规则由 CSS 自证（§1.8）', () => {
   })
 
   it('v3 卡片使用轻微染色投影，两套主题均可见', () => {
-    expect(light).toMatch(/--surface-shadow:\s*0 2px 10px rgba\(35,72,125,\.04\)/)
-    expect(dark).toMatch(/--surface-shadow:\s*0 2px 10px rgba\(15,25,45,\.12\)/)
+    expect(light).toMatch(/--surface-shadow:\s*0 2px 10px rgba\(35,\s*72,\s*125,\s*0\.04\)/)
+    expect(dark).toMatch(/--surface-shadow:\s*0 2px 10px rgba\(15,\s*25,\s*45,\s*0\.12\)/)
   })
 
   it('没有把 #000000 / #ffffff 当作背景或前景直接写死', () => {
@@ -108,38 +115,37 @@ describe('设计硬规则由 CSS 自证（§1.8）', () => {
 
 describe('排版规则（§3.3）', () => {
   it('界面字体按语言选择 Noto，深浅主题不另设字体', () => {
-    const css = read('typography.css')
-    expect(css).toContain('--font-ui: var(--font-cjk-fallback), sans-serif')
-    for (const region of ['SC', 'TC', 'HK', 'JP', 'KR']) expect(css).toContain(`'Noto Sans ${region}'`)
-    expect(read('nola-theme.css')).not.toMatch(/--font-(ui|sans|mono|serif):|@font-face/)
+    expect(typography).toContain('--font-ui: var(--nola-font-family, var(--font-cjk-fallback), sans-serif)')
+    for (const region of ['SC', 'TC', 'HK', 'JP', 'KR']) expect(typography).toContain(`'Noto Sans ${region}'`)
+    expect(section('产品主题')).not.toMatch(/--font-(ui|sans|mono|serif):|@font-face/)
   })
 
   it('正文行高沿用 Apple Liquid Glass 的产品字号', () => {
-    const css = read('nola-theme.css')
+    const css = section('产品主题')
     expect(css).toContain('--nola-text-body: var(--font-body);')
     expect(css).toMatch(/--font-body:\s*400[^;]+\/1\.55 var\(--font-ui\);/)
   })
 
   it('所有数字都用 tabular-nums', () => {
-    expect(read('typography.css')).toMatch(/tabular-nums/)
+    expect(typography).toMatch(/tabular-nums/)
   })
 })
 
 describe('动效规则（§6.4）', () => {
   it('定义了四个时长档位', () => {
-    const css = read('motion.css')
+    const css = motion
     for (const v of ['--dur-micro: 120ms', '--dur-enter: 200ms', '--dur-exit: 120ms', '--dur-page: 160ms']) {
       expect(css).toContain(v)
     }
   })
 
   it('循环动画都能被 [data-paused] 停掉', () => {
-    const css = read('motion.css')
+    const css = motion
     expect(css).toMatch(/\[data-paused[^\]]*\][^{]*\{[^}]*animation:\s*none/i)
   })
 
   it('减少动画走双通道：系统偏好 + 应用开关', () => {
-    const css = read('motion.css')
+    const css = motion
     expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/)
     expect(css).toMatch(/data-reduce-motion/)
   })

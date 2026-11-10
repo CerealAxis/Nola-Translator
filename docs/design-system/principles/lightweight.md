@@ -20,7 +20,7 @@ editLink: false
 </div>
 <figure>
 
-<demo react="visible-tools.tsx" :reactFiles="['visible-tools.tsx', '../figures/LightweightExamples.tsx', '../figures/LightweightExamples.css']" />
+<demo react="visible-tools.tsx" :reactFiles="['visible-tools.tsx', '../figures/LightweightExamples.tsx']" />
 
 <figcaption>悬停并点击「收藏」，比较常态与选中状态。</figcaption>
 </figure>
@@ -38,7 +38,7 @@ editLink: false
 </div>
 <figure>
 
-<demo react="hover-tools.tsx" :reactFiles="['hover-tools.tsx', '../figures/LightweightExamples.tsx', '../figures/LightweightExamples.css']" />
+<demo react="hover-tools.tsx" :reactFiles="['hover-tools.tsx', '../figures/LightweightExamples.tsx']" />
 
 <figcaption>工具跟随当前行出现。</figcaption>
 </figure>
@@ -56,7 +56,7 @@ editLink: false
 </div>
 <figure>
 
-<demo react="edit-mode-tools.tsx" :reactFiles="['edit-mode-tools.tsx', '../figures/LightweightExamples.tsx', '../figures/LightweightExamples.css']" />
+<demo react="edit-mode-tools.tsx" :reactFiles="['edit-mode-tools.tsx', '../figures/LightweightExamples.tsx']" />
 
 <figcaption>输入与阅读在同一个单元格切换。</figcaption>
 </figure>
@@ -74,7 +74,7 @@ editLink: false
 </div>
 <figure>
 
-<demo react="contextual-tools.tsx" :reactFiles="['contextual-tools.tsx', '../figures/DynamicPatterns.tsx', '../figures/DynamicPatterns.css']" />
+<demo react="contextual-tools.tsx" :reactFiles="['contextual-tools.tsx', '../figures/DynamicPatterns.tsx']" />
 
 <figcaption>复制发生在编号本身，无须旁置图标。</figcaption>
 </figure>
@@ -92,7 +92,7 @@ editLink: false
 </div>
 <figure>
 
-<demo react="hit-area-links.tsx" :reactFiles="['hit-area-links.tsx', '../figures/LightweightExamples.tsx', '../figures/LightweightExamples.css']" />
+<demo react="hit-area-links.tsx" :reactFiles="['hit-area-links.tsx', '../figures/LightweightExamples.tsx']" />
 
 <figcaption>点击范围覆盖完整单元格。</figcaption>
 </figure>
@@ -106,7 +106,7 @@ editLink: false
 </div>
 <figure>
 
-<demo react="hit-area.tsx" :reactFiles="['hit-area.tsx', '../figures/LightweightExamples.tsx', '../figures/LightweightExamples.css']" />
+<demo react="hit-area.tsx" :reactFiles="['hit-area.tsx', '../figures/LightweightExamples.tsx']" />
 
 <figcaption>图标尺寸与可点击范围分别标注。</figcaption>
 </figure>

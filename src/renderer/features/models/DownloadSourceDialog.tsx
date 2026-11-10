@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { downloadSourcesFor } from '../../../shared/model-download-sources'
 import { DownloadSourceTabs } from './DownloadSourceTabs'
-import './models.css'
 
 export interface DownloadSourceDialogProps {
   record: Pick<ResourceRecord, 'resourceId' | 'name'> | null

@@ -33,7 +33,6 @@ import { installedPlaygroundModels } from '../workbench/installed-models'
 import { isModelReady } from '../../../shared/model-capabilities'
 import { supportsSelectedEngine, modelEngines } from '../../../shared/model-engines'
 import { isEngineAvailable } from '../models/engine-availability'
-import './model-gateway.css'
 
 const CAPABILITIES: GatewayCapability[] = ['asr', 'mt', 'tts', 'llm', 'ocr']
 const PUBLIC_CAPABILITIES = ['asr', 'mt', 'tts'] as const

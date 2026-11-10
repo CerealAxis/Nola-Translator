@@ -1,7 +1,6 @@
 import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui'
 import { useI18n } from '@/i18n'
 import { openLogs } from '@/store'
-import './StartupFailureDialog.css'
 
 export interface StartupFailureDialogProps {
   isOpen: boolean

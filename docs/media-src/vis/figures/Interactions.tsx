@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Spinner } from '@/components/ui/spinner';
-import './Interactions.css';
 
 function ProgressBar({ value, max = 100, className, label }: { value: number; max?: number; className?: string; label: string }) {
   return <ProgressPrimitive.Root value={value} max={max} className={className} data-slot="progress" aria-label={label}>

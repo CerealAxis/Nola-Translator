@@ -31,7 +31,6 @@ import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
 import { SessionErrorDialog, StopSessionDialog } from './WorkspaceDialogs'
 import { WorkspaceToolbar } from './WorkspaceToolbar'
 import { MeetingReader } from '../meeting/MeetingReader'
-import './workspace.css'
 
 export { errorCopyOf } from './error-copy'
 

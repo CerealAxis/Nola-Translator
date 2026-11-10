@@ -1,7 +1,6 @@
 @layer theme, base, components, utilities;
 @import '../../../src/renderer/index.css';
 @source '../../../src/renderer';
-@import '../../../src/renderer/features/onboarding/onboarding.css';
 
 html, body, #root { min-height: 100%; }
 body { overflow: hidden; }

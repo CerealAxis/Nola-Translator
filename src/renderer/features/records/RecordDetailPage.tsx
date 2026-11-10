@@ -29,7 +29,6 @@ import { actions, stores, useStore } from '@/store'
 import { ExportDialog } from './ExportDialog'
 import { RenameDialog } from './RenameDialog'
 import { formatDateTime, formatClock } from './recordLogic'
-import '../home/home-records.css'
 
 /** Type-scale bounds: 0.7 is still readable, 2.0 suits projection and low vision. */
 const SCALE_MIN = 0.7

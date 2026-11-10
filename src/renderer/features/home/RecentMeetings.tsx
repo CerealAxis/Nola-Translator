@@ -11,7 +11,6 @@ import { useI18n, type TranslationKey, type UiLanguage } from '@/i18n'
 import { pathOf, recordPath, useRoute } from '@/routes'
 import { actions, stores, useStore } from '@/store'
 import { HomeListRow } from './HomeListRow'
-import './recent-activity.css'
 
 const recentLimit = 3
 const features = {

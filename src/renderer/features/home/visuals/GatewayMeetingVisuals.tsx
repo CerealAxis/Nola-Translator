@@ -9,7 +9,6 @@ import { AudioLines } from 'lucide-react'
 import { motion } from 'motion/react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import logo from '../../../../../assets/brand/nola-logo.svg'
-import './gateway-meeting-visuals.css'
 
 const modelMarks = [
   { name: 'GPT', Mark: OpenAI, x: 14, y: 18 },

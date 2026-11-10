@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider';
-import './FoundationEnvironment.css';
 
 export function KeyboardFocus() {
   const id = useId();

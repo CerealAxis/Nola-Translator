@@ -10,7 +10,6 @@ import { GatewayVisual, MeetingVisual } from './visuals/GatewayMeetingVisuals'
 import { ProviderIconCloud } from './visuals/ProviderIconCloud'
 import { QuickInterpretationVisual } from './visuals/QuickInterpretationVisual'
 import { useHomeReducedMotion } from './visuals/useHomeVisualMotion'
-import './home-features.css'
 
 const features = [
   { route: 'models', title: 'home.models', Icon: Cpu, Visual: ProviderIconCloud, size: 'small', target: 'home-models' },

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
-import '@/features/home/home-records.css'
 
 const MIN_SPLIT = 15
 const MAX_SPLIT = 85

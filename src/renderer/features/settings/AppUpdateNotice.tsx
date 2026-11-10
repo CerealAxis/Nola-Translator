@@ -12,7 +12,6 @@ import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle 
 import { notifyError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
-import './AppUpdateNotice.css'
 
 const releaseNotesSchema: Schema = {
   ...defaultSchema,

@@ -19,7 +19,6 @@ import packageInfo from '../../../../../package.json'
 import nolaLogoUrl from '../../../../../assets/brand/nola-logo.svg'
 import authorAvatarUrl from '../../../../../assets/brand/cerealaxis.png'
 import shadcnLogoUrl from '../../../../../assets/brand/shadcn-ui.png'
-import './more.css'
 
 const AUTHOR_URL = 'https://github.com/CerealAxis'
 const SPONSOR_URL = 'https://nola.xaviermc.top/zh-CN/contributing/sponsor'

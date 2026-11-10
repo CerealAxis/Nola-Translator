@@ -1,4 +1,3 @@
-import './Contrast.css';
 import { CheckCircle2, CircleAlert, Clock3, Pencil } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';

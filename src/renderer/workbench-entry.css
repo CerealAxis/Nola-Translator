@@ -1,8 +1,0 @@
-@import './features/workbench/native-agent.css';
-@import './features/workbench/native-generative.css';
-
-.aui-image-zoom-card { position: relative; max-width: 90vw; max-height: 90vh; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--card); color: var(--card-foreground); }
-.aui-mermaid-zoom-overlay { background: var(--card); color: var(--card-foreground); }
-.aui-mermaid-zoom-toolbar { display: flex; flex-direction: row; align-items: center; gap: calc(var(--spacing) * 1); padding: calc(var(--spacing) * 1); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--card); color: var(--card-foreground); }
-.aui-mermaid-zoom-close.button, .aui-mermaid-zoom-close.button:hover:not(:disabled):not([aria-disabled='true']), .aui-mermaid-zoom-close.button:active:not(:disabled):not([aria-disabled='true']), .aui-mermaid-zoom-close.button[aria-expanded='true'] { border-color: transparent; background: transparent; box-shadow: none; }
-.aui-image-zoom-card .button, .aui-mermaid-zoom-toolbar .button { width: calc(var(--spacing) * 10); height: calc(var(--spacing) * 10); min-height: calc(var(--spacing) * 10); }

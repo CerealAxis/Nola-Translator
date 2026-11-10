@@ -1,9 +1,0 @@
-.nola-home-recent-filters.tabs__list {
-  justify-content: flex-start;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.nola-home-recent-filters .tabs__tab {
-  flex: none;
-}

@@ -3,7 +3,6 @@ import { Moon, Sun } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import type { MouseEvent } from 'react'
 import { Button, type ButtonProps } from './button'
-import './animated-theme-toggler.css'
 
 type Theme = 'light' | 'dark'
 

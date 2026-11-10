@@ -19,6 +19,7 @@ const base = process.env.DOCS_BASE ?? '/'
 const shadcnPreview = fileURLToPath(new URL('../media-src/vis/shadcn-base/', import.meta.url)).replace(/\\/g, '/')
 const demoPortal = 'body:has(.nola-vis-doc) :is([data-base-ui-portal], [data-assistant-preview-portal])'
 const demoScope = `:where(.nola-vis-doc .vitepress-demo-plugin-preview > div, ${demoPortal})`
+const glassRoot = /^:is\(:root,\s*\.nola-extension\)/
 
 // Search engines and social previews need a per-page URL, which the static head array cannot provide.
 const localeSegments: Record<Locale, string> = { 'zh-CN': 'zh-CN', 'zh-TW': 'zh-TW', 'zh-HK': 'zh-HK', en: 'en', ja: 'ja', ko: 'ko' }
@@ -219,8 +220,9 @@ export default withMermaid(defineConfig({
           if (selector === '.dark') return `.dark ${scope}`
           if (selector.startsWith(':root:is(')) return `${selector} ${scope}`
           if (selector.startsWith(':host(')) return ':not(*)'
-          if (selector.startsWith(':is(:root, .nola-extension)')) return selector.replace(':is(:root, .nola-extension)', scope)
+          if (glassRoot.test(selector)) return selector.replace(glassRoot, scope)
           if (selector.startsWith(':root:lang(')) return `${scope}${selector.slice(':root'.length)}`
+          if (selector.startsWith('body:has([data-writing-scene=')) return selector
           if (/^(?:html|body|:root|:host)(?=$|[.:[\s>])/.test(selector)) return selector.replace(/^(?:html|body|:root|:host)/, scope)
           return scopedSelector
         },

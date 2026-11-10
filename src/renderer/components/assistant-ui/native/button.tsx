@@ -1,5 +1,4 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
-import "../../ui/close-button.css"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
