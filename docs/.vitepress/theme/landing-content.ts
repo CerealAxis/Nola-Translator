@@ -40,7 +40,7 @@ interface LandingContent {
 
 export const landingContent: Record<Locale, LandingContent> = {
   'zh-CN': {
-    heroSubtitle: '免费开源的实时翻译软件，集成视频字幕翻译、实时翻译、漫画翻译等功能于一体，支持本地推理+云端API调用，支持Qwen、混元、Index Translator、DeepSeek、GPT等顶尖 AI 翻译引擎，支持 100+语言互译。',
+    heroSubtitle: '免费开源的实时翻译软件，集成视频字幕翻译、实时翻译、漫画翻译等功能于一体，支持本地推理+云端API调用，支持Qwen、混元、Index Translate、DeepSeek、GPT等顶尖 AI 翻译引擎，支持 100+语言互译。',
     star: '点个 Star',
     audienceHeading: '跨越语言障碍',
     audienceLabel: '按使用人群查看',
@@ -68,7 +68,7 @@ export const landingContent: Record<Locale, LandingContent> = {
     brandNames: { hunyuan: '腾讯混元', google: '谷歌翻译', microsoft: '微软翻译' },
   },
   'zh-TW': {
-    heroSubtitle: '免費開源的即時翻譯軟體，整合影片字幕、即時翻譯與漫畫翻譯，支援本機推論和雲端 API，以及 Qwen、混元、Index Translator、DeepSeek、GPT 等 AI 翻譯引擎，支援 100 多種語言互譯。',
+    heroSubtitle: '免費開源的即時翻譯軟體，整合影片字幕、即時翻譯與漫畫翻譯，支援本機推論和雲端 API，以及 Qwen、混元、Index Translate、DeepSeek、GPT 等 AI 翻譯引擎，支援 100 多種語言互譯。',
     star: '給個 Star', audienceHeading: '跨越語言障礙', audienceLabel: '依使用族群查看', keywordsLabel: '常見使用情境', viewAudience: label => `查看${label}卡片`,
     audiences: [
       { id: 'students', label: '學生', title: '讀懂資料，聽懂課堂', description: '從大學公開課到課程講義與課外閱讀，Nola Translator 用雙語字幕幫你跟上講解，以網頁對照翻譯協助閱讀。遇到新概念，也能回到原文仔細推敲。', keywords: ['MIT 公開課', '英文課程講義', '課外閱讀清單'] },
@@ -91,7 +91,7 @@ export const landingContent: Record<Locale, LandingContent> = {
     brandNames: { hunyuan: '騰訊混元', google: 'Google 翻譯', microsoft: '微軟翻譯' },
   },
   'zh-HK': {
-    heroSubtitle: '免費開源的即時翻譯軟件，整合影片字幕、即時翻譯及漫畫翻譯，支援本機推論和雲端 API，以及 Qwen、混元、Index Translator、DeepSeek、GPT 等 AI 翻譯引擎，支援 100 多種語言互譯。',
+    heroSubtitle: '免費開源的即時翻譯軟件，整合影片字幕、即時翻譯及漫畫翻譯，支援本機推論和雲端 API，以及 Qwen、混元、Index Translate、DeepSeek、GPT 等 AI 翻譯引擎，支援 100 多種語言互譯。',
     star: '給個 Star', audienceHeading: '跨越語言障礙', audienceLabel: '按使用人群查看', keywordsLabel: '常見使用場景', viewAudience: label => `查看${label}卡片`,
     audiences: [
       { id: 'students', label: '學生', title: '讀懂資料，聽懂課堂', description: '從大學公開課到課程講義與課外閱讀，Nola Translator 用雙語字幕幫你跟上講解，透過網頁對照翻譯理解資料，亦可回看原文。', keywords: ['MIT 公開課', '英文課程講義', '課外閱讀清單'] },
@@ -114,7 +114,7 @@ export const landingContent: Record<Locale, LandingContent> = {
     brandNames: { hunyuan: '騰訊混元', google: 'Google 翻譯', microsoft: '微軟翻譯' },
   },
   en: {
-    heroSubtitle: 'Free, open-source real-time translation for videos, conversations, and comics. Use local models or cloud APIs with AI translation engines including Qwen, Hunyuan, Index Translator, DeepSeek, and GPT across 100+ languages.',
+    heroSubtitle: 'Free, open-source real-time translation for videos, conversations, and comics. Use local models or cloud APIs with AI translation engines including Qwen, Hunyuan, Index Translate, DeepSeek, and GPT across 100+ languages.',
     star: 'Star on GitHub', audienceHeading: 'Break through language barriers', audienceLabel: 'Explore by audience', keywordsLabel: 'Common use cases', viewAudience: label => `View ${label} card`,
     audiences: [
       { id: 'students', label: 'Students', title: 'Understand the material and the lesson', description: 'Follow university lectures with bilingual captions and read course notes and articles with side-by-side web translation. Return to the original whenever you want a closer look.', keywords: ['MIT OpenCourseWare', 'English lecture notes', 'Reading lists'] },
@@ -137,7 +137,7 @@ export const landingContent: Record<Locale, LandingContent> = {
     brandNames: { hunyuan: 'Tencent Hunyuan', google: 'Google Translate', microsoft: 'Microsoft Translator' },
   },
   ja: {
-    heroSubtitle: '無料・オープンソースのリアルタイム翻訳ソフト。動画字幕、リアルタイム翻訳、漫画翻訳を備え、ローカル推論とクラウド API、Qwen、混元、Index Translator、DeepSeek、GPT などの AI 翻訳エンジンを利用でき、100 以上の言語に対応します。',
+    heroSubtitle: '無料・オープンソースのリアルタイム翻訳ソフト。動画字幕、リアルタイム翻訳、漫画翻訳を備え、ローカル推論とクラウド API、Qwen、混元、Index Translate、DeepSeek、GPT などの AI 翻訳エンジンを利用でき、100 以上の言語に対応します。',
     star: 'GitHub で Star', audienceHeading: '言葉の壁を越えて', audienceLabel: '利用者別に見る', keywordsLabel: '主な利用シーン', viewAudience: label => `${label}のカードを見る`,
     audiences: [
       { id: 'students', label: '学生', title: '資料も授業も、もっとわかる', description: '大学の公開講座は二言語字幕で、講義資料や記事はウェブの対訳で読み進められます。気になる内容は原文に戻って確認できます。', keywords: ['MIT 公開講座', '英語の講義資料', '読書リスト'] },
@@ -160,7 +160,7 @@ export const landingContent: Record<Locale, LandingContent> = {
     brandNames: { hunyuan: 'Tencent Hunyuan', google: 'Google 翻訳', microsoft: 'Microsoft 翻訳' },
   },
   ko: {
-    heroSubtitle: '동영상 자막, 실시간 번역, 만화 번역을 제공하는 무료 오픈 소스 소프트웨어입니다. 로컬 추론과 클라우드 API, Qwen, Hunyuan, Index Translator, DeepSeek, GPT 등의 AI 번역 엔진을 이용해 100개 이상의 언어를 번역할 수 있습니다.',
+    heroSubtitle: '동영상 자막, 실시간 번역, 만화 번역을 제공하는 무료 오픈 소스 소프트웨어입니다. 로컬 추론과 클라우드 API, Qwen, Hunyuan, Index Translate, DeepSeek, GPT 등의 AI 번역 엔진을 이용해 100개 이상의 언어를 번역할 수 있습니다.',
     star: 'GitHub Star', audienceHeading: '언어의 장벽을 넘어', audienceLabel: '사용자별로 보기', keywordsLabel: '주요 활용 사례', viewAudience: label => `${label} 카드 보기`,
     audiences: [
       { id: 'students', label: '학생', title: '자료를 읽고 수업을 이해하세요', description: '대학 공개 강의는 이중 언어 자막으로, 강의 자료와 읽을거리는 웹 대조 번역으로 살펴보세요. 새로운 개념은 원문으로 돌아가 확인할 수 있습니다.', keywords: ['MIT 공개 강의', '영어 강의 자료', '읽기 목록'] },
