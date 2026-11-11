@@ -174,6 +174,25 @@ def test_real_http_vector_pdf_and_folder_export(tmp_path):
                 assert rendered.getpixel((0, 0)) == (255, 255, 255)
 
 
+def test_large_pdf_page_fits_default_import_and_failed_import_cleans_staging(tmp_path):
+    import pypdfium2 as pdf
+    from nola_translator_engine.backend.comic_formats import MAX_PIXELS
+
+    document = tmp_path / "large.pdf"
+    with pdf.PdfDocument.new() as book:
+        book.new_page(1500, 2100).close()
+        book.save(document)
+    repo = ComicRepository(tmp_path / "shelf")
+    with pytest.raises(FileNotFoundError):
+        repo.import_sources([str(document), str(tmp_path / "missing.pdf")], "Broken")
+    assert repo.list() == []
+    assert not list((repo.root / "assets").iterdir())
+    assert not list(repo.root.glob(".import-*"))
+    page, = repo.import_sources([str(document)], "Large")["pages"]
+    assert 2_000_000 < page["width"] * page["height"] <= MAX_PIXELS
+    assert repo.asset_path(repo.list()[0]["id"], page["id"], "source").is_file()
+
+
 def test_epub2_ncx_chapters_include_nested_fragment_targets(comic, tmp_path):
     repo, _, images = comic
     book = tmp_path / "illustrated.epub"

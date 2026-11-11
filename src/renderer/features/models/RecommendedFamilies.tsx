@@ -260,10 +260,11 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
 }
 
 
-export type LocalModelFamilyKind = 'ocrModel' | 'inpaintModel'
+export type LocalModelFamilyKind = 'ocrModel' | 'detectModel' | 'inpaintModel'
 
 const LOCAL_MODEL_FAMILIES = {
   ocrModel: { id: 'ocr', name: 'PP-OCRv5 mobile', description: 'screen.ocrDescription', runtime: 'ONNX Runtime' },
+  detectModel: { id: 'comic-detector', name: 'RT-DETR v2', description: 'suite.comicDetectorDescription', runtime: 'ONNX Runtime' },
   inpaintModel: { id: 'inpaint', name: 'LaMA Manga', description: 'suite.inpaintDescription', runtime: 'PyTorch' },
 } as const
 

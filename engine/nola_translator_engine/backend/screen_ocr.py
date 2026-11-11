@@ -18,7 +18,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.manager import ModelIntegrityError, ModelManager
-from ..models.ocr_catalog import OCR_DETECTOR, OCR_RECOGNIZERS, PP_OCRV5_MOBILE, OCR_SPECS, OCR_LANGUAGES, OCR_RESOURCE_ID
+from ..models.ocr_catalog import (COMIC_DETECTOR, COMIC_DETECTOR_ID, OCR_DETECTOR, OCR_RECOGNIZERS,
+                                  PP_OCRV5_MOBILE, OCR_SPECS, OCR_LANGUAGES, OCR_RESOURCE_ID)
 from ..protocol import NetworkSettings, ResourceRecord
 from ..debug_log import exception_fields, write as write_diagnostic
 from .gateway.resources import ConcurrencyGate
@@ -440,12 +441,10 @@ class ScreenOcr:
             results.extend(batch)
         return results
 
-    def _infer(self, request: OcrRequest) -> dict:
+    def _detect_quads(self, image, directory):
         import cv2
         import numpy as np
 
-        directory = self._verify()
-        image = decode_image(request.image)
         height, width = image.shape[:2]
         ratio = min(1, 960 / max(height, width))
         size = (max(32, round(width * ratio / 32) * 32), max(32, round(height * ratio / 32) * 32))
@@ -454,30 +453,48 @@ class ScreenOcr:
                   np.array([0.229, 0.224, 0.225], dtype=np.float32)).transpose(2, 0, 1)[None]
         detector = self._session(directory / OCR_DETECTOR)
         prediction = detector.run(None, {detector.get_inputs()[0].name: tensor})[0]
+        return detected_quads(prediction, width, height)
+
+    def _recognize_quads(self, image, quads, directory, language, batch_size):
+        import cv2
+        import numpy as np
+
+        if not len(quads):
+            return []
         if self.spec.model_id == OCR_RESOURCE_ID:
-            languages = ("ch", "ko") if request.language == "auto" else ("ko" if request.language == "ko" else "ch",)
+            languages = ("ch", "ko") if language == "auto" else ("ko" if language == "ko" else "ch",)
             paths = [OCR_RECOGNIZERS[language] for language in languages]
         else:
             paths = [entry.path for entry in self.spec.files if "_rec_" in entry.path]
         recognizers = [self._session(directory / path) for path in paths]
-        blocks, crops = [], []
-        quads = detected_quads(prediction, width, height)
-        for quad in quads:
+        def crop(points):
+            quad = np.asarray(points, dtype=np.float32)
             crop_width = max(1, round(max(np.linalg.norm(quad[0] - quad[1]), np.linalg.norm(quad[2] - quad[3]))))
             crop_height = max(1, round(max(np.linalg.norm(quad[0] - quad[3]), np.linalg.norm(quad[1] - quad[2]))))
+            scale = min(1, 2048 / max(crop_width, crop_height), 512 / min(crop_width, crop_height))
+            crop_width, crop_height = max(1, round(crop_width * scale)), max(1, round(crop_height * scale))
             target = np.array([[0, 0], [crop_width - 1, 0], [crop_width - 1, crop_height - 1], [0, crop_height - 1]], dtype=np.float32)
-            crop = cv2.warpPerspective(image, cv2.getPerspectiveTransform(quad, target), (crop_width, crop_height), borderMode=cv2.BORDER_REPLICATE)
-            if crop_height > crop_width * 1.5:
-                crop = np.rot90(crop)
-            crops.append(crop)
-        batch_size = request.max_concurrency if request.task_mode == "offline" else 1
+            pixels = cv2.warpPerspective(image, cv2.getPerspectiveTransform(quad, target), (crop_width, crop_height),
+                                         borderMode=cv2.BORDER_REPLICATE)
+            return np.rot90(pixels) if crop_height > crop_width * 1.5 else pixels
+
         recognized = []
-        for offset in range(0, len(crops), batch_size):
-            candidates = [self._recognize_batch(crops[offset:offset + batch_size], recognizer) for recognizer in recognizers]
+        for offset in range(0, len(quads), batch_size):
+            crops = [crop(quad) for quad in quads[offset:offset + batch_size]]
+            candidates = [self._recognize_batch(crops, recognizer) for recognizer in recognizers]
             recognized.extend(max(items, key=recognition_quality) for items in zip(*candidates))
-        for quad, (text, confidence) in zip(quads, recognized):
-            if self.spec.model_id == "pp-ocrv5-mobile-arabic-onnx":
-                text = arabic_logical_order(text)
+        if self.spec.model_id == "pp-ocrv5-mobile-arabic-onnx":
+            recognized = [(arabic_logical_order(text), confidence) for text, confidence in recognized]
+        return recognized
+
+    def _infer(self, request: OcrRequest) -> dict:
+        directory = self._verify()
+        image = decode_image(request.image)
+        height, width = image.shape[:2]
+        quads = self._detect_quads(image, directory)
+        batch_size = request.max_concurrency if request.task_mode == "offline" else 1
+        blocks = []
+        for quad, (text, confidence) in zip(quads, self._recognize_quads(image, quads, directory, request.language, batch_size)):
             if text.strip() and confidence >= 0.5:
                 blocks.append({"id": str(len(blocks)), "text": text, "confidence": round(confidence, 5), "quad": quad.round(2).tolist()})
         if request.appearance:
@@ -486,21 +503,52 @@ class ScreenOcr:
         return {"blocks": blocks, "width": width, "height": height}
 
     async def infer(self, request: OcrRequest) -> dict:
-        if request.language != "auto" and request.language not in self.languages:
+        return await self._run_inference(request.language, request.max_concurrency,
+                                         request.task_mode == "realtime", self._infer, request)
+
+    async def detect_comic(self, image):
+        def detect():
+            return self._detect_quads(image, self._verify())
+        return await self._run_inference("auto", 1, False, detect)
+
+    async def recognize_comic(self, image, quads, language):
+        def recognize():
+            return self._recognize_quads(image, quads, self._verify(), language, 5)
+        return await self._run_inference(language, 1, False, recognize)
+
+    async def recognize_comic_box(self, image, quad, language, vertical):
+        def recognize():
+            import numpy as np
+
+            directory = self._verify()
+            xs, ys = zip(*quad)
+            x, y = math.floor(min(xs)), math.floor(min(ys))
+            crop = image[y:math.ceil(max(ys)), x:math.ceil(max(xs))]
+            lines = self._detect_quads(crop, directory) if crop.size else []
+            offset = np.array([x, y], dtype=np.float32)
+            lines = sorted((line + offset for line in lines),
+                           key=lambda line: (-line[:, 0].mean(), line[:, 1].mean()) if vertical
+                           else (line[:, 1].mean(), line[:, 0].mean()))
+            return self._recognize_quads(image, lines or [quad], directory, language, 5)
+
+        return await self._run_inference(language, 1, False, recognize)
+
+    async def _run_inference(self, language, concurrency, realtime, run, *args):
+        if language != "auto" and language not in self.languages:
             raise ValueError("unsupportedLanguage")
         if not self._loaded:
             raise ValueError("modelNotLoaded")
         if self._closed or self._lock.locked() or (self._install and not self._install.done()):
             raise ValueError("resourceBusy")
         key = self.spec.model_id
-        await self._inference_gate.acquire(key, request.max_concurrency, realtime=request.task_mode == "realtime")
+        await self._inference_gate.acquire(key, concurrency, realtime=realtime)
         try:
             if self._closed or self._lock.locked():
                 raise ValueError("resourceBusy")
             if not self._loaded:
                 raise ValueError("modelNotLoaded")
             # Shield keeps the slot occupied until native inference finishes after disconnect.
-            task = asyncio.create_task(asyncio.to_thread(self._infer, request))
+            task = asyncio.create_task(asyncio.to_thread(run, *args))
             try:
                 return await asyncio.shield(task)
             except asyncio.CancelledError:
@@ -543,7 +591,8 @@ class ScreenOcr:
 
                 cv2.setNumThreads(1)
                 directory = self._verify()
-                self._session(directory / OCR_DETECTOR)
+                detector = COMIC_DETECTOR.files[0].path if self.spec.model_id == COMIC_DETECTOR_ID else OCR_DETECTOR
+                self._session(directory / detector)
                 for entry in self.spec.files:
                     if "_rec_" not in entry.path:
                         continue
@@ -575,11 +624,44 @@ class ScreenOcr:
                 from .comic_inpaint import ComicInpainter
                 self._variants[resource_id] = ComicInpainter(self.root)
             return self._variants[resource_id]
+        if resource_id == COMIC_DETECTOR_ID:
+            if resource_id not in self._variants:
+                self._variants[resource_id] = ComicDetector(self.root, spec=COMIC_DETECTOR)
+            return self._variants[resource_id]
         if resource_id not in OCR_SPECS:
             raise HTTPException(422, detail="invalidModel")
         if resource_id not in self._variants:
             self._variants[resource_id] = ScreenOcr(self.root, spec=OCR_SPECS[resource_id])
         return self._variants[resource_id]
+
+
+class ComicDetector(ScreenOcr):
+    def __init__(self, model_root, spec):
+        super().__init__(model_root, spec=spec)
+        self.lease = asyncio.Lock()
+
+    def _detect_quads(self, image, directory):
+        import cv2
+        import numpy as np
+
+        height, width = image.shape[:2]
+        rgb = cv2.cvtColor(cv2.resize(image, (640, 640)), cv2.COLOR_BGR2RGB)
+        tensor = np.ascontiguousarray(rgb.transpose(2, 0, 1)[None], dtype=np.float32) / 255
+        session = self._session(directory / COMIC_DETECTOR.files[0].path)
+        labels, boxes, scores = session.run(["labels", "boxes", "scores"], {
+            "images": tensor, "orig_target_sizes": np.array([[width, height]], dtype=np.int64),
+        })
+        quads = []
+        for label, box, score in zip(labels[0], boxes[0], scores[0]):
+            if label not in (1, 2) or not 0.3 <= score <= 1 or not np.isfinite(box).all():
+                continue
+            left, top, right, bottom = np.clip(box, 0, [width, height, width, height]).tolist()
+            if right - left >= 1 and bottom - top >= 1:
+                quads.append([[left, top], [right, top], [right, bottom], [left, bottom]])
+        return quads[:MAX_BLOCKS]
+
+    async def infer(self, request: OcrRequest) -> dict:
+        raise ValueError("unsupportedModel")
 
 
 def build_screen_ocr_router(service: ScreenOcr) -> APIRouter:

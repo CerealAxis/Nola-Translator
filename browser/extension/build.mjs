@@ -1,7 +1,7 @@
 import { build } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { copyFile, cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -14,11 +14,12 @@ const firefoxId = identity.match(/FIREFOX_EXTENSION_ID = '([^']+)'/)?.[1]
 if (!key || (firefox && !firefoxId)) throw new Error('Missing extension identity')
 const outDir = resolve(root, firefox ? 'dist-firefox' : 'dist')
 const common = { configFile: false, root, resolve: { alias: { '@': resolve(root, '../../src/renderer') } }, define: { ...(firefox ? { chrome: 'globalThis.browser' } : {}), 'process.env.NODE_ENV': JSON.stringify('production') }, plugins: [react(), tailwindcss()], build: { outDir, emptyOutDir: false, minify: true } }
-await build({ ...common, build: { ...common.build, emptyOutDir: true, rollupOptions: { input: ['popup.html', 'options.html', 'sidepanel.html', ...(firefox ? [] : ['offscreen.html'])].map(path => resolve(root, path)) } } })
+await build({ ...common, base: './', build: { ...common.build, emptyOutDir: true, rollupOptions: { input: ['popup.html', 'options.html', 'sidepanel.html', 'document.html', ...(firefox ? [] : ['offscreen.html'])].map(path => resolve(root, path)) } } })
 for (const name of ['background', 'content', 'capture-handle', 'worklet']) {
   await build({ ...common, build: { ...common.build, lib: { entry: resolve(root, `${name}.${name === 'content' ? 'tsx' : 'ts'}`), name: `Nola_${name.replace('-', '_')}`, formats: ['iife'], fileName: () => `${name}.js` }, rollupOptions: { output: { inlineDynamicImports: true } } } })
 }
 await mkdir(outDir, { recursive: true })
+await cp(resolve(root, '../../node_modules/pdfjs-dist/standard_fonts'), resolve(outDir, 'pdf-standard-fonts'), { recursive: true })
 // Chrome loads no SVG for extension icons, so the shipped PNGs stand in for the project logo.
 await mkdir(resolve(outDir, 'icons'), { recursive: true })
 const iconNames = (await readdir(resolve(root, 'icons'))).filter(name => name.endsWith('.png'))

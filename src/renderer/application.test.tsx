@@ -64,6 +64,9 @@ it('keeps screen, game and comic as independent entries and preserves editor dee
   expect(result.current.some(item => item.id === 'glossary')).toBe(false)
   expect(parseRoute('#/settings/glossary/library-1')).toMatchObject({ tab: 'glossary', glossaryLibraryId: 'library-1' })
   expect(parseRoute('#/comic-translation/book-1/reader')).toMatchObject({ projectId: 'book-1', reader: true })
+  expect(parseRoute('#/comic-translation/book-1/reader/page-2')).toMatchObject({
+    projectId: 'book-1', reader: true, pageId: 'page-2', path: '#/comic-translation/book-1/reader/page-2',
+  })
   expect(parseRoute('#/comic-translation/book-1/page-2')).toMatchObject({ projectId: 'book-1', pageId: 'page-2' })
   expect(parseRoute('#/game-translation/game-1')).toMatchObject({ gameId: 'game-1' })
   expect(pathOf('settings', { tab: 'glossary' })).toBe('#/settings/glossary')

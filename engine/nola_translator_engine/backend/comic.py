@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
@@ -12,6 +11,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+from tempfile import TemporaryDirectory
 import threading
 from typing import Literal
 from uuid import UUID, uuid4
@@ -21,9 +21,10 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..models.ocr_catalog import COMIC_DETECTOR_ID
 from .glossary import resolve_comic_terms
 
-from .comic_formats import (MAX_PAGE_BYTES, MAX_IMPORT_BYTES, MAX_PIXELS, PDF_DPI, epub_pages,
+from .comic_formats import (MAX_PAGE_BYTES, MAX_IMPORT_BYTES, MAX_PDF_BYTES, MAX_PIXELS, MAX_PROJECT_BYTES, PDF_DPI, epub_pages,
                             kindle_images, pdf_pages, png_bytes, validate_archive, write_epub, write_pdf)
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff"}
 
@@ -75,6 +76,7 @@ class ComicConfig(BaseModel):
     targetLanguage: str = Field(min_length=1, max_length=32)
     model: str = Field(max_length=512)
     readingDirection: Literal["rtl", "ltr"]
+    detector: Literal["ppocr", "rtdetr"] = "ppocr"
     repairMethod: Literal["telea", "lama-manga"] = "telea"
     glossary: dict
 
@@ -90,7 +92,8 @@ def validate_edit(request: dict) -> dict:
         raise ValueError('invalidCommand')
     action = command.get('action')
     fields = {'rename': {'title'}, 'configure': {'config'}, 'saveRegion': {'pageId', 'region'},
-              'deleteRegion': {'pageId', 'regionId'}, 'addChapter': {'title'}, 'movePage': {'pageId', 'chapterId', 'index'},
+              'deleteRegion': {'pageId', 'regionId'}, 'moveRegion': {'pageId', 'regionId', 'index'},
+              'addChapter': {'title'}, 'movePage': {'pageId', 'chapterId', 'index'},
               'deletePage': {'pageId'}, 'paintMask': {'pageId', 'stroke'}, 'clearMask': {'pageId'}, 'undo': set(), 'redo': set()}
     if action not in fields or set(command) != {'action'} | fields[action]:
         raise ValueError('invalidCommand')
@@ -111,7 +114,8 @@ def validate_edit(request: dict) -> dict:
                 UUID(item)
         elif set(selection) != {'mode'}:
             raise ValueError('invalidGlossarySelection')
-    if action == 'movePage' and (type(command['index']) is not int or not 0 <= command['index'] <= 1000):
+    if action in ('movePage', 'moveRegion') and (type(command['index']) is not int
+            or not 0 <= command['index'] <= (1000 if action == 'movePage' else 2048)):
         raise ValueError('invalidIndex')
     return request
 
@@ -126,6 +130,7 @@ class ComicRegion(BaseModel):
     width: float = Field(gt=0)
     height: float = Field(gt=0)
     sourceQuad: list[tuple[float, float]] | None = Field(default=None, min_length=4, max_length=4)
+    sourceLines: list[list[tuple[float, float]]] | None = Field(default=None, min_length=1, max_length=256)
     confidence: float | None = Field(ge=0, le=1)
     locked: bool
     ignored: bool
@@ -155,6 +160,11 @@ def validate_region(region: dict, page: dict) -> dict:
     if value["sourceQuad"] is None:
         value.pop("sourceQuad")
     elif any(not 0 <= x <= page["width"] or not 0 <= y <= page["height"] for x, y in value["sourceQuad"]):
+        raise ValueError("invalidGeometry")
+    if value["sourceLines"] is None:
+        value.pop("sourceLines")
+    elif any(len(line) != 4 or any(not 0 <= x <= page["width"] or not 0 <= y <= page["height"]
+                                   for x, y in line) for line in value["sourceLines"]):
         raise ValueError("invalidGeometry")
     return value
 
@@ -222,12 +232,13 @@ class ComicRepository:
             project["canRedo"] = db.execute("SELECT 1 FROM edits WHERE project_id=? AND undone=1 LIMIT 1", (project_id,)).fetchone() is not None
             return project
 
-    def asset(self, data: bytes, suffix: str = 'png') -> str:
+    def asset(self, data: bytes, suffix: str = 'png', directory: Path | None = None) -> str:
         digest = hashlib.sha256(data).hexdigest()
         if suffix not in ('png', 'original'):
             raise ValueError('invalidAsset')
-        path = self.root / "assets" / f"{digest}.{suffix}"
-        if not path.exists():
+        stored = self.root / "assets" / f"{digest}.{suffix}"
+        path = directory / stored.name if directory is not None else stored
+        if not stored.exists() and not path.exists():
             temporary = path.with_suffix(f".{uuid4()}.tmp")
             try:
                 with temporary.open("xb") as stream:
@@ -261,11 +272,21 @@ class ComicRepository:
             if project_id:
                 raise ValueError('projectImportMustCreate')
             return self.import_project(Path(paths[0]))
+        with TemporaryDirectory(prefix=".import-", dir=self.root) as staging:
+            return self._import_sources(paths, title, project_id, chapter_id, dpi, first, last, first_frame, Path(staging))
+
+    def _import_sources(self, paths, title, project_id, chapter_id, dpi, first, last, first_frame, staging):
         sources = []
         imported_chapters = {}
         current_chapter = None
         direction = "rtl"
-        total = 0
+        total = pdf_total = 0
+
+        def save_page(name, image, encoded, original):
+            if len(sources) >= 1000:
+                raise ValueError("importTooLarge")
+            digest = self.asset(encoded, directory=staging)
+            sources.append((name, image.shape[1], image.shape[0], digest, original, current_chapter))
 
         def append_page(name, data, original=None):
             nonlocal total
@@ -273,8 +294,7 @@ class ComicRepository:
             if total > MAX_IMPORT_BYTES or len(sources) >= 1000:
                 raise ValueError("importTooLarge")
             image = decode_image(data)
-            encoded = encode_image(image)
-            sources.append((name, image.shape[1], image.shape[0], self.asset(encoded), original or self.asset(data, 'original'), current_chapter))
+            save_page(name, image, encode_image(image), original or self.asset(data, 'original', staging))
 
         def append(name, data):
             from PIL import Image
@@ -282,7 +302,7 @@ class ComicRepository:
                 raise ValueError("imageTooLarge")
             with Image.open(io.BytesIO(data)) as image:
                 if image.format in ("GIF", "TIFF") or image.format == "WEBP" and image.is_animated:
-                    original = self.asset(data, "original")
+                    original = self.asset(data, "original", staging)
                     for index in range(1001):
                         try:
                             image.seek(index)
@@ -299,11 +319,19 @@ class ComicRepository:
         for raw in paths:
             current_chapter = None
             path = Path(raw).resolve(strict=True)
-            if path.is_file() and path.stat().st_size > MAX_IMPORT_BYTES:
+            is_pdf = path.is_file() and path.suffix.lower() == ".pdf"
+            if path.is_file() and path.stat().st_size > (MAX_PDF_BYTES if is_pdf else MAX_IMPORT_BYTES):
                 raise ValueError("importTooLarge")
-            if path.suffix.lower() == ".pdf" and path.is_file():
-                for name, data in pdf_pages(path, dpi, first, last):
-                    append_page(name, data)
+            if is_pdf:
+                import cv2
+                import numpy as np
+                for name, rgb in pdf_pages(path, dpi, first, last):
+                    image = cv2.cvtColor(np.asarray(rgb), cv2.COLOR_RGB2BGR)
+                    encoded = encode_image(image)
+                    pdf_total += len(encoded)
+                    if pdf_total > MAX_PDF_BYTES:
+                        raise ValueError("importTooLarge")
+                    save_page(name, image, encoded, None)
             elif path.suffix.lower() == ".epub" and path.is_file():
                 for name, data, chapter, progression in epub_pages(path):
                     if len(paths) == 1 and progression in ("rtl", "ltr"):
@@ -358,16 +386,23 @@ class ComicRepository:
                 raise ValueError("importTooLarge")
             for name, width, height, digest, original, chapter in sources:
                 page_chapter = imported_chapters[chapter]["id"] if chapter else chapter_id
-                project["pages"].append({"id": str(uuid4()), "chapterId": page_chapter, "name": name, "width": width, "height": height,
-                                         "regions": [], "status": "imported", "sourceAsset": digest, "originalAsset": original, "hasClean": False, "hasRendered": False})
+                page = {"id": str(uuid4()), "chapterId": page_chapter, "name": name, "width": width, "height": height,
+                        "regions": [], "status": "imported", "sourceAsset": digest, "hasClean": False, "hasRendered": False}
+                if original:
+                    page["originalAsset"] = original
+                project["pages"].append(page)
             project["revision"] += 1
             self._save(db, project)
+            for asset in staging.iterdir():
+                destination = self.root / "assets" / asset.name
+                if not destination.exists():
+                    os.replace(asset, destination)
             db.execute('DELETE FROM edits WHERE project_id=?', (project['id'],))
         return self.open(project["id"])
 
     def import_project(self, path: Path):
         with zipfile.ZipFile(path) as archive:
-            validate_archive(archive)
+            validate_archive(archive, MAX_PROJECT_BYTES)
             manifest = archive.getinfo('project.json')
             if manifest.file_size > 16 * 1024 * 1024:
                 raise ValueError('unsafeArchive')
@@ -493,6 +528,8 @@ class ComicRepository:
                         page.pop('cleanAsset', None); page['hasClean'] = False
                     else:
                         previous = page['regions'][existing]
+                        if previous['sourceText'] != region['sourceText']:
+                            region['confidence'] = None
                         geometry = ('sourceQuad',) if previous.get('sourceQuad') and region.get('sourceQuad') else ('sourceQuad', 'x', 'y', 'width', 'height')
                         erased_before = bool(previous['targetText']) and previous['targetText'] != previous['sourceText']
                         erased_after = bool(region['targetText']) and region['targetText'] != region['sourceText']
@@ -505,6 +542,12 @@ class ComicRepository:
                         raise ValueError("regionNotFound")
                     page["regions"] = [item for item in page["regions"] if item["id"] != command["regionId"]]
                     page.pop('cleanAsset', None); page['hasClean'] = False
+                    page.pop("renderedAsset", None); page["hasRendered"] = False
+                elif action == "moveRegion":
+                    index = next((i for i, region in enumerate(page["regions"]) if region["id"] == command["regionId"]), None)
+                    if index is None:
+                        raise ValueError("regionNotFound")
+                    page["regions"].insert(command["index"], page["regions"].pop(index))
                     page.pop("renderedAsset", None); page["hasRendered"] = False
                 elif action == "deletePage":
                     project["pages"].remove(page)
@@ -558,6 +601,8 @@ class ComicRepository:
             for page in pages:
                 if layer == "rendered" and not page["hasRendered"]:
                     raise ValueError("pageNotRendered")
+                if layer == "clean" and not page["hasClean"]:
+                    raise ValueError("repairRequired")
                 yield page, self._page_asset(page, layer)
 
         try:
@@ -624,17 +669,31 @@ class ComicRepository:
             raise
 
 
-def repair_page(image, regions: list[dict], strokes: list[dict] | None = None, *, mask_only=False):
+def source_quad(region):
+    x, y, width, height = (region[key] for key in ("x", "y", "width", "height"))
+    return region.get("sourceQuad") or [[x, y], [x + width, y], [x + width, y + height], [x, y + height]]
+
+
+def overlaps_source(first, second):
+    def bounds(region):
+        x, y = zip(*source_quad(region))
+        return min(x), min(y), max(x), max(y)
+
+    x, y, right, bottom = bounds(first)
+    sx, sy, sr, sb = bounds(second)
+    overlap = max(0, min(right, sr) - max(x, sx)) * max(0, min(bottom, sb) - max(y, sy))
+    return overlap > 0.5 * min((right - x) * (bottom - y), (sr - sx) * (sb - sy))
+
+
+def repair_page(image, regions: list[dict], strokes: list[dict] | None = None, *, mask_only=False, clean_only=False):
     import cv2
     import numpy as np
 
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
     for region in regions:
-        if region["ignored"] or not region["targetText"] or region["targetText"] == region["sourceText"]:
+        if region["ignored"] or not clean_only and (not region["targetText"] or region["targetText"] == region["sourceText"]):
             continue
-        x, y = int(region["x"]), int(region["y"])
-        w, h = int(region["width"]), int(region["height"])
-        quad = np.array(region.get("sourceQuad") or [[x, y], [x + w, y], [x + w, y + h], [x, y + h]], dtype=np.int32)
+        quad = np.array(source_quad(region), dtype=np.int32)
         x, y, w, h = cv2.boundingRect(quad)
         x, y = max(0, x), max(0, y)
         w, h = min(w, image.shape[1] - x), min(h, image.shape[0] - y)
@@ -678,7 +737,7 @@ def repair_page(image, regions: list[dict], strokes: list[dict] | None = None, *
     return cv2.inpaint(image, mask, 3, cv2.INPAINT_TELEA), mask
 
 
-def detect_comic_regions(image, blocks: list[dict], reading_direction: str) -> list[dict]:
+def detect_comic_regions(image, blocks: list[dict], reading_direction: str, line_boxes=True) -> list[dict]:
     import cv2
     import numpy as np
 
@@ -687,8 +746,8 @@ def detect_comic_regions(image, blocks: list[dict], reading_direction: str) -> l
     groups = {}
     for index, block in enumerate(blocks):
         quad = np.asarray(block['quad'])
-        x, y = np.maximum(0, np.floor(quad.min(axis=0))).astype(int)
-        right, bottom = np.minimum([image.shape[1], image.shape[0]], np.ceil(quad.max(axis=0))).astype(int)
+        x, y = map(int, np.maximum(0, np.floor(quad.min(axis=0))))
+        right, bottom = map(int, np.minimum([image.shape[1], image.shape[0]], np.ceil(quad.max(axis=0))))
         if right <= x or bottom <= y:
             continue
         counts = np.bincount(labels[y:bottom, x:right].ravel())
@@ -709,10 +768,15 @@ def detect_comic_regions(image, blocks: list[dict], reading_direction: str) -> l
         if kind == 'bubble':
             left, top, width, height, _ = components[label]
             x, y, right, bottom = left + width * 0.15, top + height * 0.15, left + width * 0.85, top + height * 0.85
-        region = {'id': str(uuid4()), 'sourceText': ('\n' if vertical else ' ').join(item[0]['text'] for item in items), 'targetText': None,
+        text = ('\n' if vertical else ' ').join(item[0]['text'] for item in items if item[0]['text'].strip())
+        region = {'id': str(uuid4()), 'sourceText': text, 'targetText': None,
                   'x': float(x), 'y': float(y), 'width': float(right - x), 'height': float(bottom - y), 'sourceQuad': source_quad,
-                  'confidence': min(item[0]['confidence'] for item in items), 'locked': False, 'ignored': False,
+                  'confidence': min((item[0]['confidence'] for item in items if item[0]['confidence'] is not None), default=None),
+                  'locked': False, 'ignored': False,
                   'style': {'fontSize': font_size, 'color': '#000000', 'direction': 'vertical-rl' if vertical else 'horizontal', 'align': 'center'}, 'qa': []}
+        if line_boxes:
+            region['sourceLines'] = [np.clip(item[0]['quad'], 0, [image.shape[1], image.shape[0]]).tolist()
+                                     for item in items]
         regions.append(region)
     regions.sort(key=lambda item: (int(item['y'] / max(item['height'], 1)), -item['x'] if reading_direction == 'rtl' else item['x']))
     return regions
@@ -791,7 +855,8 @@ class RunRequest(BaseModel):
     expectedRevision: int = Field(ge=0)
     jobId: UUID = Field(default_factory=uuid4)
     pageIds: list[UUID] = Field(min_length=1, max_length=1000)
-    stage: Literal["full", "ocr", "translate", "repair", "layout"]
+    stage: Literal["full", "clean", "detect", "ocr", "translate", "repair", "layout"]
+    regionId: UUID | None = None
     model: str = Field(max_length=512)
     ocrResourceId: str = Field(default="pp-ocrv5-mobile-onnx", max_length=200)
     glossary: dict = Field(default_factory=dict)
@@ -800,14 +865,14 @@ class RunRequest(BaseModel):
 class ExportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["images", "cbz", "project", "pdf", "epub", "png", "json", "labelplus"]
-    layer: Literal["source", "rendered"] = "rendered"
+    layer: Literal["source", "clean", "rendered"] = "rendered"
     pageIds: list[UUID] | None = Field(default=None, min_length=1, max_length=1000)
 
 
 class DirectoryExportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     directory: str = Field(min_length=1, max_length=32767)
-    layer: Literal["source", "rendered"] = "rendered"
+    layer: Literal["source", "clean", "rendered"] = "rendered"
     pageIds: list[UUID] | None = Field(default=None, min_length=1, max_length=1000)
 
 
@@ -833,7 +898,11 @@ class ComicService:
         ids = [str(value) for value in request.pageIds]
         if len(set(ids)) != len(ids) or any(not any(page["id"] == value for page in project["pages"]) for value in ids):
             raise ValueError("pageNotFound")
-        if request.stage in ("full", "repair") and project["config"].get("repairMethod") == "lama-manga":
+        if request.regionId and (request.stage not in ("ocr", "translate") or len(ids) != 1
+                or not any(region["id"] == str(request.regionId)
+                           for page in project["pages"] if page["id"] == ids[0] for region in page["regions"])):
+            raise ValueError("regionNotFound")
+        if request.stage in ("full", "clean", "repair") and project["config"].get("repairMethod") == "lama-manga":
             if self.ocr is None:
                 raise ValueError("modelMissing")
             self.ocr.variant("lama-manga")._verify()
@@ -847,102 +916,213 @@ class ComicService:
 
     async def _run(self, project, request, gateway, provider_options, job):
         from .direct_inference import DirectMtRequest, run_direct_inference
-        from .screen_ocr import OcrRequest
 
         project_id, revision = project["id"], project["revision"]
+        config = project["config"]
         neural_service = None
+        detector_service = None
+        comic_detector = config.get("detector") == "rtdetr"
+        stage = request.stage
+        recoverable = {"noRegions", "maskNeedsReview", "textOverflow", "repairRequired", "emptyTranslation"}
+
+        def check_cancelled():
+            if job["id"] in self.cancellations:
+                raise asyncio.CancelledError
+
+        def begin(name, page):
+            check_cancelled()
+            job.update(stage=name, pageId=page["id"])
+            self.repository.save_job(project_id, job)
+
+        def publish(page, *, clear_clean=False, clear_rendered=False):
+            nonlocal revision
+            check_cancelled()
+            if clear_clean:
+                page.pop("cleanAsset", None)
+                page["hasClean"] = False
+            if clear_clean or clear_rendered:
+                page.pop("renderedAsset", None)
+                page["hasRendered"] = False
+            revision = self.repository.publish_page(project_id, revision, page)
+
+        async def process(page):
+            nonlocal detector_service
+            check_cancelled()
+            def load(kind):
+                path = self.repository.asset_path(project_id, page["id"], kind)
+                return decode_image(path.read_bytes())
+
+            original = await asyncio.to_thread(load, "source") if stage not in ("translate", "layout") else None
+
+            if stage == "detect" or (stage in ("full", "clean", "ocr") and
+                                     page["status"] == "imported" and not page["regions"]):
+                begin("detect", page)
+                if self.ocr is None:
+                    raise ValueError("ocrUnavailable")
+                if comic_detector:
+                    if detector_service is None:
+                        detector = self.ocr.variant(COMIC_DETECTOR_ID)
+                        await detector.lease.acquire()
+                        detector_service = detector
+                        try:
+                            await detector_service.load()
+                        except ValueError as error:
+                            if str(error) in ("modelMissing", "modelCorrupt"):
+                                raise ValueError("detectorUnavailable") from error
+                            raise
+                    detector = detector_service
+                else:
+                    detector = self.ocr.variant(request.ocrResourceId)
+                quads = await detector.detect_comic(original)
+                regions = await asyncio.to_thread(
+                    detect_comic_regions, original,
+                    [{"quad": quad, "text": "", "confidence": None} for quad in quads],
+                    config["readingDirection"], not comic_detector)
+                # Existing boxes are editable inputs, including user-drawn boxes.
+                additions = [region for region in regions if not any(
+                    overlaps_source(region, existing) for existing in page["regions"])]
+                if additions or page["status"] == "imported":
+                    page["regions"].extend(additions)
+                    page["status"] = "detected"
+                    publish(page, clear_clean=bool(additions))
+
+            regions = [region for region in page["regions"] if not request.regionId
+                       or region["id"] == str(request.regionId)]
+            editable = [region for region in regions if not region["locked"] and not region["ignored"]]
+
+            if stage in ("full", "ocr"):
+                begin("ocr", page)
+                changed = False
+                pending = [region for region in editable if request.regionId or not region["sourceText"]
+                           or region["confidence"] is not None]
+                if pending:
+                    if self.ocr is None:
+                        raise ValueError("ocrUnavailable")
+                    ocr = self.ocr.variant(request.ocrResourceId)
+                    for region in pending:
+                        check_cancelled()
+                        if region.get("sourceLines"):
+                            result = await ocr.recognize_comic(original, region["sourceLines"], config["sourceLanguage"])
+                        else:
+                            result = await ocr.recognize_comic_box(
+                                original, source_quad(region), config["sourceLanguage"],
+                                region["style"]["direction"] == "vertical-rl")
+                        recognized = [(text, score) for text, score in result if text.strip() and score >= 0.5]
+                        separator = "\n" if region["style"]["direction"] == "vertical-rl" else " "
+                        text = separator.join(value for value, _ in recognized)
+                        if text != region["sourceText"]:
+                            changed |= bool(region["targetText"])
+                            region["targetText"] = None
+                            region["qa"] = []
+                        region["sourceText"] = text
+                        region["confidence"] = min((score for _, score in recognized), default=None)
+                if pending or page["status"] in ("imported", "detected"):
+                    page["status"] = "recognized"
+                    publish(page, clear_clean=changed)
+
+            if stage in ("full", "translate"):
+                begin("translate", page)
+                if stage == "translate" and not regions and page["status"] == "imported":
+                    raise ValueError("noRegions")
+                targets = [region for region in editable if region["sourceText"].strip()]
+                if targets and (gateway is None or not request.model):
+                    raise ValueError("translationModelMissing")
+                clean_dirty = False
+                for region in targets:
+                    check_cancelled()
+                    terms = resolve_comic_terms(request.glossary, config["glossary"], project_id,
+                                                region["sourceText"], config["targetLanguage"])
+                    preceding = page["regions"][:page["regions"].index(region)]
+                    history = [item["sourceText"] for item in preceding
+                               if not item["ignored"] and item["sourceText"].strip()][-3:]
+                    result = await run_direct_inference(gateway, DirectMtRequest(
+                        id=uuid4(), model=request.model, kind="mt", text=region["sourceText"],
+                        source=config["sourceLanguage"], target=config["targetLanguage"], glossary=terms),
+                        provider_options=provider_options, translation_history=history)
+                    if not result.text.strip():
+                        raise ValueError("emptyTranslation")
+                    before = bool(region["targetText"]) and region["targetText"] != region["sourceText"]
+                    clean_dirty |= before != (result.text != region["sourceText"])
+                    region["targetText"] = result.text
+                    region["qa"] = ["glossaryMismatch"] if any(
+                        (term.source if term.mode == "keep" else term.target) not in result.text for term in terms) else []
+                    self.repository.save_job(project_id, job, candidate=page)
+                if targets or page["status"] != "rendered":
+                    page["status"] = "translated"
+                    publish(page, clear_clean=clean_dirty, clear_rendered=bool(targets))
+
+            if stage in ("full", "clean", "repair"):
+                begin("repair", page)
+                clean_only = stage == "clean"
+                cleaned, mask = await asyncio.to_thread(
+                    repair_page, original, page["regions"], page.get("maskStrokes"),
+                    mask_only=neural_service is not None, clean_only=clean_only)
+                if mask.any():
+                    if neural_service is not None:
+                        cleaned = await neural_service.repair(original, mask)
+                    page["cleanAsset"] = await asyncio.to_thread(lambda: self.repository.asset(encode_image(cleaned)))
+                else:
+                    page["cleanAsset"] = page["sourceAsset"]
+                page["hasClean"] = True
+                publish(page, clear_rendered=True)
+
+            if stage in ("full", "layout"):
+                begin("layout", page)
+                if not page["hasClean"]:
+                    raise ValueError("repairRequired")
+                if any(region["targetText"] and region["targetText"] != region["sourceText"]
+                       and not region["ignored"] for region in page["regions"]):
+                    def render():
+                        return encode_image(render_page(load("clean"), page["regions"], self.font_path))
+                    page["renderedAsset"] = self.repository.asset(await asyncio.to_thread(render))
+                else:
+                    page["renderedAsset"] = page["cleanAsset"]
+                page["hasRendered"] = True
+                page["status"] = "rendered"
+                publish(page)
+
         try:
-            if request.stage in ("full", "repair") and project["config"].get("repairMethod") == "lama-manga":
+            if stage in ("full", "clean", "repair") and config.get("repairMethod") == "lama-manga":
                 candidate = self.ocr.variant("lama-manga")
                 await candidate._lease_lock.acquire()
                 neural_service = candidate
                 await neural_service.load()
             for page_id in request.pageIds:
-                if job["id"] in self.cancellations:
-                    raise asyncio.CancelledError
                 page = next(page for page in project["pages"] if page["id"] == str(page_id))
-                original = await asyncio.to_thread(decode_image, self.repository.asset_path(project_id, page["id"], "source").read_bytes())
-                if request.stage in ("full", "ocr"):
-                    if self.ocr is None:
-                        raise ValueError("ocrUnavailable")
-                    if any(region["locked"] for region in page["regions"]):
-                        if request.stage == "ocr":
-                            raise ValueError("lockedRegions")
-                    else:
-                        job["stage"] = "ocr"; self.repository.save_job(project_id, job)
-                        result = await self.ocr.variant(request.ocrResourceId).infer(OcrRequest(
-                            image="data:image/png;base64," + base64.b64encode(encode_image(original)).decode(),
-                            language=project["config"]["sourceLanguage"], task_mode="offline"))
-                        page["regions"] = await asyncio.to_thread(detect_comic_regions, original, result['blocks'], project['config']['readingDirection'])
-                        page["status"] = "recognized"
-                        page.pop("cleanAsset", None); page.pop("renderedAsset", None)
-                        page["hasClean"] = page["hasRendered"] = False
-                        if job["id"] in self.cancellations:
-                            raise asyncio.CancelledError
-                        revision = self.repository.publish_page(project_id, revision, page)
-                if request.stage in ("full", "translate"):
-                    if not page["regions"]:
-                        raise ValueError("noRegions")
-                    if gateway is None or not request.model:
-                        raise ValueError("translationModelMissing")
-                    job["stage"] = "translate"; self.repository.save_job(project_id, job)
-                    for region in page["regions"]:
-                        if job["id"] in self.cancellations:
-                            raise asyncio.CancelledError
-                        if region["locked"] or region["ignored"] or not region["sourceText"].strip():
-                            continue
-                        terms = resolve_comic_terms(request.glossary, project["config"]["glossary"], project_id, region["sourceText"], project["config"]["targetLanguage"])
-                        result = await run_direct_inference(gateway, DirectMtRequest(id=uuid4(), model=request.model, kind="mt", text=region["sourceText"],
-                            source=project["config"]["sourceLanguage"], target=project["config"]["targetLanguage"], glossary=terms), provider_options=provider_options)
-                        if not result.text.strip():
-                            raise ValueError("emptyTranslation")
-                        region["targetText"] = result.text
-                        region["qa"] = ["glossaryMismatch"] if any((term.source if term.mode == "keep" else term.target) not in result.text for term in terms) else []
-                        self.repository.save_job(project_id, job, candidate=page)
-                    page["status"] = "translated"
-                    page.pop("cleanAsset", None); page["hasClean"] = False
-                    page.pop("renderedAsset", None); page["hasRendered"] = False
-                    if job["id"] in self.cancellations:
-                        raise asyncio.CancelledError
-                    revision = self.repository.publish_page(project_id, revision, page)
-                if request.stage in ("full", "repair"):
-                    job["stage"] = "repair"; self.repository.save_job(project_id, job)
-                    neural = project["config"].get("repairMethod") == "lama-manga"
-                    cleaned, mask = await asyncio.to_thread(repair_page, original, page["regions"], page.get('maskStrokes'), mask_only=neural)
-                    if neural:
-                        cleaned = await neural_service.repair(original, mask)
-                    page["cleanAsset"] = self.repository.asset(encode_image(cleaned)); page["hasClean"] = True
-                    page.pop("renderedAsset", None); page["hasRendered"] = False
-                    if job["id"] in self.cancellations:
-                        raise asyncio.CancelledError
-                    revision = self.repository.publish_page(project_id, revision, page)
-                if request.stage in ("full", "layout"):
-                    job["stage"] = "layout"; self.repository.save_job(project_id, job)
-                    if not page["hasClean"]:
-                        raise ValueError("repairRequired")
-                    cleaned = decode_image(self.repository.asset_path(project_id, page["id"], "clean").read_bytes())
-                    rendered = await asyncio.to_thread(render_page, cleaned, page["regions"], self.font_path)
-                    page["renderedAsset"] = self.repository.asset(encode_image(rendered)); page["hasRendered"] = True; page["status"] = "rendered"
-                    if job["id"] in self.cancellations:
-                        raise asyncio.CancelledError
-                    revision = self.repository.publish_page(project_id, revision, page)
+                try:
+                    await process(page)
+                except ValueError as error:
+                    if len(request.pageIds) == 1 or str(error) not in recoverable:
+                        raise
+                    job.setdefault("issues", []).append({"pageId": page["id"], "stage": job["stage"], "error": str(error)})
+                    self.repository.save_job(project_id, job)
+                    continue
                 job["completedPages"] += 1
                 self.repository.save_job(project_id, job)
-            job["state"] = "completed"
+            job["state"] = "completed" if job["completedPages"] or not job.get("issues") else "failed"
         except asyncio.CancelledError:
             job["state"] = "cancelled"
         except Exception as error:
             job["state"] = "failed"
-            known = {"ocrUnavailable", "lockedRegions", "noRegions", "translationModelMissing", "emptyTranslation", "maskNeedsReview", "fontMissing", "textOverflow", "repairRequired", "editConflict", "modelNotLoaded", "modelMissing", "runtimeUnavailable", "inpaintFailed", "modelCorrupt", "resourceBusy", "glossaryBudgetExceeded"}
+            known = recoverable | {"ocrUnavailable", "detectorUnavailable", "translationModelMissing", "fontMissing",
+                                   "editConflict", "modelNotLoaded", "modelMissing", "runtimeUnavailable", "inpaintFailed",
+                                   "modelCorrupt", "resourceBusy", "glossaryBudgetExceeded"}
             job["error"] = str(error) if str(error) in known else "processingFailed"
         finally:
-            if neural_service is not None:
-                try:
-                    await neural_service.release()
-                finally:
-                    neural_service._lease_lock.release()
-            self.cancellations.discard(job["id"])
-            self.repository.save_job(project_id, job)
+            try:
+                for service, lock in ((detector_service, detector_service.lease if detector_service else None),
+                                      (neural_service, neural_service._lease_lock if neural_service else None)):
+                    if service is not None:
+                        try:
+                            await service.release()
+                        except Exception:
+                            if job["state"] == "completed":
+                                job.update(state="failed", error="processingFailed")
+                        finally:
+                            lock.release()
+            finally:
+                self.cancellations.discard(job["id"])
+                self.repository.save_job(project_id, job)
 
     async def close(self):
         self.cancellations.update(self.tasks)

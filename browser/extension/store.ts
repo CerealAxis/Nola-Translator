@@ -5,7 +5,7 @@ import type { BrowserCaptionStyleSettings, VideoCaptionAudioSource } from '../..
 import type { CaptionSegment } from '../../src/shared/contracts'
 import { BrowserFailure, type ExtensionBridge } from './bridge'
 import { CAPTURE_OPTIONS, capturePlayerAudio, createAudioCapture, pcmBase64, releaseTracks, validateCapture, type AudioCapture, type AudioChunk } from './capture'
-import type { Preferences } from './preferences'
+import { liveTranslationEnabled, type Preferences } from './preferences'
 
 export interface Caption extends CaptionSegment { videoStartedAtMs: number; videoEndedAtMs?: number }
 /**
@@ -46,6 +46,7 @@ export interface ExtensionState {
 }
 export interface StoreDependencies {
   bridge: ExtensionBridge
+  initialPreferences?: Preferences
   getDisplayMedia?: (options: DisplayMediaStreamOptions) => Promise<MediaStream>
   audioCapture?: typeof createAudioCapture
   capturePlayerAudio?: typeof capturePlayerAudio
@@ -151,7 +152,8 @@ function energyOf(buffer: ArrayBuffer): number {
   return total
 }
 export function createExtensionStore(dependencies: StoreDependencies) {
-  let state: ExtensionState = { status: 'idle', playbackPaused: false, connected: false, capturePending: false, audioCaptured: false, panelOpen: false, captionServiceActive: false, liveAttempted: false, config: DEFAULT_CAPTION_CONFIG, videos: [], selectedVideo: null, epoch: 0, captions: [] }
+  let state: ExtensionState = { status: 'idle', playbackPaused: false, connected: false, capturePending: false, audioCaptured: false, panelOpen: false, captionServiceActive: false, liveAttempted: false, config: DEFAULT_CAPTION_CONFIG, preferences: dependencies.initialPreferences, videos: [], selectedVideo: null, epoch: 0, captions: [] }
+  const liveEnabled = () => !state.preferences || liveTranslationEnabled(state.preferences)
   let liveWarning: string | undefined
   dependencies = { ...dependencies, bridge: createSpeechBridge(dependencies.bridge, () => state.preferences, code => {
     if (state.status !== 'active') return
@@ -189,6 +191,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
    * must not gain a round trip it can be blocked on.
    */
   const debug = (event: string, data?: Record<string, unknown>): void => {
+    if (!liveEnabled()) return
     const now = Date.now()
     const last = debugGate.get(event)
     if (last !== undefined && now - last < DEBUG_THROTTLE_MS) return
@@ -460,7 +463,12 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     } catch (error) { if (startGeneration === generation) await stop(failCode(error)) }
   }
   const onResponse = (response: BrowserResponse): void => {
-    if (response.type === 'error' && response.id === '*') { set({ connected: false }); void stop(response.code); return }
+    if (response.type === 'error' && response.id === '*') {
+      if (!liveEnabled()) return
+      if (!usesSpeechRuntime(state.preferences)) set({ connected: false })
+      void stop(response.code)
+      return
+    }
     if (response.type !== 'event') return
     const event = response.event
     if (event.type === 'error' && state.status !== 'idle') { void stop(event.code === 'audioBufferOverflow' ? 'slowAudio' : event.code); return }
@@ -483,11 +491,12 @@ export function createExtensionStore(dependencies: StoreDependencies) {
    * through the bridge subscription is the only thing that stops a running session.
    */
   const refreshSummary = async (): Promise<void> => {
-    if (refreshingSummary) return
+    if (!liveEnabled() || refreshingSummary) return
+    const external = usesSpeechRuntime(state.preferences)
     refreshingSummary = true
     try {
       const summary = readSummary(await dependencies.bridge.request({ type: 'hello' }))
-      if (!summary) return
+      if (!summary || !liveEnabled() || external !== usesSpeechRuntime(state.preferences)) return
       // The errors the summary owns: a mismatched extension release and an engine that is too old
       // for browser audio. A summary that no longer reports one clears the error it reported
       // before, while the errors of a running session are left to the session.
@@ -510,21 +519,28 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     getSnapshot: () => state,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
     async init() {
+      if (!liveEnabled()) return
+      const external = usesSpeechRuntime(state.preferences)
       try {
         const summary = readSummary(await dependencies.bridge.request({ type: 'hello' }))
+        if (!liveEnabled() || external !== usesSpeechRuntime(state.preferences)) return
         if (!summary) throw new BrowserFailure('updateRequired')
         // A desktop that is not serving captions yet has no engine running, and a missing
         // browser-audio capability only means the engine is too old once the gate is open.
         set({ summary, connected: true, captionServiceActive: summary.captionServiceActive, config: configuredCaption(state.config, summary, state.preferences), error: summary.extensionCompatible === false ? 'extensionVersionMismatch' : summary.captionServiceActive && !summary.browserAudio ? 'updateRequired' : undefined })
-      } catch (error) { set({ connected: false, error: failCode(error) }) }
+      } catch (error) { if (liveEnabled() && external === usesSpeechRuntime(state.preferences)) set({ connected: false, error: failCode(error) }) }
       if (state.panelOpen) scheduleSummaryRefresh()
     },
     setPreferences(preferences: Preferences) {
-      if (state.preferences && (state.preferences.sourceLanguage !== preferences.sourceLanguage || state.preferences.videoLanguage !== preferences.videoLanguage || state.preferences.pipeline !== preferences.pipeline || state.preferences.asrProvider !== preferences.asrProvider || state.preferences.s2sProvider !== preferences.s2sProvider || state.preferences.subtitleProvider !== preferences.subtitleProvider)) void stop()
+      const enabled = liveTranslationEnabled(preferences)
+      const wasEnabled = liveEnabled()
       const external = usesSpeechRuntime(preferences)
-      const summary = external ? { ...state.summary, realtimeTranslation: true } as BrowserSummary : state.summary
-      set({ preferences, config: configuredCaption(state.config, summary, preferences), ...(external ? { connected: true, captionServiceActive: true, error: undefined } : {}) })
-      if (external) void refreshSummary()
+      const changedRoute = enabled !== wasEnabled || external !== usesSpeechRuntime(state.preferences)
+      if (state.preferences && (state.preferences.sourceLanguage !== preferences.sourceLanguage || state.preferences.videoLanguage !== preferences.videoLanguage || state.preferences.pipeline !== preferences.pipeline || state.preferences.asrProvider !== preferences.asrProvider || state.preferences.s2sProvider !== preferences.s2sProvider || state.preferences.subtitleProvider !== preferences.subtitleProvider)) void stop()
+      const summary = changedRoute ? undefined : state.summary
+      set({ preferences, summary, config: configuredCaption(state.config, summary, preferences), ...(changedRoute ? { connected: false, captionServiceActive: false, liveAttempted: false, error: undefined } : {}) })
+      if (!enabled) stopSummaryRefresh()
+      else if (changedRoute && (external || state.selectedVideo)) void this.init()
     },
     async openRuntimeSettings() {
       await dependencies.bridge.request({ type: 'runtimeSettings', component: state.error === 'llamaUnavailable' ? 'llama' : 'engine' })
@@ -539,7 +555,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     async close() { set({ panelOpen: false }); stopSummaryRefresh(); await stop() },
     async refresh() { await this.init(); if (state.status === 'active') reset() },
     pressCapture() {
-      if (state.status !== 'idle' || state.capturePending || captionAudioSource(state.config) !== 'tab') return
+      if (state.status !== 'idle' || state.capturePending || captionAudioSource(state.config) !== 'tab' || state.preferences && !liveTranslationEnabled(state.preferences)) return
       set({ liveAttempted: true })
       if (navigator.userAgent.includes('Firefox/')) { set({ error: 'captureUnsupported' }); return }
       const captureGeneration = ++generation
@@ -583,7 +599,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     },
     timelineChanged: reset,
     pressStart(source: 'player' | 'toolbar' | 'sidebar' = 'player') {
-      if (state.status !== 'idle' || state.capturePending || !state.selectedVideo || state.summary?.extensionCompatible === false) return
+      if (state.status !== 'idle' || state.capturePending || !state.selectedVideo || state.summary?.extensionCompatible === false || state.preferences && !liveTranslationEnabled(state.preferences)) return
       set({ liveAttempted: true })
       debug('ext.pressStart', { source: captionAudioSource(state.config) })
       if (!videoCleanup) bind(state.selectedVideo)

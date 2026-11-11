@@ -254,7 +254,7 @@ export type AudioDevice = {
 
 export type ResourceRecord = {
   resourceId: string
-  kind: 'recognitionModel' | 'translationModel' | 'ttsModel' | 'ocrModel' | 'inpaintModel'
+  kind: 'recognitionModel' | 'translationModel' | 'ttsModel' | 'ocrModel' | 'detectModel' | 'inpaintModel'
   /**
    * Names the loader that will run this model, and two vocabularies reach it: built-in models
    * report the provider in `resources.py` (`qwen3-asr`, `sensevoice`, `m2m100`, `hymt2`) while a

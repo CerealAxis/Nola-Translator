@@ -10,7 +10,7 @@ import pytest
 
 from nola_translator_engine import resources as resources_module
 from nola_translator_engine.models.inpaint_catalog import INPAINT_RESOURCE_ID
-from nola_translator_engine.models.ocr_catalog import OCR_SPECS
+from nola_translator_engine.models.ocr_catalog import COMIC_DETECTOR_ID, OCR_SPECS
 from nola_translator_engine.models.manager import FileEntry, ModelSpec
 from nola_translator_engine.models.manager import ModelStorageError
 from nola_translator_engine.protocol import ResourceRecord
@@ -144,6 +144,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
         *(spec.model_id for spec in QWEN35_SPECS),
         *OCR_SPECS,
         INPAINT_RESOURCE_ID,
+        COMIC_DETECTOR_ID,
     ]
     assert QWEN_RESOURCE_ID == "qwen3-asr-1.7b-hf"
     assert QWEN_06B_RESOURCE_ID == "qwen3-asr-0.6b-hf"
@@ -195,7 +196,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert m2m100.installed is False
 
     for record in records:
-        if record.kind == "inpaintModel":
+        if record.kind in ("detectModel", "inpaintModel"):
             assert record.languages == []
         else:
             assert 0 < len(record.languages) <= 200
@@ -519,7 +520,7 @@ async def test_remove_installed_resource(
     assert manager.record(HYMT2_RESOURCE_ID).installedBytes == 0
 
 
-@pytest.mark.parametrize("resource_id", (OCR_RESOURCE_ID, INPAINT_RESOURCE_ID))
+@pytest.mark.parametrize("resource_id", (OCR_RESOURCE_ID, INPAINT_RESOURCE_ID, COMIC_DETECTOR_ID))
 def test_resource_listing_preserves_backend_owned_visual_download_staging(tmp_path, resource_id):
     staging = tmp_path / f".{resource_id}-abcdefgh"
     staging.mkdir()

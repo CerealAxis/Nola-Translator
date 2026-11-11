@@ -27,9 +27,16 @@ describe('browser failure guidance', () => {
     expect(t(errorKey('browserExtensionVersionMismatch'))).toContain('重装当前版本扩展')
   })
 
+  it('explains an Index-Translate service rejection in every locale', () => {
+    for (const locale of ['en', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja'] as const) {
+      const message = browserText(locale)(errorKey('indexTranslateBrowserBlocked'))
+      expect(message).toContain('412')
+    }
+  })
+
   it('keeps an unknown diagnostic code out of the user-facing message', () => {
     const message = t(errorKey('UNMAPPED_INTERNAL_CODE'))
-    expect(message).toContain('诊断日志')
+    expect(message).toContain('检查相关服务设置')
     expect(message).not.toContain('UNMAPPED_INTERNAL_CODE')
   })
 })

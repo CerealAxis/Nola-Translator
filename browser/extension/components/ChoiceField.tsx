@@ -25,7 +25,7 @@ export function ChoiceField({ label, value, options, disabled, onChange, t = bro
   </Field>
   return <Field data-disabled={disabled || undefined}>
     <FieldLabel htmlFor={id}>{label}</FieldLabel>
-    <Select value={value} items={options} disabled={disabled} onValueChange={value => { if (value !== null) onChange(value) }}>
+    <Select modal={false} value={value} items={options} disabled={disabled} onValueChange={value => { if (value !== null) onChange(value) }}>
       <SelectTrigger id={id}><SelectValue /></SelectTrigger>
       <div ref={containerRef} className="nola-portal-container" />
       {container && <SelectContent container={container}><SelectGroup>{options.map(option => <SelectItem key={option.value} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>}

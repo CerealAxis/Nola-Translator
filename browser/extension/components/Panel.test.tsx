@@ -10,6 +10,7 @@ beforeEach(() => vi.clearAllMocks())
 
 it('limits the panel to connection controls without repeating desktop settings', () => {
   const store = createExtensionStore({ bridge: { request: vi.fn(async () => undefined), subscribe: () => () => {}, close: vi.fn() } })
+  store.setPreferences({ ...DEFAULT_PREFERENCES, asrProvider: 'desktop', subtitleProvider: 'desktop' })
   render(<Panel store={store} />)
   expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()

@@ -2,11 +2,11 @@ import './csp'
 import { createRoot } from 'react-dom/client'
 import { Badge } from '../../src/renderer/components/ui/badge'
 import { Button } from '../../src/renderer/components/ui/button'
-import { ToastProvider } from '../../src/renderer/components/ui/toast'
+import { showToast, ToastProvider } from '../../src/renderer/components/ui/toast'
 import { createBridge } from './bridge'
 import { createExtensionStore } from './store'
 import { alignPlayerTrigger, detectVideos, playerAdapter } from './adapters'
-import { browserText } from './i18n'
+import { browserText, errorKey } from './i18n'
 import { resolveUiLanguage } from '../../src/shared/languages'
 import { Panel } from './components'
 import { NolaLogo } from './logo'
@@ -23,9 +23,11 @@ import { readPageContext } from './page-context'
 import { providerRequest } from './provider-client'
 import { TextActions, editableTarget, editableText, matchesShortcut, type TextActionState } from './text-actions'
 import { prepareContentRuntime, registerContentRuntime } from './content-lifecycle'
+import { recordDiagnostic } from './diagnostics'
 import { createPageTranslation } from './page-translation'
 import { createSubtitleTranslation } from './subtitle-translation'
-import { DEFAULT_PREFERENCES, MAX_WEB_TRANSLATION_CONCURRENCY, matchesSitePatterns, siteEnabled, observePreferences, savePreferences } from './preferences'
+import { ImageTranslation, cropScreenshot, type ImageRect } from './image-translation'
+import { DEFAULT_PREFERENCES, DISABLED_PROVIDER, MAX_WEB_TRANSLATION_CONCURRENCY, matchesSitePatterns, siteEnabled, observePreferences, savePreferences } from './preferences'
 import css from './styles.css?inline'
 
 /**
@@ -43,13 +45,18 @@ function install(): void {
   let destroyed = false
   let initializedVideo = false
   const desktopBridge = createBridge()
-  const store = createExtensionStore({ bridge: desktopBridge })
+  const store = createExtensionStore({ bridge: desktopBridge, initialPreferences: DEFAULT_PREFERENCES })
   const translator = createTextTranslation(createBridge())
   const page = createPageTranslation(translator)
   const subtitles = createSubtitleTranslation(translator, () => refresh())
   const colorScheme = matchMedia('(prefers-color-scheme: dark)')
   const reducedTransparency = matchMedia('(prefers-reduced-transparency: reduce)')
   let preferences = DEFAULT_PREFERENCES
+  const notifyError = (code: string) => {
+    recordDiagnostic('content', code)
+    showToast({ type: 'error', description: browserText(preferences.uiLanguage)(errorKey(code)) })
+  }
+  const save = (patch: Parameters<typeof savePreferences>[0]) => { void savePreferences(patch).catch(() => notifyError('internalError')) }
   let webConcurrency = 1
   let subtitleConcurrency = 1
   let limitsRequest: AbortController | undefined
@@ -83,6 +90,7 @@ function install(): void {
     void Promise.allSettled(lookups).then(() => { if (limitsRequest === request) limitsRequest = undefined })
   }
   function startPage() {
+    if (preferences.pageProvider === DISABLED_PROVIDER) return
     refreshTranslationLimits()
     page.start()
   }
@@ -91,14 +99,13 @@ function install(): void {
   const inputTrigger = createInputTrigger()
   let contextController: AbortController | undefined
   let contextUrl = ''
-  let contextError = false
   const updateContext = () => {
-    if (!siteEnabled(preferences, location.href) || !preferences.contextAware) { contextController?.abort(); contextController = undefined; contextUrl = ''; contextError = false; return }
+    if (!siteEnabled(preferences, location.href) || !preferences.contextAware || preferences.llmProvider === DISABLED_PROVIDER || preferences.pageProvider === DISABLED_PROVIDER) { contextController?.abort(); contextController = undefined; contextUrl = ''; return }
     if (contextUrl === location.href) return
-    contextController?.abort(); contextController = new AbortController(); contextUrl = location.href; contextError = false
+    contextController?.abort(); contextController = new AbortController(); contextUrl = location.href
     const text = readPageContext(document)
     const owned = contextController
-    if (text.trim()) void providerRequest({ type: 'context', text }, owned.signal).catch(() => { if (!owned.signal.aborted) { contextError = true; refresh() } })
+    if (text.trim()) void providerRequest({ type: 'context', text }, owned.signal).catch(error => { if (!owned.signal.aborted) notifyError(error instanceof Error ? error.message : 'providerRequestFailed') })
   }
   const surfaces: { host: HTMLElement; mount: HTMLDivElement }[] = []
   const shadow = (kind: string, pointerEvents: string): { host: HTMLElement; mount: HTMLDivElement } => {
@@ -125,6 +132,48 @@ function install(): void {
   const floating = shadow('floating', 'auto')
   const floatingRoot = createRoot(floating.mount)
 
+  const imageSurface = shadow('image-translation', 'auto')
+  imageSurface.host.className = 'z-popup'
+  imageSurface.host.style.inset = '0'
+  imageSurface.host.hidden = true
+  const imageRoot = createRoot(imageSurface.mount)
+  let imageRevision = 0
+  let contextImage: HTMLImageElement | undefined
+  const rememberImage = (event: MouseEvent) => { contextImage = event.composedPath().find(node => node instanceof HTMLImageElement) as HTMLImageElement | undefined }
+  window.addEventListener('contextmenu', rememberImage, true)
+  const closeImage = () => {
+    imageRevision++
+    imageSurface.host.hidden = true
+    imageRoot.render(null)
+    void chrome.runtime.sendMessage({ type: 'cancelImageTranslation' }).catch(() => undefined)
+  }
+  const captureImage = async (rect: ImageRect) => {
+    const revision = imageRevision
+    const viewport = { width: innerWidth, height: innerHeight, x: scrollX, y: scrollY, scale: devicePixelRatio }
+    const unchanged = () => viewport.width === innerWidth && viewport.height === innerHeight && viewport.x === scrollX && viewport.y === scrollY && viewport.scale === devicePixelRatio
+    const hidden = surfaces.map(({ host }) => host.hidden)
+    surfaces.forEach(({ host }) => { host.hidden = true })
+    try {
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+      if (destroyed || revision !== imageRevision) throw new DOMException('Aborted', 'AbortError')
+      if (!unchanged()) throw new Error('imageCaptureChanged')
+      const response = await chrome.runtime.sendMessage({ type: 'captureImageTranslation' }) as { image?: string; error?: string }
+      if (!response?.image) throw new Error(response?.error ?? 'imageCaptureFailed')
+      if (destroyed || revision !== imageRevision) throw new DOMException('Aborted', 'AbortError')
+      if (!unchanged()) throw new Error('imageCaptureChanged')
+      return await cropScreenshot(response.image, rect, viewport)
+    } finally {
+      if (!destroyed) surfaces.forEach(({ host }, index) => { if (host !== imageSurface.host || revision === imageRevision) host.hidden = hidden[index] })
+    }
+  }
+  const startImage = () => {
+    imageRevision++
+    const bounds = contextImage?.isConnected ? contextImage.getBoundingClientRect() : undefined
+    const initialRect = bounds ? { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height } : { x: 0, y: 0, width: 0, height: 0 }
+    imageSurface.host.hidden = false
+    imageRoot.render(<ImageTranslation key={imageRevision} initialRect={initialRect} preferences={preferences} container={imageSurface.mount} capture={captureImage} close={closeImage} />)
+  }
+
   const actions = shadow('text-actions', 'auto')
   const actionsRoot = createRoot(actions.mount)
   let actionRevision = 0
@@ -137,14 +186,16 @@ function install(): void {
   const actionsResize = new ResizeObserver(positionActions)
   actionsResize.observe(actions.mount)
   const closeActions = () => { actions.host.hidden = true; actionsRoot.render(null) }
-  const showActions = (target?: HTMLElement, autoTranslate = false, autoSpeak = false) => {
+  const showActions = (target?: HTMLElement, autoTranslate = false, autoSpeak = false, inputSource?: string) => {
     if (!siteEnabled(preferences, location.href)) return
+    const provider = target ? preferences.inputProvider : autoSpeak ? preferences.ttsProvider : preferences.selectionProvider
+    if (provider === DISABLED_PROVIDER || target && !preferences.inputTranslation) return
     if (!target && !autoTranslate && !autoSpeak && (matchesSitePatterns(preferences.selectionDisabledSites, location.href) || !(preferences.selectionTranslate || preferences.selectionCopy || preferences.selectionSpeak))) return
     const current = window.getSelection()
     const text = target ? editableText(target) : current?.toString().trim() ?? ''
-    if (!text || text.length > 4000) { closeActions(); return }
+    if (!text.trim() || (inputSource ?? text).length > (target ? 16000 : 4000)) { closeActions(); return }
     const rect = target?.getBoundingClientRect() ?? (current?.rangeCount ? current.getRangeAt(0).getBoundingClientRect() : undefined)
-    const selection: TextActionState = { text, target, x: rect?.left ?? 0, y: rect?.bottom ?? 0, autoTranslate, autoSpeak }
+    const selection: TextActionState = { text, target, x: rect?.left ?? 0, y: rect?.bottom ?? 0, autoTranslate, autoSpeak, inputSource }
     actions.host.hidden = false
     actionAnchor = { x: selection.x, y: selection.y }
     positionActions()
@@ -156,20 +207,30 @@ function install(): void {
     if (preferences.selectionTranslation && !editableTarget(event.target instanceof Element ? event.target : null)) showActions()
   }
   const onKey = (event: KeyboardEvent) => {
+    if (event.composedPath().includes(actions.host)) return
     if (event.key === 'Escape') { closeActions(); store.closePanel(); return }
     if (event.repeat || event.isComposing || !siteEnabled(preferences, location.href)) { inputTrigger(event); return }
-    const target = editableTarget(document.activeElement)
-    if (preferences.inputTranslation && preferences.inputTrigger === 'tripleSpace' && inputTrigger(event, target ?? undefined)) { event.preventDefault(); showActions(target!, true); return }
-    if (target && preferences.inputTranslation && event.altKey && !event.ctrlKey && !event.metaKey && event.key === 'Enter') { event.preventDefault(); showActions(target); return }
+    const origin = event.composedPath()[0]
+    const target = editableTarget(origin instanceof Element ? origin : document.activeElement)
+    const inputEnabled = preferences.inputTranslation && preferences.inputProvider !== DISABLED_PROVIDER
+    if (target && event.isTrusted && inputEnabled) {
+      const source = inputTrigger(event, preferences.inputTrigger === 'tripleSpace' ? target : undefined)
+      if (source !== undefined || event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.key === 'Enter') {
+        event.preventDefault()
+        event.stopPropagation()
+        showActions(target, true, false, source)
+        return
+      }
+    } else inputTrigger(event)
     if (target) return
-    if (preferences.shortcutPage.toLowerCase() !== 'alt+t' && matchesShortcut(event, preferences.shortcutPage)) { event.preventDefault(); if (page.state().pageActive) page.stop(); else startPage() }
-    else if (preferences.shortcutSelection.toLowerCase() !== 'alt+s' && matchesShortcut(event, preferences.shortcutSelection)) { event.preventDefault(); showActions(undefined, true) }
-    else if (preferences.shortcutSubtitles.toLowerCase() !== 'alt+v' && matchesShortcut(event, preferences.shortcutSubtitles)) { event.preventDefault(); toggleSubtitles() }
+    if (preferences.pageProvider !== DISABLED_PROVIDER && preferences.shortcutPage.toLowerCase() !== 'alt+t' && matchesShortcut(event, preferences.shortcutPage)) { event.preventDefault(); if (page.state().pageActive) page.stop(); else startPage() }
+    else if (preferences.selectionProvider !== DISABLED_PROVIDER && preferences.shortcutSelection.toLowerCase() !== 'alt+s' && matchesShortcut(event, preferences.shortcutSelection)) { event.preventDefault(); showActions(undefined, true) }
+    else if (preferences.subtitleProvider !== DISABLED_PROVIDER && preferences.shortcutSubtitles.toLowerCase() !== 'alt+v' && matchesShortcut(event, preferences.shortcutSubtitles)) { event.preventDefault(); toggleSubtitles() }
   }
   const hoverPage = (event: PointerEvent) => page.hover(event)
   window.addEventListener('pointerover', hoverPage)
   window.addEventListener('pointerup', onSelection)
-  window.addEventListener('keydown', onKey)
+  window.addEventListener('keydown', onKey, true)
   const onOutsidePress = (event: PointerEvent) => {
     const path = event.composedPath()
     if (store.getSnapshot().panelOpen && !path.includes(panel.host) && !path.includes(trigger.host) && !path.includes(toast.host)) store.closePanel()
@@ -230,7 +291,7 @@ function install(): void {
     const y = Math.max(5, Math.min(100, (drag.top + event.clientY - drag.y - drag.video.top) / drag.video.height * 100))
     preferences = { ...preferences, subtitlePositionX: x, subtitlePositionY: y }; render()
   }
-  const dragEnd = () => { if (drag) { drag = undefined; void savePreferences({ subtitlePositionX: preferences.subtitlePositionX, subtitlePositionY: preferences.subtitlePositionY }) } }
+  const dragEnd = () => { if (drag) { drag = undefined; save({ subtitlePositionX: preferences.subtitlePositionX, subtitlePositionY: preferences.subtitlePositionY }) } }
   caption.addEventListener('pointerdown', dragStart); caption.addEventListener('pointermove', dragMove); caption.addEventListener('pointerup', dragEnd); caption.addEventListener('pointercancel', dragEnd)
 
   let fingerprint = ''
@@ -341,6 +402,7 @@ function install(): void {
     if (captionPhase === 'appearing') { captionPhase = 'shown'; caption.dataset.phase = 'shown' }
     else dismissCaption()
   })
+  let lastPageError: string | undefined
   function render(): void {
     if (destroyed) return
     const state = store.getSnapshot()
@@ -362,15 +424,18 @@ function install(): void {
     floating.host.style.left = preferences.floatingSide === 'left' ? '0px' : ''
     floating.host.style.right = preferences.floatingSide === 'right' ? '0px' : ''
     floating.host.style.top = `${Math.max(48, Math.min(innerHeight - 96, innerHeight * preferences.floatingPosition))}px`
-    floatingRoot.render(floating.host.hidden ? null : <FloatingControls preferences={preferences} active={page.state().pageActive} error={page.state().pageError} onTranslate={() => { if (siteEnabled(preferences, location.href)) startPage(); refresh() }} onRestore={() => { page.stop(); refresh() }} onPosition={(position, commit) => { preferences = { ...preferences, ...position }; if (commit) void savePreferences(position); refresh() }} onLock={() => { void savePreferences({ floatingLocked: !preferences.floatingLocked }) }} onHide={scope => {
+    const pageState = page.state()
+    floatingRoot.render(floating.host.hidden ? null : <FloatingControls preferences={preferences} active={pageState.pageActive} onTranslate={() => { if (siteEnabled(preferences, location.href)) startPage(); refresh() }} onRestore={() => { page.stop(); refresh() }} onPosition={(position, commit) => { preferences = { ...preferences, ...position }; if (commit) save(position); refresh() }} onLock={() => save({ floatingLocked: !preferences.floatingLocked })} onHide={scope => {
       if (scope === 'page') floatingHiddenPage = true
-      else if (scope === 'site') void savePreferences({ floatingDisabledSites: [...preferences.floatingDisabledSites, location.origin] })
-      else void savePreferences({ floatingButton: false })
+      else if (scope === 'site') save({ floatingDisabledSites: [...preferences.floatingDisabledSites, location.origin] })
+      else save({ floatingButton: false })
       refresh()
     }} />)
     if (!enabled) { overlayHoverPause.leave(); nativeHoverPause.leave(); for (const { host } of surfaces) host.hidden = true; return }
     toast.host.hidden = false
     toastRoot.render(<ToastProvider container={toast.mount} closeLabel={t('close')} />)
+    if (pageState.pageError && pageState.pageError !== lastPageError) notifyError(pageState.pageError)
+    lastPageError = pageState.pageError
     if (!video) { for (const host of [trigger.host, panel.host, overlay.host]) host.hidden = true; return }
     // A native host process belongs to the caption port, so ordinary tabs should never open one.
     if (!initializedVideo) {
@@ -570,7 +635,7 @@ function install(): void {
     updateContext()
     const enabled = siteEnabled(next, location.href)
     store.setPreferences(next); page.configure(next); if (enabled) subtitles.configure(next)
-    const auto = enabled && matchesSitePatterns(next.autoSites, location.href) && !matchesSitePatterns(next.neverAutoSites, location.href)
+    const auto = enabled && next.pageProvider !== DISABLED_PROVIDER && matchesSitePatterns(next.autoSites, location.href) && !matchesSitePatterns(next.neverAutoSites, location.href)
     closeActions()
     if (!enabled) { page.stop(); subtitles.stop(); if (store.getSnapshot().status !== 'idle') void store.stop() }
     if (auto && !previousAuto) startPage()
@@ -600,7 +665,8 @@ function install(): void {
     switch (message.type) {
       case 'translateSelection': showActions(undefined, true); break
       case 'speakSelection': showActions(undefined, false, true); break
-      case 'translateInput': { const target = editableTarget(document.activeElement); if (target) showActions(target); break }
+      case 'translateInput': { const target = editableTarget(document.activeElement); if (target) showActions(target, true); break }
+      case 'startImageTranslation': startImage(); break
       case 'togglePageTranslation': if (page.state().pageActive) page.stop(); else startPage(); break
       case 'startPageTranslation': startPage(); break
       case 'stopPageTranslation': page.stop(); break
@@ -636,10 +702,10 @@ function install(): void {
         chrome.runtime.onMessage.removeListener(onCommand)
       },
       () => { for (const name of playerEvents) window.removeEventListener(name, refresh, true) },
-      () => { window.removeEventListener('pointerdown', onOutsidePress); window.removeEventListener('pointerover', hoverPage); window.removeEventListener('pointerup', onSelection); window.removeEventListener('keydown', onKey); window.removeEventListener('pagehide', destroy) },
+      () => { window.removeEventListener('pointerdown', onOutsidePress); window.removeEventListener('pointerover', hoverPage); window.removeEventListener('pointerup', onSelection); window.removeEventListener('keydown', onKey, true); window.removeEventListener('contextmenu', rememberImage, true); window.removeEventListener('pagehide', destroy) },
       () => contextController?.abort(),
       () => { overlayHoverPause.leave(); nativeHoverPause.leave(); caption.removeEventListener('pointerenter', hoverEnter); caption.removeEventListener('pointerleave', hoverLeave); window.removeEventListener('pointermove', nativeHover, true) },
-      () => { closeActions(); actionsRoot.unmount(); floatingRoot.unmount() },
+      () => { closeActions(); actionsRoot.unmount(); floatingRoot.unmount(); imageRoot.unmount() },
       () => subtitles.destroy(), () => page.stop(), () => translator.close(),
       () => { triggerRoot.unmount(); panelRoot.unmount(); toastRoot.unmount(); surfaces.forEach(({ host }) => host.remove()); nativeCueStyles.remove() },
       () => unregisterRuntime(),

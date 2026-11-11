@@ -20,6 +20,8 @@ it('locks manually edited translation and saves against its original revision', 
   const edit = vi.fn(async () => ({ ...project, revision: 5 }))
   vi.spyOn(store, 'getBridge').mockReturnValue({ comic: { openProject: async () => project, image: async () => 'data:image/png;base64,AA==', edit, onChanged: () => () => {} } } as unknown as NolaBridge)
   render(<ComicTranslationPage projectId="project" />)
+  expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+  fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
   const target = await screen.findByRole('textbox', { name: '译文' })
   fireEvent.change(target, { target: { value: 'manual target' } })
   expect(screen.getByRole('switch', { name: '保护人工译文' })).toBeChecked()
@@ -31,6 +33,7 @@ it('restores an unsaved draft after navigation and retains its original revision
   const edit = vi.fn(async () => ({ ...current, revision: 12 }))
   vi.spyOn(store, 'getBridge').mockReturnValue({ comic: { openProject: async () => current, image: async () => 'data:image/png;base64,AA==', edit, onChanged: () => () => {} } } as unknown as NolaBridge)
   const first = render(<ComicTranslationPage projectId="draft-project" />)
+  fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
   fireEvent.change(await screen.findByRole('textbox', { name: '译文' }), { target: { value: 'unsaved draft' } })
   first.unmount()
   current = { ...current, revision: 11 }
@@ -79,34 +82,48 @@ it('renders a saved manual translation using layout without rerunning translatio
   const edit = vi.fn(async () => saved), run = vi.fn(async () => saved)
   vi.spyOn(store, 'getBridge').mockReturnValue({ comic: { openProject: async () => ({ ...project, pages: [{ ...project.pages[0], hasClean: true }] }), image: async () => 'data:image/png;base64,AA==', edit, run, onChanged: () => () => {} } } as unknown as NolaBridge)
   render(<ComicTranslationPage projectId="project" />)
+  fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
   fireEvent.change(await screen.findByRole('textbox', { name: '译文' }), { target: { value: 'Manual correction' } })
   fireEvent.click(screen.getByRole('button', { name: '保存' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '处理此页' })).toBeEnabled())
-  fireEvent.click(screen.getByRole('button', { name: '处理此页' }))
-  fireEvent.click(await screen.findByRole('button', { name: '重新排版' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '分步处理' })).toBeEnabled())
+  await userEvent.click(screen.getByRole('button', { name: '分步处理' }))
+  await userEvent.click(await screen.findByRole('button', { name: '重新排版' }))
   await waitFor(() => expect(run).toHaveBeenCalledExactlyOnceWith({ projectId: 'project', expectedRevision: 5, pageIds: ['page'], stage: 'layout' }))
 })
 it('saves manual geometry and typography and removes stale OCR quadrilaterals', async () => {
   const edit = vi.fn(async () => ({ ...project, revision: 5 }))
   vi.spyOn(store, 'getBridge').mockReturnValue({ comic: { openProject: async () => project, image: async () => 'data:image/png;base64,AA==', edit, onChanged: () => () => {} } } as unknown as NolaBridge)
   render(<ComicTranslationPage projectId="project" />)
+  fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
+  await userEvent.click(await screen.findByRole('tab', { name: '排版' }))
   fireEvent.change(await screen.findByRole('spinbutton', { name: '横坐标' }), { target: { value: '30' } })
   fireEvent.change(screen.getByRole('spinbutton', { name: '字号' }), { target: { value: '24' } })
   fireEvent.click(screen.getByRole('switch', { name: '忽略此气泡' }))
   fireEvent.click(screen.getByRole('button', { name: '保存' }))
   await waitFor(() => expect(edit).toHaveBeenCalledWith(expect.objectContaining({ command: expect.objectContaining({ region: expect.objectContaining({ x: 30, sourceQuad: undefined, ignored: true, style: expect.objectContaining({ fontSize: 24 }) }) }) })))
 })
+
+it('keeps processing settings off the canvas and opens them from the project header', async () => {
+  vi.spyOn(store, 'getBridge').mockReturnValue({ comic: { openProject: async () => project, image: async () => 'data:image/png;base64,AA==', onChanged: () => () => {} } } as unknown as NolaBridge)
+  render(<ComicTranslationPage projectId="project" />)
+  expect(await screen.findByRole('img', { name: '001' })).toBeInTheDocument()
+  expect(screen.queryByRole('combobox', { name: '漫画检测模型' })).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: '处理设置' }))
+  expect(within(screen.getByRole('dialog')).getByRole('combobox', { name: '漫画检测模型' })).toBeInTheDocument()
+})
 it('creates chapters and moves the current page through the real edit contract', async () => {
   const book = { ...project, chapters: [...project.chapters, { id: 'appendix', title: 'Appendix' }] }
   const edit = vi.fn(async () => ({ ...book, revision: 5 }))
   vi.spyOn(store, 'getBridge').mockReturnValue({ comic: { openProject: async () => book, image: async () => 'data:image/png;base64,AA==', edit, onChanged: () => () => {} } } as unknown as NolaBridge)
   render(<ComicTranslationPage projectId="project" />)
+  fireEvent.click(await screen.findByRole('button', { name: '第 1 / 1 页' }))
   fireEvent.click(await screen.findByRole('button', { name: '新增章节' }))
   fireEvent.change(within(screen.getByRole('dialog')).getByRole('textbox', { name: '名称' }), { target: { value: 'New chapter' } })
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '新增章节' }))
   await waitFor(() => expect(edit).toHaveBeenCalledWith(expect.objectContaining({ command: { action: 'addChapter', title: 'New chapter' } })))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: '第 1 / 1 页' }))
   await user.click(screen.getByRole('combobox', { name: '移至章节' }))
   await user.click(await screen.findByRole('option', { name: 'Appendix' }))
   await waitFor(() => expect(edit).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: 5, command: { action: 'movePage', pageId: 'page', chapterId: 'appendix', index: 1 } })))
@@ -116,4 +133,59 @@ it('explains how to recover a failed layout job without exposing the raw backend
   render(<ComicTranslationPage projectId="project" />)
   expect(await screen.findByText('请先修复此页底图，再重新排版。')).toBeInTheDocument()
   expect(screen.queryByText(/worker detail/)).not.toBeInTheDocument()
+})
+
+it('runs only the selected page and shows its active job above older failures', async () => {
+  const second = { ...project.pages[0], id: 'second', name: '002' }
+  const book = { ...project, pages: [...project.pages, second], pageCount: 2 }
+  const run = vi.fn(async (): Promise<ComicProject> => ({ ...book, jobs: [
+    { id: 'active', state: 'running', stage: 'detect', completedPages: 0, totalPages: 1, pageId: 'second' },
+    { id: 'old', state: 'failed', stage: 'layout', completedPages: 0, totalPages: 1, error: 'repairRequired' },
+  ] }))
+  const cancel = vi.fn(async () => book)
+  vi.spyOn(store, 'getBridge').mockReturnValue({ comic: { openProject: async () => book, image: async () => 'data:image/png;base64,AA==', run, cancel, onChanged: () => () => {} } } as unknown as NolaBridge)
+  render(<ComicTranslationPage projectId="project" pageId="second" />)
+  fireEvent.click(await screen.findByRole('button', { name: '翻译本页' }))
+  expect(run).toHaveBeenCalledWith({ projectId: 'project', expectedRevision: 4, stage: 'full', pageIds: ['second'] })
+  expect(await screen.findByRole('status')).toHaveTextContent('检测文字区域')
+  expect(screen.queryByText('请先修复此页底图，再重新排版。')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '取消' }))
+  await waitFor(() => expect(cancel).toHaveBeenCalledWith('project', 'active'))
+})
+
+it.each([false, true])('scrolls continuously and jumps by page number (reader=%s)', async reader => {
+  const pages = Array.from({ length: 6 }, (_, index) => ({
+    ...project.pages[0], id: String(index + 1), name: `Long imported PDF name - Page ${index + 1}`,
+  }))
+  const book = { ...project, pages, pageCount: pages.length }
+  const image = vi.fn(async () => 'data:image/png;base64,AA==')
+  const run = vi.fn(async () => book)
+  vi.spyOn(store, 'getBridge').mockReturnValue({
+    comic: { openProject: async () => book, image, run, onChanged: () => () => {} },
+  } as unknown as NolaBridge)
+  render(<ComicTranslationPage projectId="project" reader={reader} />)
+  const canvas = await screen.findByRole('region', { name: '漫画画布' })
+  Object.defineProperties(canvas, { clientHeight: { value: 500 }, scrollHeight: { value: 3600 } })
+  Array.from(canvas.children).forEach((child, index) => {
+    Object.defineProperty(child, 'offsetTop', { value: index * 600 })
+  })
+  expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+  expect(image).toHaveBeenCalledTimes(2)
+  fireEvent.scroll(canvas, { target: { scrollTop: 600 } })
+  expect(screen.getByRole('button', { name: '第 2 / 6 页' })).toBeInTheDocument()
+  if (!reader) {
+    fireEvent.click(screen.getByRole('button', { name: '翻译本页' }))
+    await waitFor(() => expect(run).toHaveBeenCalledWith(expect.objectContaining({ pageIds: ['2'] })))
+  }
+  fireEvent.click(screen.getByRole('button', { name: '第 2 / 6 页' }))
+  const jump = screen.getByRole('dialog', { name: '跳转页码' })
+  const input = within(jump).getByRole('spinbutton')
+  fireEvent.change(input, { target: { value: '7' } })
+  expect(within(jump).getByRole('button', { name: '跳转页码' })).toBeDisabled()
+  fireEvent.change(input, { target: { value: '6' } })
+  fireEvent.click(within(jump).getByRole('button', { name: '跳转页码' }))
+  expect(canvas.scrollTop).toBe(3000)
+  expect(screen.getByRole('button', { name: '第 6 / 6 页' })).toBeInTheDocument()
+  expect(await screen.findByRole('img', { name: pages[5].name })).toBeInTheDocument()
+  expect(image).not.toHaveBeenCalledWith('project', '4', expect.anything())
 })

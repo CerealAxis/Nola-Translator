@@ -1,11 +1,11 @@
 import type { ExtensionBridge } from './bridge'
 import { BrowserFailure } from './bridge'
-import type { Preferences } from './preferences'
+import { liveTranslationEnabled, type Preferences } from './preferences'
 import { BROWSER_PROTOCOL_VERSION, type BrowserResponse, type BrowserSummary, type BrowserWireErrorCode } from '../../src/shared/browser'
 import { pcmBase64 } from './capture'
 
 export function usesSpeechRuntime(preferences?: Preferences): boolean {
-  return Boolean(preferences && (preferences.pipeline === 'cascade' || (preferences.pipeline !== 's2s' && (preferences.asrProvider !== 'desktop' || preferences.subtitleProvider !== 'desktop')) || (preferences.pipeline === 's2s' && preferences.s2sProvider !== 'desktop')))
+  return Boolean(preferences && liveTranslationEnabled(preferences) && (preferences.pipeline === 'cascade' || (preferences.pipeline !== 's2s' && (preferences.asrProvider !== 'desktop' || preferences.subtitleProvider !== 'desktop')) || (preferences.pipeline === 's2s' && preferences.s2sProvider !== 'desktop')))
 }
 
 export function resamplePcm(buffer: ArrayBuffer, inputRate: number): ArrayBuffer {

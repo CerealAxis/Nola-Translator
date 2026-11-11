@@ -2,7 +2,7 @@
 
 import { Toast as BaseToast } from '@base-ui/react/toast'
 import { CheckCircle2, CircleX, Info, LoaderCircle, TriangleAlert, X } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from './button'
 import { Card } from './card'
 import { useI18n } from '@/i18n'
@@ -56,6 +56,7 @@ interface ToastProviderProps {
 function ToastViewport({ onEmpty, container, closeLabel }: ToastProviderProps) {
   const { t } = useI18n()
   const { toasts } = BaseToast.useToastManager<ToastData>()
+  const [focusedToast, setFocusedToast] = useState<string>()
   const previousCount = useRef(toasts.length)
   useEffect(() => {
     if (previousCount.current > 0 && toasts.length === 0) onEmpty?.()
@@ -63,7 +64,14 @@ function ToastViewport({ onEmpty, container, closeLabel }: ToastProviderProps) {
   }, [onEmpty, toasts.length])
   return <BaseToast.Portal container={container}>
     <BaseToast.Viewport className="nola-toast-viewport z-toast" data-slot="toast-viewport">
-      {toasts.map(toast => <BaseToast.Root key={toast.id} toast={toast} render={<Card size="sm" data-slot="toast" />} className="nola-toast" data-slot="toast" data-type={toast.type ?? 'info'}>
+      {toasts.map(toast => <BaseToast.Root key={toast.id} toast={toast} render={<Card size="sm" data-slot="toast" />} className="nola-toast" data-slot="toast" data-type={toast.type ?? 'info'}
+        {...(focusedToast === toast.id ? { 'aria-hidden': false } : {})}
+        onFocus={() => setFocusedToast(toast.id)}
+        onBlur={event => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            setFocusedToast(current => current === toast.id ? undefined : current)
+          }
+        }}>
         <BaseToast.Content className="nola-toast-content">
           {toast.type === 'success' ? <CheckCircle2 className="nola-toast-icon" aria-hidden="true" /> : null}
           {toast.type === 'info' ? <Info className="nola-toast-icon" aria-hidden="true" /> : null}
@@ -74,8 +82,9 @@ function ToastViewport({ onEmpty, container, closeLabel }: ToastProviderProps) {
             {toast.title ? <BaseToast.Title className="nola-toast-title" /> : null}
             {toast.description ? <BaseToast.Description className="nola-toast-description" /> : null}
           </div>
-          {toast.actionProps ? <BaseToast.Action className="nola-toast-action" render={<Button variant="outline" />} /> : null}
-          <BaseToast.Close render={<Button size="icon" variant="tertiary" className="nola-toast-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent text-nola-ui-muted-foreground!" aria-label={closeLabel ?? t('common.close')}><X aria-hidden="true" /></Button>} />
+          {/* Base UI can hide a high-priority toast from assistive technology during pointer interaction. */}
+          {toast.actionProps ? <BaseToast.Action className="nola-toast-action" onMouseDown={event => event.preventDefault()} render={<Button variant="outline" />} /> : null}
+          <BaseToast.Close onMouseDown={event => event.preventDefault()} render={<Button size="icon" variant="tertiary" className="nola-toast-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent text-nola-ui-muted-foreground!" aria-label={closeLabel ?? t('common.close')}><X aria-hidden="true" /></Button>} />
         </BaseToast.Content>
       </BaseToast.Root>)}
     </BaseToast.Viewport>

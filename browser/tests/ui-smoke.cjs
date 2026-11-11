@@ -39,9 +39,9 @@ async function main() {
         return { input: color(input), selected: color(selected), font: getComputedStyle(document.body).fontFamily, headingFont: getComputedStyle(document.querySelector('.nola-options-header strong')).fontFamily }
       })
       colors.push({ locale, theme, width, ...computed })
-      console.log({ locale, theme, font: computed.font, headingFont: computed.headingFont })
-      assert.ok(computed.font.includes('sans-serif') && computed.headingFont.includes('Segoe UI'), 'Extension typography must use the independent system sans stack')
-      if (theme === 'light') { assert.ok(computed.input.rgba[0] > 230, 'Light input must be near white'); assert.ok(computed.selected.rgba[0] > 220, 'Selected navigation must use the soft Nola surface') }
+      console.log({ locale, theme, ...computed })
+      assert.ok(computed.font.includes('sans-serif') && computed.headingFont.includes('sans-serif'), 'Extension typography must use the independent system sans stack')
+      if (theme === 'light') { assert.ok(computed.input.rgba[0] > 230, 'Light input must be near white'); assert.ok(computed.selected.rgba[0] > 200 && computed.selected.rgba[2] > computed.selected.rgba[0], 'Selected navigation must use the soft Nola surface') }
       else assert.ok(computed.input.rgba[0] < 100, 'Dark input must use the dark Nola surface')
       await page.screenshot({ path: path.join(output, `settings-${locale}-${theme}-${width}.png`), fullPage: true, animations: 'disabled' }); screenshots++
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)
@@ -51,6 +51,11 @@ async function main() {
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.evaluate(() => chrome.storage.local.set({ uiLanguage: 'en', theme: 'light' }))
     await page.waitForFunction(() => document.documentElement.lang === 'en')
+    // A 1280px window at 200% browser zoom has a 640px CSS viewport.
+    await page.setViewportSize({ width: 640, height: 450 })
+    await page.screenshot({ path: path.join(output, 'settings-en-light-zoom-200.png'), fullPage: true, animations: 'disabled' }); screenshots++
+    assert.ok(await page.evaluate(() => document.body.getBoundingClientRect().right <= innerWidth + 1), 'Horizontal overflow at 200% zoom')
+    await page.setViewportSize({ width: 1280, height: 900 })
     for (const index of Array.from({ length: 13 }, (_, i) => i)) {
       await page.locator('aside nav button').nth(index).click()
       await page.evaluate(async () => { await Promise.all(document.getAnimations().filter(animation => Number.isFinite(animation.effect?.getComputedTiming().endTime)).map(animation => animation.finished.catch(() => undefined))) })
@@ -92,23 +97,30 @@ async function main() {
     }
     await page.evaluate(() => chrome.storage.local.set({ uiLanguage: 'en', theme: 'light' }))
     await page.waitForFunction(() => document.documentElement.lang === 'en')
-    await page.getByRole('textbox', { name: 'Search settings' }).fill('terminology')
-    await page.getByRole('textbox', { name: 'Source term' }).fill('Example')
+    await page.locator('aside nav button').nth(11).click()
+    await page.getByRole('button', { name: 'New glossary library' }).click()
+    await page.getByRole('dialog').getByRole('textbox', { name: 'Name' }).fill('Test glossary')
+    await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await page.getByRole('button', { name: 'Add term' }).click()
+    await page.getByRole('textbox', { name: 'Source', exact: true }).fill('Example')
     await page.getByRole('textbox', { name: 'Translation', exact: true }).fill('示例')
-    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
     await page.getByRole('cell', { name: 'Example', exact: true }).waitFor()
-    assert.equal((await page.evaluate(() => chrome.storage.local.get(['glossary']))).glossary[0].target, '示例')
+    await page.reload()
+    await page.getByRole('cell', { name: 'Example', exact: true }).waitFor()
     const downloadPromise = page.waitForEvent('download')
     await page.getByRole('button', { name: 'Export CSV' }).click()
     const download = await downloadPromise
-    assert.equal(download.suggestedFilename(), 'nola-terminology.csv')
+    assert.equal(download.suggestedFilename(), 'Test glossary.csv')
     await download.saveAs(path.join(output, 'terminology.csv'))
+    assert.match(await fs.readFile(path.join(output, 'terminology.csv'), 'utf8'), /Example.*示例/)
     await page.getByRole('textbox', { name: 'Search settings' }).fill('backup')
     const backupPromise = page.waitForEvent('download')
     await page.getByRole('button', { name: 'Export configuration' }).click()
     await (await backupPromise).saveAs(path.join(output, 'configuration.json'))
     const backup = JSON.parse(await fs.readFile(path.join(output, 'configuration.json'), 'utf8'))
-    assert.equal(backup.version, 1)
+    assert.equal(backup.version, 2)
     assert.ok(backup.providers.every(provider => provider.apiKey === ''))
     assert.deepEqual(errors, [])
     const result = { browser: 'Edge (real unpacked extension)', profile, screenshots, quick, colors, locales, themes: ['light', 'dark'], widths: [1920, 1280, 390], assertions: ['provider draft preserved across unrelated settings', 'floating side, slider, lock and website rules persist', 'interactive translation preview', 'toolbar visibility and opacity update', 'no horizontal overflow', '13 navigable sections', 'settings search', 'terminology persistence', 'CSV download', 'configuration export without secrets', 'no page exceptions'], limitations: ['Options-page checks only. Real toolbar popup is verified by toolbar-popup-smoke.cjs.', 'No cloud request or live audio was started.'] }

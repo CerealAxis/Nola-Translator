@@ -4,6 +4,148 @@
 @import '../../src/renderer/theme/product.css';
 
 @layer components {
+  .nola-doc-workbench {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    background: var(--background);
+    color: var(--foreground);
+    font: var(--font-body);
+  }
+  .nola-doc-header, .nola-doc-toolbar, .nola-doc-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 5);
+    border-block-end: 1px solid var(--border);
+    background: var(--card);
+  }
+  .nola-doc-header h1 { font: var(--font-title); }
+  .nola-doc-filename { flex: 1 1 10rem; min-width: 0; color: var(--muted-foreground); }
+  .nola-doc-header-actions, .nola-doc-views { display: flex; flex-wrap: wrap; gap: calc(var(--spacing) * 2); }
+  .nola-doc-toolbar { align-items: center; }
+  .nola-doc-toolbar > [data-slot="field"] { position: relative; display: flex; flex-direction: row; align-items: center; width: auto; flex: 0 1 auto; min-width: 0; gap: calc(var(--spacing) * 2); }
+  .nola-doc-toolbar > [data-slot="field"] label { white-space: nowrap; }
+  .nola-doc-toolbar > [data-slot="field"] [data-slot="combobox-trigger"],
+  .nola-doc-toolbar > [data-slot="field"] [data-slot="select-trigger"] { min-width: 9rem; }
+  .nola-doc-toolbar > [data-slot="field"] [data-slot="select-trigger"],
+  .nola-doc-toolbar > [data-slot="field"] [data-slot="combobox-trigger"] { width: 10rem; }
+  .nola-doc-views { margin-inline-start: auto; align-self: center; }
+  .nola-doc-views [aria-pressed="true"] { background: var(--accent); color: var(--accent-foreground); }
+  .nola-doc-status { min-height: calc(var(--spacing) * 9); padding-block: var(--spacing); color: var(--muted-foreground); font: var(--font-caption); }
+  .nola-doc-status progress { width: 7rem; height: calc(var(--spacing) * 2); appearance: none; overflow: hidden; border-radius: var(--radius-sm); background: var(--muted); }
+  .nola-doc-status progress::-webkit-progress-bar { background: var(--muted); }
+  .nola-doc-status progress::-webkit-progress-value { background: var(--primary); }
+  .nola-doc-status progress::-moz-progress-bar { background: var(--primary); }
+  .nola-doc-status output { font-variant-numeric: tabular-nums; }
+  .nola-doc-import {
+    display: grid;
+    place-items: center;
+    flex: 1;
+    padding: calc(var(--spacing) * 6);
+  }
+  .nola-doc-import > [data-slot="empty"] {
+    max-width: 40rem;
+    background: var(--card);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-lg);
+  }
+  .nola-doc-formats { color: var(--muted-foreground); font: var(--font-caption); }
+  .nola-doc-import > [data-dragging="true"] { border-color: var(--primary); background: var(--accent); }
+  .nola-doc-compare {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100dvh;
+    min-height: 100dvh;
+    min-width: 0;
+    padding: calc(var(--spacing) * 3);
+  }
+  .nola-doc-compare[data-both="true"] {
+    grid-template-columns: minmax(0, calc((100% - 1px) * var(--doc-split))) 1px minmax(0, 1fr);
+  }
+  .nola-doc-compare[data-resizing="true"] { user-select: none; }
+  .nola-doc-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--muted);
+  }
+  .nola-doc-compare[data-both="true"] .nola-doc-pane:first-of-type { border-inline-end-color: transparent; }
+  .nola-doc-compare[data-both="true"] .nola-doc-pane:last-of-type { border-inline-start-color: transparent; }
+  .nola-doc-pane > h2 {
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 4);
+    border-block-end: 1px solid var(--border);
+    background: var(--card);
+    font: var(--font-label);
+  }
+  .nola-doc-scroll { position: relative; flex: 1; overflow: auto; overscroll-behavior: contain; padding: calc(var(--spacing) * 4); }
+  .nola-doc-section + .nola-doc-section { margin-block-start: calc(var(--spacing) * 4); }
+  .nola-doc-divider {
+    display: grid;
+    place-items: center;
+    color: var(--muted-foreground);
+    cursor: col-resize;
+    touch-action: none;
+    background: transparent;
+    position: relative;
+  }
+  .nola-doc-divider::before { content: ''; position: absolute; inset: 0 -8px; }
+  .nola-doc-divider:hover, .nola-doc-divider:focus-visible, .nola-doc-compare[data-resizing="true"] .nola-doc-divider { background: var(--primary); outline: 2px solid var(--ring); outline-offset: -2px; }
+  .nola-doc-viewer-toolbar { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: calc(var(--spacing) * 2); padding: calc(var(--spacing) * 2); background: var(--card); border-block-end: 1px solid var(--border); font: var(--font-label); }
+  .nola-doc-placeholder { margin: calc(var(--spacing) * 8) auto; text-align: center; color: var(--muted-foreground); }
+  .nola-doc-pdf, .nola-doc-sheet {
+    width: calc(min(100%, 52rem) * var(--doc-zoom, 1));
+    margin-inline: auto;
+    background: var(--card);
+    box-shadow: var(--shadow-xs);
+  }
+  .nola-doc-pdf { display: block; height: auto; background: white; }
+  canvas.nola-doc-pdf { width: 100%; }
+  .nola-doc-sheet {
+    padding: clamp(1rem, 4%, 2.5rem);
+    overflow-wrap: anywhere;
+    font: var(--font-body);
+    font-size: calc(1em * var(--doc-zoom, 1));
+  }
+  .nola-doc-sheet :is(p, pre, ol, ul, table, blockquote) { margin-block: 0 1em; }
+  .nola-doc-sheet :is(h1, h2, h3, h4, h5, h6) { margin-block: 0 .65em; font-weight: 650; line-height: 1.3; }
+  .nola-doc-sheet h1 { font-size: 1.65em; }
+  .nola-doc-sheet h2 { font-size: 1.35em; }
+  .nola-doc-sheet :is(ol, ul) { padding-inline-start: 1.5em; list-style: revert; }
+  .nola-doc-sheet pre { overflow: auto; padding: calc(var(--spacing) * 2); background: var(--muted); }
+  .nola-doc-sheet a { color: var(--primary); text-decoration: underline; }
+  .nola-doc-sheet img { max-width: 100%; height: auto; }
+  .nola-doc-sheet :is(td, th) { border: 1px solid var(--border); padding: var(--spacing) calc(var(--spacing) * 2); vertical-align: top; }
+  .nola-doc-sheet[data-format="xlsx"] table { width: 100%; table-layout: fixed; }
+  .nola-doc-sheet[data-format="xlsx"] th { width: 3rem; background: var(--muted); }
+  .nola-doc-slide { position: relative; min-height: 8rem; border: 1px solid var(--border); overflow: auto; font-size: .85em; }
+  .nola-doc-slide p { margin: 0; }
+  @media (max-width: 42rem) {
+    .nola-doc-workbench { height: auto; }
+    .nola-doc-compare[data-both="true"] { grid-template-columns: minmax(0, 1fr); gap: calc(var(--spacing) * 3); }
+    .nola-doc-divider { display: none; }
+    .nola-doc-compare[data-both="true"] .nola-doc-pane { border-color: var(--border); }
+    .nola-doc-scroll { min-height: 0; }
+    .nola-doc-compare[data-both="true"] { height: 100dvh; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr); }
+    .nola-doc-header-actions { flex-basis: 100%; }
+    .nola-doc-import { min-height: 65dvh; }
+  }
+}
+
+@layer utilities {
+  .nola-doc-toolbar > [data-slot="field"] {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+@layer components {
   :host {
     all: initial;
     font: var(--font-body);
@@ -129,11 +271,6 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
-  }
-  .nola-error {
-    font: var(--font-caption);
-    color: var(--danger);
-    margin: 0;
   }
   .nola-muted {
     font: var(--font-caption);
@@ -728,33 +865,12 @@
     justify-content: flex-start;
     gap: var(--space-1);
   }
-  .nola-settings-section > [data-slot="field-group"] {
-    gap: 0;
-  }
-  .nola-settings-section [data-slot="field"] {
-    display: grid;
-    grid-template-columns: minmax(0,1fr) minmax(180px, 300px);
-    align-items: center;
-    gap: var(--space-3);
-    padding-block: var(--space-2);
-  }
   .nola-settings-section [data-slot="field"] > :last-child {
     min-width: 0;
   }
   .nola-settings-section [data-slot="field-group"] > .button {
     align-self: flex-start;
     margin-block: var(--space-1);
-  }
-  .nola-settings-section .nola-setting-toggle {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-  }
-  .nola-settings-section .nola-two-columns [data-slot="field"], .nola-settings-section [data-slot="field"].nola-field-stack {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-1);
   }
   .nola-settings-section .nola-field-stack > textarea {
     min-height: var(--space-8);
@@ -771,6 +887,13 @@
   }
   .nola-popup {
     width: 100%;
+  }
+  html.nola-popup-document .nola-toast-content {
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+  html.nola-popup-document .nola-toast-action {
+    margin-inline-start: 0;
   }
   .nola-popup-body {
     display: flex;
@@ -904,14 +1027,6 @@
     align-items: center;
     gap: var(--space-1);
   }
-  .nola-popup-translate-row {
-    display: grid;
-    grid-template-columns: var(--space-5) minmax(0,1fr);
-    gap: var(--space-1);
-  }
-  .nola-popup .nola-popup-translate-row > .button:first-child {
-    padding: 0;
-  }
   .nola-popup-switches {
     display: flex;
     flex-direction: column;
@@ -984,18 +1099,21 @@
     }
     .nola-settings-sidebar nav {
       flex-direction: row;
-      flex-wrap: wrap;
+      overflow-x: auto;
     }
     .nola-nav-group {
-      flex: 1;
-      min-width: 150px;
+      flex-direction: row;
+      flex: none;
+      min-width: 0;
+    }
+    .nola-nav-group > p {
+      display: none;
+    }
+    .nola-nav-group > .button {
+      flex-shrink: 0;
     }
     .nola-settings-main {
       padding: var(--space-3) var(--space-2);
-    }
-    .nola-settings-section [data-slot="field"] {
-      grid-template-columns: minmax(0,1fr);
-      gap: var(--space-1);
     }
     .nola-two-columns {
       grid-template-columns: minmax(0,1fr);
@@ -1056,6 +1174,9 @@
   .nola-illustration .nola-demo-browser {
     width: min(100%, calc(var(--space-8) * 4));
     box-shadow: var(--surface-shadow);
+  }
+  .nola-illustration[data-preview="video"] .nola-demo-browser {
+    width: min(100%, calc(var(--space-8) * 5));
   }
   .nola-illustration .nola-demo-chrome {
     min-height: var(--space-4);
@@ -1253,7 +1374,9 @@
 
 @layer components {
   .nola-portal-container {
-    display: contents;
+    position: absolute;
+    width: 0;
+    height: 0;
   }
   .combobox__list {
     max-height: calc(var(--space-8) * 3);
@@ -1493,31 +1616,23 @@
     gap: var(--space-1);
     min-width: 0;
   }
-  .nola-settings-section .nola-provider-editor [data-slot="field"] {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-1);
-    padding-block: var(--space-1);
-  }
-  .nola-provider-editor [data-slot="field-group"] {
-    gap: var(--space-1);
-  }
-  .nola-settings-section .nola-provider-editor .nola-setting-toggle {
-    flex-direction: row;
-    align-items: center;
-  }
   .nola-provider-picker {
     width: min(calc(var(--space-8) * 4), calc(100vw - var(--space-3)));
+    max-height: min(var(--available-height, 100vh), calc(100vh - var(--space-2)));
   }
   .nola-provider-picker-list {
     display: flex;
     flex-direction: column;
+    min-height: 0;
     max-height: calc(var(--space-8) * 4);
     overflow: auto;
   }
   .nola-provider-picker-list .button {
+    height: auto;
+    min-height: var(--field-control-height);
     justify-content: flex-start;
+    white-space: normal;
+    text-align: start;
   }
   .nola-settings-shell .nola-settings-disclosure > summary {
     font: var(--font-title);
@@ -1558,6 +1673,26 @@
     box-shadow: none;
     resize: vertical;
     background: transparent;
+  }
+  .nola-hub-attachment {
+    position: relative;
+    width: var(--space-8);
+    height: var(--space-8);
+    flex: none;
+  }
+  .nola-hub-attachment img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+  }
+  .nola-hub-attachment .button {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: var(--card);
   }
   .nola-hub-input-actions {
     display: flex;
@@ -1663,6 +1798,76 @@
 }
 
 @layer utilities {
+  .nola-provider-rail .nola-provider-list-item {
+    height: auto;
+    min-height: var(--space-6);
+    padding: var(--space-1);
+    white-space: normal;
+    text-align: start;
+  }
+  .nola-provider-list-item > span:nth-child(2) {
+    overflow-wrap: anywhere;
+  }
+  .nola-settings-section > [data-slot="field-group"] {
+    gap: 0;
+  }
+  .nola-settings-section [data-slot="field"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 300px);
+    align-items: center;
+    gap: var(--space-2);
+    padding-block: var(--space-1);
+  }
+  .nola-settings-section .nola-setting-toggle {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    min-height: calc(var(--field-control-height) + var(--space-2));
+  }
+  .nola-color-field .nola-color-picker__trigger {
+    justify-self: end;
+    width: auto;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+  .nola-shortcut-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .nola-shortcut-input { position: relative; flex: 1; min-width: 0; }
+  .nola-shortcut-input input { color: transparent; }
+  .nola-shortcut-input [data-slot="kbd-group"] {
+    position: absolute;
+    inset-inline-start: var(--space-2);
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  .nola-settings-section .nola-two-columns [data-slot="field"],
+  .nola-settings-section [data-slot="field"].nola-field-stack,
+  .nola-settings-section .nola-provider-editor [data-slot="field"] {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+  }
+  .nola-provider-editor [data-slot="field-group"] {
+    gap: var(--space-1);
+  }
+  .nola-settings-section .nola-provider-editor .nola-setting-toggle {
+    flex-direction: row;
+    align-items: center;
+  }
+  @media (max-width: 760px) {
+    .nola-settings-section [data-slot="field"] {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-1);
+    }
+  }
+
   .nola-subtitle-page [data-slot="field"] {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);

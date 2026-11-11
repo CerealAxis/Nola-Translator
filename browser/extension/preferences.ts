@@ -3,6 +3,7 @@ import { LANGUAGE_CODES, type UiLanguagePreference } from '../../src/shared/lang
 export const UI_LANGUAGES: UiLanguagePreference[] = ['auto', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja', 'en']
 export type DisplayMode = 'bilingual' | 'translation'
 export const MAX_WEB_TRANSLATION_CONCURRENCY = 16
+export const DISABLED_PROVIDER = 'disabled'
 export interface Preferences {
   sourceLanguage: string
   pageProvider: string
@@ -38,6 +39,8 @@ export interface Preferences {
   contextMenuSelection: boolean
   contextMenuSpeak: boolean
   contextMenuInput: boolean
+  contextMenuImage: boolean
+  contextMenuArea: boolean
   inputSourceLanguage: string
   inputTargetLanguage: string
   siteBlacklist: string[]
@@ -92,12 +95,12 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  asrProvider: 'desktop', ttsProvider: 'desktop', s2sProvider: 'desktop', llmProvider: 'desktop', sourceLanguage: 'auto', pageProvider: 'desktop', selectionProvider: 'desktop', inputProvider: 'desktop', subtitleProvider: 'desktop',
-  pageScope: 'main', translateTitle: true, skipLanguages: [], minTextLength: 2,
-  hoverTranslation: true, selectionTranslation: true, inputTranslation: false, floatingButton: true, contextAware: false, contextMenuEnabled: true,
-  contextMenuPage: true, contextMenuSelection: true, contextMenuSpeak: true, contextMenuInput: true, inputSourceLanguage: 'auto', inputTargetLanguage: 'zh',
+  asrProvider: DISABLED_PROVIDER, ttsProvider: DISABLED_PROVIDER, s2sProvider: DISABLED_PROVIDER, llmProvider: DISABLED_PROVIDER, sourceLanguage: 'auto', pageProvider: 'index-translate', selectionProvider: 'index-translate', inputProvider: 'index-translate', subtitleProvider: 'index-translate',
+  pageScope: 'all', translateTitle: true, skipLanguages: [], minTextLength: 2,
+  hoverTranslation: true, selectionTranslation: true, inputTranslation: true, floatingButton: true, contextAware: false, contextMenuEnabled: true,
+  contextMenuPage: true, contextMenuSelection: true, contextMenuSpeak: true, contextMenuInput: true, contextMenuImage: true, contextMenuArea: true, inputSourceLanguage: 'auto', inputTargetLanguage: 'zh',
   floatingSide: 'right', floatingPosition: 0.65, floatingLocked: false, floatingClickAction: 'translate', floatingDisabledSites: [], selectionOpacity: 0.95, selectionTranslate: true, selectionCopy: true, selectionSpeak: true, selectionDisabledSites: [], inputTrigger: 'tripleSpace',
-  siteBlacklist: [], neverAutoSites: [], pageStyle: 'underline', pageCustomCss: '', subtitleCustomCss: '', pagePrompt: '', subtitlePrompt: '',
+  siteBlacklist: [], neverAutoSites: [], pageStyle: 'plain', pageCustomCss: '', subtitleCustomCss: '', pagePrompt: '', subtitlePrompt: '',
   requestRate: 5, webConcurrency: 8, batchSize: 8, shortcutPage: 'Alt+T', shortcutSelection: 'Alt+S', shortcutHover: 'Alt', shortcutSubtitles: 'Alt+V',
   ttsVoice: '', ttsRate: 1, ttsPitch: 1, ttsVolume: 1, glossary: [], siteRules: [],
 
@@ -105,6 +108,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
   subtitleSourceSize: 16, subtitleSourceColor: '#ffffff', subtitleSourceFont: 'system-ui', subtitleTranslationSize: 16, subtitleTranslationColor: '#ffffff', subtitleTranslationFont: 'system-ui', subtitleTranslationFirst: false, subtitleBold: false, subtitlePauseOnHover: false,
   autoSubtitleSites: [], subtitleFont: 'system-ui', subtitleColor: '#ffffff', subtitleBackground: '#000000', subtitleBackgroundOpacity: 0.72, subtitleFollow: true, subtitlePositionX: 50, subtitlePositionY: 95,
   videoLanguage: 'zh', videoDisplay: 'bilingual', pipeline: 'cascade', subtitleSize: 16, subtitleOffset: 5,
+}
+
+export function liveTranslationEnabled(settings: Preferences): boolean {
+  return settings.pipeline === 's2s'
+    ? settings.s2sProvider !== DISABLED_PROVIDER
+    : settings.asrProvider !== DISABLED_PROVIDER && settings.subtitleProvider !== DISABLED_PROVIDER
 }
 const keys = (Object.keys(DEFAULT_PREFERENCES) as (keyof Preferences)[]).filter(key => key !== 'glossary')
 const numberIn = (value: unknown, min: number, max: number, fallback: number) =>
@@ -147,8 +156,8 @@ export function readPreferences(values: Record<string, unknown>): Preferences {
     floatingPosition: typeof values.floatingPosition === 'number' && Number.isFinite(values.floatingPosition) ? Math.max(0, Math.min(1, values.floatingPosition)) : 0.65,
     floatingClickAction: values.floatingClickAction === 'panel' ? 'panel' : 'translate',
     inputTrigger: values.inputTrigger === 'shortcut' ? 'shortcut' : 'tripleSpace',
-    pageScope: values.pageScope === 'all' ? 'all' : 'main',
-    pageStyle: values.pageStyle === 'block' || values.pageStyle === 'plain' ? values.pageStyle : 'underline',
+    pageScope: values.pageScope === 'main' ? 'main' : 'all',
+    pageStyle: values.pageStyle === 'block' ? 'block' : values.pageStyle === 'underline' && values.pageStyleExplicit === true ? 'underline' : 'plain',
     minTextLength: numberIn(values.minTextLength, 1, 1000, 2),
     requestRate: numberIn(values.requestRate, 1, 60, 5), batchSize: numberIn(values.batchSize, 1, 100, 8),
     webConcurrency: numberIn(values.webConcurrency, 1, MAX_WEB_TRANSLATION_CONCURRENCY, DEFAULT_PREFERENCES.webConcurrency),
@@ -176,10 +185,10 @@ export function readPreferences(values: Record<string, unknown>): Preferences {
   }
 }
 export async function loadPreferences(): Promise<Preferences> {
-  return readPreferences(await chrome.storage.local.get(keys))
+  return readPreferences(await chrome.storage.local.get([...keys, 'pageStyleExplicit']))
 }
 export function savePreferences(patch: Partial<Preferences>): Promise<void> {
-  return chrome.storage.local.set(patch)
+  return chrome.storage.local.set(patch.pageStyle === undefined ? patch : { ...patch, pageStyleExplicit: true })
 }
 export function observePreferences(onChange: (settings: Preferences) => void): () => void {
   let disposed = false

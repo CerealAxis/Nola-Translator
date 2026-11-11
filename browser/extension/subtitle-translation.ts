@@ -2,7 +2,7 @@ import { requestId } from './id'
 import { generate } from './provider-client'
 import { normalizeLanguage } from '../../src/shared/languages'
 import { BrowserFailure } from './bridge'
-import type { Preferences } from './preferences'
+import { DISABLED_PROVIDER, type Preferences } from './preferences'
 import { TRACK_CANCEL, TRACK_CHANGED, TRACK_RESTORE, TRACK_REQUEST, TRACK_RESPONSE, type SiteTrack, type SubtitleCue } from './site-tracks'
 import { TEXT_TRANSLATION_CONCURRENCY, type TextTranslation } from './text-translation'
 
@@ -303,6 +303,7 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
     }, signal)
   }
   const checkAvailability = (force = false) => {
+    if (settings?.subtitleProvider === DISABLED_PROVIDER) return
     if (probeController) return probeTask
     if (video && readable?.track.native && !localTracks(video).some(track => track.id === readable?.track.id)) {
       readable = undefined; checkedAt = -Infinity
@@ -361,7 +362,7 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
     return probeTask
   }
   const start = async (trackId?: string) => {
-    if (!video || !settings) return
+    if (!video || !settings || settings.subtitleProvider === DISABLED_PROVIDER) return
     const sourceVideo = video
     const previous = state.tracks
     probeController?.abort(); probeController = undefined
@@ -440,7 +441,7 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
       return cuesToSrt(rows)
     },
     async summarize() {
-      if (!controller || !settings || !cues.length || state.processing) return
+      if (!controller || !settings || settings.llmProvider === DISABLED_PROVIDER || !cues.length || state.processing) return
       const signal = controller.signal
       update({ processing: true, error: undefined })
       try {
@@ -456,7 +457,7 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
       finally { if (!signal.aborted) update({ processing: false }) }
     },
     async segment() {
-      if (!controller || !cues.length || state.processing) return
+      if (!controller || settings?.llmProvider === DISABLED_PROVIDER || !cues.length || state.processing) return
       const signal = controller.signal
       const snapshot = [...cues]
       update({ processing: true, error: undefined })
@@ -480,6 +481,12 @@ export function createSubtitleTranslation(translator: TextTranslation, onChange:
     configure(preferences: Preferences) {
       const changedLanguage = settings?.videoLanguage !== preferences.videoLanguage || settings?.subtitleProvider !== preferences.subtitleProvider || settings?.subtitlePrompt !== preferences.subtitlePrompt
       settings = preferences
+      if (preferences.subtitleProvider === DISABLED_PROVIDER) {
+        probeController?.abort(); probeController = undefined; probeTask = undefined
+        if (state.active || state.availability || state.error) stop()
+        autoStarted = false
+        return
+      }
       if (!state.active && video && preferences.autoSubtitleSites?.includes(location.origin) && !autoStarted) { autoStarted = true; void start() }
       if (changedLanguage && state.active) void start(state.trackId)
       else if (preferences.videoDisplay === 'source') { prefetch?.abort(); prefetch = undefined; refillPrefetch = undefined }

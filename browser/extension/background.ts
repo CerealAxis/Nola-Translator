@@ -6,7 +6,9 @@ import { setupSpeechRuntime } from './speech-runtime'
 import { setupTabAudioRuntime } from './tab-audio-runtime'
 import { extensionGlossary, hasApplicableGlossary } from './glossary-store'
 import { loadPreferences } from './preferences'
+import { setupDiagnosticsRuntime } from './diagnostics'
 
+setupDiagnosticsRuntime()
 setupProviderRuntime()
 setupContextMenus()
 setupSpeechRuntime()

@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { nativeRequest, translateNative } from './native-provider'
 
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 function fixture() {
   let receive!: (message: unknown) => void
   const postMessage = vi.fn(), disconnect = vi.fn()
@@ -57,6 +57,8 @@ it('rejects malformed base64 and malformed event shapes without throwing out of 
 })
 
 it('caps audio bytes during accumulation and disconnects before a result frame', async () => {
+  vi.stubGlobal('atob', () => '\0'.repeat(96000))
+  vi.spyOn(Uint8Array, 'from').mockImplementation(() => new Uint8Array(96000))
   const f = fixture(), rejected = expect(f.pending).rejects.toThrow('providerResponseSize')
   const data = 'A'.repeat(128000)
   for (let index = 0; index < 350; index++) f.audio(index, data)

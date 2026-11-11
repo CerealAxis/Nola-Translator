@@ -1,6 +1,7 @@
 import { dialog, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { open, rename, rm } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import { basename, parse } from 'node:path'
 import { z } from 'zod'
 import { comicImportSchema, comicMutationSchema, comicRunSchema, comicExportSchema,
   type ComicProject, type ComicRunRequest, type ComicProjectSummary } from '../shared/comic'
@@ -45,11 +46,14 @@ export class ComicTranslation {
       const input = comicImportSchema.parse(raw)
       const formats = { images: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tif', 'tiff'],
         archive: ['zip', 'cbz', 'nola-comic'], pdf: ['pdf'], ebook: ['epub', 'mobi', 'azw', 'azw3'] }
+      const extensions = input.kind === 'folder' ? [] : input.kind === 'auto' ? Object.values(formats).flat() : formats[input.kind]
       const result = await dialog.showOpenDialog({ properties: input.kind === 'folder' ? ['openDirectory'] : ['openFile', 'multiSelections'],
-        ...(input.kind !== 'folder' ? { filters: [{ name: formats[input.kind].join(', ').toUpperCase(), extensions: formats[input.kind] }] } : {}) })
+        ...(extensions.length ? { filters: [{ name: extensions.join(', ').toUpperCase(), extensions }] } : {}) })
       if (result.canceled || !result.filePaths.length) return null
       const { kind: _kind, ...body } = input
-      const project = await this.request<ComicProject>('/import', { ...body, paths: result.filePaths })
+      const first = result.filePaths[0]
+      const title = body.title ?? (input.kind === 'folder' ? basename(first) : parse(first).name).trim().slice(0, 200)
+      const project = await this.request<ComicProject>('/import', { ...body, title: title || basename(first).slice(0, 200), paths: result.filePaths })
       this.options.publish({ projectId: project.id })
       return project
     })
@@ -106,7 +110,7 @@ export class ComicTranslation {
     const backend = await this.options.backend()
     const response = await fetch(new URL(`/api/v2/comics${path}`, backend.baseUrl), {
       method: body === undefined ? 'GET' : 'POST', headers: { ...backend.authorizationHeader(), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers },
-      body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(120_000),
+      body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(path === '/import' ? 15 * 60_000 : 120_000),
     })
     if (!response.ok) {
       const error = await response.json().catch(() => ({})) as { detail?: unknown }

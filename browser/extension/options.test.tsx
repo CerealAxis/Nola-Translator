@@ -1,22 +1,25 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PREFERENCES, savePreferences } from './preferences'
 import { browserText } from './i18n'
 import { Options } from './options'
-import { testProvider, translate } from './provider-client'
-import { createProvider, DEFAULT_PROVIDERS, requestProviderAccess, saveProviders } from './providers'
+import { testProvider, translate, translateImage } from './provider-client'
+import { createProvider, DEFAULT_PROVIDERS, loadProviders, requestProviderAccess, saveProviders } from './providers'
+import { showToast } from '../../src/renderer/components/ui/toast'
 import { LiveServiceField } from './settings-fields'
 import { extensionGlossary, restoreExtensionConfiguration } from './glossary-store'
 import { applyGlossaryMutation } from '../../src/shared/glossary-mutation'
 import type { GlossaryDocument } from '../../src/shared/glossary'
 
+vi.mock('../../src/renderer/components/ui/toast', () => ({ showToast: vi.fn(), ToastProvider: () => null }))
+
 let settings = { ...DEFAULT_PREFERENCES }
 let glossaryDocument: GlossaryDocument | undefined
 
 vi.mock('./preferences', async original => ({ ...await original<typeof import('./preferences')>(), savePreferences: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('./settings-fields', async original => ({ ...await original<typeof import('./settings-fields')>(), usePreferences: () => [settings, 'en', browserText('en')], ConnectionStatus: () => null }))
-vi.mock('./provider-client', () => ({ translate: vi.fn().mockResolvedValue('Translated text'), synthesize: vi.fn(), testProvider: vi.fn().mockResolvedValue('OK'), clearTranslationCache: vi.fn().mockResolvedValue(undefined), providerRequest: vi.fn().mockResolvedValue({ desktopConcurrency: 10 }) }))
+vi.mock('./settings-fields', async original => ({ ...await original<typeof import('./settings-fields')>(), usePreferences: () => [settings, 'en', browserText('en')], ConnectionStatus: () => <div data-testid="connection-status" /> }))
+vi.mock('./provider-client', () => ({ translate: vi.fn().mockResolvedValue('Translated text'), translateImage: vi.fn().mockResolvedValue('Image translation result'), synthesize: vi.fn(), testProvider: vi.fn().mockResolvedValue('OK'), clearTranslationCache: vi.fn().mockResolvedValue(undefined), providerRequest: vi.fn().mockResolvedValue({ desktopConcurrency: 10 }) }))
 vi.mock('./providers', async original => { const actual = await original<typeof import('./providers')>(); return { ...actual, loadProviders: vi.fn().mockResolvedValue(actual.DEFAULT_PROVIDERS), saveProviders: vi.fn().mockResolvedValue(undefined), requestProviderAccess: vi.fn().mockResolvedValue(true) } })
 vi.mock('./glossary-store', async original => {
   const actual = await original<typeof import('./glossary-store')>()
@@ -28,14 +31,58 @@ vi.mock('./glossary-store', async original => {
 })
 beforeEach(() => { vi.clearAllMocks(); glossaryDocument = undefined; settings = { ...DEFAULT_PREFERENCES }; window.history.replaceState(null, '', '#general'); window.scrollTo = vi.fn(); vi.mocked(requestProviderAccess).mockReset().mockResolvedValue(true); vi.mocked(translate).mockReset().mockResolvedValue('Translated text'); vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } } }) })
 describe('extension settings', () => {
-  it('keeps a failed glossary save visible inside its open editor', async () => {
+  it('links to the standalone document translation page from the sidebar and search', async () => {
+    const user = userEvent.setup()
+    render(<Options />)
+    const sidebar = within(screen.getByRole('navigation'))
+    expect(sidebar.getByRole('link', { name: 'Document translation' })).toHaveAttribute('href', 'document.html')
+    await user.type(screen.getByRole('textbox', { name: 'Search settings' }), 'Document translation')
+    expect(within(screen.getByRole('main')).getAllByRole('link', { name: 'Document translation' })).toHaveLength(2)
+    expect(screen.queryByText('No results')).not.toBeInTheDocument()
+  })
+  it('disables both live pipelines without requesting provider access', async () => {
+    const user = userEvent.setup(); const t = browserText('en')
+    render(<LiveServiceField settings={settings} providers={DEFAULT_PROVIDERS} t={t} />)
+    await user.click(screen.getByRole('combobox', { name: t('liveService') }))
+    await user.click(await screen.findByRole('option', { name: t('providerNone') }))
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ asrProvider: 'disabled', s2sProvider: 'disabled' }))
+    expect(requestProviderAccess).not.toHaveBeenCalled()
+  })
+  it('disables selection translation together with its provider', async () => {
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'Selection toolbar' }))
+    await user.click(screen.getByRole('combobox', { name: browserText('en')('provider') }))
+    await user.click(await screen.findByRole('option', { name: browserText('en')('providerNone') }))
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ selectionProvider: 'disabled', selectionTranslation: false }))
+    expect(requestProviderAccess).not.toHaveBeenCalled()
+  })
+  it('keeps the built-in Index Translate connection fixed and available', async () => {
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'API connections' }))
+    await user.click(await screen.findByRole('button', { name: /Index-Translate/ }))
+    expect(screen.getByText('https://index-translate.bilibili.com/v1')).toBeVisible()
+    expect(screen.getByText('Index-Translate-35B-A3B')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'API key' })).not.toBeInTheDocument()
+  })
+  it('allows a separate Index Translate connection to be edited and removed', async () => {
+    const custom = { ...createProvider('index-translate'), id: 'custom-index', name: 'Custom Index' }
+    vi.mocked(loadProviders).mockResolvedValueOnce([...DEFAULT_PROVIDERS, custom])
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'API connections' }))
+    await user.click(await screen.findByRole('button', { name: 'Custom Index' }))
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Custom Index')
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeVisible()
+  })
+  it('toasts a failed glossary save and preserves its open editor', async () => {
     const user = userEvent.setup(); render(<Options />)
     await user.click(screen.getByRole('button', { name: 'Terminology' }))
     await user.click(await screen.findByRole('button', { name: 'New glossary library' }))
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Names')
     vi.mocked(extensionGlossary.command).mockRejectedValueOnce(new Error('conflict'))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }))
-    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(browserText('en')('suite.revisionConflict'))
+    expect(showToast).toHaveBeenCalledWith({ type: 'error', description: browserText('en')('suite.revisionConflict') })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Names')
   })
   it('chooses a live service without showing pipeline implementation terms', async () => {
@@ -61,7 +108,8 @@ describe('extension settings', () => {
     vi.mocked(requestProviderAccess).mockResolvedValueOnce(false)
     await user.click(screen.getByRole('combobox', { name: t('liveService') }))
     await user.click(await screen.findByRole('option', { name: `Alibaba Cloud · ${t('live')}` }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(t('permissionFailed'))
+    expect(showToast).toHaveBeenCalledWith({ type: 'error', description: t('permissionFailed') })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(savePreferences).not.toHaveBeenCalled()
   })
   it('adds the chosen provider and keeps its API key masked until requested', async () => {
@@ -87,8 +135,7 @@ describe('extension settings', () => {
   it('saves the translation concurrency limit only on the selected channel card', async () => {
     const user = userEvent.setup(); render(<Options />)
     await user.click(screen.getByRole('button', { name: 'API connections' }))
-    expect(await screen.findByText('Managed by the desktop app')).toBeVisible()
-    expect(await screen.findByText('10 ·')).toBeVisible()
+    expect(await screen.findByTestId('connection-status')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Microsoft Translator' }))
     const limit = screen.getByRole('spinbutton', { name: 'Translation concurrency limit' })
     expect(limit).toHaveValue(8)
@@ -122,7 +169,7 @@ describe('extension settings', () => {
     await user.click(screen.getByRole('button', { name: 'Remove' }))
     vi.mocked(savePreferences).mockRejectedValueOnce(new Error('write failed'))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
-    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(showToast).toHaveBeenCalledWith({ type: 'error', description: browserText('en')('internalError') })
     expect(saveProviders).not.toHaveBeenCalled()
   })
   it('records a shortcut from the keyboard and focuses search with Ctrl+K', async () => {
@@ -134,6 +181,28 @@ describe('extension settings', () => {
     await user.keyboard('{Control>}k{/Control}')
     expect(screen.getByRole('textbox', { name: 'Search settings' })).toHaveFocus()
   })
+  it('shows shortcut keys and allows clearing and resetting them', async () => {
+    settings = { ...settings, shortcutPage: 'Ctrl+Y' }
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }))
+    expect(screen.getByText('Ctrl', { selector: '[data-slot="kbd"]' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Remove shortcut · Translate this page' }))
+    expect(savePreferences).toHaveBeenCalledWith({ shortcutPage: '' })
+    await user.click(screen.getByRole('button', { name: 'Reset shortcut · Translate this page' }))
+    expect(savePreferences).toHaveBeenCalledWith({ shortcutPage: DEFAULT_PREFERENCES.shortcutPage })
+  })
+  it('labels system fonts and shows the image hint only for a selected image provider', async () => {
+    settings = { ...settings, pageProvider: 'google-translate' }
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'Video subtitles' }))
+    expect(screen.getAllByRole('combobox', { name: 'Subtitle font' })).toHaveLength(2)
+    expect(screen.getAllByText('System font')).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: 'Translation center' }))
+    expect(screen.getByRole('textbox', { name: 'Text to translate' })).toHaveAttribute('placeholder', browserText('en')('inputText'))
+    await user.click(screen.getByRole('button', { name: /Translation provider/ }))
+    await user.click(await screen.findByRole('switch', { name: 'Index-Translate' }))
+    expect(screen.getByRole('textbox', { name: 'Text to translate' })).toHaveAttribute('placeholder', browserText('en')('pasteTranslationInput'))
+  })
   it('rejects a shortcut already used by another action', async () => {
     const user = userEvent.setup(); render(<Options />)
     await user.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }))
@@ -142,7 +211,7 @@ describe('extension settings', () => {
     expect(savePreferences).not.toHaveBeenCalled()
     expect(input).toHaveValue(settings.shortcutSelection)
     expect(input).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByText(browserText('en')('shortcutConflict'))).toBeVisible()
+    expect(showToast).toHaveBeenCalledWith({ type: 'error', description: browserText('en')('shortcutConflict') })
   })
   it('requires confirmation before removing a term or a site rule', async () => {
     settings = { ...settings, glossary: [{ source: 'API', target: '接口', sites: '' }], siteRules: [{ host: 'example.com', includeSelectors: '', excludeSelectors: '' }] }
@@ -183,13 +252,10 @@ describe('extension settings', () => {
     expect(screen.queryByText('Late translation')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Translate text' })).toBeDisabled()
   })
-  it('tests the built-in Nola desktop connection without saving or asking for an API key', async () => {
-    vi.mocked(testProvider).mockResolvedValueOnce('OK')
+  it('shows desktop connection status inside the Nola card', async () => {
     const user = userEvent.setup(); render(<Options />)
     await user.click(screen.getByRole('button', { name: 'API connections' }))
-    await user.click(await screen.findByRole('button', { name: 'Test connection' }))
-    await waitFor(() => expect(testProvider).toHaveBeenCalledWith(expect.objectContaining({ id: 'desktop', preset: 'nola' })))
-    expect(await screen.findByRole('status')).toHaveTextContent('OK')
+    expect(await screen.findByTestId('connection-status')).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'API key' })).not.toBeInTheDocument()
     expect(saveProviders).not.toHaveBeenCalled()
   })
@@ -203,7 +269,7 @@ describe('extension settings', () => {
     await waitFor(() => expect(testProvider).toHaveBeenCalled())
     await user.click(screen.getByRole('button', { name: 'Microsoft Translator' }))
     await act(async () => finish('OLD OK'))
-    expect(screen.queryByText('OLD OK')).not.toBeInTheDocument()
+    expect(showToast).not.toHaveBeenCalled()
   })
   it('preserves a dirty provider draft when another preference or provider revision changes', async () => {
     const user = userEvent.setup(); render(<Options />)
@@ -223,7 +289,7 @@ describe('extension settings', () => {
     vi.mocked(testProvider).mockRejectedValueOnce(new Error('providerPermission'))
     await user.click(screen.getByRole('button', { name: 'Test connection' }))
     expect(testProvider).toHaveBeenCalledWith(expect.objectContaining({ preset: 'google-translate' }))
-    expect(screen.getByRole('status')).toHaveTextContent(browserText('en')('providerPermission'))
+    expect(showToast).toHaveBeenCalledWith({ type: 'error', title: 'Google Translate', description: browserText('en')('providerPermission') })
     expect(saveProviders).not.toHaveBeenCalled()
   })
   it('searches settings without hiding the matching controls', async () => {
@@ -250,13 +316,48 @@ describe('extension settings', () => {
     await user.click(screen.getByRole('button', { name: 'Test connection' }))
     await waitFor(() => expect(testProvider).toHaveBeenCalled())
   })
+  it('pastes an image, sends it only to public Index, and leaves unsupported providers in the results', async () => {
+    const t = browserText('en')
+    settings = { ...settings, pageProvider: 'google-translate' }
+    const image = 'data:image/png;base64,aGVsbG8='
+    const close = vi.fn()
+    const bitmap = vi.fn().mockResolvedValue({ width: 20, height: 10, close })
+    vi.stubGlobal('createImageBitmap', bitmap)
+    const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D)
+    const encode = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(image)
+    const view = render(<Options />)
+    try {
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: t('translationHub') }))
+      const source = screen.getByRole('textbox', { name: t('inputText') })
+      await user.type(source, 'Original text')
+      const file = new File(['image'], 'photo.jpg', { type: 'image/jpeg' })
+      fireEvent.paste(source, { clipboardData: { files: [file] } })
+      expect(await screen.findByRole('img', { name: t('imageTranslate') })).toHaveAttribute('src', image)
+      expect(bitmap).toHaveBeenCalledWith(file)
+      expect(close).toHaveBeenCalledOnce()
+      expect(translateImage).not.toHaveBeenCalled()
+      expect(screen.getByText(t('providerImageUnsupported'))).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: t('readAloud') })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: t('imageTranslate') }))
+      expect(translateImage).toHaveBeenCalledExactlyOnceWith(image, settings.pageLanguage, expect.any(AbortSignal))
+      expect(translate).not.toHaveBeenCalled()
+      expect(requestProviderAccess).not.toHaveBeenCalled()
+      expect(await screen.findByText('Image translation result')).toBeInTheDocument()
+      expect(screen.getAllByText(/^\d+ ms$|^\d+\.\d{2} s$/)).toHaveLength(1)
+      await user.click(screen.getByRole('button', { name: t('remove') }))
+      expect(screen.getByRole('textbox', { name: t('inputText') })).toHaveValue('Original text')
+    } finally { view.unmount(); context.mockRestore(); encode.mockRestore(); vi.unstubAllGlobals() }
+  })
   it('translates text using the selected providers and records terminology', async () => {
     const user = userEvent.setup(); render(<Options />)
     await user.click(screen.getByRole('button', { name: 'Translation center' }))
     await user.type(screen.getByRole('textbox', { name: 'Text to translate' }), 'Hello')
     await user.click(screen.getByRole('button', { name: 'Translate text' }))
-    await waitFor(() => expect(translate).toHaveBeenCalledWith('Hello', 'auto', 'zh', 'selection', expect.any(AbortSignal), 'desktop'))
+    await waitFor(() => expect(translate).toHaveBeenCalledWith('Hello', 'auto', 'zh', 'selection', expect.any(AbortSignal), settings.pageProvider))
     expect(await screen.findByText('Translated text')).toBeInTheDocument()
+    expect(screen.getByText(/^\d+ ms$|^\d+\.\d{2} s$/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: browserText('en')('readAloud') })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Terminology' }))
     await user.click(await screen.findByRole('button', { name: 'New glossary library' }))
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Names')

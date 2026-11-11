@@ -337,7 +337,7 @@ export const diagnosticCopyContextSchema = z.object({
 export const resourceSchema = z
   .object({
     resourceId: z.string().min(1).max(256),
-    kind: z.enum(['recognitionModel', 'translationModel', 'ttsModel', 'ocrModel', 'inpaintModel']),
+    kind: z.enum(['recognitionModel', 'translationModel', 'ttsModel', 'ocrModel', 'detectModel', 'inpaintModel']),
     // The loader that will run this model, in either vocabulary: built-ins report the provider
     // from resources.py, a hub repo passes through its adapter id. It cannot be a closed union —
     // and a value this schema rejects kills the engine, because an unparseable event is treated

@@ -6,7 +6,7 @@ import { createExtensionStore } from './store'
 import type { AudioChunk } from './capture'
 
 const summary: BrowserSummary = { protocolVersion: 1, uiLanguage: 'en', sourceLanguage: 'en', targetLanguage: 'zh', devices: [], browserAudio: true, captionServiceActive: true, config: { appearance: { showSource: true, showTranslation: false, colorScheme: 'dark', fontFamily: 'Segoe UI Variable', sourceFontSize: 28, translationFontSize: 22, lineHeight: 1.3, sourceColor: '#F7F7F7', translationColor: '#D7DEE8', backgroundColor: '#0D0E10', backgroundOpacity: 0.85, bottomOffset: 5 }, audioSource: 'tab', sourceLanguage: 'en', targetLanguage: 'zh' } }
-function setup(options: { wrongCapture?: boolean; deferredCapture?: boolean; deferredAudio?: boolean; tabAudioCapture?: Parameters<typeof createExtensionStore>[0]['tabAudioCapture'] } = {}) {
+function setup(options: { wrongCapture?: boolean; deferredCapture?: boolean; deferredAudio?: boolean; initialPreferences?: typeof DEFAULT_PREFERENCES; tabAudioCapture?: Parameters<typeof createExtensionStore>[0]['tabAudioCapture'] } = {}) {
   let listener: (response: BrowserResponse) => void = () => undefined
   let onChunk: (chunk: AudioChunk) => void = () => undefined
   const requests: RequestInput[] = []
@@ -22,7 +22,7 @@ function setup(options: { wrongCapture?: boolean; deferredCapture?: boolean; def
   let resolveCapture: (stream: MediaStream) => void = () => undefined
   const getDisplayMedia = vi.fn(() => options.deferredCapture ? new Promise<MediaStream>(resolve => { resolveCapture = resolve }) : Promise.resolve(capture))
   const audio = { enable: vi.fn(), close: vi.fn(async () => undefined) }
-  const store = createExtensionStore({ bridge, getDisplayMedia, tabAudioCapture: options.tabAudioCapture, audioCapture: async (_stream, callback) => { onChunk = callback; return audio } })
+  const store = createExtensionStore({ bridge, initialPreferences: options.initialPreferences, getDisplayMedia, tabAudioCapture: options.tabAudioCapture, audioCapture: async (_stream, callback) => { onChunk = callback; return audio } })
   store.updateVideos([video])
   return { store, bridge, requests, video, capture, audio, getDisplayMedia, stopVideo, stopAudio, resolveCapture: () => resolveCapture(capture), emit: (response: BrowserResponse) => listener(response), rawChunk: (sample: number) => onChunk({ buffer: new Int16Array(4800).fill(sample).buffer, sampleRate: 48000, epoch: store.getSnapshot().epoch, sourcePeak: 0 }), chunk: (epoch = store.getSnapshot().epoch) => onChunk({ buffer: new Int16Array(4800).buffer, sampleRate: 48000, epoch, sourcePeak: 0.1 }) }
 }
@@ -43,6 +43,18 @@ function deferRequest(fixture: ReturnType<typeof setup>, matches: (request: Requ
   return { get captured() { return captured }, resolve: () => resolve(), reject: () => reject(new BrowserFailure('appUnavailable')) }
 }
 describe('extension session lifecycle', () => {
+  it('only probes the desktop for a live route that uses Nola', async () => {
+    const { store, bridge } = setup({ initialPreferences: DEFAULT_PREFERENCES })
+    try {
+      await store.init()
+      store.togglePanel()
+      store.setPreferences({ ...DEFAULT_PREFERENCES, asrProvider: 'external-asr' })
+      await vi.waitFor(() => expect(store.getSnapshot()).toMatchObject({ connected: true, error: undefined }))
+      expect(bridge.request).not.toHaveBeenCalled()
+      store.setPreferences({ ...DEFAULT_PREFERENCES, pipeline: 's2s', s2sProvider: 'desktop' })
+      await vi.waitFor(() => expect(bridge.request).toHaveBeenCalledWith({ type: 'hello' }, undefined))
+    } finally { await store.destroy() }
+  })
   it('starts from the toolbar with tab audio when the browser already allows capture', async () => {
     let receive!: (value: unknown) => void
     const send = vi.fn((message: { type: string }) => { if (message.type === 'start') queueMicrotask(() => receive({ type: 'ready' })) })
@@ -53,7 +65,7 @@ describe('extension session lifecycle', () => {
     const playerCapture = vi.fn()
     Object.defineProperty(fixture.video, 'captureStream', { value: playerCapture })
     try {
-      fixture.store.setPreferences(DEFAULT_PREFERENCES)
+      fixture.store.setPreferences({ ...DEFAULT_PREFERENCES, asrProvider: 'desktop' })
       await fixture.store.init()
       fixture.store.pressStart('toolbar')
       await vi.waitFor(() => expect(fixture.store.getSnapshot()).toMatchObject({ status: 'active', audioCaptured: true }))

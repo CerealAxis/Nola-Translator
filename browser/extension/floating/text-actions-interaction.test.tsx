@@ -5,9 +5,10 @@ import { TextActions } from '../text-actions'
 import { DEFAULT_PREFERENCES } from '../preferences'
 import { synthesize, translate } from '../provider-client'
 vi.mock('../provider-client', () => ({ translate: vi.fn(), synthesize: vi.fn() }))
+const enabledPreferences = { ...DEFAULT_PREFERENCES, selectionProvider: 'desktop', inputProvider: 'desktop', ttsProvider: 'desktop' }
 afterEach(() => { vi.clearAllMocks(); document.body.replaceChildren() })
 it('applies action visibility and toolbar opacity', () => {
-  const { container } = render(<TextActions preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en', selectionTranslate: false, selectionCopy: false, selectionSpeak: true, selectionOpacity: 0.4 }} selection={{ text: 'Hello', x: 0, y: 0 }} dismiss={() => {}} />)
+  const { container } = render(<TextActions preferences={{ ...enabledPreferences, uiLanguage: 'en', selectionTranslate: false, selectionCopy: false, selectionSpeak: true, selectionOpacity: 0.4 }} selection={{ text: 'Hello', x: 0, y: 0 }} dismiss={() => {}} />)
   expect(screen.queryByRole('button', { name: 'Translate selection' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Copy translation' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Read aloud' })).toBeInTheDocument()
@@ -17,18 +18,22 @@ it('triple-space inference consumes the suffix but never overwrites newer edits'
   let finish!: (text: string) => void
   vi.mocked(translate).mockImplementation(() => new Promise(resolve => { finish = resolve }))
   const target = document.createElement('textarea'); target.value = 'Hello  '; document.body.append(target)
-  render(<TextActions preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en' }} selection={{ target, text: target.value, x: 0, y: 0, autoTranslate: true }} dismiss={() => {}} />)
+  render(<TextActions preferences={{ ...enabledPreferences, uiLanguage: 'en' }} selection={{ target, text: target.value, x: 0, y: 0, autoTranslate: true, inputSource: 'Hello' }} dismiss={() => {}} />)
   await waitFor(() => expect(translate).toHaveBeenCalledWith('Hello', 'auto', 'zh', 'input', expect.any(AbortSignal), 'desktop'))
+  expect(screen.getByRole('status', { name: 'Translating…' })).toBeInTheDocument()
   target.value = 'My newer edit'
+  target.dispatchEvent(new InputEvent('input', { bubbles: true }))
+  expect(vi.mocked(translate).mock.calls[0][4]?.aborted).toBe(true)
   await act(async () => finish('你好'))
   expect(target.value).toBe('My newer edit')
+  expect(screen.queryByRole('status')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Restore input' })).not.toBeInTheDocument()
 })
 it('does not apply an in-flight inference after the toolbar is dismissed', async () => {
   let finish!: (text: string) => void
   vi.mocked(translate).mockImplementation(() => new Promise(resolve => { finish = resolve }))
   const target = document.createElement('textarea'); target.value = 'Hello  '; document.body.append(target)
-  const view = render(<TextActions preferences={DEFAULT_PREFERENCES} selection={{ target, text: target.value, x: 0, y: 0, autoTranslate: true }} dismiss={() => {}} />)
+  const view = render(<TextActions preferences={enabledPreferences} selection={{ target, text: target.value, x: 0, y: 0, autoTranslate: true }} dismiss={() => {}} />)
   await waitFor(() => expect(translate).toHaveBeenCalled())
   view.unmount(); await act(async () => finish('你好'))
   expect(target.value).toBe('Hello  ')
@@ -37,7 +42,7 @@ it('does not apply an in-flight inference after the toolbar is dismissed', async
 it('uses independently configured input languages', async () => {
   vi.mocked(translate).mockResolvedValue('Bonjour')
   const target = document.createElement('textarea'); target.value = 'Hello  '; document.body.append(target)
-  render(<TextActions preferences={{ ...DEFAULT_PREFERENCES, sourceLanguage: 'ja', pageLanguage: 'zh', inputSourceLanguage: 'en', inputTargetLanguage: 'fr' }} selection={{ target, text: target.value, x: 0, y: 0, autoTranslate: true }} dismiss={() => {}} />)
+  render(<TextActions preferences={{ ...enabledPreferences, sourceLanguage: 'ja', pageLanguage: 'zh', inputSourceLanguage: 'en', inputTargetLanguage: 'fr' }} selection={{ target, text: target.value, x: 0, y: 0, autoTranslate: true, inputSource: 'Hello' }} dismiss={() => {}} />)
   await waitFor(() => expect(target.value).toBe('Bonjour'))
   expect(translate).toHaveBeenCalledWith('Hello', 'en', 'fr', 'input', expect.any(AbortSignal), 'desktop')
 })
@@ -55,7 +60,7 @@ it('executes the context-menu speak action through the configured provider', asy
 
 it('uses a compact icon toolbar and keeps secondary actions in its keyboard-accessible menu', async () => {
   const user = userEvent.setup(); const dismiss = vi.fn()
-  render(<TextActions preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en' }} selection={{ text: 'Hello', x: 0, y: 0 }} dismiss={dismiss} />)
+  render(<TextActions preferences={{ ...enabledPreferences, uiLanguage: 'en' }} selection={{ text: 'Hello', x: 0, y: 0 }} dismiss={dismiss} />)
   const toolbar = screen.getByRole('toolbar')
   expect(toolbar.querySelectorAll('button')).toHaveLength(3)
   expect(screen.getByRole('button', { name: 'Translate selection' })).toHaveAttribute('title', 'Translate selection')
@@ -74,7 +79,7 @@ it('renders translation separately and restores input from the more menu', async
   const user = userEvent.setup()
   vi.mocked(translate).mockResolvedValue('你好')
   const target = document.createElement('textarea'); target.value = 'Hello'; document.body.append(target)
-  const view = render(<TextActions preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en' }} selection={{ target, text: 'Hello', x: 0, y: 0 }} dismiss={() => {}} />)
+  const view = render(<TextActions preferences={{ ...enabledPreferences, uiLanguage: 'en' }} selection={{ target, text: 'Hello', x: 0, y: 0 }} dismiss={() => {}} />)
   await user.click(screen.getByRole('button', { name: 'Translate input' }))
   expect(await screen.findByText('你好')).toBeVisible()
   expect(view.container.querySelector('.nola-selection-result')).toHaveTextContent('你好')
@@ -88,7 +93,7 @@ it('does not start delayed speech after dismissal', async () => {
   let finish!: (sound: { audioBase64: string; contentType: string }) => void
   vi.mocked(synthesize).mockImplementation(() => new Promise(resolve => { finish = resolve }))
   const play = vi.fn(); vi.stubGlobal('Audio', class { play = play })
-  const view = render(<TextActions preferences={DEFAULT_PREFERENCES} selection={{ text: 'Hello', x: 0, y: 0, autoSpeak: true }} dismiss={() => {}} />)
+  const view = render(<TextActions preferences={enabledPreferences} selection={{ text: 'Hello', x: 0, y: 0, autoSpeak: true }} dismiss={() => {}} />)
   await waitFor(() => expect(synthesize).toHaveBeenCalled())
   view.unmount()
   await act(async () => finish({ audioBase64: btoa('audio'), contentType: 'audio/mpeg' }))

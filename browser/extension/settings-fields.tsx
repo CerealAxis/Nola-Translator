@@ -1,6 +1,8 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { LANGUAGE_CODES, languageName, resolveUiLanguage, type UiLanguage } from '../../src/shared/languages'
-import { Alert, AlertDescription } from '../../src/renderer/components/ui/alert'
+import { showToast } from '../../src/renderer/components/ui/toast'
+import { Badge } from '../../src/renderer/components/ui/badge'
 import { Button } from '../../src/renderer/components/ui/button'
 import { Field, FieldLabel } from '../../src/renderer/components/ui/field'
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '../../src/renderer/components/ui/slider'
@@ -22,8 +24,10 @@ export function RangeField({ label, value, onChange, min = 0, max = 100, step = 
 
 export function ColorField({ label, value, onChange }: { label: string; value: string; onChange(value: string): void }) {
   const [container, containerRef] = usePortalContainer()
-  return <Field><FieldLabel>{label}</FieldLabel><ColorPicker label={label} value={value} presets={[]} onChange={onChange} container={container} /><div ref={containerRef} className="nola-portal-container" /></Field>
+  return <Field className="nola-color-field"><FieldLabel>{label}</FieldLabel><ColorPicker label={label} value={value} presets={[]} onChange={onChange} container={container} /><div ref={containerRef} className="nola-portal-container" /></Field>
 }
+
+export const subtitleFontOptions = (value: string, t: ReturnType<typeof browserText>) => [...new Set(['system-ui', 'sans-serif', 'serif', 'monospace', value])].map(font => ({ value: font, label: font === 'system-ui' ? t('systemFont') : font }))
 
 export function usePreferences(): [Preferences, UiLanguage, ReturnType<typeof browserText>] {
   const [settings, setSettings] = useState(DEFAULT_PREFERENCES)
@@ -50,29 +54,45 @@ export function usePreferences(): [Preferences, UiLanguage, ReturnType<typeof br
 }
 
 export function ConnectionStatus({ t, compact = false, onReconnect }: { t: ReturnType<typeof browserText>; compact?: boolean; onReconnect?: () => Promise<void> }) {
-  const [status, setStatus] = useState<{ connected?: boolean; text?: boolean; textError?: string; realtime?: boolean; error?: string }>({})
+  const [status, setStatus] = useState<'waiting' | 'connected' | 'disconnected'>('waiting')
   const [checking, setChecking] = useState(false)
+  const request = useRef<AbortController>(null)
   async function check(reconnect = false) {
+    request.current?.abort()
+    const controller = new AbortController()
+    request.current = controller
     const bridge = createBridge('nola-popup')
     setChecking(true)
     try {
-      const summary = await bridge.request({ type: 'hello' })
+      const summary = await bridge.request({ type: 'hello' }, controller.signal)
       if (!summary || !('protocolVersion' in summary) || summary.protocolVersion !== BROWSER_PROTOCOL_VERSION || summary.extensionCompatible === false) throw new BrowserFailure('browserExtensionVersionMismatch')
       if (reconnect) await onReconnect?.()
-      setStatus({ connected: true, text: summary.textTranslation, textError: summary.textTranslationError, realtime: summary.realtimeTranslation })
-    } catch (error) { setStatus({ error: error instanceof BrowserFailure ? error.code : 'browserConnectionUnavailable' }) }
-    finally { bridge.close(); setChecking(false) }
+      if (controller.signal.aborted) return
+      setStatus('connected')
+      if (reconnect) showToast({ type: 'success', description: t('nativeReady') })
+    } catch (error) {
+      if (controller.signal.aborted) return
+      const code = error instanceof BrowserFailure ? error.code : 'browserConnectionUnavailable'
+      setStatus('disconnected')
+      if (compact || reconnect) showToast({ type: 'error', description: t(errorKey(code)) })
+    }
+    finally { bridge.close(); if (!controller.signal.aborted) setChecking(false) }
   }
-  useEffect(() => { void check() }, [])
+  useEffect(() => { void check(); return () => request.current?.abort() }, [])
+  const label = t(checking || status === 'waiting' ? 'connectionWaiting' : status === 'connected' ? 'nativeReady' : 'nativeDisconnected')
+  const variant = status === 'connected' && !checking ? 'success' : 'secondary'
   if (compact) return <div className="nola-provider-status" aria-busy={checking}>
-    <span role="status">{t(status.connected ? 'nativeReady' : status.error ? errorKey(status.error) : 'connection')}</span>
-    <Button variant="outline" size="xs" disabled={checking} onClick={() => void check(true)}>{t('reconnect')}</Button>
+    <Badge role="status" variant={variant}>{label}</Badge>
+    {status === 'disconnected' && <Button variant="outline" size="icon-xs" disabled={checking} aria-label={t('reconnect')} title={t('reconnect')} onClick={() => void check(true)}><RefreshCw aria-hidden="true" /></Button>}
   </div>
-  return <div className="flex min-w-0 flex-col gap-2">
-    {status.error ? <Alert variant={status.error === 'browserConnectionUnavailable' ? 'default' : 'danger'}><AlertDescription>{t(errorKey(status.error))}</AlertDescription></Alert>
-      : status.connected && <p role="status" className="nola-muted">{t('statusReady')}<br />{t(status.text ? 'textReady' : errorKey(status.textError ?? 'browserTextModelUnavailable'))}{status.realtime && <><br />{t('liveAvailable')}</>}</p>}
-    <Button className="self-start" variant="outline" disabled={checking} onClick={() => void check()}>{t('reconnect')}</Button>
-  </div>
+  return <span className="flex" role="status" aria-busy={checking}>
+    <Badge
+      variant={variant}
+      render={<button type="button" disabled={checking} title={t('testConnection')} aria-label={`${label} · ${t('testConnection')}`} onClick={() => void check(true)} />}
+    >
+      {label}<RefreshCw data-icon="inline-end" aria-hidden="true" />
+    </Badge>
+  </span>
 }
 
 export function TargetLanguageField({ value, onChange, locale, t }: { value: string; onChange: (value: string) => void; locale: UiLanguage; t: ReturnType<typeof browserText> }) {
@@ -80,15 +100,19 @@ export function TargetLanguageField({ value, onChange, locale, t }: { value: str
 }
 
 export function LiveServiceField({ settings, providers, t }: { settings: Preferences; providers: ProviderConnection[]; t: ReturnType<typeof browserText> }) {
-  const [error, setError] = useState('')
+  const onError = (error: unknown) => showToast({ type: 'error', description: t(errorKey(error instanceof Error ? error.message : 'internalError')) })
   const currentProvider = settings.pipeline === 's2s' ? settings.s2sProvider : settings.asrProvider
-  const value = currentProvider === 'desktop' ? 'desktop' : `${settings.pipeline === 's2s' ? 's2s' : 'asr'}:${currentProvider}`
-  const options = providers.flatMap(provider => {
+  const value = currentProvider === 'disabled' || currentProvider === 'desktop' ? currentProvider : `${settings.pipeline === 's2s' ? 's2s' : 'asr'}:${currentProvider}`
+  const options = [{ value: 'disabled', label: t('providerNone') }, ...providers.flatMap(provider => {
     const asr = provider.capabilities.includes('asr'), s2s = provider.capabilities.includes('s2s')
     if (provider.id === 'desktop') return asr || s2s ? [{ value: 'desktop', label: provider.name }] : []
     return [...(asr ? [{ value: `asr:${provider.id}`, label: s2s ? `${provider.name} · ${t('asr')}` : provider.name }] : []), ...(s2s ? [{ value: `s2s:${provider.id}`, label: asr ? `${provider.name} · ${t('live')}` : provider.name }] : [])]
-  })
-  return <><ChoiceField label={t('liveService')} value={value} options={options} onChange={value => {
+  })]
+  return <ChoiceField label={t('liveService')} value={value} options={options} onChange={value => {
+    if (value === 'disabled') {
+      void savePreferences({ asrProvider: 'disabled', s2sProvider: 'disabled' }).catch(onError)
+      return
+    }
     const direct = value === 'desktop' ? settings.pipeline === 's2s' && settings.s2sProvider === 'desktop' : value.startsWith('s2s:')
     const id = value === 'desktop' ? 'desktop' : value.slice(value.indexOf(':') + 1)
     const provider = providers.find(provider => provider.id === id)
@@ -96,6 +120,6 @@ export function LiveServiceField({ settings, providers, t }: { settings: Prefere
     void requestProviderAccess(provider).then(granted => {
       if (!granted) throw new Error('permissionFailed')
       return savePreferences(direct ? { pipeline: 's2s', s2sProvider: id } : { pipeline: 'cascade', asrProvider: id })
-    }).then(() => setError('')).catch(error => setError(t(errorKey(error instanceof Error ? error.message : 'internalError'))))
-  }} />{error && <p role="alert" className="nola-error">{error}</p>}</>
+    }).catch(onError)
+  }} />
 }

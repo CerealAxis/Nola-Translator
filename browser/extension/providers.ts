@@ -10,6 +10,7 @@ const text: Capability[] = ['mt', 'llm']
 export const PROVIDER_PRESETS: ProviderPreset[] = [
   { id: 'nola', name: 'Nola Translator', baseUrl: '', protocol: 'native', capabilities: [...CAPABILITIES], requiresKey: false },
   { id: 'google-translate', name: 'Google Translate', baseUrl: 'https://translate.googleapis.com', protocol: 'google-free', capabilities: ['mt'], requiresKey: false },
+  { id: 'index-translate', name: 'Index-Translate', baseUrl: 'https://index-translate.bilibili.com/v1', protocol: 'openai', capabilities: ['mt'], model: 'Index-Translate-35B-A3B', requiresKey: false },
   { id: 'microsoft-translate', name: 'Microsoft Translator', baseUrl: 'https://edge.microsoft.com', protocol: 'microsoft-free', capabilities: ['mt'], requiresKey: false },
   { id: 'edge-tts', name: 'Microsoft Edge TTS', baseUrl: 'https://speech.platform.bing.com', protocol: 'edge-tts', capabilities: ['tts'], requiresKey: false },
   { id: 'deepl', name: 'DeepL', baseUrl: 'https://api-free.deepl.com', protocol: 'deepl', capabilities: ['mt'], requiresKey: true },
@@ -68,9 +69,9 @@ export type ProviderConnection = z.infer<typeof providerSchema>
 export function createProvider(presetId: string): ProviderConnection {
   const preset = PROVIDER_PRESETS.find(item => item.id === presetId)
   if (!preset) throw new Error('providerInvalid')
-  return { id: presetId === 'nola' ? 'desktop' : requestId(), name: preset.name, preset: preset.id, baseUrl: preset.baseUrl, apiKey: '', model: preset.model ?? '', capabilities: [...preset.capabilities], headers: {}, options: {} }
+  return { id: presetId === 'nola' ? 'desktop' : requestId(), name: preset.name, preset: preset.id, baseUrl: preset.baseUrl, apiKey: '', model: preset.model ?? '', capabilities: [...preset.capabilities], ...(presetId === 'index-translate' ? { translationConcurrency: 16 } : {}), headers: {}, options: {} }
 }
-export const DEFAULT_PROVIDERS = ['nola', 'google-translate', 'microsoft-translate', 'edge-tts'].map(id => ({ ...createProvider(id), id: id === 'nola' ? 'desktop' : id }))
+export const DEFAULT_PROVIDERS = ['nola', 'google-translate', 'index-translate', 'microsoft-translate', 'edge-tts'].map(id => ({ ...createProvider(id), id: id === 'nola' ? 'desktop' : id }))
 
 export function isBundledProviderCopy(provider: ProviderConnection): boolean {
   const bundled = DEFAULT_PROVIDERS.find(item => item.preset === provider.preset && item.id !== 'desktop')
@@ -87,7 +88,7 @@ export function visibleProviderConnections(providers: ProviderConnection[], pref
     }
   }
   // Keep stored connections and their bindings intact when identical presets share a display row.
-  return providers.filter(provider => !isBundledProviderCopy(provider) || representatives.get(provider.preset) === provider)
+  return providers.filter(provider => provider.preset === 'index-translate' || !isBundledProviderCopy(provider) || representatives.get(provider.preset) === provider)
 }
 
 // Extension-page IndexedDB is not shared with isolated content scripts on website origins.
@@ -103,9 +104,11 @@ export function providerDatabase(): Promise<IDBDatabase> {
   })
 }
 export function parseProviders(data: unknown): ProviderConnection[] {
-  const entries = z.array(providerSchema).max(100).parse(data)
+  const entries = z.array(providerSchema).max(102).parse(data).map(provider => provider.id === 'index-translate' && provider.preset === 'index-translate' && provider.translationConcurrency === undefined ? { ...provider, translationConcurrency: 16 } : provider)
+  if (entries.filter(item => item.id !== 'desktop' && item.id !== 'index-translate').length > 100) throw new Error('providerInvalid')
   if (new Set(entries.map(item => item.id)).size !== entries.length) throw new Error('providerInvalid')
-  return [createProvider('nola'), ...entries.filter(item => item.id !== 'desktop')]
+  const index = entries.find(item => item.id === 'index-translate')
+  return [createProvider('nola'), ...(index ? [] : [structuredClone(DEFAULT_PROVIDERS.find(item => item.id === 'index-translate')!)]), ...entries.filter(item => item.id !== 'desktop')]
 }
 export async function loadProviders(): Promise<ProviderConnection[]> {
   const db = await providerDatabase()

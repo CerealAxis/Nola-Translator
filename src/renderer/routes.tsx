@@ -156,10 +156,13 @@ export function parseRoute(hash: string): Route {
     case 'game-translation':
       return { route: 'game-translation', ...(segments[1] ? { gameId: safeDecode(segments[1]) } : {}),
         path: '#/game-translation' + (segments[1] ? `/${encodeURIComponent(safeDecode(segments[1]))}` : '') }
-    case 'comic-translation':
+    case 'comic-translation': {
+      const reader = segments[2] === 'reader'
+      const page = segments[reader ? 3 : 2]
       return { route: 'comic-translation', ...(segments[1] ? { projectId: safeDecode(segments[1]) } : {}),
-        ...(segments[2] === 'reader' ? { reader: true } : segments[2] ? { pageId: safeDecode(segments[2]) } : {}),
-        path: '#/comic-translation' + segments.slice(1, 3).map(segment => `/${encodeURIComponent(safeDecode(segment))}`).join('') }
+        ...(reader && { reader: true }), ...(page && { pageId: safeDecode(page) }),
+        path: '#/comic-translation' + segments.slice(1, reader ? 4 : 3).map(segment => `/${encodeURIComponent(safeDecode(segment))}`).join('') }
+    }
     case 'model-gateway':
       return { route: 'model-gateway', path: '#/model-gateway' }
     case 'records': {

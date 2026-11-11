@@ -134,7 +134,7 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
     <DialogContent className="model-configuration-dialog modal__dialog modal__dialog--lg">
       <DialogCloseButton disabled={saving || removing} />
       <DialogHeader><div className="settings-row__title"><DialogTitle>{t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}</DialogTitle><Tooltip><TooltipTrigger delay={300} render={<Button variant="secondary" size="sm" className="settings-row__help" aria-label={t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}><CircleHelp aria-hidden="true" /></Button>} /><TooltipContent  role="tooltip" className="settings-row__tooltip z-popup">{t(readOnly ? 'modelConfig.viewDescription' : 'modelConfig.description')}</TooltipContent></Tooltip></div></DialogHeader>
-      {record.kind === 'ttsModel' || record.kind === 'inpaintModel' ? null : <div className="model-configuration-dialog__body flex flex-col gap-[var(--space-2)]">
+      {record.kind === 'ttsModel' || record.kind === 'inpaintModel' || record.kind === 'detectModel' ? null : <div className="model-configuration-dialog__body flex flex-col gap-[var(--space-2)]">
         {readOnly ? <p className="nola-caption text-muted">{t('modelConfig.viewDescription')}</p> : null}
         {draft.slot === 'recognition' ? <ModelLanguageSelect
           label={t('modelConfig.languages')}

@@ -159,7 +159,7 @@ export function ModelsPage() {
 
   const run = (record: ResourceRecord, action: 'install' | 'cancel') => () => {
     if (action === 'install') {
-      if (record.kind === 'ocrModel' || record.kind === 'inpaintModel') {
+      if (record.kind === 'ocrModel' || record.kind === 'inpaintModel' || record.kind === 'detectModel') {
         void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => notifyError(t('models.downloadFailed'), { cause }))
         return
       }
@@ -186,7 +186,7 @@ export function ModelsPage() {
 
   const footerOf = (record: ResourceRecord) => {
     const { kind, resourceId } = record
-    if (kind === 'ocrModel' || kind === 'inpaintModel') return (
+    if (kind === 'ocrModel' || kind === 'inpaintModel' || kind === 'detectModel') return (
       <Button onClick={() => setLocalFamily({ kind, resourceId })}>{t('models.openDetails')}</Button>
     )
     if (record.installed) {
@@ -366,7 +366,7 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, onOpenL
   const groups = new Map<RecommendedFamily, ResourceRecord[]>()
   for (const record of records) {
     // Keep legacy M2M100 installations available in Installed, but stop recommending it.
-    if (record.resourceId === 'm2m100-418m' || (record.kind === 'ocrModel' || record.kind === 'inpaintModel')) continue
+    if (record.resourceId === 'm2m100-418m' || (record.kind === 'ocrModel' || record.kind === 'inpaintModel' || record.kind === 'detectModel')) continue
     const family = familyOf(record)
     if (family === 'kokoro' || family === 'piper') continue
     groups.set(family, [...(groups.get(family) ?? []), record])
@@ -378,6 +378,7 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, onOpenL
     { title: t('models.llmModels'), hint: t('models.llmModelsHint'), kind: 'translationModel', families: ['qwen35'], language: true },
     { title: t('models.s2sModels'), hint: t('models.s2sModelsHint'), kind: 's2sModel', families: [] },
     { title: t('screen.ocrTitle'), hint: t('screen.ocrDescription'), kind: 'ocrModel', families: [] },
+    { title: t('suite.comicDetector'), hint: t('suite.comicDetectorDescription'), kind: 'detectModel', families: [] },
     { title: t('suite.inpaintModels'), hint: t('suite.inpaintDescription'), kind: 'inpaintModel', families: [] },
   ]
   return <div className="models-catalog-sections">
@@ -385,7 +386,7 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, onOpenL
     {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
     {sections.map(section => {
       const { kind } = section
-      const localKind = kind === 'ocrModel' || kind === 'inpaintModel' ? kind : null
+      const localKind = kind === 'ocrModel' || kind === 'inpaintModel' || kind === 'detectModel' ? kind : null
       const localRecords = localKind ? records.filter(record => record.kind === localKind) : []
       const sectionCloudModels = cloudModels.filter(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))
       if (!loading && !localRecords.length && !sectionCloudModels.length && !section.families.some(family => groups.has(family))) return null
@@ -449,6 +450,7 @@ function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute
       <Section title={t('models.mtModels')} hint={t('models.mtModelsHint')} records={mtModels} card={card}>{cloudModels.filter(model => model.kind === 'translationModel' && !model.profile && model.id !== 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.ttsModels')} hint={t('models.ttsModelsHint')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card}>{cloudModels.filter(model => model.kind === 'ttsModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('screen.ocrTitle')} hint={t('screen.ocrDescription')} records={ordered.filter(record => record.kind === 'ocrModel')} card={card} />
+      <Section title={t('suite.comicDetector')} hint={t('suite.comicDetectorDescription')} records={ordered.filter(record => record.kind === 'detectModel')} card={card} />
       <Section title={t('suite.inpaintModels')} hint={t('suite.inpaintDescription')} records={ordered.filter(record => record.kind === 'inpaintModel')} card={card} />
       <Section title={t('models.llmModels')} hint={t('models.llmModelsHint')} records={languageModels} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.s2sModels')} hint={t('models.s2sModelsHint')} records={[]} card={card}>{cloudModels.filter(model => model.kind === 's2sModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>

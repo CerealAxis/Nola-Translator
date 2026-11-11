@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PREFERENCES, matchesSitePatterns, siteEnabled, readPreferences } from './preferences'
+import { DEFAULT_PREFERENCES, DISABLED_PROVIDER, liveTranslationEnabled, matchesSitePatterns, siteEnabled, readPreferences } from './preferences'
 import { extensionCopy, extensionLocales } from './extension-copy'
 import { uiCopy } from './ui-copy'
 import { browserZh, browserEn } from './locale-base'
 import { browserJa, browserKo, browserZhHK, browserZhTW } from './locale-regions'
 
 describe('extension preferences', () => {
+  it('enables only webpage and existing subtitle translation by default, preserving saved bindings', () => {
+    const settings = readPreferences({})
+    expect(settings).toMatchObject({ pageProvider: 'index-translate', subtitleProvider: 'index-translate', selectionProvider: 'index-translate', inputProvider: 'index-translate', inputTranslation: true, ttsProvider: DISABLED_PROVIDER, s2sProvider: DISABLED_PROVIDER, llmProvider: DISABLED_PROVIDER })
+    expect(liveTranslationEnabled(settings)).toBe(false)
+    expect(readPreferences({ pageProvider: 'google-translate', selectionProvider: DISABLED_PROVIDER, inputProvider: DISABLED_PROVIDER, ttsProvider: 'edge-tts' })).toMatchObject({ pageProvider: 'google-translate', selectionProvider: DISABLED_PROVIDER, inputProvider: DISABLED_PROVIDER, ttsProvider: 'edge-tts' })
+  })
   it('upgrades legacy preferences without losing the chosen languages and pipeline', () => {
     const settings = readPreferences({ pageLanguage: 'en', videoLanguage: 'ja', pipeline: 's2s', autoSites: ['https://example.com'] })
-    expect(settings).toMatchObject({ pageLanguage: 'en', videoLanguage: 'ja', pipeline: 's2s', pageProvider: 'desktop', autoSites: ['https://example.com'], contextAware: false })
+    expect(settings).toMatchObject({ pageLanguage: 'en', videoLanguage: 'ja', pipeline: 's2s', pageProvider: 'index-translate', autoSites: ['https://example.com'], contextAware: false })
   })
   it('validates imported values and discards malformed terms and rules', () => {
     const settings = readPreferences({ sourceLanguage: '<invalid>', subtitleSize: 900, ttsRate: NaN, batchSize: -2, glossary: [null, { source: 'API', target: '接口', sites: '' }, { source: 4 }], siteRules: [null, { host: 'example.com', includeSelectors: 'article', excludeSelectors: '.ad' }] })

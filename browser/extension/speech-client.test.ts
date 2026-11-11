@@ -12,7 +12,7 @@ function fixture(ready = true) {
     postMessage: vi.fn((message: { type: string }) => { if (ready && message.type === 'start') queueMicrotask(() => messages.forEach(listener => listener({ type: 'ready' }))) }) }
   vi.stubGlobal('chrome', { runtime: { connect: () => port } })
   const native: ExtensionBridge = { request: vi.fn(async request => request.type === 'start' ? { sessionId: 'native-id' } : undefined), subscribe: () => () => {}, close: vi.fn() }
-  let preferences = { ...DEFAULT_PREFERENCES, pipeline: 'cascade' as const }
+  let preferences = { ...DEFAULT_PREFERENCES, asrProvider: 'desktop', pipeline: 'cascade' as const }
   const bridge = createSpeechBridge(native, () => preferences)
   return { bridge, port, native, setPreferences: (value: typeof DEFAULT_PREFERENCES) => { preferences = value as typeof preferences }, emit: (event: unknown) => messages.forEach(listener => listener(event)) }
 }
@@ -21,7 +21,7 @@ const start = { type: 'start' as const, source: 'tab' as const, streamId: 'input
 it('keeps the session backend pinned when preferences change before stopping', async () => {
   const f = fixture()
   const result = await f.bridge.request(start)
-  f.setPreferences({ ...DEFAULT_PREFERENCES, pipeline: 'desktop' })
+  f.setPreferences({ ...DEFAULT_PREFERENCES, asrProvider: 'desktop', subtitleProvider: 'desktop', pipeline: 'desktop' })
   await f.bridge.request({ type: 'stop', sessionId: (result as { sessionId: string }).sessionId })
   expect(f.port.disconnect).toHaveBeenCalled()
   expect(f.native.request).not.toHaveBeenCalled()
@@ -30,9 +30,9 @@ it('keeps the session backend pinned when preferences change before stopping', a
 
 it('also stops a native session through native after switching to external settings', async () => {
   const f = fixture()
-  f.setPreferences({ ...DEFAULT_PREFERENCES, pipeline: 'desktop' })
+  f.setPreferences({ ...DEFAULT_PREFERENCES, asrProvider: 'desktop', subtitleProvider: 'desktop', pipeline: 'desktop' })
   await f.bridge.request(start)
-  f.setPreferences({ ...DEFAULT_PREFERENCES, pipeline: 'cascade' })
+  f.setPreferences({ ...DEFAULT_PREFERENCES, asrProvider: 'desktop', pipeline: 'cascade' })
   await f.bridge.request({ type: 'stop', sessionId: 'native-id' })
   expect(f.native.request).toHaveBeenLastCalledWith({ type: 'stop', sessionId: 'native-id' }, undefined)
   f.bridge.close()

@@ -6,11 +6,11 @@ import { browserText } from '../i18n'
 import { NolaLogo } from '../logo'
 import { ChoiceField } from './ChoiceField'
 import { PopupLanguage } from './PopupLanguage'
-import { ColorField, languageOptions, RangeField } from '../settings-fields'
+import { ColorField, languageOptions, RangeField, subtitleFontOptions } from '../settings-fields'
 import { resolveUiLanguage } from '../../../src/shared/languages'
 import { Field, FieldGroup, FieldLabel } from '../../../src/renderer/components/ui/field'
 import { Switch, SwitchThumb } from '../../../src/renderer/components/ui/switch'
-import { DEFAULT_PREFERENCES, savePreferences, type Preferences } from '../preferences'
+import { DEFAULT_PREFERENCES, DISABLED_PROVIDER, liveTranslationEnabled, savePreferences, type Preferences } from '../preferences'
 import type { SubtitleState, SubtitleTranslation } from '../subtitle-translation'
 import { SubtitleAvailabilityTooltip } from './SubtitleAvailabilityTooltip'
 import { useErrorToasts } from './useErrorToasts'
@@ -48,6 +48,8 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
   const t = browserText(state.preferences?.uiLanguage)
   useErrorToasts(t, state.liveAttempted ? state.error : undefined, subtitles?.error, saveError || exportError ? 'internalError' : undefined)
   const preferences = state.preferences
+  const liveEnabled = preferences ? liveTranslationEnabled(preferences) : false
+  const summaryEnabled = preferences?.llmProvider !== DISABLED_PROVIDER
   const save = (patch: Partial<Preferences>) => { setSaveError(false); void savePreferences(patch).catch(() => setSaveError(true)) }
   const languages = languageOptions(resolveUiLanguage(preferences?.uiLanguage ?? 'auto', navigator.language))
   const enhanced = Boolean(state.summary?.realtimeTranslation && state.preferences)
@@ -84,14 +86,14 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
     {link('download', t('downloadSrt'), Download, !subtitleController || !subtitles?.active)}
     {link('study', t('transcript'), BookOpen, !subtitleController || !subtitles?.active)}
     {link('settings', t('subtitleSettings'), Settings2, !preferences)}
-    <div className="nola-panel-controls">
+    {(liveEnabled || locked) && <div className="nola-panel-controls">
       <Button variant="secondary" disabled={primaryDisabled} title={blocked ? t(status) : undefined} onClick={() => { if (state.status === 'active') void store.stop(); else store.pressStart() }}>
         {state.status === 'active' ? <Square aria-hidden="true" /> : <Play aria-hidden="true" />}
         {state.status === 'active' ? t('end') : state.status === 'starting' ? t('starting') : state.status === 'stopping' ? t('stopping') : t(enhanced ? 'live' : 'start')}
       </Button>
       <Button variant="bare" size="icon-sm" aria-label={t('refresh')} title={t('refresh')} disabled={state.status === 'starting' || state.status === 'stopping' || state.capturePending} onClick={() => { subtitleController?.checkAvailability(true); void store.refresh() }}><RefreshCw aria-hidden="true" /></Button>
-    </div>
-    {tabAudio && !enhanced && <Button variant="secondary" disabled={locked || !state.connected || !compatible} onClick={store.pressCapture}><AudioLines aria-hidden="true" />{t(state.audioCaptured ? 'audioCaptured' : 'captureAudio')}</Button>}
+    </div>}
+    {liveEnabled && tabAudio && !enhanced && <Button variant="secondary" disabled={locked || !state.connected || !compatible} onClick={store.pressCapture}><AudioLines aria-hidden="true" />{t(state.audioCaptured ? 'audioCaptured' : 'captureAudio')}</Button>}
     </>}
     {view === 'download' && <div className="nola-subtitle-page">
       <Button variant="secondary" disabled={exporting} onClick={() => void download(false)}><Download />{t('sourceSubtitles')} · SRT</Button>
@@ -100,8 +102,8 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
     {view === 'study' && subtitles && subtitleController && <div className="nola-subtitle-page">
       <div className="nola-subtitle-study-actions">
         <Button variant="secondary" aria-expanded={transcriptOpen} onClick={() => setTranscriptOpen(!transcriptOpen)}>{t('transcript')}</Button>
-        <Button variant="secondary" disabled={subtitles.processing} onClick={() => void subtitleController.summarize()}>{t('summarizeVideo')}</Button>
-        <Button variant="secondary" disabled={subtitles.processing} onClick={() => void subtitleController.segment()}>{t('segmentSubtitles')}</Button>
+        {summaryEnabled && <Button variant="secondary" disabled={subtitles.processing} onClick={() => void subtitleController.summarize()}>{t('summarizeVideo')}</Button>}
+        {summaryEnabled && <Button variant="secondary" disabled={subtitles.processing} onClick={() => void subtitleController.segment()}>{t('segmentSubtitles')}</Button>}
         <Button variant="secondary" onClick={() => subtitleController.playback()}>{t('playVideo')} / {t('pauseVideo')}</Button>
       </div>
       <ChoiceField t={t} label={t('playbackRate')} value={rate} options={[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => ({ value: String(rate), label: `${rate}×` }))} onChange={value => { setRate(value); subtitleController.playback(Number(value)) }} />
@@ -129,7 +131,7 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
         return <fieldset key={kind} className="nola-subtitle-style-group"><legend>{t(kind === 'source' ? 'sourceCaption' : 'translatedCaption')}</legend>
           <RangeField label={t('fontSize')} value={preferences[sizeKey]} min={10} max={60} suffix="px" onChange={value => save({ [sizeKey]: value })} />
           <ColorField label={t('subtitleColor')} value={preferences[colorKey]} onChange={value => save({ [colorKey]: value })} />
-          <ChoiceField t={t} label={t('subtitleFont')} value={preferences[fontKey]} options={[...new Set(['system-ui', 'sans-serif', 'serif', 'monospace', preferences[fontKey]])].map(value => ({ value, label: value }))} onChange={value => save({ [fontKey]: value })} />
+          <ChoiceField t={t} label={t('subtitleFont')} value={preferences[fontKey]} options={subtitleFontOptions(preferences[fontKey], t)} onChange={value => save({ [fontKey]: value })} />
         </fieldset>
       })}
       <Field className="nola-subtitle-style-row"><FieldLabel htmlFor="nola-subtitle-bold">{t('subtitleBold')}</FieldLabel><Switch id="nola-subtitle-bold" checked={preferences.subtitleBold} onCheckedChange={value => save({ subtitleBold: value })}><SwitchThumb /></Switch></Field>

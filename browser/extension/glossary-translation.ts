@@ -4,6 +4,12 @@ export function glossaryChunks(text: string, hits: readonly GlossaryHit[], limit
   const chunks: string[] = []
   for (let start = 0; start < text.length;) {
     let end = Math.min(text.length, start + limit)
+    if (end < text.length) {
+      const boundary = /\s+(?=\S{1,200}$)/u.exec(text.slice(start, end))
+      if (boundary && boundary.index >= limit / 2) end = start + boundary.index + boundary[0].length
+      const code = text.charCodeAt(end)
+      if (code >= 0xdc00 && code <= 0xdfff) end--
+    }
     const crossing = hits.find(hit => hit.start < end && hit.end > end)
     if (crossing) end = crossing.start
     if (end <= start) throw new Error('glossaryBudgetExceeded')

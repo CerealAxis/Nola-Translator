@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { Languages, Pin, PinOff, Settings2, X } from 'lucide-react'
 import { Button } from '../../../src/renderer/components/ui/button'
-import { Alert, AlertDescription } from '../../../src/renderer/components/ui/alert'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../src/renderer/components/ui/popover'
-import { browserText, errorKey } from '../i18n'
+import { browserText } from '../i18n'
+import { useErrorToasts } from '../components/useErrorToasts'
 import { NolaLogo } from '../logo'
-import type { Preferences } from '../preferences'
+import { DISABLED_PROVIDER, type Preferences } from '../preferences'
 
 export function floatingDock(x: number, y: number, width: number, height: number) {
   return { floatingSide: x < width / 2 ? 'left' as const : 'right' as const, floatingPosition: Math.max(0, Math.min(1, y / Math.max(1, height))) }
@@ -26,11 +26,9 @@ export function FloatingControls({ preferences, active, error, onTranslate, onRe
   const [hovered, setHovered] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [panelError, setPanelError] = useState<string>()
-  const [showError, setShowError] = useState(false)
-  useEffect(() => { setShowError(Boolean(error)) }, [error])
   const container = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const close = () => { setMenu(false); setShowError(false); setPanelError(undefined) }
+    const close = () => { setMenu(false); setPanelError(undefined) }
     const key = (event: KeyboardEvent) => { if (event.key === 'Escape') close() }
     const outside = (event: globalThis.PointerEvent) => { if (container.current && !event.composedPath().includes(container.current)) close() }
     window.addEventListener('keydown', key); window.addEventListener('pointerdown', outside)
@@ -39,6 +37,8 @@ export function FloatingControls({ preferences, active, error, onTranslate, onRe
   const drag = useRef<{ x: number; y: number; moved: boolean; original: ReturnType<typeof floatingDock> } | undefined>(undefined)
   const suppressClick = useRef(false)
   const t = browserText(preferences.uiLanguage)
+  const translationDisabled = !active && preferences.pageProvider === DISABLED_PROVIDER
+  useErrorToasts(t, error, panelError)
   const down = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
     drag.current = { x: event.clientX, y: event.clientY, moved: false, original: { floatingSide: preferences.floatingSide, floatingPosition: preferences.floatingPosition } }
@@ -58,7 +58,7 @@ export function FloatingControls({ preferences, active, error, onTranslate, onRe
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
   const toggleTranslation = () => { if (active) onRestore(); else onTranslate() }
-  const expanded = hovered || menu || Boolean(panelError) || showError
+  const expanded = hovered || menu
   const openPanel = () => {
     setPanelError(undefined)
     void chrome.runtime.sendMessage({ type: 'openTranslationPanel' }).then(result => {
@@ -67,11 +67,11 @@ export function FloatingControls({ preferences, active, error, onTranslate, onRe
   }
   return <div ref={container} className="nola-floating-controls" data-side={preferences.floatingSide} data-expanded={expanded} data-pinned={preferences.floatingLocked} data-dragging={dragging} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocusCapture={() => setHovered(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setHovered(false) }}>
     <div className="nola-floating-rail">
-      <Button className="nola-floating-tool" variant={active ? "default" : "outline"} size="sm" aria-label={t(active ? 'restorePage' : 'translatePage')} title={t(active ? 'restorePage' : 'translatePage')} onClick={toggleTranslation} aria-pressed={active}><Languages /></Button>
+      <Button className="nola-floating-tool" variant={active ? "default" : "outline"} size="sm" disabled={translationDisabled} aria-label={t(active ? 'restorePage' : 'translatePage')} title={t(translationDisabled ? 'providerDisabled' : active ? 'restorePage' : 'translatePage')} onClick={toggleTranslation} aria-pressed={active}><Languages /></Button>
       <div className="nola-floating-main">
         <Button className="nola-floating-trigger" variant="outline" size="lg" aria-label={t(preferences.floatingClickAction === 'panel' ? 'floatingOpenPanel' : active ? 'restorePage' : 'translatePage')} title={t(preferences.floatingClickAction === 'panel' ? 'floatingOpenPanel' : active ? 'restorePage' : 'translatePage')} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { if (drag.current?.moved) onPosition(drag.current.original, false); drag.current = undefined; setDragging(false); suppressClick.current = false }} onClick={() => {
           if (suppressClick.current) { suppressClick.current = false; return }
-          if (preferences.floatingClickAction === 'translate') toggleTranslation()
+          if (preferences.floatingClickAction === 'translate') { if (!translationDisabled) toggleTranslation() }
           else openPanel()
         }}><NolaLogo /></Button>
         <Popover open={menu} onOpenChange={setMenu}>
@@ -86,6 +86,5 @@ export function FloatingControls({ preferences, active, error, onTranslate, onRe
       <Button className="nola-floating-tool" variant="outline" size="sm" aria-label={t('settings')} title={t('settings')} onClick={() => window.open(chrome.runtime.getURL('options.html#floatingButton'), '_blank')}><Settings2 /></Button>
     </div>
     <div ref={setMenuContainer} style={{ display: 'contents' }} />
-    {(panelError || showError && error) && <div className="nola-floating-notice nola-glass-popup"><Alert variant="danger"><AlertDescription>{t(errorKey(panelError || error!))}</AlertDescription></Alert><Button variant="outline" size="sm" onClick={() => window.open(chrome.runtime.getURL('options.html#apiProviders'), '_blank')}>{t('apiProviders')}</Button></div>}
   </div>
 }

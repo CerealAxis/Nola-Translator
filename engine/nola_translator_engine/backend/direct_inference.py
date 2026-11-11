@@ -131,6 +131,7 @@ async def run_direct_inference(
     request: DirectInferenceRequest,
     *,
     provider_options: dict[str, str] | None = None,
+    translation_history: list[str] | None = None,
     timeout_s: float = DIRECT_INFERENCE_TIMEOUT_S,
 ) -> DirectInferenceResult:
     operation = {
@@ -148,9 +149,12 @@ async def run_direct_inference(
         provider_options=provider_options or {},
         task_mode=request.task_mode, max_concurrency=request.max_concurrency,
     )
-    if isinstance(request, DirectMtRequest) and request.glossary:
-        glossary_prompt(request.glossary)
-        ctx.translation_context["glossary"] = request.glossary
+    if isinstance(request, DirectMtRequest):
+        if request.glossary:
+            glossary_prompt(request.glossary)
+            ctx.translation_context["glossary"] = request.glossary
+        if translation_history:
+            ctx.translation_context["history"] = translation_history
     match = MatchRequest(operation=operation, model_id=request.model)
     try:
         async with asyncio.timeout(deadline - time.monotonic()):

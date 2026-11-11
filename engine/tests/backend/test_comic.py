@@ -256,6 +256,99 @@ async def test_locked_text_survives_real_repair_layout_job(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_detect_and_edit_before_ocr_then_process_blank_and_text_pages(tmp_path, monkeypatch):
+    from nola_translator_engine.backend import direct_inference
+
+    image, pixels = source(tmp_path)
+    blank = tmp_path / 'blank.png'
+    blank.write_bytes(encode_image(np.full_like(pixels, 255)))
+
+    class Ocr:
+        def variant(self, _):
+            return self
+
+        async def detect_comic(self, image):
+            return [np.array([[48, 40], [208, 40], [208, 112], [48, 112]])] if image.min() < 255 else []
+
+        async def recognize_comic_box(self, _image, quad, _language, _vertical):
+            assert quad[0] == [46.0, 40.0]
+            return [('Hello', 0.9)]
+
+    translated = []
+
+    async def translate(_gateway, request, **_options):
+        translated.append(request.text)
+        return direct_inference.DirectInferenceResult(text='你好')
+
+    monkeypatch.setattr(direct_inference, 'run_direct_inference', translate)
+    service = ComicService(tmp_path / 'comics', Ocr(), FONT)
+    book = service.repository.import_sources([str(blank), str(image)], 'Book')
+    page_ids = [page['id'] for page in book['pages']]
+    service.run(book['id'], RunRequest(expectedRevision=book['revision'], pageIds=page_ids, stage='detect', model=''), None, {})
+    await asyncio.gather(*service.tasks.values())
+    book = service.repository.open(book['id'])
+    assert [page['status'] for page in book['pages']] == ['detected', 'detected']
+    detected = book['pages'][1]['regions'][0]
+    assert detected['sourceText'] == ''
+    assert detected['sourceLines'][0][0] == [48, 40]
+    edited = {key: value for key, value in detected.items() if key not in ('sourceQuad', 'sourceLines')}
+    edited['x'] = 46
+    book = service.repository.edit({'projectId': book['id'], 'operationId': str(uuid4()), 'expectedRevision': book['revision'],
+        'command': {'action': 'saveRegion', 'pageId': page_ids[1], 'region': edited}})
+
+    service.run(book['id'], RunRequest(expectedRevision=book['revision'], pageIds=page_ids, stage='full', model='test'), object(), {})
+    await asyncio.gather(*service.tasks.values())
+    final = service.repository.open(book['id'])
+    assert final['jobs'][0]['state'] == 'completed'
+    assert final['jobs'][0]['completedPages'] == 2
+    assert translated == ['Hello']
+    blank_page, translated_page = final['pages']
+    assert blank_page['renderedAsset'] == blank_page['sourceAsset']
+    assert translated_page['regions'][0]['targetText'] == '你好'
+    assert translated_page['hasRendered']
+    assert translated_page['renderedAsset'] != translated_page['sourceAsset']
+
+
+@pytest.mark.asyncio
+async def test_clean_only_exports_a_clean_layer_without_translation(tmp_path):
+    image, _ = source(tmp_path)
+    service = ComicService(tmp_path / 'comics', None, FONT)
+    book = service.repository.import_sources([str(image)], 'Book')
+    page_id = book['pages'][0]['id']
+    book = service.repository.edit({'projectId': book['id'], 'operationId': str(uuid4()), 'expectedRevision': book['revision'],
+        'command': {'action': 'saveRegion', 'pageId': page_id, 'region': region(None)}})
+    service.run(book['id'], RunRequest(expectedRevision=book['revision'], pageIds=[page_id], stage='clean', model=''), None, {})
+    await asyncio.gather(*service.tasks.values())
+    final = service.repository.open(book['id'])
+    page = final['pages'][0]
+    assert page['hasClean'] and not page['hasRendered']
+    assert page['regions'][0]['targetText'] is None
+    out = service.repository.export(book['id'], 'png', [page_id], 'clean')
+    assert out.read_bytes() != image.read_bytes()
+    assert out.read_bytes() == service.repository.asset_path(book['id'], page_id, 'clean').read_bytes()
+
+
+@pytest.mark.asyncio
+async def test_layout_keeps_processing_after_a_page_needs_repair(tmp_path):
+    image, pixels = source(tmp_path)
+    second = tmp_path / 'second.png'
+    second.write_bytes(encode_image(pixels))
+    service = ComicService(tmp_path / 'comics', None, FONT)
+    book = service.repository.import_sources([str(image), str(second)], 'Book')
+    first_id, second_id = (page['id'] for page in book['pages'])
+    service.run(book['id'], RunRequest(expectedRevision=book['revision'], pageIds=[second_id], stage='repair', model=''), None, {})
+    await asyncio.gather(*service.tasks.values())
+    book = service.repository.open(book['id'])
+
+    service.run(book['id'], RunRequest(expectedRevision=book['revision'], pageIds=[first_id, second_id], stage='layout', model=''), None, {})
+    await asyncio.gather(*service.tasks.values())
+    final = service.repository.open(book['id'])
+    assert final['jobs'][0]['completedPages'] == 1
+    assert final['jobs'][0]['issues'] == [{'pageId': first_id, 'stage': 'layout', 'error': 'repairRequired'}]
+    assert not final['pages'][0]['hasRendered'] and final['pages'][1]['hasRendered']
+
+
+@pytest.mark.asyncio
 async def test_ocr_missing_is_persisted_failure_and_old_outputs_survive(tmp_path):
     image, _ = source(tmp_path)
     service = ComicService(tmp_path / 'comics', None, FONT)

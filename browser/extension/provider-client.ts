@@ -1,9 +1,12 @@
 import { requestId } from './id'
 import { requestProviderAccess, type Capability, type ProviderConnection } from './providers'
 
-export type TranslationPurpose = 'web' | 'subtitle' | 'selection' | 'input'
+export type TranslationPurpose = 'web' | 'subtitle' | 'selection' | 'input' | 'document'
 export interface SpeechAudio { audioBase64: string; contentType: string }
 export interface ProviderResult { text?: string; audioBase64?: string; contentType?: string; message?: string; webConcurrency?: number; subtitleConcurrency?: number; desktopConcurrency?: number }
+export class ProviderRequestError extends Error {
+  constructor(code: string, public retryAfterMs?: number) { super(code) }
+}
 export function providerRequest(payload: Record<string, unknown>, signal?: AbortSignal): Promise<ProviderResult> {
   if (signal?.aborted) return Promise.reject(signal.reason)
   return new Promise((resolve, reject) => {
@@ -16,10 +19,10 @@ export function providerRequest(payload: Record<string, unknown>, signal?: Abort
     port.onMessage.addListener(raw => {
       if (finished) return
       if (!raw || typeof raw !== 'object') { cleanup(); reject(new Error('providerInvalid')); return }
-      const message = raw as { id?: string; error?: string; result?: ProviderResult }
+      const message = raw as { id?: string; error?: string; retryAfterMs?: unknown; result?: ProviderResult }
       if (message.id !== id || finished) return
       cleanup()
-      if (message.error) reject(new Error(message.error))
+      if (message.error) reject(new ProviderRequestError(message.error, typeof message.retryAfterMs === 'number' && Number.isFinite(message.retryAfterMs) && message.retryAfterMs >= 0 ? message.retryAfterMs : undefined))
       else resolve(message.result ?? {})
     })
     port.onDisconnect.addListener(() => {
@@ -37,6 +40,11 @@ export async function translate(text: string, sourceLanguage: string, targetLang
 }
 export async function generate(prompt: string, signal?: AbortSignal, providerId?: string): Promise<string> {
   const result = await providerRequest({ type: 'generate', text: prompt, providerId }, signal)
+  if (!result.text) throw new Error('providerEmpty')
+  return result.text
+}
+export async function translateImage(image: string, targetLanguage: string, signal?: AbortSignal, text?: string): Promise<string> {
+  const result = await providerRequest({ type: 'translateImage', image, targetLanguage, ...(text ? { text } : {}) }, signal)
   if (!result.text) throw new Error('providerEmpty')
   return result.text
 }

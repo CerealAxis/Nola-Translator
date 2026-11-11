@@ -1166,7 +1166,7 @@ if (!hasSingleInstanceLock) {
       },
       () => gateway?.snapshot().state === 'running',
       async (resourceId, action) => {
-        if (resourceId !== 'lama-manga' && !/^pp-ocrv5-mobile(?:-[a-z]+)?-onnx$/.test(resourceId)) return undefined
+        if (resourceId !== 'lama-manga' && resourceId !== 'comic-rtdetr-onnx' && !/^pp-ocrv5-mobile(?:-[a-z]+)?-onnx$/.test(resourceId)) return undefined
         if (!screenOcr) throw new Error('backendUnavailable')
         const status = action === 'install' || action === 'resume' ? await screenOcr.install(resourceId)
           : action === 'remove' ? await screenOcr.remove(resourceId) : await screenOcr.cancel(resourceId)
@@ -1425,7 +1425,10 @@ if (!hasSingleInstanceLock) {
           if (!translation) throw new Error('modelUnavailable')
           headers = backendMtHeaders({ ...translation, apiKey: await credentials.get(customCredentialSlot(id)) })
         } else if (provider) headers = backendMtHeaders(translationOptionsFor(current.translation, provider))
+        const needsDetection = request.stage === 'detect' || (request.stage === 'clean' &&
+          project.pages.some(page => request.pageIds.includes(page.id) && page.status === 'imported' && !page.regions.length))
         const needsOcr = request.stage === 'full' || request.stage === 'ocr'
+          || (needsDetection && project.config.detector !== 'rtdetr')
         const mtLease = needsMt ? await gateway!.acquireExternalMt(binding, () => comicTranslation!.stop()) : undefined
         try {
           const releaseOcr = needsOcr ? gateway!.acquireOcr(project.config.sourceLanguage) : undefined

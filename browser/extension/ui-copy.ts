@@ -1,5 +1,9 @@
 export const uiCopy = {
   liveService: ['Live translation service', '实时翻译服务', '即時翻譯服務', '即時翻譯服務', '실시간 번역 서비스', 'リアルタイム翻訳サービス'],
+  systemFont: ['System font', '系统字体', '系統字體', '系統字體', '시스템 글꼴', 'システムフォント'],
+  resetShortcut: ['Reset shortcut', '重置快捷键', '重設快速鍵', '重設快捷鍵', '단축키 초기화', 'ショートカットをリセット'],
+  removeShortcut: ['Remove shortcut', '删除快捷键', '刪除快速鍵', '刪除快捷鍵', '단축키 삭제', 'ショートカットを削除'],
+  shortcutUnassigned: ['Not set', '未设置', '未設定', '未設定', '설정되지 않음', '未設定'],
   shortcutConflict: ['This shortcut is used by another action.', '此快捷键已用于其他操作。', '此快速鍵已用於其他操作。', '此快捷鍵已用於其他操作。', '다른 동작에서 사용하는 단축키입니다.', 'このショートカットは別の操作で使用されています。'],
   shortcutRecordHelp: ['Click and press a shortcut', '点击后按下快捷键', '點擊後按下快速鍵', '按一下後按下快捷鍵', '클릭한 다음 단축키를 누르세요', 'クリックしてショートカットを押す'],
   searchOptions: ['Search options', '搜索选项', '搜尋選項', '搜尋選項', '옵션 검색', '項目を検索'],

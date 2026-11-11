@@ -4,6 +4,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { FloatingControls, floatingDock } from './FloatingControls'
 import { DEFAULT_PREFERENCES } from '../preferences'
 import { browserText } from '../i18n'
+import { ToastProvider } from '../../../src/renderer/components/ui/toast'
 const t = browserText('en')
 beforeEach(() => {
   for (const name of ['setPointerCapture', 'releasePointerCapture']) Object.defineProperty(HTMLElement.prototype, name, { configurable: true, value: vi.fn() })
@@ -11,11 +12,11 @@ beforeEach(() => {
 })
 function callbacks() { return { onTranslate: vi.fn(), onRestore: vi.fn(), onPosition: vi.fn(), onLock: vi.fn(), onHide: vi.fn() } }
 it('opens an actionable error when direct translation fails', async () => {
-  const view = render(<FloatingControls preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en', floatingClickAction: 'translate' }} active={false} {...callbacks()} />)
+  const view = render(<><FloatingControls preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en', floatingClickAction: 'translate' }} active={false} {...callbacks()} /><ToastProvider closeLabel={t('close')} /></>)
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  view.rerender(<FloatingControls preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en', floatingClickAction: 'translate' }} active error="providerPermission" {...callbacks()} />)
+  view.rerender(<><FloatingControls preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en', floatingClickAction: 'translate' }} active error="providerPermission" {...callbacks()} /><ToastProvider closeLabel={t('close')} /></>)
   expect(await screen.findByRole('alert')).toHaveTextContent(t('providerPermission'))
-  expect(screen.getByRole('button', { name: t('settings') })).toBeInTheDocument()
+  expect(document.querySelector('.nola-toast-close')).toHaveAttribute('aria-label', t('close'))
 })
 it('expands quick actions on hover and offers only site/global hiding', async () => {
   const actions = callbacks(); const user = userEvent.setup()
@@ -51,7 +52,7 @@ it('pins visibility while retaining drag placement', () => {
 it('uses the native sidebar action and exposes a recoverable Firefox restriction', async () => {
   vi.stubGlobal('chrome', { runtime: { sendMessage: vi.fn().mockResolvedValue({ ok: false }), getURL: (value: string) => value } })
   const user = userEvent.setup()
-  render(<FloatingControls preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en', floatingClickAction: 'panel' }} active={false} {...callbacks()} />)
+  render(<><FloatingControls preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en', floatingClickAction: 'panel' }} active={false} {...callbacks()} /><ToastProvider closeLabel={t('close')} /></>)
   await user.click(screen.getByRole('button', { name: t('floatingOpenPanel') }))
   expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'openTranslationPanel' })
   expect(await screen.findByRole('alert')).toHaveTextContent(t('openPanelFromToolbar'))

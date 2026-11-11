@@ -15,6 +15,13 @@ class OcrModelSpec(ModelSpec):
 OCR_REVISION = "d298462ac20a2e994f433151b5fe6cc1180e9a09"
 OCR_RESOURCE_ID = "pp-ocrv5-mobile-onnx"
 OCR_DETECTOR = "ch_PP-OCRv5_det_mobile.onnx"
+COMIC_DETECTOR_ID = "comic-rtdetr-onnx"
+COMIC_DETECTOR = ModelSpec(
+    model_id=COMIC_DETECTOR_ID, directory=COMIC_DETECTOR_ID,
+    repo="ogkalu/comic-text-and-bubble-detector", revision="4269a0e53d40419f4746e8b3e30ae7faef3a26c6",
+    files=(FileEntry("detector.onnx", 168481531,
+        "065744e91c0594ad8663aa8b870ce3fb27222942eded5a3cc388ce23421bd195"),),
+)
 OCR_RECOGNIZERS = {
     "ch": "ch_PP-OCRv5_rec_mobile.onnx",
     "ko": "korean_PP-OCRv5_rec_mobile.onnx",

@@ -19,13 +19,16 @@ MAX_PAGE_BYTES = 24 * 1024 * 1024
 MAX_IMPORT_BYTES = 512 * 1024 * 1024
 MAX_PIXELS = 12_000_000
 PDF_DPI = 200
+MAX_PDF_BYTES = 2 * 1024**3
+MAX_PDF_PIXELS = 6_000_000
+MAX_PROJECT_BYTES = 8 * 1024**3
 # PDFium requires serialization even when threads use different documents.
 _PDF_LOCK = threading.Lock()
 
 
-def validate_archive(archive):
+def validate_archive(archive, max_bytes=MAX_IMPORT_BYTES):
     entries = archive.infolist()
-    if len(entries) > 5000 or sum(entry.file_size for entry in entries) > MAX_IMPORT_BYTES:
+    if len(entries) > 5000 or sum(entry.file_size for entry in entries) > max_bytes:
         raise ValueError("unsafeArchive")
     seen = set()
     for entry in entries:
@@ -54,11 +57,14 @@ def pdf_pages(path, dpi, first, last):
                 with closing(doc[number - 1]) as page:
                     width, height = page.get_size()
                     # PDFium reports page boxes as floats and rounds render dimensions upward.
-                    scale = dpi / 72 * (1 - 1e-7)
+                    if not (math.isfinite(width) and math.isfinite(height) and width > 0 and height > 0):
+                        raise ValueError("invalidDocument")
+                    scale = min(dpi / 72, math.sqrt(MAX_PDF_PIXELS / (width * height)),
+                                8191 / max(width, height)) * (1 - 1e-7)
                     if math.ceil(width * scale) * math.ceil(height * scale) > MAX_PIXELS:
                         raise ValueError("imageTooLarge")
                     with closing(page.render(scale=scale)) as bitmap:
-                        yield f"{path.stem}-{number:04}.png", png_bytes(bitmap.to_pil())
+                        yield f"{path.stem}-{number:04}.png", bitmap.to_pil().convert("RGB")
     except pdf.PdfiumError as error:
         raise ValueError("encryptedBook" if error.err_code == 4 else "invalidDocument") from error
 
