@@ -87,6 +87,8 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
     { section: 'features', id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#workbench',
       onPress: () => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) },
     },
+    { section: 'features', id: 'browser', label: t(SETTINGS_NAVIGATION.browser.label), icon: SETTINGS_NAVIGATION.browser.icon, path: settingsPath('browser'),
+      onPress: () => navigate(settingsPath('browser')) },
     { section: 'settings', id: 'settings', label: t('nav.settings'), icon: Settings, path: settingsPath(DEFAULT_SETTINGS_TAB),
       onPress: () => navigate(settingsPath(DEFAULT_SETTINGS_TAB)) },
   ]

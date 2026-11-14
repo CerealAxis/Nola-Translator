@@ -40,7 +40,9 @@ from .models.catalog import (
     SENSEVOICE_SMALL,
 )
 from .models.manager import ModelManager, ModelSpec
-from .models.ocr_catalog import COMIC_DETECTOR, COMIC_DETECTOR_ID
+from .models.ocr_catalog import (COMIC_DETECTOR, COMIC_DETECTOR_ID, RFDETR_SEG, RFDETR_SEG_ID,
+                                LAMA_ONNX, LAMA_ONNX_ID, LAMA_MANGA_ONNX, LAMA_MANGA_ONNX_ID,
+                                ANGLENET, ANGLENET_ID, COMIC_FONT_CLASSIFIER, COMIC_FONT_CLASSIFIER_ID, COMIC_YUZU_FONT, COMIC_YUZU_FONT_ID)
 from .models.inpaint_catalog import INPAINT_RESOURCE_ID, LAMA_MANGA
 from .models.ocr_catalog import OCR_RESOURCE_ID, PP_OCRV5_MOBILE, OCR_SPECS, OCR_LANGUAGES, OCR_NAMES
 from .models.crisp_catalog import (ADDITIONAL_TTS_NAMES, ADDITIONAL_TTS_SPECS, CRISP_ASR_SPECS,
@@ -264,14 +266,42 @@ RESOURCE_DEFINITIONS = _definitions() + tuple(
         tuple(normalize(code) for code in FLORES_LANGUAGES), spec.total_bytes,
     ) for spec in QWEN35_SPECS
 ) + tuple(ResourceDefinition(
-    spec.model_id, "ocrModel", "pp-ocrv5", OCR_NAMES[spec.model_id],
-    "PP-OCRv5 mobile multilingual OCR model.", OCR_LANGUAGES[spec.model_id], spec.total_bytes,
+    spec.model_id, "ocrModel",
+    ("manga-ocr" if spec.model_id == "manga-ocr-onnx" else
+     "baberu" if spec.model_id == "baberu-ocr-onnx" else
+     "pp-ocrv6" if spec.model_id == "pp-ocrv6-medium-onnx" else
+     "paddleocr-vl" if spec.model_id == "paddleocr-vl-1.6-onnx" else "pp-ocrv5"),
+    OCR_NAMES[spec.model_id],
+    ("Japanese manga text recognition. Model weights: Apache-2.0." if spec.model_id == "manga-ocr-onnx" else
+     "Baberu OCR multilingual manga recognition. Model weights: Apache-2.0." if spec.model_id == "baberu-ocr-onnx" else
+     "PP-OCRv6 medium recognition. Model weights: Apache-2.0." if spec.model_id == "pp-ocrv6-medium-onnx" else
+     "Experimental PaddleOCR-VL 1.6 ONNX vision-language recognition. Model weights: Apache-2.0." if spec.model_id == "paddleocr-vl-1.6-onnx" else
+     "PP-OCRv5 mobile multilingual OCR model. Model weights: Apache-2.0."),
+    OCR_LANGUAGES[spec.model_id], spec.total_bytes,
 ) for spec in OCR_SPECS.values()) + (ResourceDefinition(
     INPAINT_RESOURCE_ID, "inpaintModel", "lama", "LaMA Manga",
-    "Manga and anime image inpainting (local PyTorch).", (), LAMA_MANGA.total_bytes,
+    "Manga and anime image inpainting (local PyTorch). Model weights: Apache-2.0.", (), LAMA_MANGA.total_bytes,
 ), ResourceDefinition(
     COMIC_DETECTOR_ID, "detectModel", "rtdetr", "RT-DETR v2",
-    "Comic lettering detection (local ONNX Runtime).", (), COMIC_DETECTOR.total_bytes,
+    "Comic lettering detection (local ONNX Runtime). Model weights: Apache-2.0.", (), COMIC_DETECTOR.total_bytes,
+), ResourceDefinition(
+    RFDETR_SEG_ID, "detectModel", "rfdetr-seg", "Koharu Layout RF-DETR Seg 2XL",
+    "Optional manga layout segmentation; weights have academic, non-commercial restrictions (Manga109). Not downloaded automatically.", (), RFDETR_SEG.total_bytes,
+), ResourceDefinition(
+    LAMA_ONNX_ID, "inpaintModel", "lama-onnx", "LaMa (ONNX)",
+    "General-purpose image inpainting via OpenCV's ONNX model. Model weights: Apache-2.0.", (), LAMA_ONNX.total_bytes,
+), ResourceDefinition(
+    LAMA_MANGA_ONNX_ID, "inpaintModel", "lama-manga-onnx", "LaMa Manga (ONNX)",
+    "Manga-oriented image inpainting via ONNX Runtime. Model weights: Apache-2.0.", (), LAMA_MANGA_ONNX.total_bytes,
+), ResourceDefinition(
+    ANGLENET_ID, "detectModel", "anglenet", "AngleNet",
+    "Optional text angle estimation for comic typesetting. Model weights: Apache-2.0.", (), ANGLENET.total_bytes,
+), ResourceDefinition(
+    COMIC_FONT_CLASSIFIER_ID, "detectModel", "font-classifier", "Storia Font Classifier (ONNX)",
+    "Latin lettering font-family suggestions. Model weights: MIT.", (), COMIC_FONT_CLASSIFIER.total_bytes,
+), ResourceDefinition(
+    COMIC_YUZU_FONT_ID, "detectModel", "font-classifier", "YuzuMarker Font Detection (ONNX)",
+    "Manga font-family and lettering attribute recognition. Model weights: MIT.", (), COMIC_YUZU_FONT.total_bytes,
 ))
 RESOURCE_BY_ID = {item.resource_id: item for item in RESOURCE_DEFINITIONS}
 
@@ -446,7 +476,8 @@ class ResourceManager:
             cancellable=operation.cancellable if operation else False,
             errorCode=operation.error_code if operation else None,
         )
-        if resource_id in OCR_SPECS or resource_id in (INPAINT_RESOURCE_ID, COMIC_DETECTOR_ID):
+        if resource_id in OCR_SPECS or resource_id in (INPAINT_RESOURCE_ID, COMIC_DETECTOR_ID, RFDETR_SEG_ID,
+                LAMA_ONNX_ID, LAMA_MANGA_ONNX_ID, ANGLENET_ID, COMIC_FONT_CLASSIFIER_ID, COMIC_YUZU_FONT_ID):
             from .backend.screen_ocr import read_ocr_state
 
             state = read_ocr_state(self.model_root, resource_id)
@@ -464,7 +495,8 @@ class ResourceManager:
         download_source: str | None = None,
     ) -> ResourceRecord:
         self._definition(resource_id)
-        if resource_id in OCR_SPECS or resource_id in (INPAINT_RESOURCE_ID, COMIC_DETECTOR_ID):
+        if resource_id in OCR_SPECS or resource_id in (INPAINT_RESOURCE_ID, COMIC_DETECTOR_ID, RFDETR_SEG_ID,
+                LAMA_ONNX_ID, LAMA_MANGA_ONNX_ID, ANGLENET_ID, COMIC_FONT_CLASSIFIER_ID, COMIC_YUZU_FONT_ID):
             # The private backend owns OCR leases and operations across both processes.
             raise ResourceActionError("invalidConfiguration", {"reason": "ocrManagedByBackend"})
         if action == "cancel":
@@ -775,6 +807,12 @@ class ResourceManager:
             **OCR_SPECS,
             INPAINT_RESOURCE_ID: LAMA_MANGA,
             COMIC_DETECTOR_ID: COMIC_DETECTOR,
+            RFDETR_SEG_ID: RFDETR_SEG,
+            LAMA_ONNX_ID: LAMA_ONNX,
+            LAMA_MANGA_ONNX_ID: LAMA_MANGA_ONNX,
+            ANGLENET_ID: ANGLENET,
+            COMIC_FONT_CLASSIFIER_ID: COMIC_FONT_CLASSIFIER,
+            COMIC_YUZU_FONT_ID: COMIC_YUZU_FONT,
             OCR_RESOURCE_ID: PP_OCRV5_MOBILE,
             QWEN_RESOURCE_ID: QWEN3_ASR_1_7B_HF,
             QWEN_06B_RESOURCE_ID: QWEN3_ASR_0_6B_HF,

@@ -29,6 +29,8 @@ it('trusts only application entry documents, including queries and hash routes',
   expect(isTrustedRendererUrl('http://localhost:5173/workbench.html?theme=dark', directory, 'http://localhost:5173/')).toBe(true)
   expect(isTrustedRendererUrl('http://localhost:5173/screen.html?role=editor', directory, 'http://localhost:5173/')).toBe(true)
   expect(isTrustedRendererUrl('http://localhost:5173/?theme=dark', directory, 'http://localhost:5173/')).toBe(true)
+  expect(isTrustedRendererUrl('http://localhost:5173/comic-editor.html?projectId=123', directory, 'http://localhost:5173/')).toBe(true)
+  expect(isTrustedRendererUrl(pathToFileURL(join(directory, '../renderer/comic-editor.html')).href, directory)).toBe(true)
   expect(isTrustedRendererUrl('http://localhost:5173/other.html', directory, 'http://localhost:5173/')).toBe(false)
   expect(isTrustedRendererUrl('http://localhost:5174/', directory, 'http://localhost:5173/')).toBe(false)
 })

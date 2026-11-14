@@ -249,6 +249,7 @@ async function run() {
       results.push({ configuration, step, scene, cardGeometry, transitionMs: Date.now() - started })
     }
     await waitFor(window, `!document.querySelector('.onboarding-tour') && location.hash === '#/'`)
+    await waitFor(window, `document.activeElement?.dataset.onboarding === 'nav-home'`)
     assert.equal(settings.onboardingSeen, false)
     assert.equal(settings.onboardingCompletedVersion, 0)
     assert.equal(sideEffects, 0)

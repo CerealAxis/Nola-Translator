@@ -177,13 +177,43 @@ const api: NolaTranslatorApi = {
     },
   },
   comic: {
+    openEditor: request => invoke('comic:editor-open', request),
+    onEditorPageRequested: callback => {
+      const receive = (_event: Electron.IpcRendererEvent, pageId: string) => callback(pageId)
+      ipcRenderer.on('comic:editor-page-requested', receive)
+      return () => ipcRenderer.off('comic:editor-page-requested', receive)
+    },
+    onEditorCloseRequested: callback => {
+      const receive = (_event: Electron.IpcRendererEvent, token: string) => {
+        void Promise.resolve().then(callback).then(
+          () => ipcRenderer.send('comic:editor-close-result', { token, ok: true }),
+          () => ipcRenderer.send('comic:editor-close-result', { token, ok: false }),
+        )
+      }
+      ipcRenderer.on('comic:editor-close-requested', receive)
+      ipcRenderer.send('comic:editor-ready')
+      return () => ipcRenderer.off('comic:editor-close-requested', receive)
+    },
+    deleteProject: id => invoke('comic:delete', id),
+    restoreProject: id => invoke('comic:restore', id),
+    deleteProjects: ids => invoke('comic:delete-many', ids),
+    restoreProjects: ids => invoke('comic:restore-many', ids),
+    runtimeStatus: () => invoke('comic:runtime'),
+    purgeRuntime: () => invoke('comic:purge-runtime'),
+    listFonts: () => invoke('comic:fonts'),
+    importFonts: () => invoke('comic:import-fonts'),
+    fontPreview: family => invoke('comic:font-preview', family),
+    readFont: (family, weight = 400, italic = false) => invoke('comic:read-font', { family, weight, italic }),
+    layerImage: (projectId, pageId, kind, layerId, maxPixels) => invoke('comic:layer-image', { projectId, pageId, kind, layerId, ...(maxPixels === undefined ? {} : { maxPixels }) }),
+    previewRegion: (projectId, pageId, region) => invoke('comic:preview-region', { projectId, pageId, region }),
+    thumbnail: (projectId, pageId) => invoke('comic:thumbnail', { projectId, pageId }),
     listProjects: () => invoke('comic:list'),
     openProject: id => invoke('comic:open', id),
     importProject: request => invoke('comic:import', request),
     edit: request => invoke('comic:edit', request),
     run: request => invoke('comic:run', request),
     cancel: (projectId, jobId) => invoke('comic:cancel', { projectId, jobId }),
-    image: (projectId, pageId, kind) => invoke('comic:image', { projectId, pageId, kind }),
+    image: (projectId, pageId, kind, maxPixels) => invoke('comic:image', { projectId, pageId, kind, ...(maxPixels === undefined ? {} : { maxPixels }) }),
     exportProject: request => invoke('comic:export', request),
     onChanged: listener => {
       const receive = (_event: Electron.IpcRendererEvent, value: Parameters<typeof listener>[0]) => listener(value)

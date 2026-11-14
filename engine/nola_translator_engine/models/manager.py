@@ -665,7 +665,9 @@ class ModelManager:
             for entry in pending_files:
                 part = temp / f".{entry.path}.part"
                 self._verify_file(part, entry, lambda: progress(done, total))
-                os.replace(part, temp / entry.path)
+                destination = temp / entry.path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(part, destination)
 
             phase("install")
             target = self.model_path(spec)

@@ -12,6 +12,7 @@ export interface ColorPickerProps {
   presets: readonly string[]
   onChange: (value: string) => void
   container?: HTMLElement | null
+  inline?: boolean
 }
 
 interface Hsv { h: number; s: number; v: number }
@@ -42,7 +43,7 @@ function toHex({ h, s, v }: Hsv): string {
 }
 
 /** Retains hue for achromatic colours so moving through black or white does not reset the hue. */
-export function ColorPicker({ label, value, presets, onChange, container }: ColorPickerProps) {
+export function ColorPicker({ label, value, presets, onChange, container, inline = false }: ColorPickerProps) {
   const [hsv, setHsv] = useState(() => fromHex(value))
   const [draft, setDraft] = useState<string | null>(null)
   const emitted = useRef(value)
@@ -68,12 +69,7 @@ export function ColorPicker({ label, value, presets, onChange, container }: Colo
     if (bounds.width === 0 || bounds.height === 0) return
     change({ ...hsv, s: Math.max(0, Math.min(100, (event.clientX - bounds.left) / bounds.width * 100)), v: Math.max(0, Math.min(100, (1 - (event.clientY - bounds.top) / bounds.height) * 100)) })
   }
-  return <Popover.Root>
-    <Popover.Trigger render={<Button variant="secondary" />} className="nola-color-picker__trigger" aria-label={label}>
-      <span className="nola-color-picker__swatch" style={{ backgroundColor: value }} aria-hidden="true" /><ChevronDown aria-hidden="true" />
-    </Popover.Trigger>
-    <Popover.Portal container={container}><Popover.Positioner className="z-dropdown" sideOffset={8}><Popover.Popup className="nola-color-picker" aria-label={label} initialFocus={false}>
-      <Popover.Title className="sr-only">{label}</Popover.Title>
+  const controls = <>
       <div className="nola-color-picker__area" role="group" aria-label={label}
         style={{ '--picker-hue': `hsl(${hsv.h} 100% 50%)` } as CSSProperties}
         onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); move(event) }}
@@ -85,7 +81,7 @@ export function ColorPicker({ label, value, presets, onChange, container }: Colo
           <Slider.Control><Slider.Track><Slider.Thumb aria-label={`${label} · ${axis.toUpperCase()}`} aria-valuetext={`${Math.round(hsv[axis])}%`} /></Slider.Track></Slider.Control>
         </Slider.Root>)}
       </div>
-      <Slider.Root className="nola-color-picker__hue" value={hsv.h} min={0} max={360} step={1} onValueChange={h => change({ ...hsv, h })}>
+      <Slider.Root className="nola-color-picker__hue" orientation={inline ? 'vertical' : 'horizontal'} value={hsv.h} min={0} max={360} step={1} onValueChange={h => change({ ...hsv, h })}>
         <Slider.Control className="nola-color-picker__hue-control"><Slider.Track className="nola-color-picker__hue-track"><Slider.Thumb className="nola-color-picker__hue-thumb" aria-label={`${label} · H`} aria-valuetext={`${Math.round(hsv.h)}°`} /></Slider.Track></Slider.Control>
       </Slider.Root>
       <div className="nola-color-picker__presets" role="group" aria-label={label}>{presets.map(color => <Button key={color} variant="secondary" size="icon" className="nola-color-picker__preset" aria-label={`${label} ${color}`} aria-pressed={value.toUpperCase() === color.toUpperCase()} style={{ backgroundColor: color }} onClick={() => commitHex(color)}>{value.toUpperCase() === color.toUpperCase() ? <Check aria-hidden="true" style={{ color: fromHex(color).v > 60 ? '#000000' : '#FFFFFF' }} /> : null}</Button>)}</div>
@@ -94,6 +90,15 @@ export function ColorPicker({ label, value, presets, onChange, container }: Colo
         const parsed = parseHex(text)
         if (parsed) { commitHex(parsed); setDraft(text) }
       }} onBlur={() => setDraft(null)} />
+  </>
+  if (inline) return <div className="nola-color-picker nola-color-picker--inline" role="group" aria-label={label}>{controls}</div>
+  return <Popover.Root>
+    <Popover.Trigger render={<Button variant="secondary" />} className="nola-color-picker__trigger" aria-label={label}>
+      <span className="nola-color-picker__swatch" style={{ backgroundColor: value }} aria-hidden="true" /><ChevronDown aria-hidden="true" />
+    </Popover.Trigger>
+    <Popover.Portal container={container}><Popover.Positioner className="z-dropdown" sideOffset={8}><Popover.Popup className="nola-color-picker" aria-label={label} initialFocus={false}>
+      <Popover.Title className="sr-only">{label}</Popover.Title>
+      {controls}
     </Popover.Popup></Popover.Positioner></Popover.Portal>
   </Popover.Root>
 }

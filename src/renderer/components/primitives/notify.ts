@@ -51,7 +51,7 @@ function failureOptions(message: string, options: NotifyOptions): NotifyOptions 
 export function sessionConflictMessage(t: I18nContextValue['t'], cause: unknown): string {
   const owner = featureConflictOwner(cause)
   if (!owner) return t('gateway.realtimeSessionBusy')
-  const name = t(owner === 'meeting' ? 'meeting.title' : owner === 'screen-translation' ? 'screen.title' : owner === 'game-translation' ? 'suite.gameTitle' : owner === 'comic-translation' ? 'suite.comicTitle' : `gateway.${owner}`)
+  const name = t(owner === 'meeting' ? 'meeting.title' : owner === 'screen-translation' ? 'screen.title' : owner === 'game-translation' ? 'suite.gameTitle' : (owner === 'comic-translation' || owner === 'comic-editor') ? 'suite.comicTitle' : `gateway.${owner}`)
   return t('errors.serviceConflict', { running: name })
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { BookOpen } from 'lucide-react'
-import { ComposerMenu, ComposerMenuItem, ComposerModelItem, ComposerModelTrigger } from '@/components/assistant-ui/native/composer'
+import { Check } from 'lucide-react'
+import { ComposerMenuItem, ComposerModelTrigger } from '@/components/assistant-ui/native/composer'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getBridge } from '@/store'
 import { useI18n } from '@/i18n'
 import type { ComicProjectSummary } from '../../../shared/comic'
@@ -20,20 +21,12 @@ export function NativeComicSelector({ value, disabled, onChange }: { value: stri
     void list().then(value => { if (live) setBooks(value) }).catch(() => { if (live) setFailed(true) })
     return () => { live = false }
   }, [open, attempt])
-  useEffect(() => {
-    if (!open) return
-    const close = (event: PointerEvent) => { if (!(event.target instanceof Element) || !event.target.closest('[data-comic-selector]')) setOpen(false) }
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
-    document.addEventListener('pointerdown', close, true); document.addEventListener('keydown', escape)
-    return () => { document.removeEventListener('pointerdown', close, true); document.removeEventListener('keydown', escape) }
-  }, [open])
   const select = (projectId: string | null) => { onChange(projectId); setOpen(false) }
-  return <div data-comic-selector>
-    <ComposerModelTrigger data-menu-anchor="comic" model={value ? books?.find(book => book.id === value)?.title ?? t('suite.comicContext') : t('suite.noComicContext')} open={open} disabled={disabled && !value} aria-label={t('suite.comicContext')} onClick={() => setOpen(value => !value)} />
-    {open && <ComposerMenu open anchor="comic" className="max-h-80 overflow-y-auto">
-      <p className="px-2.5 py-2 text-xs text-muted-foreground"><BookOpen className="mr-1 inline size-3" aria-hidden="true" />{t('suite.comicContext')}</p>
-      <ComposerMenuItem active={!value} onClick={() => select(null)}>{t('suite.noComicContext')}</ComposerMenuItem>
-      {failed ? <ComposerMenuItem onClick={() => setAttempt(value => value + 1)}>{t('suite.retry')}</ComposerMenuItem> : !books ? <p className="px-2.5 py-2 text-sm text-muted-foreground">{t('common.loading')}</p> : !books.length ? <p className="px-2.5 py-2 text-sm text-muted-foreground">{t('suite.emptyBookshelf')}</p> : books.map(book => <ComposerModelItem key={book.id} entry={{ name: book.title, meta: t('suite.pages', { count: book.pageCount }) }} selected={value === book.id} disabled={disabled} onClick={() => select(book.id)} />)}
-    </ComposerMenu>}
-  </div>
+  return <Popover open={open} onOpenChange={setOpen}>
+    <PopoverTrigger render={<ComposerModelTrigger model={value ? books?.find(book => book.id === value)?.title ?? t('suite.comicContext') : t('suite.noComicContext')} open={open} disabled={disabled && !value} aria-label={t('suite.comicContext')} />} />
+    <PopoverContent side="top" align="start" className="max-h-80 max-w-[calc(100vw-1rem)] gap-0.5 overflow-y-auto p-1.5">
+      <ComposerMenuItem className="nola-menu-item data-[selected=true]:bg-[var(--accent-soft)] data-[selected=true]:text-primary" data-selected={!value || undefined} aria-pressed={!value} onClick={() => select(null)}><span className="flex-1 text-start">{t('suite.noComicContext')}</span>{!value && <Check className="size-3.5" aria-hidden="true" />}</ComposerMenuItem>
+      {failed ? <ComposerMenuItem className="nola-menu-item" onClick={() => setAttempt(value => value + 1)}>{t('suite.retry')}</ComposerMenuItem> : !books ? <p className="px-2.5 py-2 text-sm text-muted-foreground">{t('common.loading')}</p> : !books.length ? <p className="px-2.5 py-2 text-sm text-muted-foreground">{t('suite.emptyBookshelf')}</p> : books.map(book => <ComposerMenuItem className="nola-menu-item data-[selected=true]:bg-[var(--accent-soft)] data-[selected=true]:text-primary" data-selected={value === book.id || undefined} aria-pressed={value === book.id} key={book.id} disabled={disabled} onClick={() => select(book.id)}><span className="flex-1 text-start">{book.title}</span><span className="text-xs text-muted-foreground tabular-nums">{t('suite.pages', { count: book.pageCount })}</span>{value === book.id && <Check className="size-3.5" aria-hidden="true" />}</ComposerMenuItem>)}
+    </PopoverContent>
+  </Popover>
 }

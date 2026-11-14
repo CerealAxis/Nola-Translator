@@ -1,4 +1,4 @@
-"""PP-OCRv5 mobile ONNX artifacts, converted and published by RapidAI (Apache-2.0)."""
+"""Pinned OCR and comic detector artifacts; each model's license is independent of Lumina MIT."""
 
 from .manager import FileEntry, ModelSpec
 
@@ -16,6 +16,104 @@ OCR_REVISION = "d298462ac20a2e994f433151b5fe6cc1180e9a09"
 OCR_RESOURCE_ID = "pp-ocrv5-mobile-onnx"
 OCR_DETECTOR = "ch_PP-OCRv5_det_mobile.onnx"
 COMIC_DETECTOR_ID = "comic-rtdetr-onnx"
+MANGA_OCR_ID = "manga-ocr-onnx"
+BABERU_OCR_ID = "baberu-ocr-onnx"
+PPOCRV6_ID = "pp-ocrv6-medium-onnx"
+PADDLEOCR_VL_ID = "paddleocr-vl-1.6-onnx"
+RFDETR_SEG_ID = "comic-rfdetr-seg-onnx"
+LAMA_ONNX_ID = "comic-lama-onnx"
+LAMA_MANGA_ONNX_ID = "comic-lama-manga-onnx"
+ANGLENET_ID = "comic-anglenet-onnx"
+COMIC_FONT_CLASSIFIER_ID = "comic-font-classifier-onnx"
+COMIC_YUZU_FONT_ID = "comic-yuzu-font-onnx"
+MANGA_OCR = ModelSpec(
+    model_id=MANGA_OCR_ID, directory=MANGA_OCR_ID,
+    repo="mayocream/manga-ocr-onnx", revision="24b12778d85800835e2ca409236de281b8ab7b9f",
+    files=(
+        FileEntry("encoder_model.onnx", 343454249,
+                  "15fa8155fe9bc1a7d25d9bb353debaa4def033d0174e907dbd2dd6d995def85f"),
+        FileEntry("decoder_model.onnx", 117480262,
+                  "ef7765261e9d1cdc34d89356986c2bbc2a082897f753a89605ae80fdfa61f5e8"),
+        FileEntry("vocab.txt", 30216,
+                  "5cb5c5586d98a2f331d9f8828e4586479b0611bfba5d8c3b6dadffc84d6a36a3"),
+    ),
+)
+BABERU_OCR = ModelSpec(
+    model_id=BABERU_OCR_ID, directory=BABERU_OCR_ID,
+    repo="genshiai-daichi/baberu-ocr", revision="b9868433dbda3ed9ba1357d008599ff4ada873d5",
+    files=(
+        FileEntry("onnx/vision_int4.onnx", 52_293_486, "1967ecef502e4c1e1e7c512ea0a2e06396b39ded87a8a9cc77bd7db2e981a361"),
+        FileEntry("onnx/decoder_prefill_int8.onnx", 35_133_596, "187a59cb61d3870f1f97c9eb027eb34ff19d023fba801cda113a13870be0b724"),
+        FileEntry("onnx/decoder_step_int8.onnx", 34_715_466, "46640b0b3db77f0f0eef660bbe5dc9126a5e0fb49eb2786b2edba7b0371d9769"),
+        FileEntry("tokenizer/vocab.json", 130_761, blob_sha1="0c290fca124356dda12c46ee0280de38dd562acf"),
+    ),
+)
+PPOCRV6 = ModelSpec(
+    model_id=PPOCRV6_ID, directory=PPOCRV6_ID,
+    repo="PaddlePaddle/PP-OCRv6_medium_rec_onnx", revision="50c7eacafc52fa7bcf4194e8cd08e46f8558504b",
+    files=(
+        FileEntry("inference.onnx", 76_554_979, "9c09abf0957f7968c7586464b7397b84ad2387a0497a351af40e9acc71b673ba"),
+        FileEntry("inference.yml", 150_580, blob_sha1="c53a96fcd315a86cb4748d2746f3d90941e1c6d8"),
+    ),
+)
+PADDLEOCR_VL = ModelSpec(
+    model_id=PADDLEOCR_VL_ID, directory=PADDLEOCR_VL_ID,
+    repo="iaa2005/PaddleOCR-VL-1.6-ONNX", revision="869fb2eb047f49830805b32a0c53f3e370e5be7e",
+    files=(
+        FileEntry("onnx/vision_encoder_q8.onnx", 446_261_993, "d3c3721a65b2266d9102f0048b2c972f91746b07f46cb9e7b03f7f1e0aed7c8c"),
+        FileEntry("onnx/decoder_q8.onnx", 363_265_016, "bce4e3504082e8a7c3f718abb933004403b4af3f24074eaceb9952b168e1c022"),
+        FileEntry("onnx/embedding.onnx", 423_624_912, "a3cd4e685f455c9c634f1d62e4ead57eb2965de5cd6cd2b291407b61d5cfdd91"),
+        FileEntry("tokenizer.json", 11_189_060, "c8a215a59183d0d0781adc33bacd3ce6162716f7fd568fb30234a74d69803a7d"),
+        FileEntry("preprocessor_config.json", 641, blob_sha1="d873cd63d04d9e6243999759fc30f7752dab3222"),
+        FileEntry("config.json", 2_059, blob_sha1="c54711466ae75457f8e57b909a49dae570bfa5c5"),
+    ),
+)
+RFDETR_SEG = ModelSpec(
+    model_id=RFDETR_SEG_ID, directory=RFDETR_SEG_ID,
+    repo="Kiznavierr/koharu-layout-rfdetr-seg-2xl-1152-onnx-fp16",
+    revision="586b723a019e9370eefad169050609b03e0fe9a4",
+    files=(FileEntry("koharu-layout-rfdetr-seg-2xl-1152-fp16.onnx", 74_471_165,
+        "0d576a5722d72c6ac4fe96e6cb0df4e5c90197ffa9252d5167c7ec346dccd06e"),),
+)
+LAMA_ONNX = ModelSpec(
+    model_id=LAMA_ONNX_ID, directory=LAMA_ONNX_ID,
+    repo="opencv/inpainting_lama", revision="aee6d22f0a13e5e35af1c9a1c3afd62841fc6f3f",
+    files=(FileEntry("inpainting_lama_2025jan.onnx", 92_591_623,
+        "7df918ac3921d3daf0aae1d219776cf0dc4e4935f035af81841b40adcf74fdf2"),),
+)
+LAMA_MANGA_ONNX = ModelSpec(
+    model_id=LAMA_MANGA_ONNX_ID, directory=LAMA_MANGA_ONNX_ID,
+    repo="mayocream/lama-manga-onnx", revision="b55497aadbfcb9740e1ed16f008268d71b4f3f79",
+    files=(FileEntry("lama-manga.onnx", 207_482_644,
+        "4512adab295ee5a5e02ccd1bdf8d45dccbac88309d9cff1532ffd5de876f02a4"),),
+)
+ANGLENET = ModelSpec(
+    model_id=ANGLENET_ID, directory=ANGLENET_ID,
+    repo="Kellenok/anglenet", revision="e981a2b1925d649b5bb12b700c6c0d71f4c1f38a",
+    files=(FileEntry("anglenet_v0_1_distill_64x64.onnx", 2_102_682,
+        "5246cdbf819a16e7cc5da7841442609f7daba8a61ffa5c05b5323d95091a6c4d"),),
+)
+COMIC_FONT_CLASSIFIER = ModelSpec(
+    model_id=COMIC_FONT_CLASSIFIER_ID, directory=COMIC_FONT_CLASSIFIER_ID,
+    repo="storia/font-classify-onnx", revision="86a4e773157cfc4db41844742851385bd5e5d1ca",
+    files=(
+        FileEntry("model.onnx", 64_057_660,
+            "44aa3d46804aa55b7841a0eb6dcc9bb72badd6d01645e5c7448a70525655b7b6"),
+        FileEntry("model_config.yaml", 76_406,
+            "eb33dd3ed758879cf555923ae1c5af08f067995eee4ebd54d269cfb4ed905f79"),
+    ),
+)
+COMIC_YUZU_FONT = ModelSpec(
+    model_id=COMIC_YUZU_FONT_ID, directory=COMIC_YUZU_FONT_ID,
+    repo="ogkalu/yuzumarker-font-detection-onnx", revision="7f6d0bdd51140ddb9f08356519cc024c1452483a",
+    files=(
+        FileEntry("font-detector.onnx", 144_464_880,
+            "99dd351e94f06e31397113602ae000a24c1d38ad76275066e844a0c836f75d4f"),
+        FileEntry("font-labels-ex.json", 715_294,
+            "0662100cfd7654bc43a5449d868fd955060681a1648db95cbf27f5b19a4dd475",
+            repo="fffonion/yuzumarker-font-detection", revision="7484242bb840f39e27f10df8ade1f8a9a8fa8f53"),
+    ),
+)
 COMIC_DETECTOR = ModelSpec(
     model_id=COMIC_DETECTOR_ID, directory=COMIC_DETECTOR_ID,
     repo="ogkalu/comic-text-and-bubble-detector", revision="4269a0e53d40419f4746e8b3e30ae7faef3a26c6",
@@ -171,10 +269,24 @@ OCR_VARIANTS = tuple(
         modelscope_files=(OCR_FILES[0], FileEntry(f"{group}_PP-OCRv5_rec_mobile.onnx", size, digest)),
     ) for group, (size, digest) in OCR_VARIANT_FILES.items()
 )
-OCR_SPECS = {spec.model_id: spec for spec in (PP_OCRV5_MOBILE, *OCR_VARIANTS)}
+OCR_SPECS = {spec.model_id: spec for spec in (
+    PP_OCRV5_MOBILE, *OCR_VARIANTS, MANGA_OCR, BABERU_OCR, PPOCRV6, PADDLEOCR_VL
+)}
 OCR_LANGUAGES = {OCR_RESOURCE_ID: ("zh", "zh-Hant", "en", "ja", "ko"), **{
     spec.model_id: OCR_GROUP_LANGUAGES[group] for spec, group in zip(OCR_VARIANTS, OCR_VARIANT_FILES)
 }}
+OCR_LANGUAGES[MANGA_OCR_ID] = ("ja",)
+OCR_LANGUAGES.update({
+    BABERU_OCR_ID: ("ja", "zh", "zh-Hant", "ko", "en"),
+    PPOCRV6_ID: ("zh", "zh-Hant", "ja", "ko", "en"),
+    PADDLEOCR_VL_ID: ("zh", "zh-Hant", "ja", "ko", "en"),
+})
 OCR_NAMES = {OCR_RESOURCE_ID: "PP-OCRv5 mobile (CJK)", **{
     spec.model_id: f"PP-OCRv5 mobile · {OCR_GROUP_NAMES[group]}" for spec, group in zip(OCR_VARIANTS, OCR_VARIANT_FILES)
 }}
+OCR_NAMES[MANGA_OCR_ID] = "Manga OCR (Japanese)"
+OCR_NAMES.update({
+    BABERU_OCR_ID: "Baberu OCR (Apache-2.0)",
+    PPOCRV6_ID: "PP-OCRv6 Medium (Apache-2.0)",
+    PADDLEOCR_VL_ID: "PaddleOCR-VL 1.6 (experimental; Apache-2.0)",
+})

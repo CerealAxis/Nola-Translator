@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+import ctypes
 import json
 import math
 import os
@@ -19,7 +20,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.manager import ModelIntegrityError, ModelManager
 from ..models.ocr_catalog import (COMIC_DETECTOR, COMIC_DETECTOR_ID, OCR_DETECTOR, OCR_RECOGNIZERS,
-                                  PP_OCRV5_MOBILE, OCR_SPECS, OCR_LANGUAGES, OCR_RESOURCE_ID)
+                                  PP_OCRV5_MOBILE, OCR_SPECS, OCR_LANGUAGES, OCR_RESOURCE_ID, RFDETR_SEG_ID,
+                                  LAMA_ONNX_ID, LAMA_MANGA_ONNX_ID, ANGLENET_ID, COMIC_FONT_CLASSIFIER_ID, COMIC_YUZU_FONT_ID)
 from ..protocol import NetworkSettings, ResourceRecord
 from ..debug_log import exception_fields, write as write_diagnostic
 from .gateway.resources import ConcurrencyGate
@@ -28,6 +30,88 @@ MAX_IMAGE_BYTES = 12 * 1024 * 1024
 MAX_IMAGE_PIXELS = 12_000_000
 MAX_BLOCKS = 256
 STATE_FILE = ".screen-ocr-state.json"
+_DEVICE_PROVIDERS = {"cpu": "CPUExecutionProvider", "cuda": "CUDAExecutionProvider", "dml": "DmlExecutionProvider"}
+_nvml_lock = threading.Lock()
+_nvml_state: dict = {"initialized": False, "library": None, "device": None}
+
+
+class _NvmlMemoryInfo(ctypes.Structure):
+    _fields_ = [("total", ctypes.c_ulonglong), ("free", ctypes.c_ulonglong),
+                ("used", ctypes.c_ulonglong)]
+
+
+def comic_gpu_memory() -> dict[str, int | None]:
+    """Read dedicated VRAM via NVML without importing a GPU framework."""
+    result = {"gpuMemoryUsed": None, "gpuMemoryTotal": None}
+    import sys
+
+    with _nvml_lock:
+        if not _nvml_state["initialized"]:
+            _nvml_state["initialized"] = True
+            try:
+                if sys.platform == "win32":
+                    candidates = [Path(os.environ.get("WINDIR", "C:/Windows")) / "System32/nvml.dll"]
+                    program_files = os.environ.get("PROGRAMFILES")
+                    if program_files:
+                        candidates.append(Path(program_files) / "NVIDIA Corporation/NVSMI/nvml.dll")
+                    path = next((candidate for candidate in candidates if candidate.is_file()), None)
+                    if path is not None:
+                        library = ctypes.CDLL(str(path))
+                    else:
+                        library = None
+                elif sys.platform.startswith("linux"):
+                    library = ctypes.CDLL("libnvidia-ml.so.1")
+                else:
+                    library = None
+                if library is not None:
+                    library.nvmlInit_v2.argtypes = []
+                    library.nvmlInit_v2.restype = ctypes.c_uint
+                    library.nvmlDeviceGetHandleByIndex_v2.argtypes = [ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p)]
+                    library.nvmlDeviceGetHandleByIndex_v2.restype = ctypes.c_uint
+                    library.nvmlDeviceGetMemoryInfo.argtypes = [ctypes.c_void_p, ctypes.POINTER(_NvmlMemoryInfo)]
+                    library.nvmlDeviceGetMemoryInfo.restype = ctypes.c_uint
+                    handle = ctypes.c_void_p()
+                    if library.nvmlInit_v2() == 0 and library.nvmlDeviceGetHandleByIndex_v2(0, ctypes.byref(handle)) == 0:
+                        _nvml_state.update(library=library, device=handle)
+            except Exception:
+                _nvml_state.update(library=None, device=None)
+        library, device = _nvml_state["library"], _nvml_state["device"]
+        if library is None or device is None:
+            return result
+        try:
+            memory = _NvmlMemoryInfo()
+            if library.nvmlDeviceGetMemoryInfo(device, ctypes.byref(memory)) == 0:
+                result.update(gpuMemoryUsed=int(memory.used), gpuMemoryTotal=int(memory.total))
+        except Exception:
+            pass
+    return result
+
+
+def comic_execution_providers() -> list[str]:
+    """Available ONNX devices in preferred UI order; this never loads model weights."""
+    try:
+        import onnxruntime as ort
+        available = set(ort.get_available_providers())
+    except Exception:
+        return []
+    return [name for name in ("cpu", "cuda", "dml") if _DEVICE_PROVIDERS[name] in available]
+
+
+def _require_device_provider(provider: str) -> None:
+    if provider not in comic_execution_providers():
+        raise ValueError("runtimeUnavailable")
+
+
+def _effective_device(resource_id: str, provider: str) -> str:
+    if resource_id == ANGLENET_ID or resource_id == LAMA_ONNX_ID:
+        return "cpu"
+    if resource_id == "lama-manga" and provider != "cpu":
+        raise ValueError("runtimeUnavailable")
+    if resource_id == LAMA_MANGA_ONNX_ID and provider == "dml":
+        raise ValueError("runtimeUnavailable")
+    if resource_id == "paddleocr-vl-1.6-onnx" and provider == "dml":
+        raise ValueError("runtimeUnavailable")
+    return provider
 
 
 class OcrRequest(BaseModel):
@@ -228,12 +312,15 @@ class ScreenOcr:
         self.spec = spec or PP_OCRV5_MOBILE
         self.languages = OCR_LANGUAGES.get(self.spec.model_id, ())
         self._variants: dict[str, ScreenOcr] = {}
+        self._device_variants: dict[tuple[str, str], ScreenOcr] = {}
+        self.execution_provider = "cpu"
         self.models = manager or ModelManager(model_root)
         self.root = self.models.model_root
         # Only the OCR owner cleans its staging folders; listing models in the other
         # engine process must never remove a currently downloading OCR snapshot.
         self.models.cleanup_stale([self.spec])
         self._lock = asyncio.Lock()
+        self.lease = asyncio.Lock()
         self._inference_gate = ConcurrencyGate()
         self._session_lock = threading.Lock()
         self._cancel = threading.Event()
@@ -398,8 +485,22 @@ class ScreenOcr:
                 options.intra_op_num_threads = min(2, os.cpu_count() or 1)
                 options.inter_op_num_threads = 1
                 options.log_severity_level = 3
-                self._sessions[key] = ort.InferenceSession(key, options, providers=["CPUExecutionProvider"])
+                provider = self._session_provider(path)
+                _require_device_provider(provider)
+                if provider == "dml":
+                    options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+                    options.enable_mem_pattern = False
+                session = ort.InferenceSession(key, options, providers=[
+                    _DEVICE_PROVIDERS[provider], "CPUExecutionProvider"] if provider != "cpu"
+                    else ["CPUExecutionProvider"])
+                actual = set(session.get_providers())
+                if provider != "cpu" and _DEVICE_PROVIDERS[provider] not in actual:
+                    raise ValueError("runtimeUnavailable")
+                self._sessions[key] = session
         return self._sessions[key]
+
+    def _session_provider(self, path: Path) -> str:
+        return self.execution_provider
 
     @staticmethod
     def _recognize(crop, recognizer) -> tuple[str, float]:
@@ -524,6 +625,17 @@ class ScreenOcr:
             xs, ys = zip(*quad)
             x, y = math.floor(min(xs)), math.floor(min(ys))
             crop = image[y:math.ceil(max(ys)), x:math.ceil(max(xs))]
+            if crop.size:
+                from .lumina_ppocrv6.preprocess import split_lines
+                line_crops,_=split_lines(crop)
+                if len(line_crops)>1:
+                    recognized=[]
+                    for pixels in line_crops:
+                        height,width=pixels.shape[:2]
+                        line_quad=np.array([[0,0],[width-1,0],[width-1,height-1],[0,height-1]],np.float32)
+                        recognized.extend(self._recognize_quads(pixels,[line_quad],directory,language,5))
+                    if any(text.strip() and confidence>=.5 for text,confidence in recognized):
+                        return recognized
             lines = self._detect_quads(crop, directory) if crop.size else []
             offset = np.array([x, y], dtype=np.float32)
             lines = sorted((line + offset for line in lines),
@@ -567,7 +679,7 @@ class ScreenOcr:
 
     async def close(self) -> None:
         self._closed = True
-        await asyncio.gather(*(variant.close() for variant in self._variants.values()))
+        await asyncio.gather(*(variant.close() for variant in (*self._variants.values(), *self._device_variants.values())))
         await self.cancel_install()
         await self.release()
 
@@ -619,20 +731,226 @@ class ScreenOcr:
         if resource_id == self.spec.model_id:
             return self
         from ..models.inpaint_catalog import INPAINT_RESOURCE_ID
+        if resource_id in (LAMA_ONNX_ID, LAMA_MANGA_ONNX_ID):
+            if resource_id not in self._variants:
+                from .comic_inpaint import OnnxComicInpainter
+                self._variants[resource_id] = OnnxComicInpainter(self.root, manga=resource_id == LAMA_MANGA_ONNX_ID)
+            return self._variants[resource_id]
+        if resource_id == ANGLENET_ID:
+            if resource_id not in self._variants:
+                from .comic_angle import ComicAngleNet
+                self._variants[resource_id] = ComicAngleNet(self.root)
+            return self._variants[resource_id]
         if resource_id == INPAINT_RESOURCE_ID:
             if resource_id not in self._variants:
                 from .comic_inpaint import ComicInpainter
                 self._variants[resource_id] = ComicInpainter(self.root)
             return self._variants[resource_id]
+        if resource_id == 'manga-ocr-onnx':
+            if resource_id not in self._variants:
+                self._variants[resource_id] = MangaOcr(self.root, spec=OCR_SPECS[resource_id])
+            return self._variants[resource_id]
+        if resource_id == 'baberu-ocr-onnx':
+            if resource_id not in self._variants:
+                from .comic_ocr_providers import BaberuOcr
+                self._variants[resource_id] = BaberuOcr(self.root)
+            return self._variants[resource_id]
+        if resource_id == 'pp-ocrv6-medium-onnx':
+            if resource_id not in self._variants:
+                from .comic_ocr_providers import PPOcrV6
+                self._variants[resource_id] = PPOcrV6(self.root)
+            return self._variants[resource_id]
+        if resource_id == 'paddleocr-vl-1.6-onnx':
+            if resource_id not in self._variants:
+                from .comic_ocr_providers import PaddleOcrVl
+                self._variants[resource_id] = PaddleOcrVl(self.root)
+            return self._variants[resource_id]
+        if resource_id == COMIC_FONT_CLASSIFIER_ID:
+            if resource_id not in self._variants:
+                from .comic_font_match import ComicFontMatcher
+                self._variants[resource_id] = ComicFontMatcher(self.root)
+            return self._variants[resource_id]
+        if resource_id == COMIC_YUZU_FONT_ID:
+            if resource_id not in self._variants:
+                from .comic_font_match import YuzuComicFontMatcher
+                self._variants[resource_id] = YuzuComicFontMatcher(self.root)
+            return self._variants[resource_id]
         if resource_id == COMIC_DETECTOR_ID:
             if resource_id not in self._variants:
                 self._variants[resource_id] = ComicDetector(self.root, spec=COMIC_DETECTOR)
+            return self._variants[resource_id]
+        if resource_id == RFDETR_SEG_ID:
+            if resource_id not in self._variants:
+                from .comic_ocr_providers import RfDetrSeg
+                self._variants[resource_id] = RfDetrSeg(self.root)
             return self._variants[resource_id]
         if resource_id not in OCR_SPECS:
             raise HTTPException(422, detail="invalidModel")
         if resource_id not in self._variants:
             self._variants[resource_id] = ScreenOcr(self.root, spec=OCR_SPECS[resource_id])
         return self._variants[resource_id]
+
+    def device_variant(self, resource_id: str, provider: str = "cpu") -> ScreenOcr:
+        """Get a model instance pinned to one available ONNX execution provider."""
+        if provider not in _DEVICE_PROVIDERS:
+            raise ValueError("runtimeUnavailable")
+        provider = _effective_device(resource_id, provider)
+        _require_device_provider(provider)
+        base = self.variant(resource_id)
+        if provider == "cpu":
+            return base
+        key = (resource_id, provider)
+        cached = self._device_variants.get(key)
+        if cached is not None:
+            return cached
+
+        from .comic_angle import ComicAngleNet
+        from .comic_inpaint import ComicInpainter, OnnxComicInpainter
+        from .comic_font_match import ComicFontMatcher
+        from .comic_ocr_providers import BaberuOcr, PaddleOcrVl, PPOcrV6, RfDetrSeg
+
+        if isinstance(base, OnnxComicInpainter):
+            instance = OnnxComicInpainter(self.root, manga=base.manga)
+        elif isinstance(base, ComicAngleNet):
+            instance = ComicAngleNet(self.root)
+        elif isinstance(base, ComicInpainter):
+            instance = ComicInpainter(self.root, manager=self.models)
+        elif isinstance(base, MangaOcr):
+            instance = MangaOcr(self.root, spec=base.spec)
+        elif isinstance(base, ComicDetector):
+            instance = ComicDetector(self.root, spec=base.spec)
+        elif isinstance(base, ComicFontMatcher):
+            instance = ComicFontMatcher(self.root)
+        elif isinstance(base, (BaberuOcr, PPOcrV6, PaddleOcrVl, RfDetrSeg)):
+            instance = type(base)(self.root)
+        elif type(base) is ScreenOcr:
+            instance = ScreenOcr(self.root, manager=self.models, spec=base.spec)
+        else:
+            raise ValueError("invalidModel")
+        instance.execution_provider = provider
+        self._device_variants[key] = instance
+        return instance
+
+
+class MangaOcr(ScreenOcr):
+    """Vision-encoder/WordPiece-decoder OCR for complete Japanese comic paragraphs."""
+    def __init__(self, model_root, spec):
+        super().__init__(model_root, spec=spec)
+        self.lease = asyncio.Lock()
+        self.languages = ('ja',)
+
+    def _session_provider(self, path: Path) -> str:
+        return "cpu" if "decoder" in path.name else self.execution_provider
+
+    async def load(self):
+        if (self._closed or self._lock.locked() or self._inference_gate.active(self.spec.model_id)
+                or self._install and not self._install.done()):
+            raise ValueError('resourceBusy')
+        async with self._lock:
+            def weights():
+                directory = self._verify()
+                self._session(directory / 'encoder_model.onnx')
+                self._session(directory / 'decoder_model.onnx')
+            task = asyncio.create_task(asyncio.to_thread(weights))
+            try:
+                await asyncio.shield(task)
+                self._loaded = True
+            except BaseException:
+                try:
+                    await task
+                finally:
+                    self._loaded = False
+                    self._sessions.clear()
+                raise
+        return self.status()
+
+    def _paragraph(self, image, quads):
+        import cv2
+        import numpy as np
+        from PIL import Image
+
+        points = np.asarray([point for quad in quads for point in quad], dtype=np.float32)
+        left, top = np.maximum(0, np.floor(points.min(axis=0))).astype(int)
+        right, bottom = np.minimum([image.shape[1], image.shape[0]], np.ceil(points.max(axis=0))).astype(int)
+        if right <= left or bottom <= top:
+            return [('', 0.0)]
+        crop_pixels = image[top:bottom, left:right].copy()
+        polygon = np.zeros(crop_pixels.shape[:2], np.uint8)
+        cv2.fillPoly(polygon, [np.rint(np.asarray(quad) - [left,top]).astype(np.int32) for quad in quads], 255)
+        # The paragraph AABB can include neighbouring author/artwork between its columns.
+        crop_pixels[polygon == 0] = 255
+        crop = Image.fromarray(cv2.cvtColor(crop_pixels, cv2.COLOR_BGR2RGB))
+        crop = crop.convert('L').convert('RGB').resize((224, 224), Image.Resampling.BILINEAR)
+        pixels = ((np.asarray(crop, np.float32) / 255 - .5) / .5).transpose(2, 0, 1)[None]
+        directory = self._verify()
+        encoder = self._session(directory / 'encoder_model.onnx')
+        decoder = self._session(directory / 'decoder_model.onnx')
+        hidden = encoder.run(None, {encoder.get_inputs()[0].name: pixels})[0]
+        ids = [2]
+        for _ in range(300):
+            feed = {}
+            for entry in decoder.get_inputs():
+                if entry.name == 'input_ids':
+                    feed[entry.name] = np.asarray([ids], np.int64)
+                elif 'mask' in entry.name.lower():
+                    feed[entry.name] = np.ones((1, hidden.shape[1]), np.int64)
+                else:
+                    feed[entry.name] = hidden
+            token = int(np.asarray(decoder.run(None, feed)[0])[0, -1].argmax())
+            if token in (0, 3):
+                break
+            ids.append(token)
+        else:
+            raise ValueError('textTooLong')
+        vocab = (directory / 'vocab.txt').read_text(encoding='utf-8').splitlines()
+        text = ''.join(vocab[token] for token in ids[1:] if token < len(vocab)
+                       and vocab[token] not in {'[CLS]', '[SEP]', '[PAD]', '[MASK]', '[UNK]'}).replace('##', '')
+        # The decoder exposes no calibrated confidence; 1.0 only marks a completed decode.
+        return [(text, 1.0)]
+
+    async def recognize_comic(self, image, quads, language):
+        if language not in ('auto', 'ja'):
+            raise ValueError('unsupportedLanguage')
+        return await self._run_inference('ja', 1, False, self._paragraph, image, quads)
+
+    async def recognize_comic_box(self, image, quad, language, vertical):
+        return await self.recognize_comic(image, [quad], language)
+
+    def _detector(self):
+        for spec in (PP_OCRV5_MOBILE, *OCR_SPECS.values()):
+            if spec.model_id.startswith('pp-ocrv5-') and self.models.is_installed(spec):
+                return self.variant(spec.model_id)
+        raise ValueError('ocrUnavailable')
+
+    async def detect_comic(self, image):
+        detector = self._detector()
+        owned = not detector._loaded
+        try:
+            if owned:
+                await detector.load()
+            return await detector.detect_comic(image)
+        finally:
+            if owned:
+                await detector.release()
+
+    async def infer(self, request):
+        if request.language not in ('auto', 'ja'):
+            raise ValueError('unsupportedLanguage')
+        image = decode_image(request.image)
+        quads = await self.detect_comic(image)
+        def recognize():
+            blocks = []
+            for quad in quads:
+                text, confidence = self._paragraph(image, [quad])[0]
+                if text.strip():
+                    block = {'id': str(len(blocks)), 'text': text, 'confidence': confidence,
+                             'quad': quad.round(2).tolist()}
+                    if request.appearance:
+                        block['appearance'] = screen_text_appearance(image, block['quad'])
+                    blocks.append(block)
+            return {'blocks': blocks, 'width': image.shape[1], 'height': image.shape[0]}
+        return await self._run_inference(request.language, request.max_concurrency,
+                                         request.task_mode == 'realtime', recognize)
 
 
 class ComicDetector(ScreenOcr):
@@ -652,12 +970,14 @@ class ComicDetector(ScreenOcr):
             "images": tensor, "orig_target_sizes": np.array([[width, height]], dtype=np.int64),
         })
         quads = []
+        self.bubble_quads = []
         for label, box, score in zip(labels[0], boxes[0], scores[0]):
-            if label not in (1, 2) or not 0.3 <= score <= 1 or not np.isfinite(box).all():
+            if label not in (0, 1, 2) or not 0.3 <= score <= 1 or not np.isfinite(box).all():
                 continue
             left, top, right, bottom = np.clip(box, 0, [width, height, width, height]).tolist()
             if right - left >= 1 and bottom - top >= 1:
-                quads.append([[left, top], [right, top], [right, bottom], [left, bottom]])
+                quad = [[left, top], [right, top], [right, bottom], [left, bottom]]
+                (self.bubble_quads if label == 0 else quads).append(quad)
         return quads[:MAX_BLOCKS]
 
     async def infer(self, request: OcrRequest) -> dict:

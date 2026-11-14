@@ -115,6 +115,9 @@ async def test_real_preprocessing_detection_crop_and_ctc_without_model_download(
         def get_inputs(self):
             return [SimpleNamespace(name="image", shape=[None, 3, 48, None])]
 
+        def get_providers(self):
+            return ["CPUExecutionProvider"]
+
         def get_modelmeta(self):
             return SimpleNamespace(custom_metadata_map={"character": "A\nB"})
 
@@ -261,6 +264,124 @@ def test_multilingual_catalog_has_independently_verified_language_packs():
         assert spec.model_id in OCR_SPECS
 
 
+def test_comic_onnx_variants_resolve_to_their_native_services(tmp_path):
+    from nola_translator_engine.models.ocr_catalog import (
+        ANGLENET, LAMA_MANGA_ONNX, LAMA_ONNX,
+    )
+    from nola_translator_engine.backend.comic_angle import ComicAngleNet
+    from nola_translator_engine.backend.comic_inpaint import OnnxComicInpainter
+
+    service = screen_ocr.ScreenOcr(tmp_path)
+    ordinary = service.variant(LAMA_ONNX.model_id)
+    manga = service.variant(LAMA_MANGA_ONNX.model_id)
+    angle = service.variant(ANGLENET.model_id)
+    assert isinstance(ordinary, OnnxComicInpainter) and ordinary.manga is False
+    assert isinstance(manga, OnnxComicInpainter) and manga.manga is True
+    assert isinstance(angle, ComicAngleNet)
+    assert {ordinary.spec.model_id, manga.spec.model_id, angle.spec.model_id} == {
+        LAMA_ONNX.model_id, LAMA_MANGA_ONNX.model_id, ANGLENET.model_id,
+    }
+
+
+def test_comic_font_classifier_is_a_managed_variant_not_a_general_ocr_model(tmp_path):
+    from nola_translator_engine.backend.comic_font_match import ComicFontMatcher
+    from nola_translator_engine.models.ocr_catalog import COMIC_FONT_CLASSIFIER_ID, OCR_SPECS
+
+    service = screen_ocr.ScreenOcr(tmp_path)
+    matcher = service.variant(COMIC_FONT_CLASSIFIER_ID)
+    assert isinstance(matcher, ComicFontMatcher)
+    assert matcher is service.variant(COMIC_FONT_CLASSIFIER_ID)
+    assert matcher.spec.model_id == COMIC_FONT_CLASSIFIER_ID
+    assert COMIC_FONT_CLASSIFIER_ID not in OCR_SPECS
+
+
+def test_comic_execution_provider_sessions_are_isolated_and_dml_is_bounded(tmp_path, monkeypatch):
+    import onnxruntime as ort
+    from types import SimpleNamespace
+
+    created = []
+    class Options:
+        def __init__(self):
+            self.intra_op_num_threads = self.inter_op_num_threads = self.log_severity_level = None
+            self.execution_mode = None
+            self.enable_mem_pattern = True
+    monkeypatch.setattr(ort, "get_available_providers", lambda: [
+        "CPUExecutionProvider", "CUDAExecutionProvider", "DmlExecutionProvider"])
+    monkeypatch.setattr(ort, "SessionOptions", Options)
+    monkeypatch.setattr(ort, "ExecutionMode", SimpleNamespace(ORT_SEQUENTIAL="sequential"))
+    class Session:
+        def __init__(self, path, options, providers):
+            created.append((path, options, providers))
+        def get_providers(self):
+            return ["DmlExecutionProvider", "CPUExecutionProvider"]
+    monkeypatch.setattr(ort, "InferenceSession", Session)
+
+    service = screen_ocr.ScreenOcr(tmp_path)
+    base = service.device_variant("pp-ocrv5-mobile-onnx", "cpu")
+    dml = service.device_variant("pp-ocrv5-mobile-onnx", "dml")
+    assert base is service.variant("pp-ocrv5-mobile-onnx")
+    assert dml is service.device_variant("pp-ocrv5-mobile-onnx", "dml")
+    assert dml is not base and dml.lease is not base.lease and dml._lock is not base._lock
+    dml._session(tmp_path / "dml.onnx")
+    _, options, providers = created[0]
+    assert providers == ["DmlExecutionProvider", "CPUExecutionProvider"]
+    assert options.execution_mode == "sequential" and options.enable_mem_pattern is False
+
+
+def test_comic_device_rejects_silent_cpu_fallback(tmp_path, monkeypatch):
+    import onnxruntime as ort
+
+    class Options:
+        def __init__(self):
+            self.intra_op_num_threads = self.inter_op_num_threads = self.log_severity_level = None
+    class Session:
+        def get_providers(self):
+            return ["CPUExecutionProvider"]
+    monkeypatch.setattr(ort, "get_available_providers", lambda: ["CPUExecutionProvider", "CUDAExecutionProvider"])
+    monkeypatch.setattr(ort, "SessionOptions", Options)
+    monkeypatch.setattr(ort, "InferenceSession", lambda *args, **kwargs: Session())
+    service = screen_ocr.ScreenOcr(tmp_path)
+    cuda = service.device_variant("pp-ocrv5-mobile-onnx", "cuda")
+    with pytest.raises(ValueError, match="runtimeUnavailable"):
+        cuda._session(tmp_path / "silent-fallback.onnx")
+    assert not cuda._sessions
+
+
+def test_paddle_vl_runtime_rejects_silent_cpu_fallback(tmp_path, monkeypatch):
+    import onnxruntime as ort
+    from nola_translator_engine.backend.lumina_paddleocr_vl.runtime import create_session
+
+    class Options:
+        def __init__(self):
+            self.intra_op_num_threads = self.inter_op_num_threads = self.log_severity_level = None
+    class Session:
+        def get_providers(self):
+            return ["CPUExecutionProvider"]
+    monkeypatch.setattr(ort, "get_available_providers", lambda: ["CPUExecutionProvider", "CUDAExecutionProvider"])
+    monkeypatch.setattr(ort, "SessionOptions", Options)
+    monkeypatch.setattr(ort, "InferenceSession", lambda *args, **kwargs: Session())
+    with pytest.raises(ValueError, match="runtimeUnavailable"):
+        create_session(tmp_path / "paddle.onnx", prefer="cuda")
+
+
+def test_comic_device_unavailable_and_cpu_only_models_are_reported_correctly(tmp_path, monkeypatch):
+    import onnxruntime as ort
+    monkeypatch.setattr(ort, "get_available_providers", lambda: ["CPUExecutionProvider"])
+    service = screen_ocr.ScreenOcr(tmp_path)
+    assert screen_ocr.comic_execution_providers() == ["cpu"]
+    angle = service.device_variant("comic-anglenet-onnx", "cuda")
+    assert angle.execution_provider == "cpu"
+    with pytest.raises(ValueError, match="runtimeUnavailable"):
+        service.device_variant("pp-ocrv5-mobile-onnx", "cuda")
+    with pytest.raises(ValueError, match="runtimeUnavailable"):
+        service.device_variant("paddleocr-vl-1.6-onnx", "dml")
+
+
+def test_comic_gpu_memory_is_null_without_nvml(tmp_path, monkeypatch):
+    monkeypatch.setattr(screen_ocr, "_nvml_state", {"initialized": True, "library": None, "device": None})
+    assert screen_ocr.comic_gpu_memory() == {"gpuMemoryUsed": None, "gpuMemoryTotal": None}
+
+
 async def test_language_pack_uses_its_own_weights_and_rejects_unsupported_languages(tmp_path, monkeypatch):
     from nola_translator_engine.models.ocr_catalog import OCR_SPECS
 
@@ -374,3 +495,51 @@ async def test_offline_ocr_runs_concurrently_and_release_waits_for_every_native_
     assert len(await asyncio.gather(*tasks)) == 3
     await closing
     assert not service._loaded
+
+
+def test_manga_ocr_decodes_complete_paragraph_without_rotating_vertical_crop(tmp_path):
+    from types import SimpleNamespace
+    from nola_translator_engine.backend.screen_ocr import MangaOcr
+    import numpy as np
+    (tmp_path / 'vocab.txt').write_text('[PAD]\n[UNK]\n[CLS]\n[SEP]\nhello\n##world', encoding='utf-8')
+    class Encoder:
+        def get_inputs(self):
+            return [SimpleNamespace(name='pixel_values')]
+        def run(self, _, feed):
+            assert feed['pixel_values'].shape == (1,3,224,224)
+            assert np.isfinite(feed['pixel_values']).all()
+            assert np.all(feed['pixel_values'] == 1), 'outside paragraph polygons leaked into encoder'
+            return [np.zeros((1,4,8), np.float32)]
+    class Decoder:
+        never_stop = False
+        def get_inputs(self):
+            return [SimpleNamespace(name=name) for name in ('input_ids','encoder_hidden_states','encoder_attention_mask')]
+        def run(self, _, feed):
+            ids = feed['input_ids'][0]
+            token = 4 if self.never_stop else [4,5,3][len(ids)-1]
+            result = np.zeros((1,len(ids),6), np.float32)
+            result[0,-1,token] = 1
+            assert feed['encoder_attention_mask'].shape == (1,4)
+            return [result]
+    ocr = object.__new__(MangaOcr)
+    ocr._verify = lambda: tmp_path
+    ocr._session = lambda path: Encoder() if 'encoder' in path.name else Decoder()
+    image = np.full((200,100,3), 255, np.uint8)
+    assert ocr._paragraph(image, [[[0,0],[100,0],[100,200],[0,200]]]) == [('helloworld', 1.0)]
+    image[:,41:60] = 0
+    assert ocr._paragraph(image, [[[0,0],[40,0],[40,200],[0,200]],
+                                 [[61,0],[100,0],[100,200],[61,200]]]) == [('helloworld', 1.0)]
+    image[:] = 255
+    Decoder.never_stop = True
+    with pytest.raises(ValueError, match='textTooLong'):
+        ocr._paragraph(image, [[[0,0],[100,0],[100,200],[0,200]]])
+
+
+@pytest.mark.asyncio
+async def test_manga_ocr_rejects_unsupported_language_before_loading_models():
+    from nola_translator_engine.backend.screen_ocr import MangaOcr, OcrRequest
+    ocr = object.__new__(MangaOcr)
+    with pytest.raises(ValueError, match='unsupportedLanguage'):
+        await ocr.recognize_comic(None, [], 'en')
+    with pytest.raises(ValueError, match='unsupportedLanguage'):
+        await ocr.infer(OcrRequest(image='data:image/png;base64,AAAA', language='ko'))

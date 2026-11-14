@@ -24,6 +24,8 @@ export interface TitleBarProps {
   actions?: ReactNode
   leading?: ReactNode
   helpItems?: TitleBarHelpItem[]
+  /** Independent editors inherit preferences from the main application. */
+  preferences?: boolean
   className?: string
 }
 
@@ -32,7 +34,7 @@ const MENU_POPUP_CLASS = 'z-dropdown min-w-40 rounded-nola-ui-xl bg-overlay p-1 
 const MENU_ITEM_CLASS = 'nola-menu-item flex cursor-pointer items-center justify-between gap-3 rounded-nola-ui-md px-3 py-2 text-sm'
 const TOOLTIP_CLASS = 'z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
 
-export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status, timer, actions, leading, helpItems, className = '' }: TitleBarProps) {
+export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status, timer, actions, leading, helpItems, preferences = true, className = '' }: TitleBarProps) {
   const { t, uiLanguage, setLanguage } = useI18n()
   const { navigate } = useRoute()
   const { resolved, setTheme } = useNolaTheme()
@@ -85,7 +87,7 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
       {variant === 'session' ? <div className="nola-no-drag flex min-w-0 items-center gap-3">{leading}{sessionTitle}{status}{timer}</div> : leading}
       <div className={`nola-titlebar-tools nola-no-drag${windowsShell ? ' nola-titlebar-tools--windows' : ''}`}>
         {actions}
-        <Menu.Root>
+        {preferences && <><Menu.Root>
           <Menu.Trigger render={<Button variant="secondary" size="icon" className="nola-titlebar-icon" aria-label={t('titleBar.language')}>
             <Languages aria-hidden="true" />
           </Button>} />
@@ -112,7 +114,7 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
               theme={dark ? 'dark' : 'light'} onThemeChange={setTheme} reduceMotion={reduceMotion} />
           } />
           <TooltipContent sideOffset={3} className={TOOLTIP_CLASS}>{themeLabel}</TooltipContent>
-        </Tooltip>
+        </Tooltip></>}
         {help.length > 0 && <Menu.Root>
           <Menu.Trigger render={<Button variant="secondary" size="icon" className="nola-titlebar-icon" aria-label={t('titleBar.helpMenu')}>
             <CircleHelp aria-hidden="true" />

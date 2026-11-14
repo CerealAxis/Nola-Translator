@@ -10,11 +10,13 @@ it('shows the application sidebar outside settings', () => {
   const { result } = renderHook(useApplicationNavigation)
   expect(result.current.map(item => item.id)).toEqual([
     'home', 'models', 'model-gateway', 'workspace', 'meeting', 'screen-translation',
-    'game-translation', 'comic-translation', 'workbench', 'settings',
+    'game-translation', 'comic-translation', 'workbench', 'browser', 'settings',
   ])
   expect(result.current.filter(item => item.section === 'features').map(item => item.id)).toEqual([
-    'workspace', 'meeting', 'screen-translation', 'game-translation', 'comic-translation', 'workbench',
+    'workspace', 'meeting', 'screen-translation', 'game-translation', 'comic-translation', 'workbench', 'browser',
   ])
+  result.current.find(item => item.id === 'browser')?.onPress?.()
+  expect(route.navigate).toHaveBeenLastCalledWith('#/settings/browser')
   const settings = result.current.find(item => item.id === 'settings')
   settings?.onPress?.()
   expect(route.navigate).toHaveBeenCalledWith('#/settings/general')

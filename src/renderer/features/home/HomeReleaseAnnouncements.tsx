@@ -10,32 +10,32 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { notifyError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
-import { getBridge } from '@/store'
+import { actions, getBridge } from '@/store'
 import type { ReleaseAnnouncement } from '../../../shared/app-updates'
 import { ReleaseNotesMarkdown } from '../settings/AppUpdateNotice'
 import { HomeListRow } from './HomeListRow'
 
 const copyByLanguage = {
   'zh-CN': {
-    heading: '版本动态', open: '打开公告', announcement: '更新公告', github: '在 GitHub 查看', empty: '暂无版本公告。',
+    heading: '版本动态', open: '打开公告', announcement: '更新公告', github: '在 GitHub 查看', empty: '暂无版本公告。', replay: '再次查看教程',
   },
   'zh-TW': {
-    heading: '版本動態', open: '開啟公告', announcement: '更新公告', github: '在 GitHub 查看', empty: '暫無版本公告。',
+    heading: '版本動態', open: '開啟公告', announcement: '更新公告', github: '在 GitHub 查看', empty: '暫無版本公告。', replay: '再次查看教學',
   },
   'zh-HK': {
-    heading: '版本動態', open: '開啟公告', announcement: '更新公告', github: '在 GitHub 查看', empty: '暫無版本公告。',
+    heading: '版本動態', open: '開啟公告', announcement: '更新公告', github: '在 GitHub 查看', empty: '暫無版本公告。', replay: '再次查看教學',
   },
   en: {
     heading: 'Release notes', open: 'Open announcement', announcement: 'Release notes',
-    github: 'View on GitHub', empty: 'No release announcements yet.',
+    github: 'View on GitHub', empty: 'No release announcements yet.', replay: 'View tutorial again',
   },
   ja: {
     heading: 'リリース情報', open: '更新情報を開く', announcement: 'リリースノート',
-    github: 'GitHub で表示', empty: 'リリースのお知らせはありません。',
+    github: 'GitHub で表示', empty: 'リリースのお知らせはありません。', replay: 'ガイドをもう一度見る',
   },
   ko: {
     heading: '릴리스 소식', open: '공지 열기', announcement: '릴리스 노트',
-    github: 'GitHub에서 보기', empty: '릴리스 공지가 없습니다.',
+    github: 'GitHub에서 보기', empty: '릴리스 공지가 없습니다.', replay: '튜토리얼 다시 보기',
   },
 }
 
@@ -45,7 +45,7 @@ type ReleaseFeed =
 
 function HomeReleaseRow({ release }: { release: ReleaseAnnouncement }) {
   const { language, t } = useI18n()
-  const { open, announcement, github } = copyByLanguage[language]
+  const { open, announcement, github, replay } = copyByLanguage[language]
   const [opening, setOpening] = useState(false)
   const date = new Intl.DateTimeFormat(language, { dateStyle: 'medium' }).format(new Date(release.publishedAt))
   const published = <time dateTime={release.publishedAt}>{date}</time>
@@ -90,6 +90,7 @@ function HomeReleaseRow({ release }: { release: ReleaseAnnouncement }) {
             : <p className="nola-body">{t('appUpdate.notesUnavailable')}</p>}
         </div>
         <DialogFooter className="app-update-dialog-footer">
+          <DialogClose render={<Button variant="outline" size="sm" onClick={() => actions.settings.startOnboarding('welcome')}>{replay}</Button>} />
           <DialogClose render={<Button variant="outline" size="sm">{t('common.close')}</Button>} />
           <Button size="sm" disabled={opening} onClick={() => void openOnGitHub()}>
             {github}<ArrowRight data-icon="inline-end" aria-hidden="true" />

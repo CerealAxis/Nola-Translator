@@ -167,7 +167,7 @@ export function ScreenTranslationPage() {
     </Select></Field>
   )
   return <div className="screen-page" data-slot="screen-page">
-    <PageHeader title={t('screen.title')} warning={t('suite.experimentalUnavailable')} actions={<div className="screen-page__actions">
+    <PageHeader title={t('screen.title')} warning={t('suite.experimentalInDevelopment')} actions={<div className="screen-page__actions">
       {canStop && <Button variant="outline" disabled={busy || !api} onClick={() => void run({ action: 'showToolbar' })}>{t('suite.showToolbar')}</Button>}
       <Button variant={canStop ? 'destructive' : 'default'}
         disabled={busy || !api || !canStop && incompatible}

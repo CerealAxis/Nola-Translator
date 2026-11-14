@@ -56,7 +56,7 @@ export class NolaTray {
         ] : []),
       ] : []),
       { type: 'separator' },
-      ...((activity.activities?.length ? activity.activities : activity.owner ? [{ owner: activity.owner, phase: activity.phase }] : []).map(item => ({ label: `${t[item.owner]} · ${t[item.phase === 'idle' ? 'stopped' : item.phase]}`, enabled: false }))),
+      ...((activity.activities?.length ? activity.activities : activity.owner ? [{ owner: activity.owner, phase: activity.phase }] : []).map(item => ({ label: `${t[item.owner === 'comic-editor' ? 'comic-translation' : item.owner]} · ${t[item.phase === 'idle' ? 'stopped' : item.phase]}`, enabled: false }))),
       ...(!activity.owner ? [{ label: t.trayIdle, enabled: false }] : []),
       { label: t.trayStop, enabled: !!activity.owner && activity.phase !== 'stopping', click: () => { void this.options.stop().catch(error => console.error('tray stop failed', error)) } },
       { type: 'separator' },

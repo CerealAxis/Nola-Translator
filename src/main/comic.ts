@@ -1,13 +1,17 @@
-import { dialog, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
+import { dialog, ipcMain, nativeImage, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { open, rename, rm } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { basename, parse } from 'node:path'
+import { cpus, freemem, totalmem } from 'node:os'
 import { z } from 'zod'
-import { comicImportSchema, comicMutationSchema, comicRunSchema, comicExportSchema,
+import { comicImportSchema, comicMutationSchema, comicRunSchema, comicExportSchema, comicRegionSchema,
+  type ComicFont, type ComicRuntimeStatus,
   type ComicProject, type ComicRunRequest, type ComicProjectSummary } from '../shared/comic'
 import type { GlossaryDocument } from '../shared/glossary'
 import { isTrustedRendererUrl } from './window-options'
 import type { FeatureActivity, FeatureLease } from './feature-activity'
+import { exportComicPsd, rgbaFromBgra } from './comic-psd'
+import fontkit from '@pdf-lib/fontkit'
 
 interface ComicConnection { baseUrl: string; authorizationHeader(): Record<string, string> }
 export interface ComicTranslationOptions {
@@ -16,11 +20,16 @@ export interface ComicTranslationOptions {
   prepareRun(request: ComicRunRequest, project: ComicProject): Promise<{ model: string; headers: Record<string, string>; ocrResourceId?: string; release?: () => void | Promise<void> }>
   glossary?(): Promise<GlossaryDocument>
   getMainWindow(): BrowserWindow | null
+  isEditorSender?(event: IpcMainInvokeEvent, projectId?: string): boolean
   publish(event: { projectId: string }): void
   activity?: FeatureActivity
 }
 
+const maxPixelsSchema = z.number().int().min(10_000).max(4_000_000).optional()
 const projectIdSchema = z.string().uuid()
+const editorGlobalChannels = new Set(['comic:runtime', 'comic:fonts', 'comic:font-preview', 'comic:read-font', 'comic:import-fonts'])
+const editorProjectChannels = new Set(['comic:open', 'comic:layer-image', 'comic:preview-region', 'comic:thumbnail',
+  'comic:edit', 'comic:run', 'comic:cancel', 'comic:image', 'comic:export'])
 export class ComicTranslation {
   private readonly channels: string[] = []
   private readonly leases = new Map<string, { projectId: string; release: () => void | Promise<void> }>()
@@ -29,6 +38,8 @@ export class ComicTranslation {
   private stopping?: Promise<void>
   private featureLease?: FeatureLease
   private pendingStarts = 0
+  private readonly thumbnails = new Map<string, string>()
+  private cpuSample?: { idle: number; total: number }
   private draining?: Promise<void>
   constructor(private readonly options: ComicTranslationOptions) {
     const handle = (channel: string, action: (raw: unknown) => unknown) => {
@@ -36,12 +47,104 @@ export class ComicTranslation {
       ipcMain.handle(channel, (event: IpcMainInvokeEvent, raw: unknown) => {
         if (this.stopping) throw new Error('comicUnavailable')
         const main = this.options.getMainWindow()
-        if (!main || event.sender !== main.webContents || event.senderFrame !== event.sender.mainFrame || !isTrustedRendererUrl(event.senderFrame.url, this.options.mainDir)) throw new Error('Access denied')
+        if (event.senderFrame !== event.sender.mainFrame) throw new Error('Access denied')
+        const mainSender = !!main && event.sender === main.webContents && isTrustedRendererUrl(event.senderFrame.url, this.options.mainDir)
+        if (!mainSender) {
+          const target = channel === 'comic:open' ? raw : raw && typeof raw === 'object' && 'projectId' in raw ? raw.projectId : undefined
+          const editorSender = editorGlobalChannels.has(channel)
+            ? this.options.isEditorSender?.(event)
+            : editorProjectChannels.has(channel) && typeof target === 'string' && this.options.isEditorSender?.(event, target)
+          if (!editorSender) throw new Error('Access denied')
+          if (channel === 'comic:edit') {
+            const { command } = comicMutationSchema.parse(raw)
+            if (['configure', 'rename', 'addChapter'].includes(command.action)) throw new Error('Access denied')
+          }
+        }
         return action(raw)
       })
     }
     handle('comic:list', () => this.listProjects())
+    handle('comic:runtime', async () => {
+      const status = await this.request<Pick<ComicRuntimeStatus, 'availableProviders' | 'activeModels' | 'gpuMemoryUsed' | 'gpuMemoryTotal'>>('/runtime')
+      const sample = cpus().reduce((sum, cpu) => ({ idle: sum.idle + cpu.times.idle,
+        total: sum.total + Object.values(cpu.times).reduce((total, time) => total + time, 0) }), { idle: 0, total: 0 })
+      const elapsed = this.cpuSample ? sample.total - this.cpuSample.total : 0
+      const cpuPercent = elapsed > 0 ? Math.max(0, Math.min(100, 100 * (1 - (sample.idle - this.cpuSample!.idle) / elapsed))) : null
+      this.cpuSample = sample
+      const memoryTotal = totalmem()
+      return { ...status, cpuPercent, memoryTotal, memoryUsed: memoryTotal - freemem() } satisfies ComicRuntimeStatus
+    })
+    handle('comic:purge-runtime', async () => { await this.request('/runtime/purge', {}) })
+    handle('comic:fonts', () => this.request<ComicFont[]>('/fonts'))
+    handle('comic:font-preview', async raw => {
+      const family = z.string().trim().min(1).max(200).parse(raw)
+      const response = await this.fetch(`/fonts/preview?${new URLSearchParams({ family })}`)
+      if (response.status === 204) return null
+      const data = Buffer.from(await response.arrayBuffer())
+      const { width, height } = nativeImage.createFromBuffer(data).getSize()
+      if (!width || !height) throw new Error('invalidFont')
+      return { image: `data:image/png;base64,${data.toString('base64')}`, width, height }
+    })
+    handle('comic:import-fonts', async () => {
+      const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'],
+        filters: [{ name: 'Fonts', extensions: ['ttf', 'otf', 'ttc'] }] })
+      if (result.canceled || !result.filePaths.length) return this.request<ComicFont[]>('/fonts')
+      return this.request<ComicFont[]>('/fonts/import', { paths: result.filePaths })
+    })
+    handle('comic:read-font', async raw => {
+      const input = z.object({ family: z.string().trim().min(1).max(200), weight: z.number().int().min(100).max(900).default(400),
+        italic: z.boolean().default(false) }).strict().parse(typeof raw === 'string' ? { family: raw } : raw)
+      const query = new URLSearchParams({ family: input.family, weight: String(input.weight), italic: String(input.italic) })
+      const response = await this.fetch(`/fonts/file?${query}`)
+      const data = Buffer.from(await response.arrayBuffer())
+      if (data.length > 32 * 1024 * 1024) throw new Error('invalidFont')
+      return `data:font/otf;base64,${data.toString('base64')}`
+    })
+    handle('comic:layer-image', async raw => {
+      const input = z.object({ projectId: projectIdSchema, pageId: projectIdSchema,
+        kind: z.enum(['repair', 'drawing', 'text']), layerId: projectIdSchema, maxPixels: maxPixelsSchema }).strict().parse(raw)
+      const response = await this.fetch(`/projects/${input.projectId}/pages/${input.pageId}/layers/${input.kind}/${input.layerId}${input.maxPixels === undefined ? '' : `?max_pixels=${input.maxPixels}`}`)
+      return `data:image/png;base64,${Buffer.from(await response.arrayBuffer()).toString('base64')}`
+    })
+    handle('comic:thumbnail', async raw => {
+      const input = z.object({ projectId: projectIdSchema, pageId: projectIdSchema }).strict().parse(raw)
+      const key = `${input.projectId}/${input.pageId}`
+      const cached = this.thumbnails.get(key)
+      if (cached) return cached
+      const response = await this.fetch(`/projects/${input.projectId}/pages/${input.pageId}/source?max_pixels=40000`)
+      const data = `data:image/png;base64,${Buffer.from(await response.arrayBuffer()).toString('base64')}`
+      this.thumbnails.set(key, data)
+      if (this.thumbnails.size > 100) this.thumbnails.delete(this.thumbnails.keys().next().value!)
+      return data
+    })
+    handle('comic:preview-region', raw => {
+      const input = z.object({ projectId: projectIdSchema, pageId: projectIdSchema, region: comicRegionSchema }).strict().parse(raw)
+      return this.request(`/projects/${input.projectId}/pages/${input.pageId}/preview-region`, { region: input.region })
+    })
     handle('comic:open', raw => this.openProject(projectIdSchema.parse(raw)))
+    handle('comic:delete', async raw => {
+      const id = projectIdSchema.parse(raw)
+      await this.request(`/projects/${id}/delete`, {})
+      for (const key of this.thumbnails.keys()) if (key.startsWith(`${id}/`)) this.thumbnails.delete(key)
+      this.options.publish({ projectId: id })
+    })
+    handle('comic:restore', async raw => {
+      const id = projectIdSchema.parse(raw)
+      await this.request(`/projects/${id}/restore`, {})
+      this.options.publish({ projectId: id })
+    })
+    const batchIds = z.array(projectIdSchema).min(1).max(1000).refine(ids => new Set(ids).size === ids.length)
+    handle('comic:delete-many', async raw => {
+      const projectIds = batchIds.parse(raw)
+      await this.request('/projects/batch/delete', { projectIds })
+      for (const key of this.thumbnails.keys()) if (projectIds.some(id => key.startsWith(`${id}/`))) this.thumbnails.delete(key)
+      projectIds.forEach(id => this.options.publish({ projectId: id }))
+    })
+    handle('comic:restore-many', async raw => {
+      const projectIds = batchIds.parse(raw)
+      await this.request('/projects/batch/restore', { projectIds })
+      projectIds.forEach(id => this.options.publish({ projectId: id }))
+    })
     handle('comic:import', async raw => {
       const input = comicImportSchema.parse(raw)
       const formats = { images: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tif', 'tiff'],
@@ -69,8 +172,8 @@ export class ComicTranslation {
       return this.request<ComicProject>(`/projects/${input.projectId}/jobs/${input.jobId}/cancel`, {})
     })
     handle('comic:image', async raw => {
-      const input = z.object({ projectId: projectIdSchema, pageId: projectIdSchema, kind: z.enum(['source', 'clean', 'rendered']) }).strict().parse(raw)
-      const response = await this.fetch(`/projects/${input.projectId}/pages/${input.pageId}/${input.kind}`)
+      const input = z.object({ projectId: projectIdSchema, pageId: projectIdSchema, kind: z.enum(['source', 'clean', 'rendered']), maxPixels: maxPixelsSchema }).strict().parse(raw)
+      const response = await this.fetch(`/projects/${input.projectId}/pages/${input.pageId}/${input.kind}${input.maxPixels === undefined ? '' : `?max_pixels=${input.maxPixels}`}`)
       return `data:image/png;base64,${Buffer.from(await response.arrayBuffer()).toString('base64')}`
     })
     handle('comic:export', async raw => {
@@ -81,11 +184,58 @@ export class ComicTranslation {
         await this.request(`/projects/${input.projectId}/export-directory`, { directory: result.filePaths[0], pageIds: input.pageIds, layer: input.layer })
         return true
       }
-      const extension = input.kind === 'project' ? 'nola-comic' : ['images', 'labelplus'].includes(input.kind) ? 'zip' : input.kind
-      const result = await dialog.showSaveDialog({ defaultPath: `comic.${extension}`, filters: [{ name: 'Comic', extensions: [extension] }] })
+      const project = await this.openProject(input.projectId)
+      const pages = input.pageIds ? input.pageIds.map(id => project.pages.find(page => page.id === id)!) : project.pages
+      if (!pages.length || pages.some(page => !page) || new Set(pages.map(page => page.id)).size !== pages.length) throw new Error('pageNotFound')
+      const extension = input.kind === 'project' ? 'nola-comic' : ['images', 'labelplus'].includes(input.kind)
+        || input.kind === 'jpg' && pages.length > 1 ? 'zip' : input.kind
+      const safeTitle = project.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 100).replace(/[. ]+$/, '') || 'comic'
+      const result = await dialog.showSaveDialog({ defaultPath: `${safeTitle}.${extension}`, filters: [{ name: 'Comic', extensions: [extension] }] })
       if (result.canceled || !result.filePath) return false
       const { projectId, ...body } = input
-      const response = await this.fetch(`/projects/${projectId}/export`, body)
+      let response: Response
+      if (input.kind === 'psd') {
+        if (pages.some(page => !page.hasRendered)) throw new Error('pageNotRendered')
+        const decode = async (path: string) => {
+          const reply = await this.fetch(path)
+          const image = nativeImage.createFromBuffer(Buffer.from(await reply.arrayBuffer()))
+          if (image.isEmpty()) throw new Error('comicImageUnavailable')
+          const size = image.getSize()
+          if (size.width * size.height > 40_000_000) throw new Error('exportTooLarge')
+          return { ...size, data: rgbaFromBgra(image.toBitmap()),
+            ...(reply.headers.has('x-font-size') ? { fontSize: Number(reply.headers.get('x-font-size')) } : {}),
+            ...(reply.headers.has('x-text-base64') ? { text: Buffer.from(reply.headers.get('x-text-base64')!, 'base64').toString('utf8') } : {}) }
+        }
+        const fonts = new Map<string, string>()
+        const bytes = await exportComicPsd(project, pages, {
+          image: (pageId, kind) => decode(`/projects/${projectId}/pages/${pageId}/${kind}`),
+          layer: (pageId, kind, layerId) => decode(`/projects/${projectId}/pages/${pageId}/layers/${kind}/${layerId}`),
+          font: async region => {
+            const style = region.style
+            const family = style.fontFamily ?? 'Noto Sans SC'
+            const query = new URLSearchParams({ family, weight: String(style.fontWeight ?? 400), italic: String(style.fontStyle === 'italic') })
+            const key = query.toString()
+            const cached = fonts.get(key)
+            if (cached) return cached
+            const reply = await this.fetch(`/fonts/file?${query}`)
+            const metadata = fontkit.create(new Uint8Array(await reply.arrayBuffer()))
+            let name = metadata.postscriptName || family
+            const variable = metadata as typeof metadata & { variationAxes?: { wght?: { default: number } }; namedVariations?: Record<string, { wght: number }> }
+            const weightAxis = variable.variationAxes?.wght
+            if (weightAxis) {
+              const variations = Object.entries(variable.namedVariations ?? {})
+              const base = variations.find(([, axes]) => axes.wght === weightAxis.default)
+              const closest = variations.filter(([, axes]) => typeof axes.wght === 'number')
+                .sort((a, b) => Math.abs(a[1].wght - (style.fontWeight ?? 400)) - Math.abs(b[1].wght - (style.fontWeight ?? 400)))[0]
+              if (base && closest && name.endsWith(`-${base[0]}`)) name = name.slice(0, -base[0].length) + closest[0]
+            }
+            fonts.set(key, name)
+            return name
+          },
+        })
+        if ((await this.openProject(projectId)).revision !== project.revision) throw new Error('conflict')
+        response = new Response(new Uint8Array(bytes))
+      } else response = await this.fetch(`/projects/${projectId}/export`, body)
       if (!response.body) throw new Error('exportFailed')
       const temporary = `${result.filePath}.${randomUUID()}.tmp`
       try {

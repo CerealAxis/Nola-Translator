@@ -79,6 +79,7 @@ src/
     game-hook.ts              双位数 Hook 辅助进程与文本线程
     game-overlay.ts           游戏独立浮动字幕
     comic.ts                  漫画 IPC、工程及任务生命周期
+    comic-editor.ts           漫画编辑窗口生命周期与保存握手
     comic-reader.ts           工作台漫画只读工具
     glossary-store.ts         桌面术语库与原子保存
     desktop-data.ts           桌面数据登记、快照备份与恢复
@@ -90,6 +91,7 @@ src/
 
   preload/                   contextBridge
   shared/                    类型、Zod、默认值与协议
+    window-titles.ts          多语言窗口名称
 
   renderer/
     application.tsx          页面及导航注册
@@ -129,6 +131,8 @@ src/
 
     workbench.html           工作台独立入口
     workbench-entry.tsx
+    comic-editor.html         漫画翻译编辑器独立入口
+    comic-editor-entry.tsx
     latency.html             延迟检测独立入口
     latency-entry.tsx
     screen.html              屏幕翻译独立入口

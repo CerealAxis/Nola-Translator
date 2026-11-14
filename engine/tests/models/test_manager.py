@@ -40,6 +40,16 @@ def test_file_entry_allows_nested_snapshot_paths() -> None:
     assert FileEntry("a/b", 1, "0" * 64).path == "a/b"
 
 
+def test_model_manager_installs_nested_snapshot_paths(tmp_path: Path) -> None:
+    payload = b"nested model file"
+    spec = ModelSpec(
+        model_id="nested-test", directory="nested-test", repo="test/nested",
+        revision="pinned-test-revision", files=(_entry("onnx/model.onnx", payload),),
+    )
+    target = ModelManager(tmp_path, _fetcher({spec.url_for(spec.files[0]): payload})).ensure(spec)
+    assert (target / "onnx" / "model.onnx").read_bytes() == payload
+
+
 def _snapshot_spec() -> tuple[ModelSpec, dict[str, bytes]]:
     payloads = {
         "config.json": b'{"model_type": "qwen3_asr"}',

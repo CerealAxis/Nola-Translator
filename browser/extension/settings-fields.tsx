@@ -27,7 +27,7 @@ export function ColorField({ label, value, onChange }: { label: string; value: s
   return <Field className="nola-color-field"><FieldLabel>{label}</FieldLabel><ColorPicker label={label} value={value} presets={[]} onChange={onChange} container={container} /><div ref={containerRef} className="nola-portal-container" /></Field>
 }
 
-export const subtitleFontOptions = (value: string, t: ReturnType<typeof browserText>) => [...new Set(['system-ui', 'sans-serif', 'serif', 'monospace', value])].map(font => ({ value: font, label: font === 'system-ui' ? t('systemFont') : font }))
+export const subtitleFontOptions = (value: string, t: ReturnType<typeof browserText>) => [...new Set(['system-ui', 'sans-serif', 'serif', 'monospace', value])].map(font => ({ value: font, label: font === 'system-ui' ? t('systemFont') : font, previewFont: ['system-ui', 'sans-serif', 'serif', 'monospace'].includes(font) ? font : JSON.stringify(font) }))
 
 export function usePreferences(): [Preferences, UiLanguage, ReturnType<typeof browserText>] {
   const [settings, setSettings] = useState(DEFAULT_PREFERENCES)

@@ -5,6 +5,7 @@ import nolaAvatarUrl from '@/assets/nola-avatar.png'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { ResizableHandle } from '@/components/ui/resizable'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader,
   SidebarInset, SidebarMenu, SidebarMenuItem, SidebarProvider, SidebarTrigger,
@@ -45,7 +46,7 @@ export function AppShell({ children, navigation, title, className = '' }: AppShe
   return (
     <div className={`nola-app-shell ${className}`}>
       <FeatureActivityNotice />
-      <SidebarProvider className="nola-shell-layout" defaultOpen={!compact}>
+      <SidebarProvider className="nola-shell-layout" defaultOpen={!compact} storageKey="nola-sidebar-width">
         <Sidebar variant="inset" className="nola-sidebar">
           <SidebarHeader>
             <SidebarMenu>
@@ -90,6 +91,7 @@ export function AppShell({ children, navigation, title, className = '' }: AppShe
             </SidebarMenu>
           </SidebarFooter>
         </Sidebar>
+        <ResizableHandle className="nola-sidebar-resizer nola-no-drag" aria-label={t('shellUi.resizeSidebar')} />
         <SidebarInset className="nola-shell-content">
           <TitleBar brand={false} leading={
             <div className="nola-shell-heading">

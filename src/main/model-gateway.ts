@@ -253,6 +253,28 @@ export class ModelGateway {
     } }
   }
 
+  /** Comic jobs load an installed OCR variant in Python, independently of the realtime selection. */
+  async acquireComicOcr(onStop: () => Promise<void>): Promise<{ resourceId: string; release(error?: unknown): void }> {
+    const version = this.stopVersion
+    if (this.externalStopping || this.stopping && this.state !== 'stopped') throw new Error('ocrNotReady')
+    const resources = await this.options.listResources()
+    const resource = resources.find(item => item.installed && item.kind === 'ocrModel' && item.resourceId === 'pp-ocrv5-mobile-ch-onnx')
+      ?? resources.find(item => item.installed && item.kind === 'ocrModel' && item.provider === 'pp-ocrv5')
+    if (!resource) throw new Error('ocrMissing')
+    if (version !== this.stopVersion) throw new Error('ocrNotReady')
+    const binding = `resource:${resource.resourceId}`
+    const request = this.begin('ocr', binding)
+    let complete!: () => void
+    let cancelling: Promise<void> | undefined
+    const done = new Promise<void>(resolve => { complete = resolve })
+    this.externalMt.set(request.id, { binding, done, cancel: () => cancelling ??= Promise.resolve().then(onStop) })
+    return { resourceId: resource.resourceId, release: error => {
+      if (!this.externalMt.delete(request.id)) return
+      this.finish(request, error ?? (cancelling ? new Error('Cancelled') : undefined), !!cancelling)
+      complete()
+    } }
+  }
+
   async infer(request: DirectModelRequest, signal: AbortSignal, inspect = false): Promise<DirectModelResult> {
     const kind = request.kind as WorkerKind
     const binding = normalizeModelBinding(kind, request.model)

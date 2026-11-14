@@ -1,7 +1,7 @@
-export type ActiveFeature = 'workbench' | 'interpretation' | 'browser-captions' | 'meeting' | 'screen-translation' | 'game-translation' | 'comic-translation' | 'model-gateway'
+export type ActiveFeature = 'comic-editor' | 'workbench' | 'interpretation' | 'browser-captions' | 'meeting' | 'screen-translation' | 'game-translation' | 'comic-translation' | 'model-gateway'
 export function featureConflictOwner(error: unknown): ActiveFeature | undefined {
   const message = error instanceof Error ? error.message : String(error)
-  return /FEATURE_CONFLICT:(workbench|interpretation|browser-captions|meeting|screen-translation|game-translation|comic-translation|model-gateway)/.exec(message)?.[1] as ActiveFeature | undefined
+  return /FEATURE_CONFLICT:(comic-editor|workbench|interpretation|browser-captions|meeting|screen-translation|game-translation|comic-translation|model-gateway)/.exec(message)?.[1] as ActiveFeature | undefined
 }
 export interface FeatureActivitySnapshot {
   owner: ActiveFeature | null

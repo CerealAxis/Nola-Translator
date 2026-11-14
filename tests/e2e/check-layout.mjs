@@ -303,7 +303,7 @@ contextBridge.exposeInMainWorld('layoutFixture', { emit,
 
 // Two rAFs only cover paint; the stub's async bridge calls need wall-clock time on top.
 async function settle(window) {
-  if (process.argv.includes('--translation-suite') || process.argv.includes('--settings-navigation') || process.argv.includes('--meeting-stage') || process.argv.includes('--meeting-settings') || process.argv.includes('--screen-page')) {
+  if (process.argv.includes('--sidebar-resize') || process.argv.includes('--translation-suite') || process.argv.includes('--settings-navigation') || process.argv.includes('--meeting-stage') || process.argv.includes('--meeting-settings') || process.argv.includes('--screen-page')) {
     // Hidden windows throttle animation frames; state and computed layout are asserted below.
     await window.webContents.executeJavaScript('document.fonts.ready.then(() => true)')
     if (process.argv.includes('--meeting-settings') || process.argv.includes('--screen-page')) await window.webContents.executeJavaScript('new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))')
@@ -411,6 +411,94 @@ async function main() {
       }
     })
   })()`)
+
+  if (process.argv.includes('--sidebar-resize')) {
+    const sidebarSnapshot = () => window.webContents.executeJavaScript(`(() => {
+      const sidebar = document.querySelector('.nola-sidebar'), route = document.querySelector('.nola-route-content');
+      const icon = document.querySelector('[data-slot="sidebar-trigger"] svg');
+      return { width: sidebar?.getBoundingClientRect().width, state: sidebar?.dataset.state,
+        alignment: route && icon ? icon.getBoundingClientRect().left - route.getBoundingClientRect().left - parseFloat(getComputedStyle(route).paddingLeft) : null,
+        overflow: [...document.querySelectorAll('.nola-shell-content, .nola-main, .nola-route-content')].filter(el => el.scrollWidth > el.clientWidth + 2).map(el => ({ name: el.className, width: el.clientWidth, scroll: el.scrollWidth })),
+        saved: localStorage.getItem('nola-sidebar-width'), crashed: [...document.querySelectorAll('.nola-main button')].some(button => ['重新载入界面', 'Reload the window'].includes(button.textContent?.trim())) };
+    })()`)
+    const verify = async (context, width) => {
+      const state = await sidebarSnapshot(); scenarios++;
+      if (Math.abs(state.width - width) > 2) fail(context, 'sidebar width mismatch', state);
+      if (state.overflow.length || state.crashed) fail(context, 'page overflow or crash after resizing', state);
+      if (state.alignment === null || Math.abs(state.alignment) > 1.5) fail(context, 'titlebar icon does not align with page content', state);
+    }
+    const dragTo = async width => {
+      const handle = await window.webContents.executeJavaScript(`(() => { const r = document.querySelector('.nola-sidebar-resizer').getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
+      window.webContents.sendInputEvent({ type: 'mouseMove', ...handle });
+      window.webContents.sendInputEvent({ type: 'mouseDown', ...handle, button: 'left', clickCount: 1 });
+      for (let step = 1; step <= 12; step++) {
+        window.webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(handle.x + (width - handle.x) * step / 12), y: handle.y, modifiers: ['leftButtonDown'] });
+        await delay(12);
+      }
+      await delay(80);
+      window.webContents.sendInputEvent({ type: 'mouseUp', x: width, y: handle.y, button: 'left', clickCount: 1 });
+      await delay(150);
+    }
+    window.setContentSize(1360, 900);
+    await goto(window, '#/', 'home');
+    await verify({ phase: 'initial' }, 272);
+    await dragTo(248);
+    await verify({ phase: 'drag' }, 248);
+    const saved = await sidebarSnapshot(); scenarios++;
+    if (Math.abs(Number(saved.saved) - 248) > 2) fail({ phase: 'persist' }, 'expanded pixel width not saved', saved);
+    await dragTo(160);
+    await verify({ phase: 'automatic-collapse' }, 56);
+    const collapsed = await sidebarSnapshot(); scenarios++;
+    if (collapsed.state !== 'collapsed') fail({ phase: 'automatic-collapse' }, 'navigation labels were not collapsed', collapsed);
+    await clickAt(window, '[data-slot="sidebar-trigger"]'); await delay(100);
+    const restored = await sidebarSnapshot(); scenarios++;
+    if (restored.width < 208 || restored.width > 320) fail({ phase: 'restore' }, 'toggle did not restore an expanded width', restored);
+    await dragTo(248);
+    const beforeReload = await sidebarSnapshot();
+    await new Promise(done => { window.webContents.once('did-finish-load', done); window.reload() }); await settle(window);
+    await verify({ phase: 'reload' }, beforeReload.width);
+    await window.webContents.executeJavaScript(`document.querySelector('.nola-sidebar-resizer').focus()`);
+    window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
+    window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' }); await delay(100);
+    await verify({ phase: 'keyboard-collapse' }, 56);
+    await dragTo(500);
+    await verify({ phase: 'maximum-clamp' }, 320);
+    await dragTo(190);
+    await verify({ phase: 'minimum-clamp' }, 208);
+    await dragTo(160);
+    await verify({ phase: 'minimum-collapse' }, 56);
+    const suite = [...PAGES, { name: 'model-gateway', hash: '#/model-gateway' },
+      { name: 'game-translation', hash: '#/game-translation' }, { name: 'comic-translation', hash: '#/comic-translation' },
+      { name: 'comic-editor', page: 'comic-translation', hash: '#/comic-translation/' + suiteId },
+      { name: 'comic-reader', page: 'comic-translation', hash: '#/comic-translation/' + suiteId + '/reader' }];
+    for (const theme of ['light', 'dark']) {
+      await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({ theme: ${JSON.stringify(theme)}, appearance: { reduceMotion: true } })`);
+      for (const size of [208, 320, 56]) {
+        await goto(window, '#/', 'home');
+        await dragTo(size === 56 ? 160 : size);
+        for (const target of suite) {
+          const context = { theme, size, page: target.name };
+          if (!await goto(window, target.hash, target.page ?? target.name)) fail(context, 'route did not render');
+          await verify(context, size);
+        }
+        await goto(window, '#/', 'home');
+        await window.webContents.executeJavaScript('new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))');
+        await writeFile(resolve(output, `sidebar-${theme}-${size}.png`), (await window.webContents.capturePage()).toPNG());
+      }
+    }
+    for (const width of [640, 768]) {
+      window.setContentSize(width, 900); await settle(window);
+      if (width === 640) {
+        await dragTo(248); await verify({ phase: 'narrow-manual-expand' }, 248);
+        await clickAt(window, '[data-slot="sidebar-trigger"]'); await delay(100);
+      }
+      for (const target of suite) { await goto(window, target.hash, target.page ?? target.name); await verify({ phase: 'narrow', width, page: target.name }, 56); }
+    }
+    window.setContentSize(1536, 900); window.webContents.setZoomFactor(2); await settle(window);
+    for (const target of suite) { await goto(window, target.hash, target.page ?? target.name); await verify({ phase: 'zoom200', page: target.name }, 56); }
+    await writeFile(resolve(output, 'sidebar-results.json'), JSON.stringify({ scenarios, failures }, null, 2));
+    console.log(JSON.stringify({ scenarios, failures }, null, 2)); app.exit(failures.length ? 1 : 0); return;
+  }
 
   if (process.argv.includes('--desktop-data')) {
     for (const language of ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko']) for (const theme of ['light', 'dark']) for (const width of [760, 1180]) {

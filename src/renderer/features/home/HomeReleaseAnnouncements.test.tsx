@@ -35,3 +35,14 @@ it('opens the selected release with its complete bilingual Markdown and GitHub l
   fireEvent.click(dialog.getByRole('button', { name: '在 GitHub 查看' }))
   await waitFor(() => expect(openReleasePage).toHaveBeenCalledWith(secondUrl))
 })
+
+it('starts the tutorial again from the release announcement', async () => {
+  vi.spyOn(store, 'getBridge').mockReturnValue({ app: { listRecentReleases: async () => [
+    { tag: 'v1', publishedAt: '2026-11-02T09:00:00Z', notes: 'Notes', url: 'https://github.com/example/release' },
+  ] } } as unknown as NolaBridge)
+  const start = vi.spyOn(store.actions.settings, 'startOnboarding').mockReturnValue(true)
+  render(<HomeReleaseAnnouncements />)
+  fireEvent.click(await screen.findByRole('button', { name: '打开公告 v1' }))
+  fireEvent.click(await screen.findByRole('button', { name: '再次查看教程' }))
+  expect(start).toHaveBeenCalledWith('welcome')
+})

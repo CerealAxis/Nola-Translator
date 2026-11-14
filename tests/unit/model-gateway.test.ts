@@ -14,6 +14,26 @@ import { createGatewayWorker, GatewayWorkerError, type GatewayWorker, type Gatew
 import type { createGatewayLanguageModel } from '../../src/main/gateway-language-model'
 
 const gateways: ModelGateway[] = []
+
+it('leases installed comic OCR without starting or changing the realtime gateway', async () => {
+  const test = await fixture()
+  test.resources.push({ resourceId: 'pp-ocrv5-mobile-ch-onnx', kind: 'ocrModel', provider: 'pp-ocrv5',
+    name: 'PP OCR', installed: true } as ResourceRecord)
+  const lease = await test.gateway.acquireComicOcr(async () => { lease.release() })
+  expect(lease.resourceId).toBe('pp-ocrv5-mobile-ch-onnx')
+  expect(test.gateway.resourceInUse(lease.resourceId)).toBe(true)
+  expect(test.gateway.snapshot().state).toBe('stopped')
+  expect(test.workers).toHaveLength(0)
+  await test.gateway.stop()
+  expect(test.gateway.resourceInUse(lease.resourceId)).toBe(false)
+})
+
+it('does not download missing comic OCR or lease an unrelated recognizer', async () => {
+  const test = await fixture()
+  test.resources.push({ resourceId: 'manga-ocr-onnx', kind: 'ocrModel', provider: 'manga-ocr',
+    name: 'Manga OCR', installed: true } as ResourceRecord)
+  await expect(test.gateway.acquireComicOcr(async () => {})).rejects.toThrow('ocrMissing')
+})
 afterEach(async () => { await Promise.all(gateways.splice(0).map(gateway => gateway.dispose())); vi.unstubAllGlobals() })
 function enable(settings: AppSettings, kind: GatewayCapability, binding: string): void {
   settings.modelPolicy = mergeModelPolicy(settings, modelEnablePatch(settings, kind, binding, true).modelPolicy)

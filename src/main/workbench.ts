@@ -76,12 +76,11 @@ export function registerWorkbench(
       // Match the Elements surface before the independent renderer paints.
       backgroundColor: (getTheme() === 'system' ? nativeTheme.shouldUseDarkColors : getTheme() === 'dark') ? '#0a0a0a' : '#ffffff',
       backgroundMaterial: 'none',
-      width: 1380,
-      height: 900,
       minWidth: 760,
       minHeight: 600,
     })
     windows.set(surface, window)
+    window.once('ready-to-show', () => { window.maximize(); window.show(); window.focus() })
     window.on('close', event => { event.preventDefault(); void stop().catch(error => console.error('workbench shutdown failed', error)) })
     window.on('closed', () => {
       if (windows.get(surface) === window) windows.delete(surface)
@@ -101,8 +100,6 @@ export function registerWorkbench(
     try {
       await window.loadURL(url.toString())
       lease?.running()
-      window.show()
-      window.focus()
     } catch (error) {
       window.destroy()
       await stop()

@@ -19,6 +19,11 @@ export interface OnboardingTourProps {
   autoStart?: boolean
 }
 
+function returnToHome(navigate: (path: string) => void) {
+  navigate('#/')
+  requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-onboarding="nav-home"]')?.focus())
+}
+
 export function OnboardingTour({ autoStart = true }: OnboardingTourProps) {
   const { settings, loaded, onboardingActive, onboardingWelcome, onboardingRun, runtimeBusy } = useStore(stores.settings, state => state)
   const { status, engineStatus } = useStore(stores.session, state => state)
@@ -47,7 +52,7 @@ function WelcomeDialog() {
 
   return <Dialog open onOpenChange={(open, details) => { if (details.reason === 'outside-press' || required) { details.cancel(); return } if (!open) actions.settings.stopOnboarding() }}>
 
-        <DialogContent className="onboarding-welcome onboarding-dialog" aria-modal="true" aria-describedby="onboarding-welcome-description">
+        <DialogContent className="onboarding-welcome onboarding-dialog" finalFocus={false} aria-modal="true" aria-describedby="onboarding-welcome-description">
           {!required ? <DialogCloseButton aria-label={t('onboarding.exit')} /> : null}
           <CardHeader>
             <CardTitle><DialogTitle>{t('onboarding.welcomeTitle')}</DialogTitle></CardTitle>
@@ -121,7 +126,7 @@ function TourSteps() {
     if (index === TOUR_STEPS.length - 1) {
       void actions.settings.completeOnboarding().then(() => {
         closeTourDialog()
-        navigate('#/')
+        returnToHome(navigate)
       }).catch(error => {
         reportSettingsFailure(t('onboarding.saveFailed'), error)
         busyRef.current = false
@@ -274,14 +279,14 @@ function TourCompletion() {
     setFailed(false)
     try {
       await actions.settings.completeOnboarding()
-      navigate('#/')
+      returnToHome(navigate)
     } catch (error) {
       setFailed(true)
       reportSettingsFailure(t('onboarding.saveFailed'), error)
     } finally { setSaving(false) }
   }
   return <Dialog open onOpenChange={(open, details) => { if (details.reason === 'outside-press' || required) { details.cancel(); return } if (!open) actions.settings.stopOnboarding() }}>
-    <DialogContent className="onboarding-dialog" data-onboarding="complete" aria-modal="true" aria-describedby="onboarding-complete-description">
+    <DialogContent className="onboarding-dialog" data-onboarding="complete" finalFocus={false} aria-modal="true" aria-describedby="onboarding-complete-description">
       {!required ? <DialogCloseButton aria-label={t('onboarding.exit')} /> : null}
       <CardHeader><CardTitle><DialogTitle>{t('onboarding.finishTitle')}</DialogTitle></CardTitle><CardDescription id="onboarding-complete-description">{t('onboarding.finishBody')}</CardDescription></CardHeader>
       <CardContent>

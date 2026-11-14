@@ -1,7 +1,7 @@
 import { Combobox as ComboboxPrimitive } from '@base-ui/react/combobox'
-import { Check, ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { InputGroup, InputGroupAddon, InputGroupInput } from './input-group'
+import { Input } from './input'
 
 const Combobox = ComboboxPrimitive.Root
 
@@ -12,7 +12,7 @@ function ComboboxTrigger({ className, children, ...props }: ComboboxPrimitive.Tr
 }
 
 function ComboboxInput(props: ComboboxPrimitive.Input.Props) {
-  return <InputGroup><InputGroupAddon><Search /></InputGroupAddon><ComboboxPrimitive.Input data-slot="combobox-input" render={<InputGroupInput />} {...props} /></InputGroup>
+  return <ComboboxPrimitive.Input render={<Input />} {...props} />
 }
 
 function ComboboxContent({ container, className, sideOffset = 4, align = 'start', children, ...props }: ComboboxPrimitive.Popup.Props & Pick<ComboboxPrimitive.Positioner.Props, 'sideOffset' | 'align'> & { container?: HTMLElement | null }) {

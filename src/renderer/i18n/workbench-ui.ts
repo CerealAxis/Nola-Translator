@@ -1,4 +1,6 @@
 const rows = {
+  modelAvailable: ['可用', 'Available', '可用', '可用', '사용 가능', '利用可能'],
+  modelNotStarted: ['未启动', 'Not started', '未啟動', '未啟動', '시작 안 됨', '未起動'],
   imageContent: ['图片内容', 'Image content', '圖片內容', '圖片內容', '이미지 내용', '画像の内容'],
   diagramLabel: ['图表', 'Diagram', '圖表', '圖表', '다이어그램', '図表'],
   expandDiagram: ['展开图表', 'Expand diagram', '展開圖表', '展開圖表', '다이어그램 확대', '図表を拡大'],

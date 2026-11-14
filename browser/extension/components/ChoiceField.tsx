@@ -6,8 +6,13 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { browserText } from '../i18n'
 import { usePortalContainer } from './usePortalContainer'
 
-export interface ChoiceOption { value: string; label: string; disabled?: boolean }
+export interface ChoiceOption { value: string; label: string; disabled?: boolean; previewFont?: string }
 export interface ChoiceFieldProps { label: string; value: string; options: ChoiceOption[]; disabled?: boolean; onChange: (value: string) => void; t?: ReturnType<typeof browserText> }
+
+function optionContent(option: ChoiceOption) {
+  if (!option.previewFont) return option.label
+  return <span className="min-w-0 truncate" style={{ fontFamily: option.previewFont }}>{option.label}</span>
+}
 export function ChoiceField({ label, value, options, disabled, onChange, t = browserText(resolveUiLanguage('auto', document.documentElement.lang || navigator.language)) }: ChoiceFieldProps) {
   const [container, containerRef] = usePortalContainer()
   const id = useId()
@@ -19,7 +24,7 @@ export function ChoiceField({ label, value, options, disabled, onChange, t = bro
       {container && <ComboboxContent container={container} className="nola-choice-search-list">
         <ComboboxInput aria-label={t('searchOptions')} placeholder={t('searchOptions')} />
         <ComboboxEmpty>{t('noResults')}</ComboboxEmpty>
-        <ComboboxList>{(option: ChoiceOption) => <ComboboxItem key={option.value} value={option} disabled={option.disabled}>{option.label}</ComboboxItem>}</ComboboxList>
+        <ComboboxList>{(option: ChoiceOption) => <ComboboxItem key={option.value} value={option} disabled={option.disabled}>{optionContent(option)}</ComboboxItem>}</ComboboxList>
       </ComboboxContent>}
     </Combobox>
   </Field>
@@ -28,7 +33,7 @@ export function ChoiceField({ label, value, options, disabled, onChange, t = bro
     <Select modal={false} value={value} items={options} disabled={disabled} onValueChange={value => { if (value !== null) onChange(value) }}>
       <SelectTrigger id={id}><SelectValue /></SelectTrigger>
       <div ref={containerRef} className="nola-portal-container" />
-      {container && <SelectContent container={container}><SelectGroup>{options.map(option => <SelectItem key={option.value} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>}
+      {container && <SelectContent container={container}><SelectGroup>{options.map(option => <SelectItem key={option.value} value={option.value} disabled={option.disabled}>{optionContent(option)}</SelectItem>)}</SelectGroup></SelectContent>}
     </Select>
   </Field>
 }

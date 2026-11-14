@@ -58,8 +58,8 @@ function readText(path) {
   try {
     // 许可证正文一律按 LF 输出：源文件里 CRLF 与 LF 混杂（Pillow 系老包用 CRLF，
     // MarkupSafe 只在首行用 CRLF），原样透传会让同一份内容在不同机器上产生不同字节。
-    // 只归一化行尾符，不动任何折行与措辞。
-    return readFileSync(path, 'utf8').replace(/^﻿/, '').replace(/\r\n/g, '\n')
+    // 归一化行尾符与行末空格，不动任何折行与措辞。
+    return readFileSync(path, 'utf8').replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/[\t ]+$/gm, '')
   } catch {
     return null
   }
@@ -1525,6 +1525,13 @@ function collectPythonTree() {
 // ---------------------------------------------------------------------------
 
 collectRendererTree()
+const luminaLicense = readText(join(ROOT, 'engine', 'nola_translator_engine', 'backend', 'lumina-upstream.LICENSE'))
+if (luminaLicense === null) {
+  report('unresolved', 'Lumina', 'vendored Lumina source license is missing')
+} else {
+  addEntry('Lumina', 'b19fb886abc474b39b217d80806ecc1297876f61', luminaLicense, 'renderer')
+  report('embedded', 'Lumina', 'MIT notice from the vendored OCR, canvas typography, and PSD source adaptation')
+}
 const NOTO_CJK_REVISION = 'f8d157532fbfaeda587e826d4cd5b21a49186f7c'
 const notoCjkLicense = readText(join(ROOT, 'src', 'renderer', 'assets', 'fonts', 'OFL-Noto-CJK.txt'))
 if (notoCjkLicense === null) {

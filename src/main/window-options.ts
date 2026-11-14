@@ -15,7 +15,7 @@ export function isTrustedRendererUrl(raw: string, mainDirectory: string, rendere
       const base = new URL(rendererUrl)
       if (url.origin === base.origin && url.pathname === base.pathname) return true
     }
-    return ['index.html', 'workbench.html', 'onboarding-card.html', 'latency.html', 'screen.html'].some(entry => {
+    return ['index.html', 'workbench.html', 'comic-editor.html', 'onboarding-card.html', 'latency.html', 'screen.html'].some(entry => {
       const expected = rendererUrl ? new URL(entry, rendererUrl) : pathToFileURL(join(mainDirectory, '../renderer', entry))
       return url.origin === expected.origin && url.protocol === expected.protocol && url.host === expected.host && url.pathname === expected.pathname
     })

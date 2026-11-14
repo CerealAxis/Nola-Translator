@@ -280,7 +280,7 @@ export function MeetingModePage() {
     </FieldGroup>
 
   return <section data-slot="meeting-page" className="flex min-w-0 flex-col gap-6">
-    <PageHeader title={t('meeting.title')} warning={t('suite.experimentalUnavailable')} subtitle={t('meeting.singlePageHint')} actions={<>
+    <PageHeader title={t('meeting.title')} warning={t('suite.experimentalInDevelopment')} subtitle={t('meeting.singlePageHint')} actions={<>
       <Button variant="outline" onClick={() => void actions.settings.showWorkspace().catch(error => notifyError(t('workspaceUi.windowFailed'), { cause: error }))}><MessagesSquare data-icon="inline-start" />{t('meeting.conversation')}</Button>
       <Button variant="outline" onClick={() => void actions.settings.showOverlay('workspace').then(opened => { if (opened === false) notifyError(t('workspaceUi.overlayFailed')) }).catch(error => notifyError(t('workspaceUi.overlayFailed'), { cause: error }))}><Captions data-icon="inline-start" />{t('workspaceUi.openOverlay')}</Button>
       <Button disabled={!api || pending || !!testing} onClick={() => void run()}>

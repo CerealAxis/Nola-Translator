@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { createExtensionStore } from '../store'
@@ -62,6 +62,12 @@ it('navigates through settings and style, saves changes, and goes back with Esca
   await user.clear(color)
   await user.type(color, '#ff0000')
   expect(savePreferences).toHaveBeenLastCalledWith({ subtitleBackground: '#FF0000' })
+  await user.keyboard('{Escape}')
+  const fonts = screen.getAllByRole('combobox', { name: 'Subtitle font' })
+  expect(fonts).toHaveLength(2)
+  fireEvent.keyDown(fonts[0], { key: 'ArrowDown' })
+  const monospace = await screen.findByRole('option', { name: 'monospace' })
+  expect(within(monospace).getByText('monospace')).toHaveStyle({ fontFamily: 'monospace' })
   await user.keyboard('{Escape}')
   await user.click(screen.getByRole('button', { name: 'Reset style' }))
   expect(savePreferences).toHaveBeenLastCalledWith(expect.objectContaining({ subtitleBackgroundOpacity: DEFAULT_PREFERENCES.subtitleBackgroundOpacity }))

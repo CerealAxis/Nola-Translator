@@ -2,7 +2,9 @@ import { ModelAvailabilityLabel } from '@/features/workspace/ModelAvailabilityLa
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AttachmentPrimitive, ComposerPrimitive, AuiIf, MessagePrimitive, ThreadPrimitive, useAui, useAuiState, useMessageTiming, type ToolCallMessagePart, type ToolCallMessagePartProps } from '@assistant-ui/react'
 import { Archive, BrainCircuit, ChevronLeft, ChevronRight, Ellipsis, Minus, PanelLeft, Pin, Plus, Search, Settings2, Square, X } from 'lucide-react'
-import { Composer, ComposerActions, ComposerAttachButton, ComposerAttachments, ComposerBar, ComposerContext, ComposerInput, ComposerMenu, ComposerMenuItem, ComposerModelItem, ComposerModelTrigger, ComposerSend, ComposerToolbar, ComposerVoice, ComposerVoiceButton } from '@/components/assistant-ui/native/composer'
+import { Composer, ComposerActions, ComposerAttachButton, ComposerAttachments, ComposerBar, ComposerContext, ComposerInput, ComposerMenu, ComposerMenuItem, ComposerModelTrigger, ComposerSend, ComposerToolbar, ComposerVoice, ComposerVoiceButton } from '@/components/assistant-ui/native/composer'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ThreadList } from '@/components/assistant-ui/native/thread-list'
 import { NativeAgentSettings } from './NativeAgentSettings'
 import { NativeComicSelector } from './NativeComicSelector'
@@ -43,6 +45,7 @@ export interface NativeAgentSurfaceProps {
   onChange: (config: PlaygroundConfig) => void
   profiles: readonly CustomTranslationModel[]
   models: readonly PlaygroundModel[]
+  modelCatalog: readonly PlaygroundModel[]
   voices: string[]
   onVoices: (names: string[]) => void
   onConfigure: () => void
@@ -408,7 +411,6 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
     } catch { /* Draft persistence is optional when browser storage is unavailable. */ }
   }, [text, threadId])
   const [menu, setMenu] = useState('')
-  const [modelQuery, setModelQuery] = useState('')
   const [seconds, setSeconds] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -467,7 +469,11 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
   }
   return <Composer className="max-w-none" data-testid="native-composer">
     {!!savedDraft && !text && <DraftRestore draft={savedDraft} savedAt={t('workbench.nativeDraft')} onRestore={() => { aui.thread.composer().setText(savedDraft); setSavedDraft('') }} onDiscard={() => { setSavedDraft(''); try { localStorage.removeItem(`nola.native.draft:${threadId}`) } catch { /* Keep dismissing usable when storage is unavailable. */ } }} />}
-    {menu === 'models' && <ComposerMenu open anchor="models"><p className="px-2.5 py-2 text-xs text-muted-foreground"><ModelAvailabilityLabel label={t('nav.models')} hint={t('gateway.modelNoneHint')} /></p><ComposerInput className="mx-2 w-[calc(100%-1rem)] rounded-lg border border-border bg-background" placeholder={t('workbench.searchModels')} value={modelQuery} onChange={event => setModelQuery(event.target.value)} />{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 text-xs text-muted-foreground">{t(`workbench.${kind}`)}</p>{props.models.filter(model => model.kind === kind && model.name.toLowerCase().includes(modelQuery.toLowerCase())).map(model => <ComposerModelItem key={model.id} entry={{ name: model.name, meta: t(`workbench.${kind}`) }} selected={props.config.model === model.id} onClick={() => pick({ model: model.id, kind: model.kind, images: model.images, voice: '' })} />)}</div>)}<ComposerMenuItem onClick={props.onConfigure}><Settings2 className="size-4" aria-hidden="true" />{t('nav.models')}</ComposerMenuItem></ComposerMenu>}
+    {menu === 'models' && <ComposerMenu open anchor="models" className="max-h-[min(70vh,32rem)] overflow-y-auto"><p className="px-2.5 py-2 text-xs text-muted-foreground"><ModelAvailabilityLabel label={t('nav.modelGateway')} hint={t('gateway.modelNoneHint')} /></p><TooltipProvider>{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 text-xs text-muted-foreground">{t(`workbench.${kind}`)}</p>{props.modelCatalog.filter(model => model.kind === kind).map(model => {
+      const available = props.models.some(item => item.id === model.id && item.kind === model.kind)
+      const item = <ComposerMenuItem className="nola-menu-item" active={props.config.model === model.id} aria-disabled={!available} onClick={() => { if (available) pick({ model: model.id, kind: model.kind, images: model.images, voice: '' }) }}><span className="min-w-0 flex-1 truncate text-start">{model.name}</span><Badge variant={available ? 'success' : 'secondary'}>{t(available ? 'workbench.modelAvailable' : 'workbench.modelNotStarted')}</Badge></ComposerMenuItem>
+      return available ? <div key={model.id}>{item}</div> : <Tooltip key={model.id}><TooltipTrigger render={item} /><TooltipContent>{t('gateway.modelGatewayStartHint')}</TooltipContent></Tooltip>
+    })}</div>)}</TooltipProvider><ComposerMenuItem className="nola-menu-item" onClick={props.onConfigure}><Settings2 className="size-4" aria-hidden="true" />{t('nav.modelGateway')}</ComposerMenuItem></ComposerMenu>}
     {menu === 'effort' && <ComposerMenu open anchor="effort" className="w-80 gap-3 p-3"><ReasoningEffort variant="slider" levels={(['auto', 'low', 'medium', 'high'] as const).map(key => ({ key, label: t(key === 'auto' ? 'modelsSettingsUi.default' : `workbench.${key}`) }))} selectedKey={props.config.effort} title={t('workbench.reasoningTokens')} onSelect={effort => pick({ effort }, false)} /></ComposerMenu>}
     {menu === 'language' && <ComposerMenu open anchor="language">{(props.config.kind === 'mt' ? targetCodes : sourceCodes).map(code => <ComposerMenuItem key={code} onClick={() => pick(props.config.kind === 'mt' ? { target: code } : { source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'source' && <ComposerMenu open anchor="source">{sourceCodes.map(code => <ComposerMenuItem key={code} onClick={() => pick({ source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}

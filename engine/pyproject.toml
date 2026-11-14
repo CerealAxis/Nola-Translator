@@ -19,6 +19,7 @@ dependencies = [
   "onnxruntime==1.23.2",
   "opencv-python-headless==4.11.0.86",
   "Pillow==12.3.0",
+  "fonttools==4.68.0",
   "pypdfium2==5.14.0",
   "pydantic==2.13.4",
   "PyAudioWPatch==0.2.12.8",

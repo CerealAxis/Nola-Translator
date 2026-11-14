@@ -136,6 +136,7 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
   const available = useAvailableModels()
   const playground = useMemo(() => installedPlaygroundModels(resources, settings, credentials, t), [resources, settings, credentials, t])
   const models = useMemo(() => callableModels(available, playground), [available, playground])
+  const modelCatalog = useMemo(() => [...models, ...playground.filter(model => model.id.startsWith('resource:') && resources.some(resource => `resource:${resource.resourceId}` === model.id && ['recognitionModel', 'translationModel', 'ttsModel'].includes(resource.kind)) && !models.some(item => item.id === model.id && item.kind === model.kind))], [models, playground, resources])
   const modelsRef = useRef(models)
   modelsRef.current = models
   const [config, setConfig] = useState<PlaygroundConfig>({ model: '', kind: 'llm', effort: 'auto', source: 'auto', target: 'zh', voice: '', projectId: snapshot?.selectedProject ?? null })
@@ -236,7 +237,7 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
     <WorkbenchRequestLifecycle onRunningChange={setRequestRunning} />
     <AgentInstructions active={config.kind === 'llm'} />
     <DictationLifecycle adapter={audioDictation} />
-    <NativeAgentSurface config={config} profiles={profiles} models={models} onConfigure={openConfiguration}
+    <NativeAgentSurface config={config} profiles={profiles} models={models} modelCatalog={modelCatalog} onConfigure={openConfiguration}
       onChange={next => {
         if (requestRunning) return
         setConfig(next)

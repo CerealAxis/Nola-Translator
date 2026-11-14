@@ -26,9 +26,8 @@ type TranslationKey = DictionaryKey
 
 export type { TranslationKey }
 
-export function appNameForLanguage(language: UiLanguage): string {
-  return language === 'en' ? 'Nola Translator' : language === 'zh-TW' || language === 'zh-HK' ? '諾拉翻譯' : language === 'ko' ? '놀라 번역기' : language === 'ja' ? 'ノラ翻訳' : '诺拉翻译'
-}
+export { appNameForLanguage } from '../shared/window-titles'
+import { windowTitleForUrl } from '../shared/window-titles'
 
 const dictionaries: Record<UiLanguage, Dictionary> = {
   'zh-CN': zhCN,
@@ -126,7 +125,7 @@ export function I18nProvider({ children, readSettings = true }: { children: Reac
 
   useEffect(() => {
     document.documentElement.lang = language
-    document.title = appNameForLanguage(language)
+    document.title = windowTitleForUrl(window.location.href, language)
   }, [language])
 
   /**

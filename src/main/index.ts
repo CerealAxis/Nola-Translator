@@ -8,6 +8,7 @@ import { DesktopDataManager } from './desktop-data'
 import { drainLoggedIpc } from './logged-ipc'
 import { registerDesktopDataIpc } from './desktop-data-ipc'
 import { ComicTranslation } from './comic'
+import { DEFAULT_COMIC_MODEL, isManagedComicVisualResource } from '../shared/comic'
 import { GameTranslation } from './game-translation'
 import { glossaryMutationSchema, glossaryTestSchema } from '../shared/glossary'
 import { resolveGlossaryTerms } from '../shared/glossary-match'
@@ -16,6 +17,9 @@ import { configureIpcSenderValidation, loggedHandle } from './logged-ipc'
 import { modelEngines, supportsSelectedEngine } from '../shared/model-engines'
 import { INDEX_TRANSLATE_MODEL_IDS } from '../shared/index-translate'
 import { registerWorkbench, isWorkbenchWindow } from './workbench'
+import { registerComicEditor } from './comic-editor'
+import { windowTitleForUrl } from '../shared/window-titles'
+import { resolveUiLanguage } from '../shared/languages'
 import { registerOnboardingCard } from './onboardingCard'
 import { closeDirectModelWorker } from './direct-model'
 import { AgentWorkspace } from './agent-workspace'
@@ -96,6 +100,8 @@ let flushDesktopData: (() => Promise<void>) | undefined
 let browserConnection: BrowserConnection | null = null
 let tray: NolaTray | null = null
 let gateway: ModelGateway | null = null
+let comicEditors: ReturnType<typeof registerComicEditor> | null = null
+let editorQuitPending = false
 let stopWorkbench: (() => Promise<void>) | null = null
 let stopOnboardingCard: (() => void) | null = null
 let stopSessions: (() => Promise<void>) | null = null
@@ -546,6 +552,12 @@ if (!hasSingleInstanceLock) {
     relocateSessionLogs(join(dataRoot, 'logs'))
     const settings = new SettingsStore(join(dataRoot, 'settings.json'))
     const initialSettings = await settings.load()
+    app.on('browser-window-created', (_event, window) => {
+      const updateTitle = () => { if (!window.isDestroyed()) window.setTitle(windowTitleForUrl(window.webContents.getURL(), resolveUiLanguage(settings.current().uiLanguage, app.getLocale()))) }
+      window.webContents.on('page-title-updated', event => { event.preventDefault(); updateTitle() })
+      window.webContents.on('did-finish-load', updateTitle)
+    })
+    comicEditors = registerComicEditor(() => settings.current().theme, __dirname, () => mainWindow, activity, undefined, () => resolveUiLanguage(settings.current().uiLanguage, app.getLocale()))
     if (initialSettings.modelStoragePath) await cleanupStorageCaches(initialSettings.modelStoragePath)
     const meetings = new MeetingStore(join(dataRoot, 'meetings'))
     const credentials = new SecureCredentialStore(join(dataRoot, 'credentials.json'), safeStorage)
@@ -1166,7 +1178,7 @@ if (!hasSingleInstanceLock) {
       },
       () => gateway?.snapshot().state === 'running',
       async (resourceId, action) => {
-        if (resourceId !== 'lama-manga' && resourceId !== 'comic-rtdetr-onnx' && !/^pp-ocrv5-mobile(?:-[a-z]+)?-onnx$/.test(resourceId)) return undefined
+        if (!isManagedComicVisualResource(resourceId)) return undefined
         if (!screenOcr) throw new Error('backendUnavailable')
         const status = action === 'install' || action === 'resume' ? await screenOcr.install(resourceId)
           : action === 'remove' ? await screenOcr.remove(resourceId) : await screenOcr.cancel(resourceId)
@@ -1400,6 +1412,7 @@ if (!hasSingleInstanceLock) {
     comicTranslation = new ComicTranslation({
       activity,
       mainDir: __dirname, getMainWindow: () => mainWindow,
+      isEditorSender: (event, projectId) => comicEditors?.isEditorSender(event, projectId) ?? false,
       backend: async () => {
         await ensureRealtimeBackend()
         if (!backend?.ready) throw new Error('backendUnavailable')
@@ -1408,7 +1421,7 @@ if (!hasSingleInstanceLock) {
       glossary: () => glossary.snapshot(),
       prepareRun: async (request, project) => {
         const current = settings.current()
-        const binding = project.config.model || sceneModelBinding(current, 'mt')
+        const binding = project.config.model || DEFAULT_COMIC_MODEL
         const needsMt = request.stage === 'full' || request.stage === 'translate'
         const provider = needsMt ? backendCloudMt(binding) : undefined
         const model = needsMt ? provider ?? (binding.startsWith('resource:') ? binding.slice('resource:'.length) : '') : ''
@@ -1427,16 +1440,18 @@ if (!hasSingleInstanceLock) {
         } else if (provider) headers = backendMtHeaders(translationOptionsFor(current.translation, provider))
         const needsDetection = request.stage === 'detect' || (request.stage === 'clean' &&
           project.pages.some(page => request.pageIds.includes(page.id) && page.status === 'imported' && !page.regions.length))
-        const needsOcr = request.stage === 'full' || request.stage === 'ocr'
-          || (needsDetection && project.config.detector !== 'rtdetr')
+        const needsOcr = request.stage === 'full' || request.stage === 'ocr' || needsDetection
         const mtLease = needsMt ? await gateway!.acquireExternalMt(binding, () => comicTranslation!.stop()) : undefined
         try {
-          const releaseOcr = needsOcr ? gateway!.acquireOcr(project.config.sourceLanguage) : undefined
-          return { model, headers, release: () => { releaseOcr?.(); mtLease?.release() },
-            ...(needsOcr ? { ocrResourceId: gateway!.snapshot().services.ocr?.model.replace(/^resource:/, '') } : {}) }
+          const ocrLease = needsOcr ? await gateway!.acquireComicOcr(() => comicTranslation!.stop()) : undefined
+          return { model, headers, release: () => { ocrLease?.release(); mtLease?.release() },
+            ...(ocrLease ? { ocrResourceId: ocrLease.resourceId } : {}) }
         } catch (error) { mtLease?.release(error); throw error }
       },
-      publish: event => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('comic:changed', event) },
+      publish: event => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('comic:changed', event)
+        comicEditors?.broadcast('comic:changed', event)
+      },
     })
     screenTranslation = new ScreenTranslation({
       glossary: () => glossary.snapshot(),
@@ -1479,7 +1494,7 @@ if (!hasSingleInstanceLock) {
       selectRoot: writeDataRootPointer,
     })
     disposeAppIpc = registerAppIpc({
-      isDevelopmentWindow: isWorkbenchWindow,
+      isDevelopmentWindow: window => isWorkbenchWindow(window) || !!comicEditors?.isWindow(window),
       isDevelopmentBuild: !app.isPackaged,
       settings,
       initialSettings,
@@ -1611,6 +1626,15 @@ if (!hasSingleInstanceLock) {
 
 app.on('window-all-closed', () => { if (quitting && !desktopData?.pending) app.quit() })
 app.on('before-quit', (event) => {
+  // Keep IPC and the backend alive until every independent editor has flushed its save queue.
+  if (!quitting && comicEditors?.hasWindows()) {
+    event.preventDefault()
+    if (!editorQuitPending) {
+      editorQuitPending = true
+      void comicEditors.stop().then(() => app.quit()).catch(error => console.error('comic editor shutdown failed', error)).finally(() => { editorQuitPending = false })
+    }
+    return
+  }
   if (quitting && desktopData?.pending) { event.preventDefault(); return }
   if (quitting || !engine) return
   event.preventDefault()

@@ -10,7 +10,8 @@ import pytest
 
 from nola_translator_engine import resources as resources_module
 from nola_translator_engine.models.inpaint_catalog import INPAINT_RESOURCE_ID
-from nola_translator_engine.models.ocr_catalog import COMIC_DETECTOR_ID, OCR_SPECS
+from nola_translator_engine.models.ocr_catalog import (COMIC_DETECTOR_ID, OCR_SPECS, RFDETR_SEG_ID,
+    LAMA_ONNX_ID, LAMA_MANGA_ONNX_ID, ANGLENET_ID, COMIC_FONT_CLASSIFIER_ID, COMIC_YUZU_FONT_ID)
 from nola_translator_engine.models.manager import FileEntry, ModelSpec
 from nola_translator_engine.models.manager import ModelStorageError
 from nola_translator_engine.protocol import ResourceRecord
@@ -106,6 +107,24 @@ def test_file_entry_allows_nested_snapshot_paths() -> None:
     assert FileEntry("a/b", 1, "0" * 64).path == "a/b"
 
 
+def test_comic_font_classifier_resource_is_pinned_and_uses_managed_directory(tmp_path: Path) -> None:
+    from nola_translator_engine.models.ocr_catalog import COMIC_FONT_CLASSIFIER
+
+    manager = ResourceManager(tmp_path / "models", lambda _event: None)
+    spec = manager._spec(COMIC_FONT_CLASSIFIER_ID)
+    assert spec == COMIC_FONT_CLASSIFIER
+    assert spec.directory == "comic-font-classifier-onnx"
+    assert [entry.path for entry in spec.files] == ["model.onnx", "model_config.yaml"]
+    assert [entry.size for entry in spec.files] == [64_057_660, 76_406]
+    assert spec.files[0].sha256 == "44aa3d46804aa55b7841a0eb6dcc9bb72badd6d01645e5c7448a70525655b7b6"
+    assert spec.files[1].sha256 == "eb33dd3ed758879cf555923ae1c5af08f067995eee4ebd54d269cfb4ed905f79"
+    assert spec.url_for(spec.files[0]) == (
+        "https://huggingface.co/storia/font-classify-onnx/resolve/"
+        "86a4e773157cfc4db41844742851385bd5e5d1ca/model.onnx"
+    )
+    assert manager.models.model_path(spec) == tmp_path / "models" / "comic-font-classifier-onnx"
+
+
 def _fetcher(payloads: dict[str, bytes]):
     def fetch(url: str, destination: Path, progress) -> None:
         data = payloads[url]
@@ -120,6 +139,16 @@ def _fetcher(payloads: dict[str, bytes]):
                 progress(written, len(data))
 
     return fetch
+
+
+def test_yuzu_font_model_and_labels_use_pinned_independent_repositories(tmp_path: Path) -> None:
+    from nola_translator_engine.models.ocr_catalog import COMIC_YUZU_FONT
+    manager = ResourceManager(tmp_path / "models", lambda _event: None)
+    assert manager._spec(COMIC_YUZU_FONT_ID) == COMIC_YUZU_FONT
+    assert COMIC_YUZU_FONT.total_bytes == 145_180_174
+    assert COMIC_YUZU_FONT.url_for(COMIC_YUZU_FONT.files[0]).endswith("/7f6d0bdd51140ddb9f08356519cc024c1452483a/font-detector.onnx")
+    assert COMIC_YUZU_FONT.url_for(COMIC_YUZU_FONT.files[1]) == "https://huggingface.co/fffonion/yuzumarker-font-detection/resolve/7484242bb840f39e27f10df8ade1f8a9a8fa8f53/font-labels-ex.json"
+    assert manager.record(COMIC_YUZU_FONT_ID).kind == "detectModel"
 
 
 def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
@@ -145,6 +174,12 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
         *OCR_SPECS,
         INPAINT_RESOURCE_ID,
         COMIC_DETECTOR_ID,
+        RFDETR_SEG_ID,
+        LAMA_ONNX_ID,
+        LAMA_MANGA_ONNX_ID,
+        ANGLENET_ID,
+        COMIC_FONT_CLASSIFIER_ID,
+        COMIC_YUZU_FONT_ID,
     ]
     assert QWEN_RESOURCE_ID == "qwen3-asr-1.7b-hf"
     assert QWEN_06B_RESOURCE_ID == "qwen3-asr-0.6b-hf"
@@ -194,6 +229,14 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert m2m100.name == "M2M100 418M"
     assert m2m100.downloadBytes == 1_941_936_305
     assert m2m100.installed is False
+
+    font_classifier = next(record for record in records if record.resourceId == COMIC_FONT_CLASSIFIER_ID)
+    assert font_classifier.resourceId == COMIC_FONT_CLASSIFIER_ID
+    assert font_classifier.kind == "detectModel"
+    assert font_classifier.provider == "font-classifier"
+    assert font_classifier.name == "Storia Font Classifier (ONNX)"
+    assert font_classifier.downloadBytes == 64_134_066
+    assert font_classifier.installed is False
 
     for record in records:
         if record.kind in ("detectModel", "inpaintModel"):

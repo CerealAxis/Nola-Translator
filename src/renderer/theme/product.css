@@ -611,8 +611,8 @@
       width: auto;
     }
     .nola-toast-content {
-      align-items: flex-start;
-      flex-wrap: wrap;
+      align-items: center;
+      flex-wrap: nowrap;
     }
     .nola-toast-action {
       margin-inline-start: auto;

@@ -58,3 +58,4 @@ __pycache__/
 /engine/uv.lock
 /logs/
 /comics/
+/.agents/
