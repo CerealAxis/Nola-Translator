@@ -1,3 +1,5 @@
+import { useWordRules } from '../settings/word-rules/useWordRules'
+import { maskSubtitleTracks } from '../../../shared/subtitle-word-rules'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useI18n } from '@/i18n'
 import { stores, useStore } from '@/store'
@@ -7,6 +9,7 @@ import { CaptionTrack } from '../overlay/CaptionTrack'
 
 export function GameOverlay({ api, sessionId }: { api: Pick<GameTranslationBridge, 'snapshot' | 'onChanged'>; sessionId: string }) {
   const { t } = useI18n()
+  const { document: wordRules } = useWordRules()
   const config = useStore(stores.settings, state => state.settings?.overlay) ?? DEFAULT_SETTINGS.overlay
   const [snapshot, setSnapshot] = useState<GameSnapshot>()
   useEffect(() => {
@@ -30,7 +33,7 @@ export function GameOverlay({ api, sessionId }: { api: Pick<GameTranslationBridg
     '--overlay-translation-font-size': `${config.translationFontSize}px`, '--overlay-translation-font-weight': config.translationFontWeight, '--overlay-translation-line-height': config.translationLineHeight,
   } as CSSProperties
   return <main className="game-overlay" data-slot="game-overlay" aria-label={t('suite.gameTitle')} style={style}><div className="game-overlay__caption">
-    {source && <CaptionTrack key={`source:${line.id}`} kind="source" lines={[{ key: line.id, text: source }]} maxLines={3} layout="sentence" />}
-    {target && <CaptionTrack key={`translation:${line.id}`} kind="translation" lines={[{ key: line.id, text: target }]} maxLines={3} layout="sentence" />}
+    {source && <CaptionTrack key={`source:${line.id}`} kind="source" lines={maskSubtitleTracks(wordRules, [{ key: line.id, text: source }], '*', 'game', snapshot?.activeGameId ?? undefined)} maxLines={3} layout="sentence" />}
+    {target && <CaptionTrack key={`translation:${line.id}`} kind="translation" lines={maskSubtitleTracks(wordRules, [{ key: line.id, text: target }], '*', 'game', snapshot?.activeGameId ?? undefined)} maxLines={3} layout="sentence" />}
   </div></main>
 }

@@ -79,6 +79,7 @@ export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'trans
 
 export type NolaTranslatorApi = {
   desktopData?: import('./desktop-data').DesktopDataApi
+  wordRules?: import('./word-rules').WordRulesBridge
   glossary?: import('./glossary').GlossaryBridge
   comic?: import('./comic').ComicBridge
   gameTranslation?: import('./game-translation').GameTranslationBridge
@@ -96,7 +97,6 @@ export type NolaTranslatorApi = {
   requestQuit?(): Promise<void>
   confirmQuit?(): Promise<void>
   onQuitRequested?(callback: () => void): () => void
-  openWorkbench?(surface: import('./workbench').WorkbenchSurface): Promise<void>
   cancelLanguageModel?(id: string): Promise<void>
   releaseDirectModel?(): Promise<void>
   agentWorkspace?(action: import('./agent-workspace').WorkspaceAction): Promise<import('./agent-workspace').AgentWorkspaceSnapshot>

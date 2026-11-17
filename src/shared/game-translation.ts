@@ -9,6 +9,7 @@ export const gameProfileSchema = z.object({
   source: z.enum(['auto', 'ocr', 'clipboard', 'hook']).default('auto'),
   strategy: z.enum(['auto', 'speed', 'quality']).default('auto'),
   glossarySelection: glossarySelectionSchema.default({ mode: 'auto' }),
+  excludedSelection: glossarySelectionSchema.optional(),
   hookRules: z.array(z.object({ code: z.string().max(1024), name: z.string().max(1024), context: z.string().max(12) })).max(8).optional(),
   hookCodes: z.array(z.string().min(1).max(400)).max(32).optional(),
   embedStyle: z.object({

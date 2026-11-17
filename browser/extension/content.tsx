@@ -5,7 +5,7 @@ import { Button } from '../../src/renderer/components/ui/button'
 import { showToast, ToastProvider } from '../../src/renderer/components/ui/toast'
 import { createBridge } from './bridge'
 import { createExtensionStore } from './store'
-import { alignPlayerTrigger, detectVideos, playerAdapter } from './adapters'
+import { alignPlayerTrigger, detectVideos, playerAdapter, playerIsInteractive } from './adapters'
 import { browserText, errorKey } from './i18n'
 import { resolveUiLanguage } from '../../src/shared/languages'
 import { Panel } from './components'
@@ -431,12 +431,12 @@ function install(): void {
       else save({ floatingButton: false })
       refresh()
     }} />)
-    if (!enabled) { overlayHoverPause.leave(); nativeHoverPause.leave(); for (const { host } of surfaces) host.hidden = true; return }
+    if (!enabled) { overlayHoverPause.leave(); nativeHoverPause.leave(); for (const { host } of surfaces) host.hidden = true; trigger.host.style.display = 'none'; return }
     toast.host.hidden = false
     toastRoot.render(<ToastProvider container={toast.mount} closeLabel={t('close')} />)
     if (pageState.pageError && pageState.pageError !== lastPageError) notifyError(pageState.pageError)
     lastPageError = pageState.pageError
-    if (!video) { for (const host of [trigger.host, panel.host, overlay.host]) host.hidden = true; return }
+    if (!video) { for (const host of [trigger.host, panel.host, overlay.host]) host.hidden = true; trigger.host.style.display = 'none'; return }
     // A native host process belongs to the caption port, so ordinary tabs should never open one.
     if (!initializedVideo) {
       initializedVideo = true
@@ -451,18 +451,20 @@ function install(): void {
         trigger.host.style.top = ''
         adapter.controls.append(trigger.host)
       }
-      Object.assign(trigger.host.style, { position: 'relative', display: 'inline-flex', left: '' })
+      Object.assign(trigger.host.style, { position: 'relative', left: '' })
     } else {
       trigger.host.dataset.docked = 'false'
       if (trigger.host.parentElement !== parent) parent.append(trigger.host)
-      Object.assign(trigger.host.style, { position: 'fixed', display: 'block' })
+      Object.assign(trigger.host.style, { position: 'fixed' })
     }
     const rect = video.getBoundingClientRect()
     const theme = getComputedStyle(panel.host)
     const token = (name: string): number => Number.parseFloat(theme.getPropertyValue(name)) || 0
     const spacing = token('--space-1')
+    const player = adapter.container === document.body || adapter.container === document.documentElement ? video : adapter.container
+    trigger.host.hidden = fullscreen === video || (!adapter.controls && !fullscreen && !state.panelOpen && !playerIsInteractive(player, document) && !playerIsInteractive(trigger.host, document))
+    trigger.host.style.display = trigger.host.hidden ? 'none' : adapter.controls ? 'inline-flex' : 'block'
     if (!adapter.controls) { trigger.host.style.left = `${Math.max(0, rect.right - trigger.host.getBoundingClientRect().width - token('--space-2'))}px`; trigger.host.style.top = `${rect.top + spacing}px` }
-    trigger.host.hidden = fullscreen === video || rect.width < 160
     const triggerLabel = t('button')
     // The native hover tooltip rides on the trigger host.
     trigger.host.title = triggerLabel
@@ -573,6 +575,7 @@ function install(): void {
   }
   const unsubscribe = store.subscribe(render)
   let scheduled = false
+  let observedVideo: HTMLVideoElement | null = null
   const refresh = (): void => {
     if (destroyed || scheduled) return
     scheduled = true
@@ -583,7 +586,11 @@ function install(): void {
       const state = store.getSnapshot()
       if (videos.length !== state.videos.length || videos.some((video, index) => video !== state.videos[index])) store.updateVideos(videos)
       const selected = store.getSnapshot().selectedVideo
-      if (selected) resize.observe(selected)
+      if (selected !== observedVideo) {
+        if (observedVideo) resize.unobserve(observedVideo)
+        observedVideo = selected
+        if (selected) resize.observe(selected)
+      }
       const nextFingerprint = `${location.href}|${selected?.currentSrc}|${selected?.getAttribute('src')}`
       const changed = Boolean(fingerprint && fingerprint !== nextFingerprint)
       const enabled = siteEnabled(preferences, location.href)
@@ -623,7 +630,7 @@ function install(): void {
   const desktopLimitsInterval = setInterval(() => {
     if (preferences.pageProvider === 'desktop' && page.state().pageActive || preferences.subtitleProvider === 'desktop' && subtitles.state().active) refreshTranslationLimits()
   }, 5000)
-  const playerEvents = ['scroll', 'resize', 'pointermove', 'pointerleave', 'fullscreenchange', 'enterpictureinpicture', 'leavepictureinpicture', 'timeupdate', 'seeked', 'loadedmetadata']
+  const playerEvents = ['scroll', 'resize', 'pointermove', 'pointerleave', 'focusin', 'focusout', 'fullscreenchange', 'enterpictureinpicture', 'leavepictureinpicture', 'timeupdate', 'seeked', 'loadedmetadata']
   for (const name of playerEvents) window.addEventListener(name, refresh, true)
   const unobservePreferences = observePreferences(next => {
     const changedProviders = next.pageProvider !== preferences.pageProvider || next.subtitleProvider !== preferences.subtitleProvider

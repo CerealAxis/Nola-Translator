@@ -5,7 +5,7 @@ import { Menu } from '@base-ui/react/menu'
 import { AnimatedThemeToggler } from '../../../src/renderer/components/ui/animated-theme-toggler'
 import { Button } from '../../../src/renderer/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../src/renderer/components/ui/card'
-import { ArrowDown, ArrowUpRight, ChevronDown, Globe2, Monitor, Terminal, Check, Github, Sparkle, Star } from 'lucide-react'
+import { ArrowDown, ArrowUpRight, ChevronDown, Globe2, Menu as MenuIcon, Monitor, Terminal, Check, Github, Sparkle, Star } from 'lucide-react'
 import { copy, downloadSources, downloadUrl, license, localeNames, localePath, repositoryUrl } from './content'
 import type { LandingCopy, Locale } from './content'
 import { autoLocaleNames, detectSiteLocale, localizedSitePath, readLocalePreference, saveLocalePreference } from './siteLocale'
@@ -70,6 +70,16 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
           </Menu.Popup></Menu.Positioner></Menu.Portal>
         </Menu.Root>
         <AnimatedThemeToggler className="site-theme site-theme--animated" theme={dark ? 'dark' : 'light'} aria-label={themeLabel} onThemeChange={onToggleTheme} />
+        <Menu.Root>
+          <Menu.Trigger render={<Button variant="secondary" size="icon" />} className="site-mobile-menu" aria-label={t.nav.menu}><MenuIcon aria-hidden="true" /></Menu.Trigger>
+          <Menu.Portal><Menu.Positioner className="z-dropdown" sideOffset={4} align="end"><Menu.Popup className="site-mobile-menu-popup" aria-label={t.nav.menu}>
+            <Menu.Item render={<a href="#product" />}>{t.nav.product}</Menu.Item>
+            <Menu.Item render={<a href="#scenarios" />}>{t.nav.scenarios}</Menu.Item>
+            <Menu.Item render={<a href="#download" />}>{t.nav.download}</Menu.Item>
+            <Menu.Item render={<a href={docUrl} />}>{t.nav.docs}</Menu.Item>
+            <Menu.Item render={<a href={`${base}vis/`} />}>{t.nav.designDocs}</Menu.Item>
+          </Menu.Popup></Menu.Positioner></Menu.Portal>
+        </Menu.Root>
       </div>
     </header>
     <main id="main">

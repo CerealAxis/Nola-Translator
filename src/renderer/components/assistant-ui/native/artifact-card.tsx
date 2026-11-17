@@ -26,7 +26,7 @@ export function ArtifactCard({
       data-slot="artifact-card"
       className={cn(
         paper,
-        "group flex w-full max-w-xs cursor-pointer items-center gap-3 rounded-[20px] p-3.5 transition-transform duration-150 hover:-translate-y-px active:scale-[0.98]",
+        "group flex w-full max-w-xs cursor-pointer items-center gap-3 rounded-[var(--radius-lg)] p-3.5 transition-transform duration-150 hover:-translate-y-px active:scale-[0.98]",
         className,
       )}
 
@@ -41,7 +41,7 @@ export function ArtifactCard({
         />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] font-medium">{title}</p>
+        <p className="truncate [font:var(--font-label)] font-medium">{title}</p>
         {generating ? (
           <p
             className={cn(

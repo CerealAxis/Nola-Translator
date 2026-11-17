@@ -292,12 +292,6 @@ class AsrPipeline:
             except asyncio.CancelledError:
                 pass
 
-    async def dispatch(self):
-        """Wake background recognition without waiting for model inference."""
-
-        self.check()
-        self._wake_worker()
-
     def check(self):
         """Surface background inference failures from the realtime consumer loop."""
 

@@ -1,23 +1,53 @@
-import { useLayoutEffect, useRef } from 'react'
-import { ModelGatewayPage } from './features/model-gateway/ModelGatewayPage'
-import { requestFeatureStart } from './components/primitives/FeatureActivityNotice'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { AppShell } from './components/primitives/AppShell'
+import { ErrorBoundary } from './components/primitives/ErrorBoundary'
+import { Spinner } from './components/ui/spinner'
 import { ArrowLeft, AudioLines, LayoutDashboard, SlidersHorizontal, Settings, MessagesSquare, Network, Headphones, ScanText, BookOpen, Gamepad2 } from 'lucide-react'
-import { getBridge } from './store'
-import { notifyError } from './components/primitives/notify'
 import { useI18n } from './i18n'
-import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, settingsPath, useRoute } from './routes'
+import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, ROUTE_TITLES, Routes, settingsPath, useRoute } from './routes'
 import { HomePage } from './features/home'
-import { OverlayPage } from './features/overlay/OverlayPage'
-import { MeetingModePage } from './features/meeting/MeetingModePage'
-import { ScreenTranslationPage } from './features/screen/ScreenTranslationPage'
-import { ComicTranslationPage } from './features/comic/ComicTranslationPage'
-import { GameTranslationPage } from './features/game/GameTranslationPage'
-import { RecordsPage, RecordDetailPage } from './features/records'
-import { ModelsPage } from './features/models'
-import { SettingsPage } from './features/settings'
 import { SETTINGS_NAVIGATION } from './features/settings/settingsNavigation'
 import type { RoutesProps } from './routes'
 import type { AppShellNavigationItem } from './components/primitives/AppShell'
+
+const WorkbenchPage = lazy(() => import('./features/workbench/WorkbenchPage').then(module => ({ default: module.WorkbenchPage })))
+const ModelGatewayPage = lazy(() => import('./features/model-gateway/ModelGatewayPage').then(module => ({ default: module.ModelGatewayPage })))
+const OverlayPage = lazy(() => import('./features/overlay/OverlayPage').then(module => ({ default: module.OverlayPage })))
+const MeetingModePage = lazy(() => import('./features/meeting/MeetingModePage').then(module => ({ default: module.MeetingModePage })))
+const ScreenTranslationPage = lazy(() => import('./features/screen/ScreenTranslationPage').then(module => ({ default: module.ScreenTranslationPage })))
+const ComicTranslationPage = lazy(() => import('./features/comic/ComicFrontendPage').then(module => ({ default: module.ComicFrontendPage })))
+const GameTranslationPage = lazy(() => import('./features/game/GameTranslationPage').then(module => ({ default: module.GameTranslationPage })))
+const RecordsPage = lazy(() => import('./features/records').then(module => ({ default: module.RecordsPage })))
+const RecordDetailPage = lazy(() => import('./features/records').then(module => ({ default: module.RecordDetailPage })))
+const ModelsPage = lazy(() => import('./features/models').then(module => ({ default: module.ModelsPage })))
+const SettingsPage = lazy(() => import('./features/settings').then(module => ({ default: module.SettingsPage })))
+
+/** Keep the Assistant-ui runtime outside the route element that is keyed by path. */
+export function ApplicationShell({ children }: { children?: ReactNode }) {
+  const navigation = useApplicationNavigation()
+  const { route } = useRoute()
+  const { t } = useI18n()
+  const active = route === 'workbench'
+  const [opened, setOpened] = useState(active)
+  const [sidebar, setSidebar] = useState<HTMLDivElement | null>(null)
+  const [heading, setHeading] = useState<HTMLDivElement | null>(null)
+  const [actions, setActions] = useState<HTMLDivElement | null>(null)
+  useEffect(() => { if (active) setOpened(true) }, [active])
+  const title = route === 'settings' ? t(ROUTE_TITLES.settings) : navigation.find(item => item.active)?.label ?? t(ROUTE_TITLES[route])
+  return <AppShell navigation={navigation} title={title} className={active ? 'nola-app-shell--workbench' : ''}
+    sidebarContent={active ? <div ref={setSidebar} className="nola-workbench-sidebar-slot" /> : undefined}
+    heading={active ? <div ref={setHeading} /> : undefined}
+    actions={active ? <div ref={setActions} className="nola-no-drag" /> : undefined}>
+    {children}
+    {!active && <Routes pages={APPLICATION_PAGES} />}
+    {(active || opened) && <div className="nola-workbench-page" hidden={!active} data-page="workbench">
+      <ErrorBoundary><Suspense fallback={<div className="flex h-full items-center justify-center" role="status" aria-label={t('common.loading')}><Spinner /></div>}>
+        <WorkbenchPage active={active} sidebar={sidebar} heading={heading} actions={actions}
+          onBack={() => navigation.find(item => item.id === 'workbench-back')?.onPress?.()} />
+      </Suspense></ErrorBoundary>
+    </div>}
+  </AppShell>
+}
 
 /** The documentation demo uses the same page registry as the desktop app. */
 export const APPLICATION_PAGES = {
@@ -33,6 +63,7 @@ export const APPLICATION_PAGES = {
   record: () => <RecordDetailPage />,
   models: () => <ModelsPage />,
   settings: () => <SettingsPage />,
+  workbench: () => null, // ApplicationShell owns the persistent instance.
 } satisfies RoutesProps['pages']
 
 function ComicRoutePage() {
@@ -49,9 +80,16 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
   const { t, dictionary } = useI18n()
   const { route, path, tab, navigate } = useRoute()
   const returnPath = useRef('#/')
+  const workbenchReturnPath = useRef('#/')
   useLayoutEffect(() => {
     if (route !== 'settings') returnPath.current = path
+    if (route !== 'settings' && route !== 'workbench') workbenchReturnPath.current = path
   }, [route, path])
+
+  if (route === 'workbench') {
+    return [{ id: 'workbench-back', label: t('suite.back'), icon: ArrowLeft, section: 'features', path: workbenchReturnPath.current,
+      onPress: () => navigate(workbenchReturnPath.current) }]
+  }
 
   if (route === 'settings') {
     return [
@@ -84,8 +122,8 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
       active: route === id || id === 'workspace' && route === 'overlay',
       onPress: () => navigate(path),
     })),
-    { section: 'features', id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#workbench',
-      onPress: () => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) },
+    { section: 'features', id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#/workbench',
+      onPress: () => navigate('#/workbench'),
     },
     { section: 'features', id: 'browser', label: t(SETTINGS_NAVIGATION.browser.label), icon: SETTINGS_NAVIGATION.browser.icon, path: settingsPath('browser'),
       onPress: () => navigate(settingsPath('browser')) },

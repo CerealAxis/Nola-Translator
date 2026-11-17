@@ -578,13 +578,8 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     chooseVideo(index: number) { if (state.status === 'idle') bind(state.videos[index] ?? null) },
     updateVideos(videos: HTMLVideoElement[]) {
       set({ videos })
-      // Prefer the playing, largest visible player; thumbnail/preview videos need no selector UI.
-      const preferred = [...videos].sort((left, right) => {
-        const playing = Number(!right.paused && !right.ended) - Number(!left.paused && !left.ended)
-        if (playing) return playing
-        const a = left.getBoundingClientRect(); const b = right.getBoundingClientRect()
-        return b.width * b.height - a.width * a.height
-      })[0]
+      // FluentRead videoPlayerLocator.ts, GPL-3.0: prefer playing media, then the first candidate.
+      const preferred = videos.find(video => !video.paused && !video.ended) ?? videos[0]
       if (!state.selectedVideo) { if (preferred) bind(preferred); return }
       if (!videos.includes(state.selectedVideo)) {
         if (preferred) {

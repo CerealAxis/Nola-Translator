@@ -116,7 +116,7 @@ it('confirms copying diagnostics only after the store action succeeds', async ()
 
 it('lists user settings including glossary and removes retired routes', () => {
   expect(SETTINGS_TABS.filter(tab => tab !== 'developer')).toEqual([
-    'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'help',
+    'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'preserve-words', 'subtitle-words', 'help',
   ])
   for (const tab of ['translation', 'compute', 'performance', 'advanced', 'more']) {
     expect(parseRoute(`#/settings/${tab}`).tab).toBe('general')

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
+from uuid import uuid4
 from contextvars import ContextVar
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -54,25 +55,11 @@ def _blocking(char: str) -> bool:
                 or 0x1000 <= point <= 0x109f or 0x1780 <= point <= 0x17ff)
 
 
-def resolve_comic_terms(document: dict, selection: dict, project_id: str, text: str, target: str) -> list[GlossaryTerm]:
-    if not document.get("enabled") or selection.get("mode") == "off":
-        return []
-    libraries = []
-    for library in document.get("libraries", []):
-        if not library.get("enabled") or selection.get("mode") == "selected" and library["id"] not in selection.get("libraryIds", []):
-            continue
-        scope = library["scope"]
-        if scope["mode"] != "global" and not any(item["kind"] == "comic" and (item["ids"] == "*" or project_id in item["ids"]) for item in scope["targets"]):
-            continue
-        libraries.append([entry for entry in library["entries"] if entry["enabled"]])
-    return _match_trie(_make_trie(libraries, target), text)
-
-
-def _make_trie(libraries: list[list[dict]], target: str) -> dict:
+def _make_trie(libraries: list[list[dict]], target: str, source_language: str = "*") -> dict:
     trie = {}
     for order, entries in enumerate(libraries):
         for index, entry in enumerate(entries):
-            if entry["targetLanguage"] in ("*", target):
+            if entry["targetLanguage"] in ("*", target) and entry.get("sourceLanguage", "*") in ("*", source_language):
                 source = _normal(entry["source"])
                 branch = trie
                 for char in _fold(source):
@@ -133,6 +120,8 @@ def _match_trie(trie: dict, text: str) -> list[GlossaryTerm]:
 
 class RealtimeRule(GlossaryTerm):
     targetLanguage: str = Field(min_length=1, max_length=32)
+    sourceLanguage: str = Field(default="*", min_length=1, max_length=32)
+    preserve: bool = False
 
 
 class RealtimeGlossaryUpdate(BaseModel):
@@ -161,7 +150,52 @@ class RealtimeGlossary:
         self.revision = snapshot.revision
         return True
 
-    def match(self, text: str, target: str) -> list[GlossaryTerm]:
-        if target not in self.tries:
-            self.tries[target] = _make_trie(self.libraries, target)
-        return _match_trie(self.tries[target], text)
+    def match(self, text: str, target: str, source_language: str = "auto") -> list[GlossaryTerm]:
+        key = (target, source_language)
+        if key not in self.tries:
+            preserve = [[entry for entry in library if entry.get("preserve")] for library in self.libraries]
+            normal = [[entry for entry in library if not entry.get("preserve")] for library in self.libraries]
+            self.tries[key] = (_make_trie(preserve, target, source_language), _make_trie(normal, target, source_language))
+        preserve, normal = self.tries[key]
+        terms = _match_trie(preserve, text) + _match_trie(normal, text)
+        return list({term.model_dump_json(): term for term in terms}.values())
+
+
+def protect_keep_terms(text: str, terms: list[GlossaryTerm]):
+    """Keep spans use verifiable markers; provider instructions alone are not a guarantee."""
+    spans = []
+    for term in terms:
+        if term.mode != "keep":
+            continue
+        flags = 0 if term.caseSensitive else re.IGNORECASE
+        for match in re.finditer(re.escape(term.source), text, flags):
+            start, end = match.span()
+            if start and _blocking(text[start]) and _blocking(text[start - 1]):
+                continue
+            if end < len(text) and _blocking(text[end - 1]) and _blocking(text[end]):
+                continue
+            spans.append((start, end))
+    accepted, end = [], 0
+    for start, stop in sorted(set(spans), key=lambda item: (item[0], -item[1])):
+        if start >= end:
+            accepted.append((start, stop))
+            end = stop
+    prefix = f"⟪NOLA_{uuid4().hex}_"
+    tokens, parts, cursor = [], [], 0
+    for index, (start, end) in enumerate(accepted):
+        marker = f"{prefix}{index}⟫"
+        tokens.append((marker, text[start:end]))
+        parts.extend((text[cursor:start], marker))
+        cursor = end
+    parts.append(text[cursor:])
+
+    def restore(output):
+        for marker, actual in tokens:
+            if output.count(marker) != 1:
+                raise ValueError("preserveTermsChanged")
+            output = output.replace(marker, actual)
+        if prefix in output:
+            raise ValueError("preserveTermsChanged")
+        return output
+
+    return "".join(parts), restore

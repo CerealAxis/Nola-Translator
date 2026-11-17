@@ -829,7 +829,10 @@ class _ConnectionWriter:
         except asyncio.QueueFull:
             pass
         if self._task is not None:
-            await asyncio.wait_for(self._task, timeout=2.0)
+            try:
+                await asyncio.wait_for(self._task, timeout=2.0)
+            except asyncio.TimeoutError:
+                pass
 
 
 async def _hello(ws: WebSocket, session: Session, server_instance_id: str, *, want_owner: bool = False) -> WsHelloAck | None:
@@ -993,6 +996,7 @@ async def input_ws(ws: WebSocket, session_id: UUID, ctx) -> None:
     await writer.start()
     ingestion = _session_ingestion(ctx, session)
     opened: dict[int, object] = {}  # stream_handle -> StreamFormat
+    stream_owners = {}
 
     from .contracts import AudioFrameError, parse_audio_frame
     from .ingestion import InputAudioFrame, StreamFormat
@@ -1045,7 +1049,7 @@ async def input_ws(ws: WebSocket, session_id: UUID, ctx) -> None:
                         encoding=frame.encoding,
                     )
                     opened[frame.stream_handle] = fmt
-                    ingestion.open_stream(str(frame.stream_handle), frame.epoch, fmt)
+                    stream_owners[frame.stream_handle] = ingestion.open_stream(str(frame.stream_handle), frame.epoch, fmt)
                     writer.push_json(
                         WsStreamOpened(
                             stream_handle=frame.stream_handle,
@@ -1055,7 +1059,7 @@ async def input_ws(ws: WebSocket, session_id: UUID, ctx) -> None:
                     )
                 elif frame.frame == "stream_close":
                     if opened.pop(frame.stream_handle, None) is not None:
-                        ingestion.close_stream(str(frame.stream_handle), eof=frame.eof)
+                        ingestion.close_stream(str(frame.stream_handle), eof=frame.eof, expected=stream_owners.pop(frame.stream_handle))
             elif (data := message.get("bytes")) is not None:
                 # Validate against the negotiated format before any allocation,
                 # then delegate continuity/dedup/gap to AudioIngestion.
@@ -1121,6 +1125,8 @@ async def input_ws(ws: WebSocket, session_id: UUID, ctx) -> None:
     except WebSocketDisconnect:
         pass
     finally:
+        for handle in opened:
+            ingestion.close_stream(str(handle), expected=stream_owners[handle])
         await writer.close()
 
 
@@ -1283,8 +1289,9 @@ async def audio_ws(ws: WebSocket, session_id: UUID, ctx) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        if playback is not None:
-            playback.detach(ack.consumer_id)
         forward_task.cancel()
-        session._log.unsubscribe(ack.consumer_id, reason="ws_closed")
+        if session._log.get_subscription(ack.consumer_id) is sub:
+            if playback is not None:
+                playback.detach(ack.consumer_id)
+            session._log.unsubscribe(ack.consumer_id, reason="ws_closed")
         await writer.close()

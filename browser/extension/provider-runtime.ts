@@ -34,6 +34,14 @@ const cooldownUntil = new Map<string, number>()
 const contexts = new Map<string, string>()
 const translationQueues = new Map<string, { active: number; limit: number; pending: Array<() => void>; interactive: Array<() => void> }>()
 
+function expireEntry(map: Map<string, number>, id: string, until: number): void {
+  setTimeout(() => {
+    if (map.get(id) !== until) return
+    if (Date.now() >= until) map.delete(id)
+    else expireEntry(map, id, until)
+  }, Math.min(2_147_483_647, Math.max(0, until - Date.now())))
+}
+
 async function desktopTranslationLimit(): Promise<number> {
   const { textTranslationConcurrency: limit } = await nativeTranslationSummary()
   return typeof limit === 'number' && Number.isInteger(limit) && limit >= 1 && limit <= MAX_WEB_TRANSLATION_CONCURRENCY ? limit : 1
@@ -89,8 +97,14 @@ async function throttle(id: string, rate: number, signal: AbortSignal): Promise<
       await waitForDelay(at - Date.now(), signal)
     }
     signal.throwIfAborted()
-    nextRequest.set(id, Date.now() + 1000 / rate)
-  } finally { waiting.set(id, (waiting.get(id) ?? 1) - 1) }
+    const next = Date.now() + 1000 / rate
+    nextRequest.set(id, next)
+    expireEntry(nextRequest, id, next)
+  } finally {
+    const remaining = (waiting.get(id) ?? 1) - 1
+    if (remaining) waiting.set(id, remaining)
+    else waiting.delete(id)
+  }
 }
 export async function scheduleProviderTranslation(provider: ProviderConnection, preferences: Preferences, signal: AbortSignal, run: () => Promise<string>, interactive = false): Promise<string> {
   const native = provider.preset === 'nola'
@@ -110,7 +124,9 @@ export async function scheduleProviderTranslation(provider: ProviderConnection, 
     } catch (error) {
       if (error instanceof ProviderError && error.retryAfterMs !== undefined &&
         (error.code === 'providerRateLimit' || error.code === 'providerRequestFailed')) {
-        cooldownUntil.set(channel, Math.max(cooldownUntil.get(channel) ?? 0, Date.now() + error.retryAfterMs))
+        const until = Math.max(cooldownUntil.get(channel) ?? 0, Date.now() + error.retryAfterMs)
+        cooldownUntil.set(channel, until)
+        expireEntry(cooldownUntil, channel, until)
       }
       throw error
     }

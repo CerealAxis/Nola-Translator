@@ -102,6 +102,7 @@ export function createIpcBridge(): NolaBridge {
     desktopData: injectedApi()?.desktopData,
     glossary: injectedApi()?.glossary,
     comic: injectedApi()?.comic,
+    wordRules: injectedApi()?.wordRules,
     gameTranslation: injectedApi()?.gameTranslation,
     workspaceView: injectedApi()?.workspaceView,
     requestQuit: () => call('requestQuit', api => api.requestQuit?.() ?? Promise.reject(new MissingIpcApiError('requestQuit'))),
@@ -262,10 +263,6 @@ export function createIpcBridge(): NolaBridge {
         if (!api?.onLanguageModelStream) throw new Error('Language model streaming unavailable')
         return api.onLanguageModelStream(callback)
       },
-      openWorkbench: surface => call('openWorkbench', injected => {
-        if (!injected.openWorkbench) throw new Error('Workbench is unavailable')
-        return injected.openWorkbench(surface)
-      }),
       showWorkspace: () => call('showWorkspace', injected => injected.showWorkspace()),
       openMainPage: path => call('openMainPage', injected => injected.openMainPage(path)),
       // No payload and no translation: the main process resolves the user's default browser

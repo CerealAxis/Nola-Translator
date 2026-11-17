@@ -25,7 +25,7 @@ const fileVariants = cva(
         muted: "bg-muted/50 hover:bg-muted/70",
       },
       size: {
-        sm: "px-2.5 py-1.5 text-xs",
+        sm: "px-2.5 py-1.5 [font:var(--font-caption)]",
         default: "px-3 py-2 text-sm",
         lg: "px-4 py-3 text-base",
       },
@@ -343,7 +343,7 @@ const FileImpl: FileMessagePartComponent = ({
               bytes={
                 kind === "data-uri" ? getDataUrlSize(data) : getBase64Size(data)
               }
-              className="text-muted-foreground text-[11px]"
+              className="text-muted-foreground [font:var(--font-caption)]"
             />
           )}
           <FileDownload
@@ -367,7 +367,7 @@ const FileImpl: FileMessagePartComponent = ({
             bytes={
               kind === "data-uri" ? getDataUrlSize(data) : getBase64Size(data)
             }
-            className="text-xs"
+            className="[font:var(--font-caption)]"
           />
         )}
       </div>

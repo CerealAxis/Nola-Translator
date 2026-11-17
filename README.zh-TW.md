@@ -1,184 +1,182 @@
 <div align="center">
   <img src="assets/brand/nola-logo.svg" alt="Nola Translator Logo" width="112" height="112">
   <h1>Nola Translator</h1>
-  <p>即時字幕與翻譯軟體</p>
+  <p>一款開源的即時翻譯軟體，提供瀏覽器插件版本</p>
   <p><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文（台灣）</a> · <a href="README.zh-HK.md">繁體中文（香港）</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a></p>
 </div>
 
 <p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3-blue.svg?style=flat-square" alt="GPL v3 授權"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3-blue.svg?style=flat-square" alt="GPL v3 授權條款"></a>
   <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml/badge.svg" alt="建置工作流程狀態"></a>
-  <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://img.shields.io/badge/Actions-Download%20Artifacts-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="從 GitHub Actions 下載產物"></a>
+  <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://img.shields.io/badge/Actions-Download%20Artifacts-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="下載 GitHub Actions 產物"></a>
   <a href="https://github.com/CerealAxis/Nola-Translator/releases"><img src="https://img.shields.io/github/v/release/CerealAxis/Nola-Translator?style=flat-square&label=Release" alt="最新 GitHub 版本"></a>
   <a href="https://github.com/CerealAxis/Nola-Translator/releases/latest"><img src="https://img.shields.io/badge/Releases-Download%20Latest-2DA44E?style=flat-square&logo=github&logoColor=white" alt="下載最新版本"></a>
-  <img src="https://img.shields.io/badge/QQ%E7%BE%A4-701699932-12B7F5?style=flat-square&logo=tencentqq&logoColor=white" alt="QQ 群組：701699932">
+  <img src="https://img.shields.io/badge/QQ%E7%BE%A4-701699932-12B7F5?style=flat-square&logo=tencentqq&logoColor=white" alt="QQ 群：701699932">
   <img src="https://img.shields.io/badge/Electron-43-47848F?style=flat-square&logo=electron&logoColor=white" alt="Electron">
   <img src="https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white" alt="React 19">
   <img src="https://img.shields.io/badge/Vite-7-7A5CFA?style=flat-square&logo=vite&logoColor=white" alt="Vite 7">
 </p>
 
+Nola Translator 是一款跨平台即時翻譯應用，支援 Windows 桌面端和瀏覽器端；支援本機推理；同時可以接取千問、MiniMax、OpenAI 相容介面、Google 翻譯、微軟翻譯、Index Translate 等雲端服務商。提供即時字幕、會議口譯、漫畫翻譯等功能。
+
+## 示範
+
 <p align="center">
-  <img src="docs/public/screenshots/zh-TW/home.png" alt="Nola Translator 介面預覽" width="1000">
+  <a href="https://nola.xaviermc.top/">
+    <img src="docs/public/screenshots/zh-TW/home.png" alt="點擊體驗 Nola Translator 線上示範" width="1000">
+  </a>
 </p>
 
-## 專案簡介
+> [!TIP]
+> 點擊體驗線上演示
 
-Nola Translator 是一套即時字幕與翻譯軟體，支援本機模型和雲端模型。您可以使用本機運算資源進行語音辨識與翻譯，也可以連線至雲端模型完成這些工作。
+## 運作方式
 
-## 功能特色
+```mermaid
+graph LR
+    A["聲音<br/>麥克風 · 系統音訊"] --> B["Nola Translator"]
+    H["文字與圖片<br/>網頁 · 螢幕 · 遊戲 · 漫畫"] --> B
+    B --> C{"選擇處理方式"}
+    C -->|"雲端"| D["雲端辨識與翻譯服務"]
+    C -->|"本機"| E["本機模型<br/>辨識 · 翻譯 · 語音合成"]
+    D --> F["字幕 · 譯文 · 翻譯語音"]
+    E --> F
+    F --> G["浮動視窗 · 瀏覽器<br/>會議 · 遊戲 · 漫畫"]
+```
 
-- **本機模型：** 可在本機執行 Qwen3-ASR、SenseVoiceSmall 等語音辨識模型，以及 HY-MT2 等翻譯模型。您也可以搜尋並安裝 Hugging Face 上的其他模型。
-- **雲端模型：** 支援阿里雲、MiniMax 等雲端語音辨識模型，也支援 OpenAI 相容 API、Anthropic、Ollama 等 LLM 協定，以及免費的 MyMemory 翻譯服務。
-- **GPU 加速：** 偵測可用的運算裝置，並可分別指定語音辨識與翻譯所使用的裝置。
-- **瀏覽器擴充功能：** 提供 Chrome 和 Edge 擴充功能，可在網頁影片中顯示雙語字幕，也能將桌面系統音訊設為輸入來源。
-- **浮動字幕：** 可使用系統音訊、指定音訊裝置或麥克風。字幕會顯示在獨立視窗中，並可調整位置、字型大小、顏色、透明度，以及原文和譯文的排列方式。
-- **彈性設定：** 可依需求安裝模型，選擇辨識與翻譯方式、語言方向、運算裝置和字幕樣式；API 憑證會由應用程式安全儲存。
-- **記錄與匯出：** 可儲存字幕記錄並匯出為 TXT、SRT 或 WebVTT。錄音儲存功能可自行啟用。
+| | |
+|---|---|
+| **服務商** | 阿里雲、MiniMax、OpenAI、Gemini、Anthropic、DeepSeek、Google 翻譯、Microsoft Translator、OpenAI 相容介面、Anthropic、Ollama 等|
+| **本機模型** | 26 個 ASR 模型、17 個翻譯模型、16 個 TTS 模型、3 個 LLM 模型、17 個 OCR 模型、5 個漫畫偵測與分類模型、3 個影像修復模型 |
+| **語言** | 60+（語音辨識）· 150+（翻譯）· 29+（語音合成） |
+| **平台** | Windows x64 · Chrome · Edge · Firefox |
+| **隱私** | 本機推理 = 100% 裝置端運行，使用雲端服務時，相關內容會傳送給所選服務商 |
 
-## 介面預覽
-
-| 首頁 | 浮動字幕 | 影片字幕 |
-|---|---|---|
-| ![首頁](docs/public/screenshots/zh-TW/home.png) | ![浮動字幕](docs/public/screenshots/zh-TW/overlay-scene.png) | ![影片字幕](docs/public/screenshots/zh-TW/browser-scene.png) |
-
-| 本機模型安裝 | 推論環境設定 | 深色模式 |
-|---|---|---|
-| ![本機模型安裝](docs/public/screenshots/zh-TW/models.png) | ![推論環境設定](docs/public/screenshots/zh-CN/compute-environment.png) | ![深色模式](docs/public/screenshots/zh-CN/dark-mode.png) |
-
-浮動字幕和影片字幕場景使用 [Blender Foundation《Tears of Steel》](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg) 的裁切畫面，依 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) 授權使用。
+> [!TIP]
+> 軟體支援的語言由所選的模型決定，不同模型支援的語言能力可能不同，具體請以軟體中的配置為準
 
 ## 安裝
 
-- [下載最新版本](https://github.com/CerealAxis/Nola-Translator/releases/latest)
-
-目前支援 Windows x64，可選擇 EXE 或 MSI 安裝程式；其他平台將視開發進度陸續支援。
-
-- [線上說明文件](https://nola.xaviermc.top/zh-TW/)
-
-## 本地語音辨識模型
+Nola 提供**桌面應用程式**和**瀏覽器擴充功能**。桌面端涵蓋即時字幕、會議、螢幕、遊戲和漫畫等場景；瀏覽器擴充功能提供網頁翻譯與視訊字幕，並可連接桌面端呼叫模型能力。
 
 > [!TIP]
-> 可辨識與翻譯的語言取決於所選模型的能力。下表列出內建推薦模型支援的語言。歡迎透過 issue 推薦其他模型，我們會評估是否納入。第一次使用時，可先選擇 **SenseVoiceSmall** 作為辨識模型，以及 **HY-MT2** 作為翻譯模型。
+> 桌面端的會議口譯、螢幕翻譯、遊戲翻譯、漫畫翻譯功能為實驗性功能，正在開發中
 
-| 模型 | 語言數量 | 詳細資訊 |
-|---|---:|---|
-| Qwen3-ASR | 30 | 中文、英文、粵語、阿拉伯文、德文、法文、西班牙文、葡萄牙文、印尼文、義大利文、韓文、俄文、泰文、越南文、日文、土耳其文、印地文、馬來文、荷蘭文、瑞典文、丹麥文、芬蘭文、波蘭文、捷克文、菲律賓文、波斯文、希臘文、匈牙利文、馬其頓文、羅馬尼亞文 |
-| SenseVoiceSmall | 5 | 中文、英文、粵語、日文與韓語 |
-| Fun-ASR Nano | 4 | 中文、英文、日文、粵語 |
-| VibeVoice-ASR | 48 | 英文、中文、西班牙文、葡萄牙文、德文、日文、韓文、法文、俄文、印尼文、瑞典文、義大利文、希伯來文、荷蘭文、波蘭文、挪威文、土耳其文、泰文、阿拉伯文、匈牙利文、加泰蘭文、捷克文、丹麥文、波斯文、南非荷蘭文、印地文、芬蘭文、愛沙尼亞文、希臘文、羅馬尼亞文、越南文、保加利亞文、冰島文、斯洛維尼亞文、斯洛伐克文、立陶宛文、史瓦希里文、烏克蘭文、拉脫維亞文、克羅埃西亞文、尼泊爾文、塞爾維亞文、菲律賓文、馬來文、烏都文、蒙古文、馬其頓文、爪哇文 |
-| MiMo-V2.5-ASR | 3 | 中文、英文、粵語 |
+| | 桌面應用程式 | 瀏覽器擴充功能 |
+|---|---|---|
+| **功能** | 模型閘道、即時字幕、會議口譯、螢幕翻譯、遊戲翻譯、漫畫翻譯、工作台、術語庫 | 網頁翻譯、影片字幕、文件翻譯、服務設定、術語庫 |
+| **使用場景** | 電腦音訊、會議軟體、螢幕內容、遊戲和漫畫 | 網頁及影片 |
+| **安裝方式** | 下載安裝包 | 下載並安裝擴充功能 |
+| **平台** | Windows x64 | Chrome · Edge · Firefox |
 
-## 本地翻譯模型
+### 桌面應用程式
 
-| 模型 | 語言數量 | 詳細資訊 |
-|---|---:|---|
-| HY-MT2 | 38 | 簡體中文、繁體中文、英文、法文、葡萄牙文、西班牙文、日文、土耳其文、俄文、阿拉伯文、韓文、泰文、義大利文、德文、越南文、馬來文、印尼文、菲律賓文、印地文、波蘭文、捷克文、荷蘭文、高棉文、緬甸文、波斯文、古吉拉特文、烏都文、泰盧固文、馬拉地文、希伯來文、孟加拉文、坦米爾文、烏克蘭文、藏文、哈薩克文、蒙古文、維吾爾文、粵語 |
-| M2M100 418M | 100 | 南非荷蘭文、阿姆哈拉文、阿拉伯文、阿斯圖里亞文、亞塞拜然文、巴什喀爾文、白俄羅斯文、保加利亞文、孟加拉文、布列塔尼文、波士尼亞文、加泰蘭文、宿霧文、捷克文、威爾斯文、丹麥文、德文、希臘文、英文、西班牙文、愛沙尼亞文、波斯文、富拉文、芬蘭文、法文、西弗里西亞文、愛爾蘭文、蘇格蘭蓋爾文、加利西亞文、古吉拉特文、豪薩文、希伯來文、印地文、克羅埃西亞文、海地文、匈牙利文、亞美尼亞文、印尼文、伊布文、伊洛闊文、冰島文、義大利文、日文、爪哇文、喬治亞文、哈薩克文、高棉文、坎那達文、韓文、盧森堡文、干達文、林加拉文、寮文、立陶宛文、拉脫維亞文、馬達加斯加文、馬其頓文、馬來亞拉姆文、蒙古文、馬拉地文、馬來文、緬甸文、尼泊爾文、荷蘭文、挪威文、北索托文、奧克西坦文、歐迪亞文、旁遮普文、波蘭文、普什圖文、葡萄牙文、羅馬尼亞文、俄文、信德文、僧伽羅文、斯洛伐克文、斯洛維尼亞文、索馬利文、阿爾巴尼亞文、塞爾維亞文、斯瓦特文、巽他文、瑞典文、史瓦希里文、坦米爾文、泰文、菲律賓文、塞茲瓦納文、土耳其文、烏克蘭文、烏都文、烏茲別克文、越南文、沃洛夫文、科薩文、意第緒文、約魯巴文、中文、祖魯文 |
-| Index-Translate | 150 | 英文、中文、德文、法文、西班牙文、日文、韓文、葡萄牙文、俄文、阿拉伯文、義大利文、荷蘭文、波蘭文、羅馬尼亞文、瑞典文、土耳其文、印地文、越南文、泰文、印尼文、馬來文、菲律賓文、烏克蘭文、波斯文、捷克文、希臘文、丹麥文、匈牙利文、芬蘭文、書面挪威文、斯洛伐克文、保加利亞文、波士尼亞文、加泰蘭文、孟加拉文、希伯來文、立陶宛文、斯洛維尼亞文、愛沙尼亞文、阿爾巴尼亞文、拉脫維亞文、亞塞拜然文、克羅埃西亞文、坦米爾文、尼泊爾文、烏都文、馬其頓文、塞爾維亞文（西里爾）、馬拉地文、喬治亞文、馬來亞拉姆文、哈薩克文、冰島文、加利西亞文、坎那達文、摩洛哥阿拉伯文、古吉拉特文、白俄羅斯文、南非荷蘭文、亞美尼亞文、蒙古文、高棉文、巴斯克文、緬甸文、拉丁文、烏茲別克文（西里爾）、泰盧固文、歐迪亞文、新挪威文、烏茲別克文、史瓦希里文、僧伽羅文、吉爾吉斯文、索馬利文、旁遮普文、埃及阿拉伯文、威爾斯文、諾曼文、普什圖文、愛爾蘭文、塞爾維亞文（拉丁）、豪薩文、中庫爾德文、馬耳他文、粵語、塔吉克文、北庫爾德文、貝塔維文、阿姆哈拉文、寮文、盧森堡文、弗里西文、迪維希文、世界文、盧旺達文、內志阿拉伯文、法羅文、馬達加斯加文、阿薩姆文、信德文、科薩文、土庫曼文、海地克里奧爾文、蘇格蘭蓋爾文、宿霧文、意第緒文、爪哇文、巴什喀爾文、帕皮阿門托文、毛利文、維吾爾文、韃靼文、藏文、白苗文、西亞美尼亞文、約魯巴文、祖魯文、南庫爾德文、薩摩亞文、科西嘉文、斐濟印地文、巽他文、齊切瓦文、伊布文、夏威夷文、塞索托文、米佐文、紹納文、楚瓦什文、南阿塞拜然文、羅曼什文、基隆迪文、印地文（拉丁）、雅庫特文、提格利尼亞文、阿斯圖里亞文、奧克文、欽語（哈卡）、北薩米文、低地德文、奧塞梯文、烏都文（拉丁）、瑞士德文、昂加文、黎凡特阿拉伯文、奧羅莫文、那不勒斯文、上索布文、希利蓋農文、格陵蘭文 |
+- [GitHub Releases](https://github.com/CerealAxis/Nola-Translator/releases)
+- [百度網盤](https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2)
+- [夸克網盤](https://pan.quark.cn/s/ef1e11262087)
 
-## 本地語音合成
+### 瀏覽器擴充功能
 
-| 模型 | 語言數量 | 詳細資訊 |
-|---|---:|---|
-| Qwen3-TTS | 10 | 中文、英文、日文、韓語、德文、法文、俄文、葡萄牙文、西班牙文、義大利文 |
+在 Nola 桌面端的瀏覽器設定中下載和管理擴充功能。擴充功能可以單獨配置翻譯服務；如需呼叫桌面端模型，請在軟體中啟用瀏覽器連線。
 
-## 雲端語音辨識模型
+- [GitHub Releases](https://github.com/CerealAxis/Nola-Translator/releases)
+- [百度網盤](https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2)
+- [夸克網盤](https://pan.quark.cn/s/ef1e11262087)
 
-| 服務供應商 | 模型 | 支援語言 | 詳細資訊 |
-|---|---|---|---|
-| Aliyun | Qwen3.5 / Qwen3.8 LiveTranslate | 60 | 中文、英文、阿拉伯文、德文、法文、西班牙文、葡萄牙文、印尼文、義大利文、韓文、俄文、泰文、越南文、日文、土耳其文、印地文、馬來文、荷蘭文、烏都文、書面挪威文、瑞典文、丹麥文、希伯來文、芬蘭文、波蘭文、冰島文、捷克文、菲律賓文、波斯文、粵語、希臘文、南非荷蘭文、阿斯圖里亞文、白俄羅斯文、保加利亞文、孟加拉文、波士尼亞文、加泰蘭文、宿霧文、愛沙尼亞文、加利西亞文、古吉拉特文、克羅埃西亞文、匈牙利文、爪哇文、哈薩克文、坎那達文、吉爾吉斯文、拉脫維亞文、馬其頓文、馬來亞拉姆文、馬拉地文、旁遮普文、羅馬尼亞文、斯洛伐克文、斯洛維尼亞文、史瓦希里文、塔吉克文、亞塞拜然文、烏克蘭文。3.8 會自動偵測來源語言；3.5 可指定來源語言。 |
-| MiniMax | Speech-to-Text `asr-1.0` | 20 | 阿拉伯文、粵語、中文、英文、菲律賓文、法文、德文、印尼文、義大利文、日文、韓文、馬來文、波蘭文、葡萄牙文、俄文、西班牙文、泰文、土耳其文、烏克蘭文、越南文 |
+<details>
+<summary>在開發者模式下安裝擴展</summary>
 
-## 雲端翻譯模型
+1. 從 Nola 的瀏覽器設定或專案發布頁下載擴充功能。
+2. 解壓縮擴充檔。
+3. 在瀏覽器中開啟擴充管理頁面，並啟用開發者模式。
+4. 選擇“載入已解壓縮的擴充功能”，選擇解壓縮後的資料夾。
 
-| 模型 | 語言數量 | 詳細資訊 |
-|---|---:|---|
-| 阿里雲 LiveTranslate | 60 | 自動偵測 |
-| Index-Translate-35B-A3B | 150 | 英文、中文、德文、法文、西班牙文、日文、韓文、葡萄牙文、俄文、阿拉伯文、義大利文、荷蘭文、波蘭文、羅馬尼亞文、瑞典文、土耳其文、印地文、越南文、泰文、印尼文、馬來文、菲律賓文、烏克蘭文、波斯文、捷克文、希臘文、丹麥文、匈牙利文、芬蘭文、書面挪威文、斯洛伐克文、保加利亞文、波士尼亞文、加泰蘭文、孟加拉文、希伯來文、立陶宛文、斯洛維尼亞文、愛沙尼亞文、阿爾巴尼亞文、拉脫維亞文、亞塞拜然文、克羅埃西亞文、坦米爾文、尼泊爾文、烏都文、馬其頓文、塞爾維亞文（西里爾）、馬拉地文、喬治亞文、馬來亞拉姆文、哈薩克文、冰島文、加利西亞文、坎那達文、摩洛哥阿拉伯文、古吉拉特文、白俄羅斯文、南非荷蘭文、亞美尼亞文、蒙古文、高棉文、巴斯克文、緬甸文、拉丁文、烏茲別克文（西里爾）、泰盧固文、歐迪亞文、新挪威文、烏茲別克文、史瓦希里文、僧伽羅文、吉爾吉斯文、索馬利文、旁遮普文、埃及阿拉伯文、威爾斯文、諾曼文、普什圖文、愛爾蘭文、塞爾維亞文（拉丁）、豪薩文、中庫爾德文、馬耳他文、粵語、塔吉克文、北庫爾德文、貝塔維文、阿姆哈拉文、寮文、盧森堡文、弗里西文、迪維希文、世界文、盧旺達文、內志阿拉伯文、法羅文、馬達加斯加文、阿薩姆文、信德文、科薩文、土庫曼文、海地克里奧爾文、蘇格蘭蓋爾文、宿霧文、意第緒文、爪哇文、巴什喀爾文、帕皮阿門托文、毛利文、維吾爾文、韃靼文、藏文、白苗文、西亞美尼亞文、約魯巴文、祖魯文、南庫爾德文、薩摩亞文、科西嘉文、斐濟印地文、巽他文、齊切瓦文、伊布文、夏威夷文、塞索托文、米佐文、紹納文、楚瓦什文、南阿塞拜然文、羅曼什文、基隆迪文、印地文（拉丁）、雅庫特文、提格利尼亞文、阿斯圖里亞文、奧克文、欽語（哈卡）、北薩米文、低地德文、奧塞梯文、烏都文（拉丁）、瑞士德文、昂加文、黎凡特阿拉伯文、奧羅莫文、那不勒斯文、上索布文、希利蓋農文、格陵蘭文 |
-| Microsoft Translator | 100+ | 以官方語言表為準 |
-| Google 翻譯 | 100+ | 以官方語言表為準 |
-| MyMemory 免費翻譯 | 100+ | 以官方語言表為準 |
-| LLM API（OpenAI 相容／Anthropic／Ollama） | 由所選模型決定 | — |
+</details>
 
-## LLM API 設定
+### 從源碼構建
 
-> [!TIP]
-> 此處的 LLM 協定用於翻譯。阿里雲與 MiniMax ASR 模型使用「音訊與辨識」中的獨立連線設定與憑證。本機模型不需要 API 設定。
-
-### 支援的協定
-
-軟體支援以下 API 協定：
-
-| 協定 |
-|---|
-| OpenAI Chat Completions |
-| OpenAI Responses |
-| Anthropic Messages |
-| Ollama Chat |
-
-### 設定範例
-
-| 服務供應商 | API 格式 | API URL 範例 | 模型 ID 範例 |
-|---|---|---|---|
-| DeepSeek | OpenAI Chat Completions | `https://api.deepseek.com` | `deepseek-flash` |
-| MiniMax | OpenAI Chat Completions | `https://api.minimax.io/v1` | `MiniMax-M3` |
-| MiMo | OpenAI Chat Completions | `https://api.xiaomimimo.com/v1` | `mimo-v2.6-pro` |
-
-### 設定步驟
-
-![LLM API 設定畫面](docs/public/screenshots/zh-CN/llm-configuration.png)
-
-1. 在翻譯設定中選擇 **雲端翻譯**。
-2. 選擇服務供應商支援的 **API 格式**。
-3. 輸入 **API URL**、**API 金鑰**與**模型 ID**。
-4. 依需求調整上下文長度和最大輸出 Token 數。
-
-## 專案結構
-
-```text
-assets/brand/                  標誌與品牌素材
-docs/                          VitePress 產品網站與多語言文件
-engine/nola_translator_engine/  Python 音訊、辨識與翻譯引擎
-engine/tests/                   Python 測試
-scripts/                        安裝與建置指令碼
-src/main/                       Electron 主程序
-src/preload/                    IPC 橋接
-src/renderer/                   React 介面
-src/shared/                     共用契約與設定
-tests/                          應用程式測試
-```
-
-## 開發與建置
+開發環境使用 Node.js 24、npm 11 和 Python 3.12。
 
 ```powershell
-npm run typecheck
-npm test
-.\.venv\Scripts\python.exe -m pytest engine\tests
-npm run build
+git clone https://github.com/CerealAxis/Nola-Translator.git
+cd Nola-Translator
+npm ci
+npm run dev       # 開發
+npm run build     # 建置桌面應用程式
 ```
 
-建置 Windows x64 安裝程式：
+## 功能
 
-```powershell
-npm run dist:win
-```
+### 本機推理
+
+- **語音辨識**：使用本機 ASR 模型，將音訊轉換為文字。
+- **文字翻譯**：使用本地翻譯模型處理辨識結果和其他文字。
+- **語音合成**：使用已配置的語音合成模型產生譯音。
+- **模型管理**：按需安裝模型，選擇運算設備，並在模型閘道中管理模型能力和運作狀態。
+
+### 雲端服務
+
+| 服務或介面 | 主要用途 |
+|---|---|
+| **阿里雲 LiveTranslate** | 端對端語音翻譯 |
+| **阿里雲、MiniMax** | 雲端語音辨識 |
+| **OpenAI 相容介面** | 存取相容的雲端語言模型，用於翻譯和文字處理 |
+| **Anthropic** | 接入使用 Anthropic Messages 協定的模型 |
+| **Ollama** | 接入 Ollama 模型 |
+| **免費翻譯服務** | 使用應用程式提供的免費翻譯服務，如微軟翻譯、Google 翻譯、Index Translate 等 |
+
+### 音訊
+
+- **快速口譯**：採集麥克風、系統音訊或指定應用的聲音，產生即時字幕和譯文。
+- **會議口譯**：翻譯會議雙方發言，透過配置的音訊設備播放或發送譯音。
+- **瀏覽器字幕**：使用標籤頁音訊或系統音訊，為網頁影片顯示字幕。
+- **懸浮字幕**：在獨立視窗中顯示字幕，調整原文、譯文和外觀。
+- **記錄與匯出**：儲存口譯記錄，匯出字幕，並按需儲存錄音。
+
+### 介面
+
+- **多語言介面**：支援簡體中文、繁體中文、英文、日文和韓語，也可跟隨系統語言。
+- **工作台**：使用已配置的模型進行對話、文字處理和其他模型能力呼叫。
+- **螢幕翻譯**：選擇螢幕或視窗中的文字區域，在原始位置顯示譯文。
+- **遊戲翻譯**：從 OCR、Hook 或剪貼簿取得遊戲文本，透過浮窗顯示譯文。
+- **漫畫翻譯**：導入漫畫，在工程中進行辨識、翻譯、修復、排版和編輯。
+- **術語庫**：管理術語，並在支援的翻譯場景中選擇使用。
 
 ## 參與貢獻
 
-Fork 專案、建立分支、提交變更並發起 Pull Request。請簡要說明變更內容與執行過的檢查。設計與程式碼規範請參閱 [DESIGN.md](DESIGN.md) 與[參與貢獻指南](https://nola.xaviermc.top/zh-TW/contributing/)。
+歡迎提交 Issue 和 Pull Request。開始之前，請參閱[專案工程規範](AGENTS.md)與[設計規範](docs/design-system/DESIGN.md)。
 
 ## 贊助
 
-您可以透過以下方式贊助本專案。贊助者可獲得相關權益，包括問題優先答覆、一對一指導、永久列入贊助者名單並在軟體等管道展示，以及功能客製化等。
+如果你希望支持 Nola Translator 的後續開發，可以透過以下方式贊助：
 
-**1. 中國大陸**
 - [愛發電](https://afdian.com/a/CerealAxis)
-
-**2. 其他地區**
 - [GitHub Sponsors](https://github.com/sponsors/CerealAxis/)
 
-## 授權
+## 獲取協助
 
-Nola Translator 原始程式碼採用 [GNU GPL v3.0 only](LICENSE) 授權。第三方元件與模型依各自授權條款使用，詳情請參閱 [Third-Party Notices](THIRD_PARTY_NOTICES.md)。
+- [Issues](https://github.com/CerealAxis/Nola-Translator/issues) — 報告問題
+- [Discussions](https://github.com/CerealAxis/Nola-Translator/discussions) — 提問與交流
+- [幫助文件](https://nola.xaviermc.top/zh-TW/docs) — 幫助文件
+
+## 參考專案
+
+| 專案 | 許可證 |
+| --- | --- |
+| [X-Translator](https://github.com/zhaoyx239/X-Translator) | [MIT](https://github.com/zhaoyx239/X-Translator#acknowledgements) |
+| [流暢閱讀（FluentRead）](https://github.com/FluentRead/FluentRead) | [GPL-3.0](https://github.com/FluentRead/FluentRead/blob/main/LICENSE) |
+| [Sokuji](https://github.com/kizuna-ai-lab/sokuji) | [AGPL-3.0](https://github.com/kizuna-ai-lab/sokuji/blob/main/LICENSE) |
+| [Lumina](https://github.com/lumina-tl/lumina) | [MIT](https://github.com/lumina-tl/lumina/blob/main/LICENSE) |
+| [PhotoCraft](https://github.com/storytold/photocraft) | [MIT](https://github.com/storytold/photocraft/blob/main/LICENSE-MIT) 或 [Apache-2.0](https://github.com/storytold/photocraft/blob/main/LICENSE-APACHE) |
+
+## 授權條款
+
+Nola Translator 的原創軟體程式碼採用 [GPL-3.0-only](LICENSE)，文件中的原創內容採用 [CC BY-SA 4.0](LICENSE-DOCUMENTATION)。
+
+專案使用的第三方元件、模型、字型、圖示及其他資源遵循各自的授權條款。相關版權和授權資訊請參閱[第三方元件聲明](THIRD_PARTY_NOTICES.md)及對應檔案中的說明。
+
+Nola Translator 的名稱、文字標誌及品牌標誌不在上述開源授權的品牌使用許可範圍內。使用條件請參閱[品牌使用聲明](LICENSE-BRAND)。
+
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=CerealAxis/Nola-Translator&type=Date)](https://star-history.com/#CerealAxis/Nola-Translator)

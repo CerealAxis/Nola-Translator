@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 
 from ..models.inpaint_catalog import LAMA_MANGA
@@ -44,16 +45,19 @@ def inpaint_with_model(model, device, image, mask):
 
 
 def _load_model(path):
+    import torch
     from safetensors.torch import load_file
     from .lama_network import FFCResNetGenerator
 
-    model = FFCResNetGenerator(
-        4, 3, n_blocks=18, add_out_act="sigmoid",
-        init_conv_kwargs=dict(ratio_gin=0, ratio_gout=0, enable_lfu=False),
-        downsample_conv_kwargs=dict(ratio_gin=0, ratio_gout=0, enable_lfu=False),
-        resnet_conv_kwargs=dict(ratio_gin=0.75, ratio_gout=0.75, enable_lfu=False),
-    )
-    model.load_state_dict(load_file(str(path)), strict=True)
+    # PyTorch's meta/assign loading recipe avoids allocating a second full weight copy.
+    with torch.device('meta'):
+        model = FFCResNetGenerator(
+            4, 3, n_blocks=18, add_out_act="sigmoid",
+            init_conv_kwargs=dict(ratio_gin=0, ratio_gout=0, enable_lfu=False),
+            downsample_conv_kwargs=dict(ratio_gin=0, ratio_gout=0, enable_lfu=False),
+            resnet_conv_kwargs=dict(ratio_gin=0.75, ratio_gout=0.75, enable_lfu=False),
+        )
+    model.load_state_dict(load_file(str(path)), strict=True, assign=True)
     return model.eval().to("cpu")
 
 
@@ -63,7 +67,11 @@ def _worker():
     import sys
     import cv2
     import numpy as np
+    import os
+    import torch
 
+    torch.set_num_threads(min(2, os.cpu_count() or 1))
+    torch.set_num_interop_threads(1)
     model = _load_model(sys.argv[1])
     print("ready", flush=True)
     for line in sys.stdin:
@@ -148,6 +156,9 @@ class ComicInpainter(ScreenOcr):
             await self._stop_worker()
             raise
         if not output or process.returncode not in (None, 0):
+            if not output:
+                await process.wait()
+            logging.getLogger(__name__).warning('LaMa Manga worker exited: code=%s image=%s', process.returncode, image.shape[:2])
             raise ValueError("inpaintFailed")
         repaired = cv2.imdecode(np.frombuffer(base64.b64decode(output.strip(), validate=True), np.uint8), cv2.IMREAD_COLOR)
         if repaired is None or repaired.shape != image.shape:
@@ -184,14 +195,6 @@ class ComicInpainter(ScreenOcr):
         finally:
             self._inference_gate.release(key)
         return self.status()
-
-    async def repair_installed(self, image, mask):
-        async with self._lease_lock:
-            try:
-                await self.load()
-                return await self.repair(image, mask)
-            finally:
-                await self.release()
 
     async def infer(self, request):
         raise ValueError("invalidModel")

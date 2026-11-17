@@ -41,15 +41,18 @@ it('streams Anthropic reasoning before completion and forwards text and actual u
   const getCredential = vi.fn().mockResolvedValue('fixture-secret')
   const services = { getSettings: () => ({ ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [profile] } }), getCredential }
   const runtime = await createGatewayLanguageModel(services, 'custom:saved', new AbortController().signal)
-  registerLanguageModelIpc({ ...services, acquireLanguageModel: async () => ({ ...runtime, signal: new AbortController().signal, release: vi.fn() }) }, () => true)
+  const runningChanged = vi.fn()
+  registerLanguageModelIpc({ ...services, acquireLanguageModel: async () => ({ ...runtime, signal: new AbortController().signal, release: vi.fn() }) }, () => true, runningChanged)
   const chunks: string[] = []
   const sender = Object.assign(new EventEmitter(), { id: 1, isDestroyed: () => false, send: (_channel: string, data: { chunk: string }) => chunks.push(data.chunk) })
   let completed = false
   const run = handlers.get('app:language-model:stream')!({ sender }, { id: crypto.randomUUID(), modelId: 'saved', body: { messages: [{ id: 'u', role: 'user', parts: [{ type: 'text', text: 'Reply OK' }] }], tools: {} } }).then(() => { completed = true })
   await vi.waitFor(() => expect(chunks.join('')).toContain('reasoning-delta'))
   expect(completed).toBe(false)
+  expect(runningChanged.mock.calls).toEqual([[true]])
   finish()
   await run
+  expect(runningChanged.mock.calls).toEqual([[true], [false]])
   expect(chunks.join('')).toContain('text-delta')
   expect(chunks.join('')).toContain('OK')
   expect(chunks.join('')).toContain('totalTokens')
@@ -149,4 +152,22 @@ it('releases an asynchronously acquired model if the request was cancelled while
   expect(model).not.toHaveBeenCalled()
   expect(release).toHaveBeenCalledOnce()
   expect(release.mock.calls[0][0]).toMatchObject({ name: 'AbortError' })
+})
+
+it('keeps the activity running until every concurrent model request has settled', async () => {
+  const leases: Array<(lease: unknown) => void> = []
+  const runningChanged = vi.fn()
+  registerLanguageModelIpc({ getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '',
+    acquireLanguageModel: () => new Promise<any>(resolve => leases.push(resolve)) }, () => true, runningChanged)
+  const sender = Object.assign(new EventEmitter(), { id: 302, isDestroyed: () => false, send: vi.fn() })
+  const ids = [crypto.randomUUID(), crypto.randomUUID()]
+  const jobs = ids.map(id => handlers.get('app:language-model:stream')!({ sender }, { id, modelId: 'saved',
+    body: { messages: [{ id: 'u', role: 'user', parts: [{ type: 'text', text: 'Hello' }] }], tools: {} } }))
+  expect(runningChanged.mock.calls).toEqual([[true]])
+  for (const [index, id] of ids.entries()) {
+    handlers.get('app:language-model:cancel')!({ sender }, id)
+    leases[index]({ signal: new AbortController().signal, release: vi.fn(), model: vi.fn() })
+    await jobs[index]
+    expect(runningChanged.mock.calls).toEqual(index === 0 ? [[true]] : [[true], [false]])
+  }
 })

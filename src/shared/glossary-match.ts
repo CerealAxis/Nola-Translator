@@ -49,7 +49,7 @@ function indexedText(raw: string) {
   return units
 }
 
-export function resolveGlossaryTerms(document: GlossaryDocument, request: GlossaryTestRequest): GlossaryMatch {
+export function resolveGlossaryTerms(document: GlossaryDocument, request: GlossaryTestRequest, enforceRequestBudget = true): GlossaryMatch {
   const empty = { terms: [], hits: [], signature: '' }
   if (!document.enabled || request.selection.mode === 'off') return empty
   const trie = node()
@@ -100,7 +100,7 @@ export function resolveGlossaryTerms(document: GlossaryDocument, request: Glossa
   const terms = [...new Map(hits.map(hit => [JSON.stringify(hit.term), hit.term])).entries()]
     .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, term]) => term)
   const signature = terms.length ? JSON.stringify({ matcher: 1, renderer: 1, terms }) : ''
-  if (terms.length > 256 || new TextEncoder().encode(signature).length > 32768) throw new Error('glossaryBudgetExceeded')
+  if (enforceRequestBudget && (terms.length > 256 || new TextEncoder().encode(signature).length > 32768)) throw new Error('glossaryBudgetExceeded')
   return { terms, hits, signature }
 }
 

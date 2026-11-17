@@ -13,9 +13,10 @@ if (!process.versions.electron) {
   const { build } = await import('vite')
   const { default: react } = await import('@vitejs/plugin-react')
   const { default: tailwind } = await import('@tailwindcss/vite')
-  if (!process.argv.includes('--skip-build')) await build({ configFile: false, root: resolve('src/renderer'), base: './', plugins: [react(), tailwind()],
+  if (!process.argv.includes('--skip-build')) await build({ configFile: false, root: resolve('tests/e2e/fixtures'), base: './', plugins: [react(), tailwind()],
     resolve: { alias: { '@': resolve('src/renderer'), '@renderer': resolve('src/renderer') } },
-    build: { rollupOptions: { input: resolve('src/renderer/workbench.html') }, outDir: resolve(output, 'renderer'), emptyOutDir: true, minify: false, chunkSizeWarningLimit: 5000 } })
+    build: { target: 'esnext', rollupOptions: { input: resolve('tests/e2e/fixtures/workbench-shell.html') }, outDir: resolve(output, 'renderer'), emptyOutDir: true, minify: false, chunkSizeWarningLimit: 5000 } })
+  await writeFile(resolve(output, 'renderer/index.html'), await readFile(resolve(output, 'renderer/workbench-shell.html')))
   const { build: bundle } = await import('esbuild')
   await bundle({ stdin: { contents: `export { registerWorkbench } from './src/main/workbench';
     export { createGatewayLanguageModel } from './src/main/gateway-language-model';`, resolveDir: process.cwd() },
@@ -37,32 +38,30 @@ if (!process.versions.electron) {
     let settings = { ...structuredClone(DEFAULT_SETTINGS), theme: 'light', uiLanguage: 'zh-CN' }
     const resources = []
     const services = {}
-    if (process.argv.includes('--smoke')) {
-      settings.recognition.modelId = 'qwen3-asr-1.7b-crisp-q4-k'
-      settings.translation.localModelId = 'index-translate-2b-q4-k-m'
-      settings.synthesis = { modelId: 'hub:voice/custom', voice: 'default-fixture-voice' }
-      settings.translation.customModels = [{ id: 'existing', name: 'Existing language model', endpoint: 'http://fixture.invalid/v1', model: 'existing-model', apiFormat: 'chat-completions', contextWindow: 4096, maxOutputTokens: 256, languages: ['zh', 'en'] }]
-      for (const [resourceId, kind, name, installed] of [
-        ['qwen3-asr-1.7b-crisp-q4-k', 'recognitionModel', 'Installed Qwen3-ASR Q4_K', true],
-        ['index-translate-2b-q4-k-m', 'translationModel', 'Installed Index Translate Q4_K_M', true],
-        ['hub:voice/custom', 'ttsModel', 'Installed custom TTS', true],
-        ['not-installed', 'recognitionModel', 'Uninstalled model', false],
-      ]) resources.push({ resourceId, kind, name, installed, provider: 'fixture', description: '', languages: ['zh', 'en'], installedBytes: 1, state: 'idle', cancellable: false })
-      // 模拟模型网关已加载的能力，以及工作台会话选中的已配置模型。
-      const defaults = {
-        asr: 'resource:qwen3-asr-1.7b-crisp-q4-k',
-        mt: 'resource:index-translate-2b-q4-k-m',
-        tts: 'resource:hub:voice/custom',
-        llm: 'custom:existing',
-      }
-      settings.modelPolicy = {
-        enabled: Object.fromEntries(Object.entries(defaults).map(([kind, model]) => [`${kind}:${model}`, true])),
-        defaults,
-        selections: defaults,
-      }
-      for (const [kind, model] of Object.entries(defaults)) {
-        if (model.startsWith('resource:')) services[kind] = { state: 'ready', model, name: '' }
-      }
+    settings.recognition.modelId = 'qwen3-asr-1.7b-crisp-q4-k'
+    settings.translation.localModelId = 'index-translate-2b-q4-k-m'
+    settings.synthesis = { modelId: 'hub:voice/custom', voice: 'default-fixture-voice' }
+    settings.translation.customModels = [{ id: 'existing', name: 'Existing language model', endpoint: 'http://fixture.invalid/v1', model: 'existing-model', apiFormat: 'chat-completions', contextWindow: 4096, maxOutputTokens: 256, languages: ['zh', 'en'] }]
+    for (const [resourceId, kind, name, installed] of [
+      ['qwen3-asr-1.7b-crisp-q4-k', 'recognitionModel', 'Installed Qwen3-ASR Q4_K', true],
+      ['index-translate-2b-q4-k-m', 'translationModel', 'Installed Index Translate Q4_K_M', true],
+      ['hub:voice/custom', 'ttsModel', 'Installed custom TTS', true],
+      ['not-installed', 'recognitionModel', 'Uninstalled model', false],
+    ]) resources.push({ resourceId, kind, name, installed, provider: 'fixture', description: '', languages: ['zh', 'en'], installedBytes: 1, state: 'idle', cancellable: false })
+    // 模拟模型网关已加载的能力，以及工作台会话选中的已配置模型。
+    const defaults = {
+      asr: 'resource:qwen3-asr-1.7b-crisp-q4-k',
+      mt: 'resource:index-translate-2b-q4-k-m',
+      tts: 'resource:hub:voice/custom',
+      llm: 'custom:existing',
+    }
+    settings.modelPolicy = {
+      enabled: Object.fromEntries(Object.entries(defaults).map(([kind, model]) => [`${kind}:${model}`, true])),
+      defaults,
+      selections: defaults,
+    }
+    for (const [kind, model] of Object.entries(defaults)) {
+      if (model.startsWith('resource:')) services[kind] = { state: 'ready', model, name: '' }
     }
     ipcMain.handle('fixture:settings', () => settings)
     ipcMain.handle('fixture:resources', () => ({ storagePath: '', resources }))
@@ -89,7 +88,11 @@ if (!process.versions.electron) {
     })
     ipcMain.handle('fixture:main-page', (_, path) => { mainPage = path })
     ipcMain.handle('fixture:update', (event, patch) => {
-      settings = { ...settings, ...patch }
+      const next = { ...settings, ...patch }
+      for (const key of Object.keys(patch)) {
+        if (patch[key] && typeof patch[key] === 'object' && !Array.isArray(patch[key])) next[key] = { ...settings[key], ...patch[key] }
+      }
+      settings = next
       BrowserWindow.getAllWindows().forEach(win => win.webContents.send('fixture:settings-changed', settings))
       return settings
     })
@@ -112,7 +115,6 @@ if (!process.versions.electron) {
       openMainPage:path=>ipcRenderer.invoke('fixture:main-page',path),
       isMainWindowMaximized:async()=>false,onMainWindowMaximizedChanged:()=>()=>{},
       minimizeMainWindow:async()=>{},toggleMainWindowMaximize:async()=>false,closeMainWindow:async()=>{},
-      openWorkbench:surface=>ipcRenderer.invoke('workbench:open',surface)
     });`)
     const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wav': 'audio/wav', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png' }
     const server = createServer(async (req, res) => {
@@ -127,7 +129,7 @@ if (!process.versions.electron) {
           event({ type: 'message_start', message: { id: 'fixture', type: 'message', role: 'assistant', model: 'existing-model', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 125, output_tokens: 0 } } })
           event({ type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } })
           event({ type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'Native reasoning stream' } })
-          await pause(500)
+          await pause(JSON.stringify(request.messages.at(-1)).includes('Keep generating') ? 4500 : 500)
           event({ type: 'content_block_stop', index: 0 })
           const last = request.messages.at(-1)
           const present = JSON.stringify(last).includes('Show widget') && !JSON.stringify(last).includes('tool_result')
@@ -169,44 +171,48 @@ if (!process.versions.electron) {
     })
     await new Promise(done => server.listen(0, '127.0.0.1', done))
     const origin = `http://127.0.0.1:${server.address().port}`
-    if (process.argv.includes('--smoke')) {
-      settings.translation.customModels[0].endpoint = origin + '/anthropic'
-      settings.translation.customModels[0].apiFormat = 'anthropic'
-    }
+    settings.translation.customModels[0].endpoint = origin + '/anthropic'
+    settings.translation.customModels[0].apiFormat = 'anthropic'
     if (process.argv.includes('--production')) delete process.env.ELECTRON_RENDERER_URL
     else process.env.ELECTRON_RENDERER_URL = origin
     const fixtureProject = { id: 'c29b359b-c948-40b2-99ed-6143e9243fd4', name: 'Fixture project', path: 'C:/fixture' }
-    const workspaceSnapshot = { projects: [fixtureProject], selectedProject: process.argv.includes('--smoke') ? fixtureProject.id : null, skills: [], subagents: [], activity: [], sandbox: { available: false, backend: 'fixture', reason: 'fixture isolation disabled' } }
+    const workspaceSnapshot = { projects: [fixtureProject], selectedProject: fixtureProject.id, skills: [], subagents: [], activity: [], sandbox: { available: false, backend: 'fixture', reason: 'fixture isolation disabled' } }
     const workspace = { project: async () => workspaceSnapshot.selectedProject ? fixtureProject : undefined, skills: async () => [], definitions: async () => workspaceSnapshot.subagents, canUseTerminal: async () => !!workspaceSnapshot.selectedProject,
       terminal: async () => { terminalExecutions++; return JSON.stringify({ exitCode: 0, output: 'Native approved terminal output' }) },
       action: async action => { if (action.action === 'subagent') workspaceSnapshot.subagents = [...workspaceSnapshot.subagents.filter(item => item.id !== action.agent.id), action.agent]; if (action.action === 'selectProject') workspaceSnapshot.selectedProject = action.id; return workspaceSnapshot } }
     const { registerWorkbench, createGatewayLanguageModel } = await import(pathToFileURL(resolve(output, 'window.mjs')).href)
-    const workerPath = resolve(output, 'fixture-model-worker.cjs')
-    await writeFile(workerPath, `require('node:readline').createInterface({ input: process.stdin }).on('line', line => {
-      const request = JSON.parse(line);
-      if (request.kind === 'asr' && !request.audio?.startsWith('data:audio/wav;base64,')) throw new Error('ASR requires normalized audio');
-      const result = request.kind === 'tts' ? { text: '', audio: ${JSON.stringify(fixtureAudio)}, voices: ['default-fixture-voice'] }
-        : { text: request.kind === 'asr' ? 'Default ASR tool transcript' : 'Default MT tool translation' };
-      setTimeout(() => process.stdout.write(JSON.stringify({ ...result, id: request.id }) + '\\n'), 800);
-    });`)
     const modelSettings = { getSettings: () => settings, getCredential: async () => 'fixture-secret' }
-    registerWorkbench(() => settings.theme, resolve('out/main'), options => {
-      const win = new BrowserWindow({ ...options, show: false, webPreferences: { ...options.webPreferences, preload, offscreen: true, backgroundThrottling: false } })
-      win.webContents.on('console-message', event => { if (event.level === 'error') errors.push(event.message) })
-      win.webContents.on('render-process-gone', (_, details) => errors.push(JSON.stringify(details)))
-      return win
-    }, { ...modelSettings, workspace,
+    const win = new BrowserWindow({ width: 1180, height: 780, show: false, frame: false,
+      webPreferences: { preload, offscreen: true, backgroundThrottling: false, partition: 'workbench-fixture' } })
+    win.webContents.on('console-message', event => { if (event.level === 'error') errors.push(event.message) })
+    win.webContents.on('render-process-gone', (_, details) => errors.push(JSON.stringify(details)))
+    const workbench = registerWorkbench(() => win, resolve(output, 'main'), { ...modelSettings, workspace,
       acquireLanguageModel: async binding => {
         const { signal } = new AbortController()
         const model = await createGatewayLanguageModel(modelSettings, binding, signal)
         return { ...model, signal, release: () => { void model.close() } }
       },
-      directLaunch: async () => ({ command: process.execPath, args: [workerPath], cwd: output, env: { ELECTRON_RUN_AS_NODE: '1' } }) })
-    const host = new BrowserWindow({ show: false, webPreferences: { preload, offscreen: true, backgroundThrottling: false } })
-    if (process.argv.includes('--production')) await host.loadFile(resolve('out/renderer/index.html'))
-    else await host.loadURL(origin + '/host')
-    await host.webContents.executeJavaScript(`window.nolaTranslator.openWorkbench('chat')`)
-    const win = BrowserWindow.getAllWindows().find(item => item !== host)
+      inferModel: async (request, signal) => {
+        if (request.kind === 'asr') assert.ok(request.audio?.startsWith('data:audio/wav;base64,'))
+        await pause(800)
+        signal.throwIfAborted()
+        return request.kind === 'tts' ? { text: '', audio: fixtureAudio, voices: ['default-fixture-voice'] }
+          : { text: request.kind === 'asr' ? 'Default ASR tool transcript' : 'Default MT tool translation' }
+      } })
+    if (process.argv.includes('--production')) {
+      // Seed the former file document to verify Electron's existing storage survives the move.
+      const legacy = resolve(output, 'renderer/workbench.html')
+      await writeFile(legacy, '<!doctype html><html><body>Legacy workbench storage fixture</body></html>')
+      await win.loadFile(legacy)
+      const prefix = `nola.local-call:project:${fixtureProject.id}:`
+      const format = 'ai-sdk/v6'
+      const legacyEntry = { id: 'legacy-user', parent_id: null, format,
+        content: { role: 'user', parts: [{ type: 'text', text: 'Message saved by the old workbench' }] } }
+      const legacyItems = [{ remoteId: 'legacy-thread', status: 'regular', title: 'Legacy saved conversation', formats: [format] }]
+      const legacyMessagesKey = prefix + 'formatted-messages:' + JSON.stringify(['legacy-thread', format])
+      await win.webContents.executeJavaScript(`localStorage.setItem(${JSON.stringify(prefix + 'threads')}, ${JSON.stringify(JSON.stringify(legacyItems))}); localStorage.setItem(${JSON.stringify(legacyMessagesKey)}, ${JSON.stringify(JSON.stringify({ messages: [legacyEntry] }))})`)
+      await win.loadFile(resolve(output, 'renderer/index.html'), { hash: '/workbench' })
+    } else await win.loadURL(origin + '/index.html#/workbench')
     const evaluate = code => win.webContents.executeJavaScript(code, true).catch(error => { console.error('Evaluation failed:', code, errors); throw error })
     const waitFor = async code => {
       for (let i = 0; i < 100; i++) { if (await evaluate(code)) return; await pause(100) }
@@ -229,185 +235,242 @@ if (!process.versions.electron) {
       assert.ok(dimensions.root <= dimensions.width + 1, JSON.stringify(dimensions))
       await writeFile(resolve(output, `${name}.png`), (await win.webContents.capturePage()).toPNG())
     }
+    const assertSelectionContrast = async () => {
+      const contrast = await evaluate(`(()=>{
+        const row=document.querySelector('.nola-workbench-sidebar .nola-nav-button[data-active="true"]');
+        if(!row) return 0;
+        const context=document.createElement('canvas').getContext('2d');
+        const luminance=color=>{context.fillStyle=color;context.fillRect(0,0,1,1);const rgb=[...context.getImageData(0,0,1,1).data].slice(0,3).map(value=>{const s=value/255;return s<=0.04045?s/12.92:((s+0.055)/1.055)**2.4;});return rgb[0]*0.2126+rgb[1]*0.7152+rgb[2]*0.0722;};
+        const background=luminance(getComputedStyle(row).backgroundColor);
+        const foreground=luminance(getComputedStyle(row).color);
+        return (Math.max(background,foreground)+0.05)/(Math.min(background,foreground)+0.05);
+      })()`)
+      assert.ok(contrast >= 4.5, `Selected conversation contrast: ${contrast}`)
+    }
     await waitFor(`!!document.querySelector('.aui-composer-input')`)
-    if (process.argv.includes('--smoke')) {
-      assert.ok(await evaluate(`document.documentElement.classList.contains('native-agent-document')`))
-      assert.match(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).backdropFilter`), /blur\(/)
-      await waitFor(`document.querySelector('[data-testid="native-composer"] [data-slot="composer-model-trigger"]').innerText.includes('Existing language model')`)
-      assert.ok(await evaluate(`!!document.querySelector('[data-testid="native-agent-app"]')`))
-      assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).padding`), '10px')
-      assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).borderTopWidth`), '1px')
-      assert.ok(await evaluate(`!!document.querySelector('[data-slot="composer-voice-button"]')`))
-      await type('Hello')
-      await click('.aui-composer-send')
-      await waitFor(`document.body.innerText.includes('Native reasoning stream')`)
-      await waitFor(`document.body.innerText.includes('Native streamed answer') && !document.querySelector('.aui-composer-cancel')`)
-      await waitFor(`document.querySelector('[data-slot="composer-context"]').textContent.includes('0.15')`)
-      await send('Show widget')
-      await waitFor(`document.body.innerText.includes('Native generated UI')`)
-      await waitFor(`document.body.innerText.includes('Native widget completed') && !document.querySelector('.aui-composer-cancel')`)
-      const prefaceCount = await evaluate(`document.body.textContent.split('Preparing native generated UI.').length - 1`)
-      assert.equal(prefaceCount, 1, 'Tool continuation must not repeat its preface')
-      await send('Plan native task')
-      await waitFor(`!!document.querySelector('[data-slot="agent-plan"]') && document.body.innerText.includes('Inspect configuration') && !document.querySelector('.aui-composer-cancel')`)
-      await screenshot('native-catalog-rebuilt-layout')
-      await send('Run approved command')
-      await waitFor(`!!document.querySelector('[data-slot="approval-card"]')`)
-      assert.equal(await evaluate(`window.nolaTranslator.fixtureTerminalCount()`), 0)
-      await click('[data-slot="approval-card-allow-once"]')
-      await waitFor(`document.body.innerText.includes('Native approved terminal output') && !document.querySelector('.aui-composer-cancel')`)
-      assert.equal(await evaluate(`window.nolaTranslator.fixtureTerminalCount()`), 1)
-      assert.ok(await evaluate(`!!document.querySelector('[data-slot="terminal-block"]')`))
+    if (process.argv.includes('--production')) {
+      await waitFor(`!![...document.querySelectorAll('aside button')].find(el=>el.innerText==='Legacy saved conversation')`)
+      await evaluate(`[...document.querySelectorAll('aside button')].find(el=>el.innerText==='Legacy saved conversation').click()`)
+      await waitFor(`document.querySelector('[data-testid="native-conversation"]').textContent.includes('Message saved by the old workbench')`)
+      await screenshot('legacy-conversation-restored')
       await evaluate(`[...document.querySelectorAll('aside button')].find(el=>el.innerText.includes('新建对话')).click()`)
-      await click('[data-testid="native-composer"] [data-slot="composer-model-trigger"]')
-      await waitFor(`!!document.querySelector('[data-slot="composer-menu"][data-open]')`)
-      const names = await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu"][data-open] [data-slot="composer-menu-item"]')].map(el=>el.querySelector('span')?.innerText || el.innerText)`)
-      assert.equal(names.filter(name => name === 'Existing language model').length, 2)
-      for (const name of ['Installed Qwen3-ASR Q4_K', 'Installed Index Translate Q4_K_M', 'Installed custom TTS']) assert.ok(names.includes(name), name)
-      for (const name of ['Whisper', 'NLLB', 'Uninstalled model', 'LLM']) assert.ok(!names.includes(name), name)
-      await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu-item"]')].find(el=>el.querySelector('span')?.innerText==='Installed Qwen3-ASR Q4_K').click()`)
-      await waitFor(`!document.querySelector('.aui-composer-input').readOnly`)
-      await type('empty')
-      const addVideo = `async () => {
-        const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 16;
-        const context = new AudioContext(); const oscillator = context.createOscillator();
-        const destination = context.createMediaStreamDestination(); oscillator.connect(destination); oscillator.start(); await context.resume();
-        const stream = canvas.captureStream(10); destination.stream.getAudioTracks().forEach(track => stream.addTrack(track));
-        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' }); const chunks = [];
-        recorder.ondataavailable = event => chunks.push(event.data);
-        const stopped = new Promise(resolve => recorder.onstop = resolve);
-        recorder.start(); const timer = setInterval(() => canvas.getContext('2d').fillRect(0, 0, 16, 16), 100);
-        await new Promise(resolve => setTimeout(resolve, 1500)); recorder.stop(); await stopped; clearInterval(timer);
-        stream.getTracks().forEach(track => track.stop()); oscillator.stop(); await context.close();
-        const clipboard = new DataTransfer(); clipboard.items.add(new File(chunks, 'very-long-video-filename-for-attachment-layout-and-transcription.webm', { type: 'video/webm' }));
-        document.querySelector('.aui-composer-input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true }));
-      }`
-      await evaluate(`(${addVideo})()`)
-      await waitFor(`!!document.querySelector('[data-slot="composer-attachments"] [data-slot="file-root"]')`)
-      await click('.aui-composer-send')
-      await waitFor(`!!document.querySelector('[data-role="assistant"] [data-slot="run-activity"][data-status="running"]') && document.body.innerText.includes('提取视频音轨')`)
-      assert.equal(await evaluate(`document.querySelector('[data-testid="native-composer"]').innerText.includes('正在准备文件并提取音频')`), false)
-      assert.equal(await evaluate(`[...document.querySelectorAll('[data-role="user"]')].some(el => el.innerText.includes('正在准备文件并提取音频'))`), false)
-      await screenshot('asr-preparing-video')
-      await waitFor(`!!document.querySelector('[data-role="assistant"] [data-slot="run-activity"][data-status="running"]') && [...document.querySelectorAll('[data-slot="tool-call"]')].some(el => el.innerText.includes('语音识别'))`)
-      await screenshot('asr-transcribing-video')
-      await waitFor(`document.body.innerText.includes('识别已完成，未检测到可识别的语音')`)
-      await evaluate(`(${addVideo})()`)
-      await waitFor(`!!document.querySelector('[data-slot="composer-attachments"] [data-slot="file-root"]')`)
-      await click('.aui-composer-send')
-      await waitFor(`document.body.innerText.includes('Fixture video transcript')`)
-      assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] [data-slot="file-root"]').length`), 2)
-      assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] video').length`), 2)
-      assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] audio').length`), 0)
-      assert.ok(await evaluate(`[...document.querySelectorAll('[data-role="user"] [data-slot="file-name"]')].every(el => el.textContent.endsWith('.webm'))`))
-      assert.equal(await evaluate(`document.querySelectorAll('[data-role="assistant"] [data-slot="run-activity"][data-status="complete"]').length`), 2)
-      assert.ok(await evaluate(`[...document.querySelectorAll('[data-role="user"] [data-slot="file-root"]')].every(el => el.getBoundingClientRect().right <= innerWidth && el.scrollWidth <= el.clientWidth + 1)`))
-      await screenshot('asr-video-result')
-      const selectInstalled = async name => {
-        await click('[data-testid="native-composer"] [data-slot="composer-model-trigger"]')
-        await waitFor(`!!document.querySelector('[data-slot="composer-menu"][data-open]')`)
-        await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu-item"]')].find(el=>el.querySelector('span')?.innerText===${JSON.stringify(name)}).click()`)
-      }
-      await selectInstalled('Installed Index Translate Q4_K_M')
-      await type('Translate this text'); await click('.aui-composer-send')
-      await waitFor(`document.querySelectorAll('[data-slot="run-activity"][data-status="running"]').length > 0`)
-      await waitFor(`document.body.innerText.includes('Fixture translation result') && !document.querySelector('.aui-composer-cancel')`)
-      await selectInstalled('Installed custom TTS')
-      await send('Synthesize this text')
-      await waitFor(`!!document.querySelector('[data-role="assistant"] audio')`)
-      await screenshot('direct-mt-tts-results')
-      await selectInstalled('Existing language model')
-      await evaluate(`[...document.querySelectorAll('aside button')].find(el=>el.innerText.includes('新建对话')).click()`)
-      for (const [prompt, model] of [['Use default translation', 'resource:index-translate-2b-q4-k-m'], ['Use default speech', 'resource:hub:voice/custom'], ['Use default recognition', 'resource:qwen3-asr-1.7b-crisp-q4-k']]) {
-        if (prompt.includes('recognition')) {
-          await evaluate(`(${addVideo})()`)
-          await waitFor(`!!document.querySelector('[data-slot="composer-attachments"] [data-slot="file-root"]')`)
-        }
-        await send(prompt)
-        await waitFor(`!document.querySelector('.aui-composer-cancel') && !!document.querySelector('[data-slot="run-activity"][data-status="complete"]')`)
-        await evaluate(`[...document.querySelectorAll('[data-slot="run-activity"]')].at(-1).querySelector('button').click()`)
-        assert.ok(await evaluate(`[...document.querySelectorAll('[data-slot="run-activity"]')].at(-1).textContent.includes(${JSON.stringify(model)})`), `Tool must use ${model}`)
-      }
-      assert.ok(await evaluate(`!!document.querySelector('[data-role="assistant"] audio')`))
-      assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] video').length`), 1)
-      await screenshot('language-model-default-tools')
-      await click('[data-testid="native-composer"] [data-slot="composer-model-trigger"]')
-      await waitFor(`!!document.querySelector('[data-slot="composer-menu"][data-open]')`)
-      await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu-item"]')].find(el=>el.innerText==='模型网关').click()`)
-      await pause(200)
-      assert.equal(mainPage, '#/model-gateway')
-      assert.equal(await evaluate(`!!document.querySelector('.aui-composer-input')`), true)
-      assert.deepEqual(errors.filter(message => !message.includes('Electron Security Warning')), [])
-      console.log('assistant-ui: native chat shell, composer, approved terminal, native streaming, reasoning, token usage, microphone, generative tool UI, installed model catalog and management navigation passed')
-      BrowserWindow.getAllWindows().forEach(item => item.destroy())
-      await new Promise(done => server.close(done))
-      app.quit()
-      return
+      await waitFor(`document.querySelectorAll('[data-role="user"]').length===0`)
     }
-    await evaluate(`document.fonts.ready.then(()=>true)`)
-    await screenshot('welcome-light')
-    await send('介绍一下你的功能')
-    await screenshot('conversation-light')
-    await click('[data-testid="native-composer"] [data-slot="composer-model-trigger"]')
-    await waitFor(`!!document.querySelector('[cmdk-item]')`)
-    await screenshot('model-selector')
-    const selectModel = async name => {
-      if (!await evaluate(`!!document.querySelector('[cmdk-item]')`)) await click('[data-testid="native-composer"] [data-slot="composer-model-trigger"]')
-      await waitFor(`!!document.querySelector('[cmdk-item]')`)
-      await evaluate(`[...document.querySelectorAll('[cmdk-item]')].find(el=>el.innerText.includes(${JSON.stringify(name)})).click()`)
-      await pause(200)
-    }
-    await selectModel('Index Translate')
-    await waitFor(`!!document.querySelector('.aui-composer-add-attachment') || !!document.querySelector('input[type="file"]')`)
-    await evaluate(`(()=>{
-      const bytes=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aAZkAAAAASUVORK5CYII='),c=>c.charCodeAt(0));
-      const data=new DataTransfer();data.items.add(new File([bytes],'screenshot.png',{type:'image/png'}));
-      document.querySelector('.aui-composer-input').dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true}));
+    assert.equal(await evaluate(`document.documentElement.classList.contains('native-agent-document')`), false)
+    assert.equal(BrowserWindow.getAllWindows().length, 1)
+    assert.equal(await evaluate(`document.querySelectorAll('.nola-titlebar').length`), 1)
+    assert.match(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).backdropFilter`), /blur\(/)
+    await waitFor(`document.querySelector('[data-testid="native-composer"] [data-slot="composer-model-trigger"]').innerText.includes('Existing language model')`)
+    assert.ok(await evaluate(`!!document.querySelector('[data-testid="native-agent-app"]')`))
+    const mutedColors = await evaluate(`(()=>{
+      const surface=document.createElement('div');surface.className='bg-muted text-muted';surface.textContent='token check';document.body.append(surface);
+      const probe=document.createElement('div');probe.style.cssText='background:var(--muted);color:var(--muted-foreground)';document.body.append(probe);
+      const a=getComputedStyle(surface), b=getComputedStyle(probe);const result={actual:[a.backgroundColor,a.color],expected:[b.backgroundColor,b.color]};
+      surface.remove();probe.remove();return result;
     })()`)
-    await waitFor(`!!document.querySelector('.aui-attachment-tile')`)
-    await screenshot('translation')
-    await send('翻译这张截图')
-    await waitFor(`document.body.innerText.includes('截图翻译示例')`)
-    await selectModel('IndexTTS')
-    await send('Hello, this is a voice preview.')
-    await waitFor(`!!document.querySelector('audio')`)
-    await waitFor(`document.querySelector('audio').readyState >= 1`)
-    assert.ok(await evaluate(`document.querySelector('audio').duration > 0`))
-    await click('[data-slot="audio-player"] button')
-    await waitFor(`document.querySelector('audio').currentTime > 0`)
-    await evaluate(`document.querySelector('audio').pause()`)
-    await screenshot('tts')
-    await selectModel('SenseVoice')
-    assert.equal(await evaluate(`document.querySelector('.aui-composer-input').readOnly`), false)
-    await click('[aria-label="开始录音"]')
-    await waitFor(`!!document.querySelector('[aria-pressed="true"]')`)
-    await pause(500)
-    await click('[aria-label="结束录音并识别"]')
-    await waitFor(`document.body.innerText.includes('这是一段语音识别示例文字')`)
-    await screenshot('asr')
-    await selectModel('LLM')
-    await click('[data-slot="aui_thread-list-new"]')
-    await waitFor(`document.querySelectorAll('[data-role="assistant"]').length===0`)
-    await send('第二个会话')
-    assert.equal(await evaluate(`document.querySelectorAll('[data-slot="aui_thread-list-item"]').length`), 2)
-    await input('[data-slot="aui_thread-list-search"] input', '介绍')
-    await pause(150)
-    assert.equal(await evaluate(`document.querySelectorAll('[data-slot="aui_thread-list-item"]').length`), 1)
-    await input('[data-slot="aui_thread-list-search"] input', '')
-    await click('[data-slot="aui_thread-list-item-trigger"]')
-    await host.webContents.executeJavaScript(`window.nolaTranslator.openWorkbench('chat')`)
-    assert.equal(BrowserWindow.getAllWindows().length, 2)
-    await evaluate(`window.nolaTranslator.updateSettings({theme:'dark',uiLanguage:'en'})`)
-    await pause(400)
-    await screenshot('conversation-dark-en')
-    win.setSize(760, 600)
-    await screenshot('minimum-dark')
+    assert.deepEqual(mutedColors.actual, mutedColors.expected, 'Muted surfaces and legacy muted text must resolve to separate semantic colors')
+    await screenshot('welcome-aligned-light')
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).padding`), '12px')
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).borderTopWidth`), '1px')
+    assert.ok(await evaluate(`!!document.querySelector('[data-slot="composer-voice-button"]')`))
+    await type('Hello')
+    await click('.aui-composer-send')
+    await waitFor(`document.body.innerText.includes('Native reasoning stream')`)
+    await waitFor(`document.body.innerText.includes('Native streamed answer') && !document.querySelector('.aui-composer-cancel')`)
+    await waitFor(`document.querySelector('[data-slot="composer-context"]').textContent.includes('0.15')`)
+    await screenshot('embedded-welcome-light')
+    await input('.nola-workbench-sidebar input[type="search"]', 'no-matching-conversation')
+    await waitFor(`document.querySelectorAll('.nola-workbench-thread').length===0`)
+    assert.equal(await evaluate(`!!document.querySelector('.nola-workbench-sidebar .nola-nav-button[data-active="true"]')`), false, 'Filtering must not select the new conversation action')
+    await input('.nola-workbench-sidebar input[type="search"]', '')
+    await waitFor(`!!document.querySelector('.nola-workbench-thread .nola-nav-button[data-active="true"]')`)
+    await type('Keep generating')
+    await click('.aui-composer-send')
+    await waitFor(`!!document.querySelector('.aui-composer-cancel')`)
+    await evaluate(`window.workbenchConversation=document.querySelector('[data-testid="native-conversation"]'); location.hash='#/settings/general'`)
+    await waitFor(`!!document.querySelector('.settings-page')`)
+    assert.ok(await evaluate(`document.querySelector('.nola-workbench-page').hidden`))
+    assert.ok(await evaluate(`!!document.querySelector('.aui-composer-cancel')`), 'generation continues while settings is visible')
+    await screenshot('settings-during-generation')
+    await evaluate(`location.hash='#/workbench'`)
+    await waitFor(`!!document.querySelector('.nola-workbench-sidebar')`)
+    assert.ok(await evaluate(`window.workbenchConversation===document.querySelector('[data-testid="native-conversation"]')`))
+    await waitFor(`!document.querySelector('.aui-composer-cancel')`)
+    await type('Draft retained across pages')
+    await evaluate(`location.hash='#/settings/general'`)
+    await waitFor(`!!document.querySelector('.settings-page')`)
+    await evaluate(`location.hash='#/workbench'`)
+    await waitFor(`!!document.querySelector('.nola-workbench-sidebar')`)
+    assert.equal(await evaluate(`document.querySelector('.aui-composer-input').value`), 'Draft retained across pages')
+    await evaluate(`(()=>{const el=document.querySelector('.aui-composer-input');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'');el.dispatchEvent(new Event('input',{bubbles:true}));})()`)
+    await waitFor(`document.querySelector('.aui-composer-input').value===''`)
+    for (const theme of ['light', 'dark']) {
+      await evaluate(`window.nolaTranslator.updateSettings({theme:${JSON.stringify(theme)}})`)
+      await waitFor(`document.documentElement.dataset.theme===${JSON.stringify(theme)}`)
+      await assertSelectionContrast()
+      const feedbackPoint = await evaluate(`(()=>{const button=document.querySelector('[data-slot="message-actions"] button[aria-pressed]');if(button.getAttribute('aria-pressed')!=='true')button.click();const r=button.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()`)
+      win.webContents.sendInputEvent({ type: 'mouseMove', ...feedbackPoint })
+      await pause(200)
+      assert.ok(await evaluate(`(()=>{
+        const button=document.querySelector('[data-slot="message-actions"] button[aria-pressed="true"]');
+        const probe=document.createElement('div');probe.style.cssText='background:var(--accent);color:var(--primary)';document.body.append(probe);
+        const a=getComputedStyle(button), b=getComputedStyle(probe);const matches=a.backgroundColor===b.backgroundColor && a.color===b.color;probe.remove();return matches;
+      })()`), 'Selected feedback must stay blue while hovered')
+      assert.ok(await evaluate(`(()=>{
+        const action=document.querySelector('.nola-workbench-sidebar .nola-nav-button');
+        const thread=document.querySelector('.nola-workbench-thread .nola-nav-button');
+        const a=getComputedStyle(action), b=getComputedStyle(thread);
+        return ['height','fontFamily','fontSize','fontWeight','borderRadius'].every(key=>a[key]===b[key]);
+      })()`), 'Conversation rows must use the main navigation geometry and typography')
+      await evaluate(`document.querySelector('[data-testid="native-composer"]').parentElement.style.transform='translateX(37px)'`)
+      await click('[data-testid="native-composer"] [data-menu-anchor="models"]')
+      await waitFor(`!!document.querySelector('[data-slot="composer-menu-item"][data-selected="true"]')`)
+      assert.ok(await evaluate(`(()=>{const t=document.querySelector('[data-menu-anchor="models"]').getBoundingClientRect(),m=document.querySelector('[data-slot="composer-menu"][data-open]').getBoundingClientRect();return Math.abs(m.left-Math.max(8,Math.min(innerWidth-m.width-8,t.left)))<2 && (t.top-m.height-8<8 || Math.abs(m.bottom-t.top+8)<2)})()`), 'Model menu must align with its trigger inside a transformed container')
+      assert.ok(await evaluate(`(()=>{
+        const item=document.querySelector('[data-slot="composer-menu-item"][data-selected="true"]');
+        const probe=document.createElement('div');probe.style.cssText='background:var(--accent);color:var(--primary);font:var(--font-control)';document.body.append(probe);
+        const a=getComputedStyle(item), b=getComputedStyle(probe);
+        const matches=['backgroundColor','color','fontFamily','fontSize'].every(key=>a[key]===b[key]);probe.remove();return matches;
+      })()`), 'Selected model must use product accent, primary and control font tokens')
+      await screenshot('models-' + theme)
+      await click('[data-testid="native-composer"] [data-menu-anchor="models"]')
+      await click('[data-testid="native-composer"] [data-menu-anchor="effort"]')
+      await waitFor(`!!document.querySelector('[data-slot="composer-menu"][data-open]')`)
+      assert.ok(await evaluate(`(()=>{const t=document.querySelector('[data-menu-anchor="effort"]').getBoundingClientRect(),m=document.querySelector('[data-slot="composer-menu"][data-open]').getBoundingClientRect();return Math.abs(m.left-Math.max(8,Math.min(innerWidth-m.width-8,t.left)))<2 && (t.top-m.height-8<8 || Math.abs(m.bottom-t.top+8)<2)})()`), 'Effort menu must align with its trigger inside a transformed container')
+      await click('[data-testid="native-composer"] [data-menu-anchor="effort"]')
+      await evaluate(`document.querySelector('[data-testid="native-composer"]').parentElement.style.transform=''`)
+      await screenshot('embedded-' + theme)
+      await evaluate(`window.nolaTranslator.updateSettings({appearance:{...${JSON.stringify(settings.appearance)},liquidGlass:false}})`)
+      await waitFor(`document.documentElement.dataset.nolaGlass==='off'`)
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).backdropFilter`), 'none')
+      await assertSelectionContrast()
+      await screenshot('embedded-' + theme + '-solid')
+      await evaluate(`window.nolaTranslator.updateSettings({appearance:{...${JSON.stringify(settings.appearance)},liquidGlass:true}})`)
+    }
+    for (const [width, height, zoom] of [[760,600,1],[1180,780,2]]) {
+      win.setSize(width, height)
+      win.webContents.setZoomFactor(zoom)
+      await pause(400)
+      await screenshot(zoom===2 ? 'embedded-zoom-200' : 'embedded-narrow')
+      await click('[data-testid="native-composer"] [data-menu-anchor="models"]')
+      await waitFor(`!!document.querySelector('[data-slot="composer-menu"][data-open]')`)
+      assert.ok(await evaluate(`(()=>{const r=document.querySelector('[data-slot="composer-menu"][data-open]').getBoundingClientRect();return r.left>=0 && r.top>=0 && r.right<=innerWidth+1 && r.bottom<=innerHeight+1;})()`), 'Model menu must remain inside the viewport at narrow widths and 200% zoom')
+      await screenshot(zoom===2 ? 'models-zoom-200' : 'models-narrow')
+      await click('[data-testid="native-composer"] [data-menu-anchor="models"]')
+    }
+    win.webContents.setZoomFactor(1)
+    win.setSize(1180,780)
+    await pause(300)
+    await evaluate(`(()=>{const original=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);navigator.mediaDevices.getUserMedia=async options=>{const stream=await original(options);window.fixtureMicTracks=stream.getTracks();return stream;};})()`)
+    await click('[data-slot="composer-voice-button"]')
+    await waitFor(`window.fixtureMicTracks?.some(track=>track.readyState==='live')`)
+    await evaluate(`location.hash='#/settings/general'`)
+    await waitFor(`window.fixtureMicTracks.every(track=>track.readyState==='ended')`)
+    await evaluate(`location.hash='#/workbench'`)
+    await waitFor(`!!document.querySelector('.nola-workbench-sidebar')`)
+    await send('Show widget')
+    await waitFor(`document.body.innerText.includes('Native generated UI')`)
+    await waitFor(`document.body.innerText.includes('Native widget completed') && !document.querySelector('.aui-composer-cancel')`)
+    const prefaceCount = await evaluate(`document.body.textContent.split('Preparing native generated UI.').length - 1`)
+    assert.equal(prefaceCount, 1, 'Tool continuation must not repeat its preface')
+    await send('Plan native task')
+    await waitFor(`!!document.querySelector('[data-slot="agent-plan"]') && document.body.innerText.includes('Inspect configuration') && !document.querySelector('.aui-composer-cancel')`)
+    await screenshot('native-catalog-rebuilt-layout')
+    await send('Run approved command')
+    await waitFor(`!!document.querySelector('[data-slot="approval-card"]')`)
+    assert.equal(await evaluate(`window.nolaTranslator.fixtureTerminalCount()`), 0)
+    await click('[data-slot="approval-card-allow-once"]')
+    await waitFor(`document.body.innerText.includes('Native approved terminal output') && !document.querySelector('.aui-composer-cancel')`)
+    assert.equal(await evaluate(`window.nolaTranslator.fixtureTerminalCount()`), 1)
+    assert.ok(await evaluate(`!!document.querySelector('[data-slot="terminal-block"]')`))
+    await evaluate(`[...document.querySelectorAll('aside button')].find(el=>el.innerText.includes('新建对话')).click()`)
+    await click('[data-testid="native-composer"] [data-slot="composer-model-trigger"]')
+    await waitFor(`!!document.querySelector('[data-slot="composer-menu"][data-open]')`)
+    const names = await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu"][data-open] [data-slot="composer-menu-item"]')].map(el=>el.querySelector('span')?.innerText || el.innerText)`)
+    assert.equal(names.filter(name => name === 'Existing language model').length, 2)
+    for (const name of ['Installed Qwen3-ASR Q4_K', 'Installed Index Translate Q4_K_M', 'Installed custom TTS']) assert.ok(names.includes(name), name)
+    for (const name of ['Whisper', 'NLLB', 'Uninstalled model', 'LLM']) assert.ok(!names.includes(name), name)
+    await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu-item"]')].find(el=>el.querySelector('span')?.innerText==='Installed Qwen3-ASR Q4_K').click()`)
+    await waitFor(`!document.querySelector('.aui-composer-input').readOnly`)
+    await type('empty')
+    const addVideo = `async () => {
+      const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 16;
+      const context = new AudioContext(); const oscillator = context.createOscillator();
+      const destination = context.createMediaStreamDestination(); oscillator.connect(destination); oscillator.start(); await context.resume();
+      const stream = canvas.captureStream(10); destination.stream.getAudioTracks().forEach(track => stream.addTrack(track));
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' }); const chunks = [];
+      recorder.ondataavailable = event => chunks.push(event.data);
+      const stopped = new Promise(resolve => recorder.onstop = resolve);
+      recorder.start(); const timer = setInterval(() => canvas.getContext('2d').fillRect(0, 0, 16, 16), 100);
+      await new Promise(resolve => setTimeout(resolve, 1500)); recorder.stop(); await stopped; clearInterval(timer);
+      stream.getTracks().forEach(track => track.stop()); oscillator.stop(); await context.close();
+      const clipboard = new DataTransfer(); clipboard.items.add(new File(chunks, 'very-long-video-filename-for-attachment-layout-and-transcription.webm', { type: 'video/webm' }));
+      document.querySelector('.aui-composer-input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true }));
+    }`
+    await evaluate(`(${addVideo})()`)
+    await waitFor(`!!document.querySelector('[data-slot="composer-attachments"] [data-slot="file-root"]')`)
+    await click('.aui-composer-send')
+    await waitFor(`!!document.querySelector('[data-role="assistant"] [data-slot="run-activity"][data-status="running"]') && document.body.innerText.includes('提取视频音轨')`)
+    assert.equal(await evaluate(`document.querySelector('[data-testid="native-composer"]').innerText.includes('正在准备文件并提取音频')`), false)
+    assert.equal(await evaluate(`[...document.querySelectorAll('[data-role="user"]')].some(el => el.innerText.includes('正在准备文件并提取音频'))`), false)
+    await screenshot('asr-preparing-video')
+    await waitFor(`!!document.querySelector('[data-role="assistant"] [data-slot="run-activity"][data-status="running"]') && [...document.querySelectorAll('[data-slot="tool-call"]')].some(el => el.innerText.includes('语音识别'))`)
+    await screenshot('asr-transcribing-video')
+    await waitFor(`document.body.innerText.includes('识别已完成，未检测到可识别的语音')`)
+    await evaluate(`(${addVideo})()`)
+    await waitFor(`!!document.querySelector('[data-slot="composer-attachments"] [data-slot="file-root"]')`)
+    await click('.aui-composer-send')
+    await waitFor(`document.body.innerText.includes('Fixture video transcript')`)
+    assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] [data-slot="file-root"]').length`), 2)
+    assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] video').length`), 2)
+    assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] audio').length`), 0)
+    assert.ok(await evaluate(`[...document.querySelectorAll('[data-role="user"] [data-slot="file-name"]')].every(el => el.textContent.endsWith('.webm'))`))
+    assert.equal(await evaluate(`document.querySelectorAll('[data-role="assistant"] [data-slot="run-activity"][data-status="complete"]').length`), 2)
+    assert.ok(await evaluate(`[...document.querySelectorAll('[data-role="user"] [data-slot="file-root"]')].every(el => el.getBoundingClientRect().right <= innerWidth && el.scrollWidth <= el.clientWidth + 1)`))
+    await screenshot('asr-video-result')
+    const selectInstalled = async name => {
+      await click('[data-testid="native-composer"] [data-slot="composer-model-trigger"]')
+      await waitFor(`!!document.querySelector('[data-slot="composer-menu"][data-open]')`)
+      await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu-item"]')].find(el=>el.querySelector('span')?.innerText===${JSON.stringify(name)}).click()`)
+    }
+    await selectInstalled('Installed Index Translate Q4_K_M')
+    await type('Translate this text'); await click('.aui-composer-send')
+    await waitFor(`document.querySelectorAll('[data-slot="run-activity"][data-status="running"]').length > 0`)
+    await waitFor(`document.body.innerText.includes('Fixture translation result') && !document.querySelector('.aui-composer-cancel')`)
+    await selectInstalled('Installed custom TTS')
+    await send('Synthesize this text')
+    await waitFor(`!!document.querySelector('[data-role="assistant"] audio')`)
+    await screenshot('direct-mt-tts-results')
+    await selectInstalled('Existing language model')
+    await evaluate(`[...document.querySelectorAll('aside button')].find(el=>el.innerText.includes('新建对话')).click()`)
+    for (const [prompt, model] of [['Use default translation', 'resource:index-translate-2b-q4-k-m'], ['Use default speech', 'resource:hub:voice/custom'], ['Use default recognition', 'resource:qwen3-asr-1.7b-crisp-q4-k']]) {
+      if (prompt.includes('recognition')) {
+        await evaluate(`(${addVideo})()`)
+        await waitFor(`!!document.querySelector('[data-slot="composer-attachments"] [data-slot="file-root"]')`)
+      }
+      await send(prompt)
+      await waitFor(`!document.querySelector('.aui-composer-cancel') && !!document.querySelector('[data-slot="run-activity"][data-status="complete"]')`)
+      await evaluate(`[...document.querySelectorAll('[data-slot="run-activity"]')].at(-1).querySelector('button').click()`)
+      assert.ok(await evaluate(`[...document.querySelectorAll('[data-slot="run-activity"]')].at(-1).textContent.includes(${JSON.stringify(model)})`), `Tool must use ${model}`)
+    }
+    assert.ok(await evaluate(`!!document.querySelector('[data-role="assistant"] audio')`))
+    assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] video').length`), 1)
+    await screenshot('language-model-default-tools')
+    await click('[data-testid="native-composer"] [data-slot="composer-model-trigger"]')
+    await waitFor(`!!document.querySelector('[data-slot="composer-menu"][data-open]')`)
+    await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu-item"]')].find(el=>el.innerText==='模型网关').click()`)
+    await pause(200)
+    assert.equal(mainPage, '#/model-gateway')
+    assert.equal(await evaluate(`!!document.querySelector('.aui-composer-input')`), true)
     assert.deepEqual(errors.filter(message => !message.includes('Electron Security Warning')), [])
-    await writeFile(resolve(output, 'result.json'), JSON.stringify({ passed: true, errors }, null, 2))
-    console.log('assistant-ui: independent window, models, conversations, audio, themes and minimum layout passed')
-    BrowserWindow.getAllWindows().forEach(item => item.destroy())
+    const singleWindow = BrowserWindow.getAllWindows().length === 1
+    await workbench.stop()
+    server.closeAllConnections()
     await new Promise(done => server.close(done))
-    app.quit()
+    await writeFile(resolve(output, process.argv.includes('--production') ? 'result-production.json' : 'result-dev.json'), JSON.stringify({ passed: true, errors, singleWindow }, null, 2))
+    console.log('assistant-ui: embedded single-window shell, background generation, drafts, microphone cleanup, themes, glass, narrow/200% layout, media and native tools passed')
+    BrowserWindow.getAllWindows().forEach(item => item.destroy())
+    app.exit(0)
   }
   void app.whenReady().then(run).catch(error => { console.error(error); app.exit(1) })
 }

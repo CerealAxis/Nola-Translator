@@ -50,7 +50,7 @@ export function DaySeparator({
             >
               <span
                 className={cn(
-                  "max-w-[80%] text-[13.5px] leading-relaxed break-words",
+                  "max-w-[80%] [font:var(--font-label)] leading-relaxed break-words",
                   message.role === "user"
                     ? "bg-foreground/[0.05] rounded-2xl px-3.5 py-2"
                     : "text-foreground/75",

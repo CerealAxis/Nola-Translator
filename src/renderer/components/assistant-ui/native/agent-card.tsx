@@ -50,7 +50,7 @@ export function AgentCard({
       data-slot="agent-card"
       className={cn(
         paper,
-        "flex w-full max-w-sm flex-col gap-3.5 rounded-[20px] p-4",
+        "flex w-full max-w-sm flex-col gap-3.5 rounded-[var(--radius-lg)] p-4",
         className,
       )}
 
@@ -62,18 +62,18 @@ export function AgentCard({
         </span>
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-baseline gap-2">
-            <span className="truncate text-[13.5px] font-medium">{name}</span>
+            <span className="truncate [font:var(--font-label)] font-medium">{name}</span>
             <span className={cn(mono, "text-muted-foreground shrink-0")}>
               v{version}
             </span>
           </span>
-          <span className="text-muted-foreground truncate text-xs">
+          <span className="text-muted-foreground truncate [font:var(--font-caption)]">
             {provider}
           </span>
         </div>
       </div>
 
-      <p className="text-foreground/60 text-xs leading-relaxed">
+      <p className="text-foreground/60 [font:var(--font-caption)] leading-relaxed">
         {description}
       </p>
 
@@ -89,7 +89,7 @@ export function AgentCard({
             >
               {skill.name}
             </span>
-            <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+            <span className="text-muted-foreground min-w-0 flex-1 truncate [font:var(--font-caption)]">
               {skill.description}
             </span>
           </div>
@@ -115,7 +115,7 @@ export function AgentCard({
           connected
             ? cn(field, "text-muted-foreground")
             : cn(inkButton, "justify-center"),
-          "flex h-8 items-center justify-center gap-1.5 rounded-full px-3.5 text-xs font-medium disabled:pointer-events-none",
+          "flex h-8 items-center justify-center gap-1.5 rounded-full px-3.5 [font:var(--font-caption)] font-medium disabled:pointer-events-none",
         )}
       >
         {connected ? (

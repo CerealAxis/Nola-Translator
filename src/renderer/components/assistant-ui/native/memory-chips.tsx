@@ -43,7 +43,7 @@ export function MemoryChips({
           <span
             key={chip.id}
             className={cn(
-              "fade-in zoom-in-95 animate-in fill-mode-both group flex items-center gap-1 rounded-full py-1 pr-1 pl-2.5 text-xs duration-300",
+              "fade-in zoom-in-95 animate-in fill-mode-both group flex items-center gap-1 rounded-full py-1 pr-1 pl-2.5 [font:var(--font-caption)] duration-300",
               chip.change === "existing"
                 ? cn(field, "text-muted-foreground")
                 : "bg-primary/12 text-accent-foreground dark:bg-primary/15 dark:text-primary",

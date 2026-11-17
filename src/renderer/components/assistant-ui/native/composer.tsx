@@ -140,7 +140,7 @@ export function ComposerBar({
       data-drag-active={dragActive || undefined}
       className={cn(
         paper,
-        "flex w-full flex-col gap-2 rounded-[24px] p-2.5 transition-colors",
+        "flex w-full flex-col gap-2 rounded-[var(--radius-lg)] p-3 transition-colors",
         dragActive && "bg-accent",
         className,
       )}
@@ -170,7 +170,9 @@ function useFitInComposer(
         const left = Math.max(8, Math.min(window.innerWidth - width - 8, align === "end" ? triggerRect.right - width : triggerRect.left));
         const above = triggerRect.top - menu.offsetHeight - 8;
         const top = above >= 8 ? above : Math.min(window.innerHeight - menu.offsetHeight - 8, triggerRect.bottom + 8);
-        setFit(current => current?.left === left && current.top === top && current.maxWidth === width ? current : { left, top, maxWidth: width });
+        const localLeft = left - rect.left;
+        const localTop = top - rect.top;
+        setFit(current => current?.left === localLeft && current.top === localTop && current.maxWidth === width ? current : { left: localLeft, top: localTop, maxWidth: width });
         return;
       }
       const parent = menu.offsetParent;
@@ -233,13 +235,13 @@ export const ComposerMenu = forwardRef<
       style={
         fit
           ? anchor && fit.left !== undefined && fit.top !== undefined
-            ? { position: "fixed", left: fit.left, top: fit.top, maxWidth: fit.maxWidth, ...style }
+            ? { position: "absolute", left: fit.left, top: fit.top, maxWidth: fit.maxWidth, ...style }
             : { maxWidth: fit.maxWidth, translate: `${fit.shift ?? 0}px 0`, ...style }
           : style
       }
       className={cn(
         floating,
-        anchor ? "fixed z-popup flex w-72 flex-col gap-0.5 rounded-2xl p-1.5" : "absolute bottom-full z-dropdown mb-2 flex w-72 flex-col gap-0.5 rounded-2xl p-1.5",
+        anchor ? "absolute z-popup flex w-72 flex-col gap-0.5 rounded-[var(--radius-xl)] p-1.5" : "absolute bottom-full z-dropdown mb-2 flex w-72 flex-col gap-0.5 rounded-[var(--radius-xl)] p-1.5",
         align === "start"
           ? "start-0 origin-bottom-left"
           : "end-0 origin-bottom-right",
@@ -264,9 +266,10 @@ export function ComposerMenuItem({
       type="button"
       data-slot="composer-menu-item"
       data-active={active || undefined}
+      data-selected={active || undefined}
+      aria-pressed={active || undefined}
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-[13.5px] transition-colors",
-        active ? field : "hover:bg-foreground/[0.04]",
+        "nola-menu-item flex min-h-[var(--field-control-height)] w-full items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 text-start [font:var(--font-control)] outline-none transition-colors disabled:pointer-events-none disabled:opacity-50 aria-disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-ring",
         className,
       )}
       {...props}
@@ -286,11 +289,11 @@ export function ComposerCommandItem({
     <ComposerMenuItem active={active} {...props}>
       <command.icon className="text-muted-foreground size-3.5 shrink-0" />
       <span className="font-medium">/{command.name}</span>
-      <span className="text-muted-foreground flex-1 truncate text-start text-xs">
+      <span className="text-muted-foreground flex-1 truncate text-start [font:var(--font-caption)]">
         {command.description}
       </span>
       {active && (
-        <kbd className="bg-foreground/[0.06] text-muted-foreground rounded px-1 font-mono text-[10px]">
+        <kbd className="bg-foreground/[0.06] text-muted-foreground rounded px-1 font-mono [font:var(--font-caption)]">
           ↵
         </kbd>
       )}
@@ -348,21 +351,21 @@ export function ComposerAttachmentChip({
       data-state={attachment.state}
       className={cn(
         field,
-        "relative flex items-center gap-2.5 overflow-hidden rounded-[14px] py-1.5 ps-1.5 pe-2.5",
+        "relative flex items-center gap-2.5 overflow-hidden rounded-[var(--radius-lg)] py-1.5 ps-1.5 pe-2.5",
         className,
       )}
       {...props}
     >
-      <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-[10px]">
+      <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-lg)]">
         <Icon className="size-4" />
       </span>
       <span className="flex flex-col">
-        <span className="max-w-36 truncate text-xs font-medium">
+        <span className="max-w-36 truncate [font:var(--font-caption)] font-medium">
           {attachment.name}
         </span>
         <span
           className={cn(
-            "text-[11px]",
+            "[font:var(--font-caption)]",
             attachment.state === "error"
               ? "text-destructive/80"
               : "text-muted-foreground",
@@ -419,7 +422,7 @@ export function ComposerInput({
         onSubmit?.();
       }}
       className={cn(
-        "placeholder:text-muted-foreground min-h-11 w-full bg-transparent px-3 text-[15px] caret-primary outline-none",
+        "placeholder:text-muted-foreground min-h-[var(--field-control-height)] w-full bg-transparent px-3 [font:var(--font-body)] caret-primary outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[var(--radius-md)]",
         className,
       )}
       {...props}
@@ -466,7 +469,7 @@ export function ComposerVoice({
           0:{String(seconds).padStart(2, "0")}
         </span>
       ) : (
-        <ShimmerLabel className="text-muted-foreground relative text-[13px]">
+        <ShimmerLabel className="text-muted-foreground relative [font:var(--font-caption)]">
           Transcribing
         </ShimmerLabel>
       )}
@@ -536,13 +539,13 @@ export function ComposerModelTrigger({
       aria-expanded={open}
       data-slot="composer-model-trigger"
       className={cn(
-        "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground/90 dark:hover:bg-foreground/[0.09] flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-colors",
+        "text-muted-foreground hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground flex min-h-[var(--field-control-height)] min-w-0 max-w-full items-center gap-2 whitespace-nowrap rounded-[var(--radius-xl)] px-3 [font:var(--font-control)] outline-none transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
         className,
       )}
       {...props}
     >
-      {model}
-      <ChevronDownIcon className="size-3 opacity-60" />
+      <span className="min-w-0 truncate">{model}</span>
+      <ChevronDownIcon className="size-3 shrink-0 opacity-60" />
     </button>
   );
 }
@@ -603,7 +606,7 @@ export function ComposerContext({
         )}
       >
         <div className="flex items-baseline justify-between">
-          <p className="text-[13.5px] font-medium">{labels.context}</p>
+          <p className="[font:var(--font-label)] font-medium">{labels.context}</p>
           <p
             className={cn(
               mono,
@@ -630,7 +633,7 @@ export function ComposerContext({
           {segments.map((segment) => (
             <div
               key={segment.label}
-              className="text-muted-foreground flex items-center gap-2.5 text-[13px]"
+              className="text-muted-foreground flex items-center gap-2.5 [font:var(--font-caption)]"
             >
               <span
                 aria-hidden
@@ -647,7 +650,7 @@ export function ComposerContext({
           ))}
         </div>
         <div className="bg-foreground/[0.06] h-px" />
-        <div className="text-muted-foreground flex items-center justify-between text-[13px]">
+        <div className="text-muted-foreground flex items-center justify-between [font:var(--font-caption)]">
           <span>{labels.total}</span>
           <span className={cn(mono, "text-muted-foreground tabular-nums")}>
             {used}k / {usage.total}k

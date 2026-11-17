@@ -383,7 +383,13 @@ class RealtimePipelines:
                 for frame, start in frames:
                     recorder = self.recorders.get(session.session_id)
                     if recorder is not None:
-                        recorder.write_capture(frame.samples.astype("<f4", copy=False).tobytes(), "float32")
+                        write = asyncio.create_task(asyncio.to_thread(
+                            recorder.write_capture, frame.samples.astype("<f4", copy=False).tobytes(), "float32"))
+                        try:
+                            await asyncio.shield(write)
+                        except asyncio.CancelledError:
+                            await write
+                            raise
                     if isinstance(pipeline, AsrPipeline):
                         await pipeline.accept(frame, start, allow_preview=ingestion.buffered_ms < ingestion.buffer_warn_ms)
                     else:

@@ -3,9 +3,25 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app } from 'electron'
 
-import type { BrowserWindowConstructorOptions } from 'electron'
+import type { BrowserWindow, BrowserWindowConstructorOptions } from 'electron'
 
 import type { AppSettings } from '../shared/settings'
+
+/** Window objects can outlive a crashed or detached renderer frame. */
+export function sendToRenderer(window: BrowserWindow, channel: string, ...args: unknown[]): boolean {
+  try {
+    if (window.isDestroyed()) return false
+    const contents = window.webContents
+    if (contents.isDestroyed() || contents.isCrashed()) return false
+    const frame = contents.mainFrame
+    if (frame.detached || frame.isDestroyed()) return false
+    frame.send(channel, ...args)
+    return true
+  } catch (error) {
+    if (/Render frame was disposed|Render frame was destroyed|Object has been destroyed/.test(String(error))) return false
+    throw error
+  }
+}
 
 /** Match renderer documents, never the shared null origin of arbitrary file URLs. */
 export function isTrustedRendererUrl(raw: string, mainDirectory: string, rendererUrl = process.env.ELECTRON_RENDERER_URL): boolean {
@@ -15,7 +31,7 @@ export function isTrustedRendererUrl(raw: string, mainDirectory: string, rendere
       const base = new URL(rendererUrl)
       if (url.origin === base.origin && url.pathname === base.pathname) return true
     }
-    return ['index.html', 'workbench.html', 'comic-editor.html', 'onboarding-card.html', 'latency.html', 'screen.html'].some(entry => {
+    return ['index.html', 'onboarding-card.html', 'latency.html', 'screen.html'].some(entry => {
       const expected = rendererUrl ? new URL(entry, rendererUrl) : pathToFileURL(join(mainDirectory, '../renderer', entry))
       return url.origin === expected.origin && url.protocol === expected.protocol && url.host === expected.host && url.pathname === expected.pathname
     })

@@ -785,10 +785,1064 @@
           }
         }
       }
+    },
+    "/api/v2/comics/books": {
+      "get": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Books",
+        "operationId": "books_api_v2_comics_books_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/workspaces/quick": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Quick",
+        "operationId": "quick_api_v2_comics_workspaces_quick_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/books/import": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Import Book",
+        "operationId": "import_book_api_v2_comics_books_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/books/delete": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Delete",
+        "operationId": "delete_api_v2_comics_books_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ids"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/books/restore": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Restore",
+        "operationId": "restore_api_v2_comics_books_restore_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ids"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/books/{book_id}": {
+      "get": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Book",
+        "operationId": "book_api_v2_comics_books__book_id__get",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Book Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/books/{book_id}/save": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Save",
+        "operationId": "save_api_v2_comics_books__book_id__save_post",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Book Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/books/{book_id}/document": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Document",
+        "operationId": "document_api_v2_comics_books__book_id__document_post",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Book Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mutation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/books/{book_id}/pages/{page_id}/{kind}": {
+      "get": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Image",
+        "operationId": "image_api_v2_comics_books__book_id__pages__page_id___kind__get",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Book Id"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Page Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "max_pixels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 40000000,
+                  "minimum": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Pixels"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/books/{book_id}/export": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Export",
+        "operationId": "export_api_v2_comics_books__book_id__export_post",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Book Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/fonts": {
+      "get": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Fonts",
+        "operationId": "fonts_api_v2_comics_fonts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/fonts/file": {
+      "get": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Font File",
+        "operationId": "font_file_api_v2_comics_fonts_file_get",
+        "parameters": [
+          {
+            "name": "family",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Family"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/jobs": {
+      "get": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Jobs",
+        "operationId": "jobs_api_v2_comics_jobs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Create Job",
+        "operationId": "create_job_api_v2_comics_jobs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/jobs/claim": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Claim",
+        "operationId": "claim_api_v2_comics_jobs_claim_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/jobs/interrupt": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Interrupt",
+        "operationId": "interrupt_api_v2_comics_jobs_interrupt_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/jobs/{job_id}/prepare": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Prepare",
+        "operationId": "prepare_api_v2_comics_jobs__job_id__prepare_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Attempt"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/jobs/{job_id}/complete": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Complete",
+        "operationId": "complete_api_v2_comics_jobs__job_id__complete_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Completion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/comics/jobs/{job_id}/control": {
+      "post": {
+        "tags": [
+          "comics"
+        ],
+        "summary": "Control",
+        "operationId": "control_api_v2_comics_jobs__job_id__control_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Control"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/screen/ocr": {
+      "get": {
+        "summary": "Status",
+        "operationId": "status_api_v2_screen_ocr_get",
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pp-ocrv5-mobile-onnx",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Infer",
+        "operationId": "infer_api_v2_screen_ocr_post",
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pp-ocrv5-mobile-onnx",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OcrRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove",
+        "operationId": "remove_api_v2_screen_ocr_delete",
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pp-ocrv5-mobile-onnx",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/screen/ocr/install": {
+      "post": {
+        "summary": "Install",
+        "operationId": "install_api_v2_screen_ocr_install_post",
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pp-ocrv5-mobile-onnx",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OcrInstallRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Cancel",
+        "operationId": "cancel_api_v2_screen_ocr_install_delete",
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pp-ocrv5-mobile-onnx",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/screen/ocr/release": {
+      "post": {
+        "summary": "Release",
+        "operationId": "release_api_v2_screen_ocr_release_post",
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pp-ocrv5-mobile-onnx",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/screen/ocr/load": {
+      "post": {
+        "summary": "Load",
+        "operationId": "load_api_v2_screen_ocr_load_post",
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pp-ocrv5-mobile-onnx",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ApplyProofCommand": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "applyProof",
+            "title": "Action"
+          },
+          "jobId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Jobid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action",
+          "jobId"
+        ],
+        "title": "ApplyProofCommand"
+      },
+      "Attempt": {
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Attemptid"
+          },
+          "pageId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pageid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "attemptId",
+          "pageId"
+        ],
+        "title": "Attempt"
+      },
       "AudioPreflightRequest": {
         "properties": {
           "input_mode": {
@@ -931,6 +1985,19 @@
         ],
         "title": "AudioProcessesResponse"
       },
+      "AutoSelection": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "auto",
+            "title": "Mode",
+            "default": "auto"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AutoSelection"
+      },
       "CascadePipelineConfig": {
         "properties": {
           "kind": {
@@ -1001,6 +2068,212 @@
         ],
         "title": "CascadePipelineConfig"
       },
+      "Completion": {
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Attemptid"
+          },
+          "pageId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pageid"
+          },
+          "translations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 2048,
+            "title": "Translations"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "attemptId",
+          "pageId"
+        ],
+        "title": "Completion"
+      },
+      "Config": {
+        "properties": {
+          "sourceLanguage": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Sourcelanguage",
+            "default": "ja"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Targetlanguage",
+            "default": "zh"
+          },
+          "normalModel": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Normalmodel",
+            "default": ""
+          },
+          "visualModel": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Visualmodel",
+            "default": ""
+          },
+          "proofModel": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Proofmodel",
+            "default": ""
+          },
+          "rounds": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Rounds",
+            "default": 2
+          },
+          "detector": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ppocr",
+              "rtdetr",
+              "rfdetr-seg"
+            ],
+            "title": "Detector",
+            "default": "auto"
+          },
+          "ocr": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ppocr",
+              "manga-ocr"
+            ],
+            "title": "Ocr",
+            "default": "auto"
+          },
+          "repairMethod": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "lama-manga",
+              "telea",
+              "solid"
+            ],
+            "title": "Repairmethod",
+            "default": "auto"
+          },
+          "glossary": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AutoSelection"
+              },
+              {
+                "$ref": "#/components/schemas/OffSelection"
+              },
+              {
+                "$ref": "#/components/schemas/SelectedSelection"
+              }
+            ],
+            "title": "Glossary",
+            "discriminator": {
+              "propertyName": "mode",
+              "mapping": {
+                "auto": "#/components/schemas/AutoSelection",
+                "off": "#/components/schemas/OffSelection",
+                "selected": "#/components/schemas/SelectedSelection"
+              }
+            }
+          },
+          "excludedSelection": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AutoSelection"
+              },
+              {
+                "$ref": "#/components/schemas/OffSelection"
+              },
+              {
+                "$ref": "#/components/schemas/SelectedSelection"
+              }
+            ],
+            "title": "Excludedselection",
+            "discriminator": {
+              "propertyName": "mode",
+              "mapping": {
+                "auto": "#/components/schemas/AutoSelection",
+                "off": "#/components/schemas/OffSelection",
+                "selected": "#/components/schemas/SelectedSelection"
+              }
+            }
+          },
+          "renderSettings": {
+            "$ref": "#/components/schemas/RenderSettings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Config"
+      },
+      "ConfigureCommand": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "configure",
+            "title": "Action"
+          },
+          "config": {
+            "$ref": "#/components/schemas/Config"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action",
+          "config"
+        ],
+        "title": "ConfigureCommand"
+      },
+      "Control": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "resume",
+              "cancel",
+              "retry"
+            ],
+            "title": "Action"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "Control"
+      },
       "CreateSessionRequest": {
         "properties": {
           "command_id": {
@@ -1068,6 +2341,56 @@
         ],
         "title": "DirectInferenceResult"
       },
+      "ExportRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpg",
+              "images",
+              "cbz",
+              "pdf",
+              "json",
+              "labelplus"
+            ],
+            "title": "Kind"
+          },
+          "pageIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 1000,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageids"
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "source",
+              "clean",
+              "rendered"
+            ],
+            "title": "Layer",
+            "default": "rendered"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "ExportRequest"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1080,6 +2403,129 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "Ids": {
+        "properties": {
+          "projectIds": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Projectids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "projectIds"
+        ],
+        "title": "Ids"
+      },
+      "ImportRequest": {
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Paths"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
+          },
+          "chapterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapterid"
+          },
+          "quick": {
+            "type": "boolean",
+            "title": "Quick",
+            "default": false
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "images",
+              "folder",
+              "archive",
+              "pdf",
+              "ebook"
+            ],
+            "title": "Kind",
+            "default": "auto"
+          },
+          "pdfDpi": {
+            "type": "integer",
+            "maximum": 600.0,
+            "minimum": 72.0,
+            "title": "Pdfdpi",
+            "default": 200
+          },
+          "firstPage": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Firstpage",
+            "default": 1
+          },
+          "lastPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastpage"
+          },
+          "firstFrame": {
+            "type": "boolean",
+            "title": "Firstframe",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "paths"
+        ],
+        "title": "ImportRequest"
       },
       "InputConfig": {
         "properties": {
@@ -1145,6 +2591,86 @@
           "kind"
         ],
         "title": "InputConfig"
+      },
+      "JobRequest": {
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Projectid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expectedrevision"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "visual",
+              "proof",
+              "erase",
+              "detect",
+              "ocr",
+              "repair",
+              "translate"
+            ],
+            "title": "Kind"
+          },
+          "pageIds": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Pageids"
+          },
+          "regionIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 2048,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regionids"
+          },
+          "glossaryDocument": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Glossarydocument"
+          },
+          "wordRulesDocument": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Wordrulesdocument"
+          },
+          "modelConfigSignature": {
+            "type": "string",
+            "maxLength": 128,
+            "title": "Modelconfigsignature",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "projectId",
+          "expectedRevision",
+          "kind",
+          "pageIds"
+        ],
+        "title": "JobRequest"
       },
       "LanguageModelOpenRequest": {
         "properties": {
@@ -1298,6 +2824,110 @@
         ],
         "title": "MeetingRequest"
       },
+      "Mutation": {
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Operationid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expectedrevision"
+          },
+          "command": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConfigureCommand"
+              },
+              {
+                "$ref": "#/components/schemas/SavePagesCommand"
+              },
+              {
+                "$ref": "#/components/schemas/UndoCommand"
+              },
+              {
+                "$ref": "#/components/schemas/RedoCommand"
+              },
+              {
+                "$ref": "#/components/schemas/ApplyProofCommand"
+              }
+            ],
+            "title": "Command",
+            "discriminator": {
+              "propertyName": "action",
+              "mapping": {
+                "applyProof": "#/components/schemas/ApplyProofCommand",
+                "configure": "#/components/schemas/ConfigureCommand",
+                "redo": "#/components/schemas/RedoCommand",
+                "savePages": "#/components/schemas/SavePagesCommand",
+                "undo": "#/components/schemas/UndoCommand"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operationId",
+          "expectedRevision",
+          "command"
+        ],
+        "title": "Mutation"
+      },
+      "OffSelection": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "off",
+            "title": "Mode",
+            "default": "off"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OffSelection"
+      },
+      "PageEdit": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "regions": {
+            "items": {
+              "$ref": "#/components/schemas/Region"
+            },
+            "type": "array",
+            "maxItems": 2048,
+            "title": "Regions"
+          },
+          "maskStrokes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Stroke"
+                },
+                "type": "array",
+                "maxItems": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maskstrokes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "regions"
+        ],
+        "title": "PageEdit"
+      },
       "PlaybackResolution": {
         "properties": {
           "owner_id": {
@@ -1370,6 +3000,18 @@
             "maxLength": 32,
             "minLength": 1,
             "title": "Targetlanguage"
+          },
+          "sourceLanguage": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Sourcelanguage",
+            "default": "*"
+          },
+          "preserve": {
+            "type": "boolean",
+            "title": "Preserve",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -1382,6 +3024,342 @@
           "targetLanguage"
         ],
         "title": "RealtimeRule"
+      },
+      "RedoCommand": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "redo",
+            "title": "Action"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "RedoCommand"
+      },
+      "Region": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "sourceText": {
+            "type": "string",
+            "maxLength": 64000,
+            "title": "Sourcetext",
+            "default": ""
+          },
+          "targetText": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targettext"
+          },
+          "x": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Y"
+          },
+          "width": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Height"
+          },
+          "sourceQuad": {
+            "anyOf": [
+              {
+                "items": {
+                  "prefixItems": [
+                    {
+                      "type": "number",
+                      "minimum": 0.0
+                    },
+                    {
+                      "type": "number",
+                      "minimum": 0.0
+                    }
+                  ],
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
+                },
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcequad"
+          },
+          "sourceLines": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "prefixItems": [
+                      {
+                        "type": "number",
+                        "minimum": 0.0
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0.0
+                      }
+                    ],
+                    "type": "array",
+                    "maxItems": 2,
+                    "minItems": 2
+                  },
+                  "type": "array",
+                  "maxItems": 4,
+                  "minItems": 4
+                },
+                "type": "array",
+                "maxItems": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelines"
+          },
+          "sourceFontSize": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 4096.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcefontsize"
+          },
+          "textQuad": {
+            "anyOf": [
+              {
+                "items": {
+                  "prefixItems": [
+                    {
+                      "type": "number",
+                      "minimum": 0.0
+                    },
+                    {
+                      "type": "number",
+                      "minimum": 0.0
+                    }
+                  ],
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
+                },
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Textquad"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked",
+            "default": false
+          },
+          "ignored": {
+            "type": "boolean",
+            "title": "Ignored",
+            "default": false
+          },
+          "manuallyEdited": {
+            "type": "boolean",
+            "title": "Manuallyedited",
+            "default": false
+          },
+          "style": {
+            "$ref": "#/components/schemas/Style"
+          },
+          "qa": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Qa"
+          },
+          "resolvedLayout": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolvedlayout"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "title": "Region"
+      },
+      "RenderSettings": {
+        "properties": {
+          "fontFamily": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Fontfamily",
+            "default": "Noto Sans SC"
+          },
+          "autoFont": {
+            "type": "boolean",
+            "title": "Autofont",
+            "default": true
+          },
+          "fontSize": {
+            "type": "number",
+            "maximum": 200.0,
+            "minimum": 6.0,
+            "title": "Fontsize",
+            "default": 23
+          },
+          "autoSize": {
+            "type": "boolean",
+            "title": "Autosize",
+            "default": true
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "horizontal",
+              "vertical-rl"
+            ],
+            "title": "Direction",
+            "default": "auto"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$",
+            "title": "Color",
+            "default": "#222222"
+          },
+          "autoColor": {
+            "type": "boolean",
+            "title": "Autocolor",
+            "default": true
+          },
+          "strokeColor": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$",
+            "title": "Strokecolor",
+            "default": "#ffffff"
+          },
+          "strokeWidth": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Strokewidth",
+            "default": 0
+          },
+          "lineSpacing": {
+            "type": "number",
+            "maximum": 3.0,
+            "minimum": 0.5,
+            "title": "Linespacing",
+            "default": 1.4
+          },
+          "autoLineSpacing": {
+            "type": "boolean",
+            "title": "Autolinespacing",
+            "default": true
+          },
+          "align": {
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ],
+            "title": "Align",
+            "default": "center"
+          },
+          "autoAlign": {
+            "type": "boolean",
+            "title": "Autoalign",
+            "default": true
+          },
+          "blockAlign": {
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ],
+            "title": "Blockalign",
+            "default": "center"
+          },
+          "autoBlockAlign": {
+            "type": "boolean",
+            "title": "Autoblockalign",
+            "default": true
+          },
+          "fillColor": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$",
+            "title": "Fillcolor",
+            "default": "#ffffff"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RenderSettings"
       },
       "S2SPipelineConfig": {
         "properties": {
@@ -1416,6 +3394,56 @@
           "s2s_model"
         ],
         "title": "S2SPipelineConfig"
+      },
+      "SavePagesCommand": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "savePages",
+            "title": "Action"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PageEdit"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Pages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action",
+          "pages"
+        ],
+        "title": "SavePagesCommand"
+      },
+      "SelectedSelection": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "selected",
+            "title": "Mode"
+          },
+          "libraryIds": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Libraryids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mode",
+          "libraryIds"
+        ],
+        "title": "SelectedSelection"
       },
       "SessionCommand": {
         "properties": {
@@ -1607,6 +3635,172 @@
         "type": "object",
         "title": "SpeakerDetectionConfig"
       },
+      "Stroke": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "erase",
+              "restore"
+            ],
+            "title": "Mode"
+          },
+          "size": {
+            "type": "number",
+            "maximum": 200.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Size"
+          },
+          "points": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "minItems": 1,
+            "title": "Points"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "mode",
+          "size",
+          "points"
+        ],
+        "title": "Stroke"
+      },
+      "Style": {
+        "properties": {
+          "fontFamily": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontfamily"
+          },
+          "autoFont": {
+            "type": "boolean",
+            "title": "Autofont",
+            "default": false
+          },
+          "fontSize": {
+            "type": "number",
+            "maximum": 200.0,
+            "minimum": 6.0,
+            "title": "Fontsize",
+            "default": 23
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$",
+            "title": "Color",
+            "default": "#222222"
+          },
+          "strokeColor": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$",
+            "title": "Strokecolor",
+            "default": "#ffffff"
+          },
+          "strokeWidth": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Strokewidth",
+            "default": 0
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "horizontal",
+              "vertical-rl"
+            ],
+            "title": "Direction",
+            "default": "horizontal"
+          },
+          "align": {
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ],
+            "title": "Align",
+            "default": "center"
+          },
+          "blockAlign": {
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ],
+            "title": "Blockalign",
+            "default": "center"
+          },
+          "lineSpacing": {
+            "type": "number",
+            "maximum": 3.0,
+            "minimum": 0.5,
+            "title": "Linespacing",
+            "default": 1.4
+          },
+          "autoLineSpacing": {
+            "type": "boolean",
+            "title": "Autolinespacing",
+            "default": false
+          },
+          "autoAlign": {
+            "type": "boolean",
+            "title": "Autoalign",
+            "default": false
+          },
+          "autoBlockAlign": {
+            "type": "boolean",
+            "title": "Autoblockalign",
+            "default": false
+          },
+          "angle": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Angle",
+            "default": 0
+          },
+          "autoFontSize": {
+            "type": "boolean",
+            "title": "Autofontsize",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Style"
+      },
       "SubscriptionRequest": {
         "properties": {
           "command_id": {
@@ -1684,6 +3878,21 @@
         ],
         "title": "SwitchPipelineParams"
       },
+      "UndoCommand": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "undo",
+            "title": "Action"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "UndoCommand"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -1723,6 +3932,122 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "NetworkSettings": {
+        "properties": {
+          "useHuggingFaceMirror": {
+            "type": "boolean",
+            "title": "Usehuggingfacemirror",
+            "default": false
+          },
+          "usePypiMirror": {
+            "type": "boolean",
+            "title": "Usepypimirror",
+            "default": false
+          },
+          "pypiMirrorUrl": {
+            "type": "string",
+            "title": "Pypimirrorurl",
+            "default": "https://mirrors.aliyun.com/pypi/simple/"
+          },
+          "useGithubAccelerate": {
+            "type": "boolean",
+            "title": "Usegithubaccelerate",
+            "default": false
+          },
+          "githubAccelerateUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Githubaccelerateurl",
+            "default": ""
+          },
+          "proxyUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Proxyurl",
+            "default": ""
+          },
+          "proxyForPip": {
+            "type": "boolean",
+            "title": "Proxyforpip",
+            "default": false
+          },
+          "proxyForModelDownload": {
+            "type": "boolean",
+            "title": "Proxyformodeldownload",
+            "default": false
+          },
+          "proxyForRuntimeDownload": {
+            "type": "boolean",
+            "title": "Proxyforruntimedownload",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "NetworkSettings",
+        "description": "Where outbound downloads are fetched from, and whether they go through a proxy.\n\nA copy rides along with each command that reaches the network instead of being fixed once at\nstartup, so a settings change applies to the next download without an engine restart."
+      },
+      "OcrInstallRequest": {
+        "properties": {
+          "network": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OcrInstallRequest"
+      },
+      "OcrRequest": {
+        "properties": {
+          "image": {
+            "type": "string",
+            "maxLength": 16777280,
+            "minLength": 24,
+            "title": "Image"
+          },
+          "appearance": {
+            "type": "boolean",
+            "title": "Appearance",
+            "default": false
+          },
+          "task_mode": {
+            "type": "string",
+            "enum": [
+              "realtime",
+              "offline"
+            ],
+            "title": "Task Mode",
+            "default": "realtime"
+          },
+          "max_concurrency": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Max Concurrency",
+            "default": 1
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$",
+            "title": "Language",
+            "default": "auto"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "image"
+        ],
+        "title": "OcrRequest"
       }
     }
   }

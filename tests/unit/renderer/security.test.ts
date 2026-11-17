@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('renderer content security policy', () => {
-  it.each(['workbench.html', 'onboarding-card.html'])('protects the %s entry document', entry => {
+  it.each(['onboarding-card.html'])('protects the %s entry document', entry => {
     const content = readFileSync(resolve(process.cwd(), 'src/renderer', entry), 'utf8')
     expect(content).toContain('http-equiv="Content-Security-Policy"')
     expect(content).toContain("script-src 'self'")
@@ -37,7 +37,8 @@ describe('renderer content security policy', () => {
     // URL misses media-src fires `error` and nothing else — no thrown error, no failed
     // capture. The scheme source covers both runtimes: `blob:http://localhost:...` in dev,
     // `blob:null/...` once the packaged document is loaded over `file://`.
-    expect(html).toContain("media-src 'self' blob: nola-audio:")
+    expect(html).toContain("media-src 'self' data: blob: nola-audio:")
+    expect(html).toContain("connect-src 'self' data: blob:")
   })
 
   it('keeps dev HMR reachable on localhost', () => {

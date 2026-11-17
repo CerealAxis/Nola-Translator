@@ -48,10 +48,11 @@ export type { HubCompatibility, HubInspectResult, HubModelSummary, HubSearchResu
 export type { PrewarmErrorCode, PrewarmResult } from '../../shared/contracts'
 
 /** Route id for this app's multi-window UI; `routes.tsx` holds the hash mapping. */
-export type RouteId = 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'game-translation' | 'comic-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
+export type RouteId = 'workbench' | 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'game-translation' | 'comic-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
 
 export interface NolaBridge {
   desktopData?: import('../../shared/desktop-data').DesktopDataApi
+  wordRules?: import('../../shared/word-rules').WordRulesBridge
   glossary?: import('../../shared/glossary').GlossaryBridge
   comic?: import('../../shared/comic').ComicBridge
   gameTranslation?: import('../../shared/game-translation').GameTranslationBridge
@@ -158,7 +159,6 @@ export interface NolaBridge {
    */
   app: {
     listComics?(): Promise<import('../../shared/comic').ComicProjectSummary[]>
-    openWorkbench?(surface: import('../../shared/workbench').WorkbenchSurface): Promise<void>
     cancelLanguageModel?(id: string): Promise<void>
     releaseDirectModel?(): Promise<void>
     agentWorkspace?(action: import('../../shared/agent-workspace').WorkspaceAction): Promise<import('../../shared/agent-workspace').AgentWorkspaceSnapshot>
@@ -233,7 +233,6 @@ export interface NolaBridge {
  * Two methods have no UI caller: `overlay.hide` and `overlay.resize`.
  */
 export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
-  'app.openWorkbench': 'ipc',
   'app.cancelLanguageModel': 'ipc',
   'app.releaseDirectModel': 'ipc',
     'app.agentWorkspace': 'ipc',

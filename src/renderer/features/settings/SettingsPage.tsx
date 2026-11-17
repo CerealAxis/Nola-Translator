@@ -23,6 +23,7 @@ import { PerformanceTab } from './tabs/PerformanceTab'
 import { BrowserTab } from './tabs/BrowserTab'
 import { DeveloperTab } from './tabs/DeveloperTab'
 import { ShortcutsTab } from './tabs/ShortcutsTab'
+import { WordRulesTab } from './word-rules/WordRulesTab'
 import { GlossaryTab } from './glossary/GlossaryTab'
 import { SETTINGS_NAVIGATION } from './settingsNavigation'
 
@@ -57,6 +58,8 @@ export function SettingsPage() {
     appearance: <AppearanceTab settings={settings} />,
     storage: <StorageTab settings={settings} />,
     glossary: <GlossaryTab libraryId={glossaryLibraryId} />,
+    'preserve-words': <WordRulesTab key="preserve" kind="preserve" libraryId={glossaryLibraryId} />,
+    'subtitle-words': <WordRulesTab key="mask" kind="mask" libraryId={glossaryLibraryId} />,
     help: <MoreTab />,
     browser: <BrowserTab />,
     developer: import.meta.env.DEV ? <DeveloperTab /> : null,

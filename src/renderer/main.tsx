@@ -3,20 +3,20 @@ import { ModelDownloadNotice } from './features/models/ModelDownloadNotice'
 import { OfflineFailureNotice } from './features/offline/OfflineFailureNotice'
 import './index.css'
 import './theme/desktop-material'
-import { StrictMode, useEffect, useRef, useState } from 'react'
+import { lazy, StrictMode, Suspense, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
 import { showToast, ToastProvider } from './components/ui/toast'
 import type { ToastPayload } from './components/ui/toast'
-import { APPLICATION_PAGES, useApplicationNavigation } from './application'
+import { Spinner } from './components/ui/spinner'
 import { dismissNotice, notifyError } from './components/primitives/notify'
 import { createIpcBridge, isIpcBridgeAvailable } from './bridge/ipc/ipcBridge'
 import { I18nProvider, useI18n } from './i18n'
 import type { TranslationKey } from './i18n'
-import { AppShell, ErrorBoundary, TitleBar } from './components/primitives'
+import { ErrorBoundary, TitleBar } from './components/primitives'
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert'
 import { Button } from './components/ui/button'
-import { ROUTE_TITLES, Routes, useRoute } from './routes'
+import { useRoute } from './routes'
 import { actions, disposeStores, initStores, isEngineConnected, stores, useStore } from './store'
 import type { SettingsCommand } from './store/settingsStore'
 import { OverlayRoot } from './features/overlay/OverlayRoot'
@@ -48,6 +48,7 @@ const isOverlayDocument = new URLSearchParams(window.location.search).get('overl
 const isOverlayMenuDocument = new URLSearchParams(window.location.search).get('overlayMenu') === '1'
 const isOverlayToastDocument = new URLSearchParams(window.location.search).get('overlayToast') === '1'
 const isMigrationDocument = new URLSearchParams(window.location.search).get('migration') === '1'
+const ApplicationShell = lazy(() => import('./application').then(module => ({ default: module.ApplicationShell })))
 if (isOverlayToastDocument) document.documentElement.dataset.overlayToast = 'true'
 const bridge = createIpcBridge()
 const onOverlayToastEmpty = isOverlayToastDocument ? () => bridge.app.dismissOverlayToast?.() : undefined
@@ -227,19 +228,14 @@ function SettingsErrorNotice() {
 
 /** 侧边栏导航 + 路由联动 */
 function Shell() {
-  const navigation = useApplicationNavigation()
-  const { route } = useRoute()
-  const { t } = useI18n()
-  const title = route === 'settings' ? t(ROUTE_TITLES.settings) : navigation.find(item => item.active)?.label ?? t(ROUTE_TITLES[route])
   useOverlayNavigation()
 
   return (
-    <AppShell navigation={navigation} title={title}>
+    <ApplicationShell>
       {isEngineConnected() ? null : <EngineDisconnectedNotice />}
       <SettingsErrorNotice />
-      <Routes pages={APPLICATION_PAGES} />
       <OnboardingTour autoStart={false} />
-    </AppShell>
+    </ApplicationShell>
   )
 }
 
@@ -292,6 +288,7 @@ function WorkspaceWindow() {
 }
 
 function Root() {
+  const { t } = useI18n()
   const engineStatus = useStore(stores.session, state => state.engineStatus)
   const [startupTimedOut, setStartupTimedOut] = useState(false)
   const [startupDialogDismissed, setStartupDialogDismissed] = useState(false)
@@ -326,7 +323,7 @@ function Root() {
 
   return (
     <ErrorBoundary>
-      <Shell />
+      <Suspense fallback={<div className="flex h-full items-center justify-center" role="status" aria-label={t('common.loading')}><Spinner /></div>}><Shell /></Suspense>
       <ModelDownloadNotice />
       <OfflineFailureNotice />
       <ModelCapabilityNotices />

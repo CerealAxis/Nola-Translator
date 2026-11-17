@@ -15,16 +15,16 @@ import numpy as np
 
 
 def classifier_source_crop(image, quad, lines=None, cjk=False):
-    """Reuse the OCR provider's rectification for a detector-confirmed Latin text line."""
+    """Rectify source lettering before applying the upstream classifier input transform."""
+    import cv2
     if not cjk and lines:
-        import cv2
-        from .comic_ocr_providers import _crop_quad
-        selected=max(lines,key=lambda value:abs(cv2.contourArea(np.asarray(value,np.float32))))
-        return _crop_quad(image,selected)
-    points=np.asarray(quad,float)
-    left,top=np.floor(points.min(axis=0)).astype(int)
-    right,bottom=np.ceil(points.max(axis=0)).astype(int)
-    return image[max(0,top):min(image.shape[0],bottom),max(0,left):min(image.shape[1],right)]
+        quad=max(lines,key=lambda value:abs(cv2.contourArea(np.asarray(value,np.float32))))
+    points=np.asarray(quad,np.float32)
+    width=max(2,round((np.linalg.norm(points[1]-points[0])+np.linalg.norm(points[2]-points[3]))/2))
+    height=max(2,round((np.linalg.norm(points[3]-points[0])+np.linalg.norm(points[2]-points[1]))/2))
+    destination=np.array([[0,0],[width-1,0],[width-1,height-1],[0,height-1]],np.float32)
+    return cv2.warpPerspective(image,cv2.getPerspectiveTransform(points,destination),
+        (width,height),borderValue=(255,255,255))
 
 
 def font_classifier_input(image):
@@ -63,7 +63,7 @@ def installed_candidate(candidate, fonts, text):
     label = re.sub(r'-(?:Thin|ExtraLight|Light|Regular|Medium|SemiBold|Bold|ExtraBold|Black)?(?:Italic)?$', '', label)
     matches = [item for item in fonts.list() if normalize(item['family']) == normalize(label)]
     for item in matches:
-        path = fonts.resolve(item['family'], item['weight'], item['italic'])
+        path = fonts.path(item['family'])
         try:
             from fontTools.ttLib import TTFont
         except ImportError:
@@ -88,7 +88,7 @@ def category_font_family(fonts, text, serif, language='zh'):
     catalog=sorted(fonts.list(),key=lambda item:(order.get(item['family'].casefold(),len(order)),item['family']))
     for item in catalog:
         try:
-            with TTFont(str(fonts.resolve(item['family'],item['weight'],item['italic'])),fontNumber=0,lazy=True) as font:
+            with TTFont(str(fonts.path(item['family'])),fontNumber=0,lazy=True) as font:
                 if 'OS/2' not in font:
                     continue
                 panose=font['OS/2'].panose
@@ -99,6 +99,22 @@ def category_font_family(fonts, text, serif, language='zh'):
                 if all(ord(char) in characters for char in text if not char.isspace()):
                     return item['family']
         except (OSError,ValueError,TTLibError):
+            continue
+    return None
+
+
+def calligraphic_font_family(fonts, text):
+    from fontTools.ttLib import TTFont, TTLibError
+    for item in fonts.list():
+        family = item['family'].casefold()
+        if not any(name in family for name in ('kaiti', 'kai ti', '楷', '行書', '行书', '書法', '书法')):
+            continue
+        try:
+            with TTFont(str(fonts.path(item['family'])), fontNumber=0, lazy=True) as font:
+                characters = font.getBestCmap() or {}
+                if all(ord(char) in characters for char in text if not char.isspace()):
+                    return item['family']
+        except (OSError, ValueError, TTLibError):
             continue
     return None
 
@@ -114,11 +130,66 @@ def match_installed_candidates(candidates, fonts, text, serif=None, language="zh
         if installed.get('matchedFamily'):
             return {**result, 'matchedFamily': installed['matchedFamily'],
                     'matchedConfidence': candidate['confidence'], 'rank': rank, 'substitution':'exact'}
+    # Explicit style names allow category substitution when the predicted fonts are absent.
+    labels = ' '.join(candidate['family'].casefold() for candidate in candidates)
+    if comic_font_is_cjk(text) and any(marker in labels for marker in
+            ('字迹', '字跡', '书法', '書法', '手写', '手寫', '手书', '手書', '楷', '行书', '行書', '魏碑', '碑体', '碑體')):
+        family = calligraphic_font_family(fonts, text)
+        if family:
+            return {**result, 'matchedFamily': family, 'substitution': 'category'}
     if type(serif) is bool:
         family = category_font_family(fonts, text, serif, language)
         if family:
             return {**result, 'serif':serif, 'matchedFamily':family, 'substitution':'category'}
     return result
+
+
+async def match_comic_fonts(owner, image, regions, fonts, cache, language='zh'):
+    from hashlib import sha256
+    from .comics.vision import pixels, quad, resource
+    from ..models.ocr_catalog import COMIC_FONT_CLASSIFIER, COMIC_YUZU_FONT
+    selected=[r for r in regions if r['style'].get('autoFont') and r.get('targetText')
+        and not r.get('ignored') and not r.get('locked')]
+    if not selected:
+        return
+    raw=pixels(image)
+    groups={}
+    for region in selected:
+        cjk=comic_font_is_cjk(region.get('sourceText') or region['targetText'])
+        spec=COMIC_YUZU_FONT if cjk else COMIC_FONT_CLASSIFIER
+        groups.setdefault(spec.model_id,(spec,[]))[1].append((region,cjk))
+    for model_id,(spec,members) in groups.items():
+        pending=[]
+        descriptions={}
+        available=owner is not None and owner.models.is_installed(spec)
+        for region,cjk in members:
+            if not available:
+                descriptions[region['id']]={'candidates':[], 'reason':'modelMissing'}
+                continue
+            crop=await asyncio.to_thread(classifier_source_crop,raw,quad(region),region.get('sourceLines'),cjk)
+            key=(model_id,sha256(crop.tobytes()).digest(),crop.shape)
+            if key in cache:
+                cache.move_to_end(key)
+                descriptions[region['id']]=cache[key]
+            else:
+                pending.append((region,crop,key,cjk))
+        if pending:
+            async with resource(owner,model_id) as classifier:
+                for region,crop,key,cjk in pending:
+                    description=await classifier.describe(crop) if cjk else {'candidates':await classifier.classify(crop)}
+                    cache[key]=description
+                    cache.move_to_end(key)
+                    if len(cache)>512:
+                        cache.popitem(last=False)
+                    descriptions[region['id']]=description
+        for region,_ in members:
+            description=descriptions[region['id']]
+            result=await asyncio.to_thread(match_installed_candidates,description['candidates'],fonts,
+                region['targetText'],description.get('serif'),language) if description['candidates'] else dict(description)
+            family=result.get('matchedFamily') or fonts.automatic(region['targetText'])
+            region['style']['fontFamily']=family
+            region.setdefault('resolvedLayout',{})['fontMatch']={**result,'model':model_id,
+                'selectedFamily':family, 'substitution':result.get('substitution','fallback')}
 
 
 

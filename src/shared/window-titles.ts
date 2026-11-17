@@ -18,9 +18,7 @@ export function windowTitleForUrl(raw: string, language: UiLanguage): string {
   try {
     const url = new URL(raw)
     const entry = url.pathname.split('/').at(-1)
-    if (entry === 'workbench.html') feature = 0
-    else if (entry === 'comic-editor.html') feature = 1
-    else if (entry === 'latency.html') feature = 2
+    if (entry === 'latency.html') feature = 2
     else if (entry === 'screen.html') feature = url.searchParams.get('role') === 'game-overlay' ? 4 : 3
     else if (entry === 'onboarding-card.html') feature = 7
     else if (url.searchParams.has('migration')) feature = 8
@@ -32,14 +30,3 @@ export function windowTitleForUrl(raw: string, language: UiLanguage): string {
   return feature === undefined ? brand : `${titles[language][feature]} — ${brand}`
 }
 
-export function comicEditorCloseError(language: UiLanguage): { message: string; ok: string } {
-  const messages: Record<UiLanguage, { message: string; ok: string }> = {
-    'zh-CN': { message: '编辑器未能完成保存，窗口已保留。请等待操作完成后重试关闭。', ok: '确定' },
-    'zh-TW': { message: '編輯器未能完成儲存，視窗已保留。請等待操作完成後重試關閉。', ok: '確定' },
-    'zh-HK': { message: '編輯器未能完成儲存，視窗已保留。請等待操作完成後再試關閉。', ok: '確定' },
-    ko: { message: '저장을 완료하지 못해 편집기 창을 열어 두었습니다. 작업이 끝난 후 다시 닫아 주세요.', ok: '확인' },
-    ja: { message: '保存が完了していないため、編集画面を開いたままにしています。処理の完了後にもう一度閉じてください。', ok: 'OK' },
-    en: { message: 'The editor could not finish saving and has been kept open. Wait for the current operation to finish, then try closing again.', ok: 'OK' },
-  }
-  return messages[language]
-}

@@ -4,12 +4,13 @@ import type { ReactNode } from 'react'
 import { Menu } from '@base-ui/react/menu'
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Check, CircleHelp, Languages, Minus, Square, Copy, X } from 'lucide-react'
+import { Check, CircleHelp, Keyboard, Languages, Minus, Square, Copy, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
 import { settingsStore, updateSettings, useStore } from '@/store'
 import { Button } from '../ui/button'
 import { notifyError } from '@/components/primitives/notify'
+import { ShortcutOverview } from '@/components/primitives/ShortcutOverview'
 import nolaLogoUrl from '../../../../assets/brand/nola-logo.svg'
 
 export type TitleBarVariant = 'brand' | 'session'
@@ -42,6 +43,7 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
   const native = isElectronShell()
   const windowsShell = native && window.nolaTranslator?.isWindows === true
   const [maximized, setMaximized] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const dark = resolved === 'dark'
   const themeLabel = dark ? t('titleBar.themeToLight') : t('titleBar.themeToDark')
   useEffect(() => {
@@ -87,7 +89,7 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
       {variant === 'session' ? <div className="nola-no-drag flex min-w-0 items-center gap-3">{leading}{sessionTitle}{status}{timer}</div> : leading}
       <div className={`nola-titlebar-tools nola-no-drag${windowsShell ? ' nola-titlebar-tools--windows' : ''}`}>
         {actions}
-        {preferences && <><Menu.Root>
+        {preferences && <><Button variant="secondary" size="icon" className="nola-titlebar-icon" aria-label={t('shortcuts.title')} title={t('shortcuts.title')} onClick={() => setShortcutsOpen(true)}><Keyboard aria-hidden="true" /></Button><Menu.Root>
           <Menu.Trigger render={<Button variant="secondary" size="icon" className="nola-titlebar-icon" aria-label={t('titleBar.language')}>
             <Languages aria-hidden="true" />
           </Button>} />
@@ -130,6 +132,7 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
           </Menu.Portal>
         </Menu.Root>}
       </div>
+      {preferences && <ShortcutOverview open={shortcutsOpen} onOpenChange={setShortcutsOpen} />}
       {windowsShell ? <div className="nola-window-controls nola-no-drag">
         <Button variant="secondary" size="icon" className="nola-window-control" aria-label={t('titleBar.minimizeWindow')} onClick={() => { void window.nolaTranslator?.minimizeMainWindow() }}><Minus aria-hidden="true" /></Button>
         <Button variant="secondary" size="icon" className="nola-window-control" aria-label={maximized ? t('titleBar.restoreWindow') : t('titleBar.maximizeWindow')} onClick={toggleMaximize}>{maximized ? <Copy aria-hidden="true" /> : <Square aria-hidden="true" />}</Button>

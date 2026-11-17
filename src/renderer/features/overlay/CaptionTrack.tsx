@@ -13,11 +13,13 @@
  * when their openings or boundary characters match; those can be real speech.
  */
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { CaptionRevisionText } from './CaptionRevisionText'
+import { useSubtitleCopy } from '@/components/caption/useSubtitleCopy'
+import type { SubtitleCopyMetadata } from '../../../shared/subtitle-word-rules'
 
-export type TrackLine = { key: string; text: string; stableText?: string }
+export type TrackLine = { key: string; text: string; stableText?: string } & SubtitleCopyMetadata
 
 /** Sentences that have scrolled far out of view; dropped in bulk so the DOM cannot grow without bound. */
 const MAX_ENTRIES = 40
@@ -44,6 +46,8 @@ export function CaptionTrack({
   layout: 'rolling' | 'sentence'
 }) {
   const [entries, setEntries] = useState<TrackLine[]>([])
+  const copyHost = useRef<HTMLDivElement>(null), copyId = useId()
+  useSubtitleCopy(copyHost, lines.some(line => !!line.subtitleCopy))
   const [offset, setOffset] = useState(0)
   const stream = useRef<TrackLine[]>([])
   const knownLines = useRef(new Map<string, TrackLine>())
@@ -62,7 +66,7 @@ export function CaptionTrack({
    * part of it and the renderer needs it to tell confirmed text from the tail.
    */
   for (const line of lines) {
-    if (!knownLines.current.has(line.key) || line.text) knownLines.current.set(line.key, line)
+    if (!knownLines.current.has(line.key) || line.text || line.subtitleCopy !== undefined) knownLines.current.set(line.key, line)
   }
   const lineOrder = [...new Set(lines.map((line) => line.key))].slice(-MAX_ENTRIES)
   const visibleKeys = new Set(lineOrder)
@@ -76,7 +80,8 @@ export function CaptionTrack({
   if (next.length !== stream.current.length || next.some((line, index) =>
     line.key !== stream.current[index]?.key
     || line.text !== stream.current[index]?.text
-    || line.stableText !== stream.current[index]?.stableText)) {
+    || line.stableText !== stream.current[index]?.stableText
+    || JSON.stringify(line.subtitleCopy) !== JSON.stringify(stream.current[index]?.subtitleCopy))) {
     commit(next)
   }
 
@@ -108,6 +113,7 @@ export function CaptionTrack({
   if (layout === 'sentence') {
     return (
       <div
+        ref={copyHost}
         data-slot="caption-track"
         data-kind={kind}
         data-layout="sentence"
@@ -117,7 +123,7 @@ export function CaptionTrack({
       >
         <div className="nola-caption-track-flow nola-caption-track-sentence" ref={viewport}>
           <div className="nola-caption-track-content" ref={content}>
-            {entries.map((entry) => <p className="nola-caption-entry" key={entry.key} data-latency-segment={entry.key} data-latency-kind={latencyKind}>
+            {entries.map((entry) => <p className="nola-caption-entry" key={entry.key} data-latency-segment={entry.key} data-latency-kind={latencyKind} data-subtitle-copy-id={entry.subtitleCopy ? `${copyId}:${entry.key}` : undefined} data-subtitle-copy={entry.subtitleCopy ? JSON.stringify(entry.subtitleCopy) : undefined}>
               {kind === 'translation' ? <CaptionRevisionText text={entry.text} stableText={entry.stableText} /> : entry.text}
             </p>)}
           </div>
@@ -128,6 +134,7 @@ export function CaptionTrack({
 
   return (
     <div
+      ref={copyHost}
       data-slot="caption-track"
       data-kind={kind}
       data-layout="rolling"
@@ -149,7 +156,7 @@ export function CaptionTrack({
           <p className="nola-caption-entry" aria-live="polite" aria-atomic="false">
             {entries.flatMap((entry, index) => [
               index > 0 && seamNeedsSpace(entries[index - 1].text, entry.text) ? ' ' : null,
-              <span className="nola-caption-segment" key={entry.key} data-latency-segment={entry.key} data-latency-kind={latencyKind}>
+              <span className="nola-caption-segment" key={entry.key} data-latency-segment={entry.key} data-latency-kind={latencyKind} data-subtitle-copy-id={entry.subtitleCopy ? `${copyId}:${entry.key}` : undefined} data-subtitle-copy={entry.subtitleCopy ? JSON.stringify(entry.subtitleCopy) : undefined}>
                 {kind === 'translation' ? <CaptionRevisionText text={entry.text} stableText={entry.stableText} /> : entry.text}
               </span>,
             ])}

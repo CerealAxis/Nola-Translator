@@ -176,55 +176,35 @@ const api: NolaTranslatorApi = {
       return () => ipcRenderer.off('game:changed', receive)
     },
   },
-  comic: {
-    openEditor: request => invoke('comic:editor-open', request),
-    onEditorPageRequested: callback => {
-      const receive = (_event: Electron.IpcRendererEvent, pageId: string) => callback(pageId)
-      ipcRenderer.on('comic:editor-page-requested', receive)
-      return () => ipcRenderer.off('comic:editor-page-requested', receive)
-    },
-    onEditorCloseRequested: callback => {
-      const receive = (_event: Electron.IpcRendererEvent, token: string) => {
-        void Promise.resolve().then(callback).then(
-          () => ipcRenderer.send('comic:editor-close-result', { token, ok: true }),
-          () => ipcRenderer.send('comic:editor-close-result', { token, ok: false }),
-        )
-      }
-      ipcRenderer.on('comic:editor-close-requested', receive)
-      ipcRenderer.send('comic:editor-ready')
-      return () => ipcRenderer.off('comic:editor-close-requested', receive)
-    },
-    deleteProject: id => invoke('comic:delete', id),
-    restoreProject: id => invoke('comic:restore', id),
-    deleteProjects: ids => invoke('comic:delete-many', ids),
-    restoreProjects: ids => invoke('comic:restore-many', ids),
-    runtimeStatus: () => invoke('comic:runtime'),
-    purgeRuntime: () => invoke('comic:purge-runtime'),
-    listFonts: () => invoke('comic:fonts'),
-    importFonts: () => invoke('comic:import-fonts'),
-    fontPreview: family => invoke('comic:font-preview', family),
-    readFont: (family, weight = 400, italic = false) => invoke('comic:read-font', { family, weight, italic }),
-    layerImage: (projectId, pageId, kind, layerId, maxPixels) => invoke('comic:layer-image', { projectId, pageId, kind, layerId, ...(maxPixels === undefined ? {} : { maxPixels }) }),
-    previewRegion: (projectId, pageId, region) => invoke('comic:preview-region', { projectId, pageId, region }),
-    thumbnail: (projectId, pageId) => invoke('comic:thumbnail', { projectId, pageId }),
-    listProjects: () => invoke('comic:list'),
-    openProject: id => invoke('comic:open', id),
-    importProject: request => invoke('comic:import', request),
-    edit: request => invoke('comic:edit', request),
-    run: request => invoke('comic:run', request),
-    cancel: (projectId, jobId) => invoke('comic:cancel', { projectId, jobId }),
-    image: (projectId, pageId, kind, maxPixels) => invoke('comic:image', { projectId, pageId, kind, ...(maxPixels === undefined ? {} : { maxPixels }) }),
-    exportProject: request => invoke('comic:export', request),
-    onChanged: listener => {
-      const receive = (_event: Electron.IpcRendererEvent, value: Parameters<typeof listener>[0]) => listener(value)
-      ipcRenderer.on('comic:changed', receive)
-      return () => ipcRenderer.off('comic:changed', receive)
-    },
-  },
+
   desktopData: {
     snapshot: () => invoke('desktop-data:snapshot'),
     backup: options => invoke('desktop-data:backup', options),
     restore: password => invoke('desktop-data:restore', password),
+  },
+  comic: {
+    onFlushRequested: callback => {
+      const receive = (_: Electron.IpcRendererEvent, token: string) => { void Promise.resolve().then(callback).then(() => invoke('comic:flush-result', { token, ok: true }), () => invoke('comic:flush-result', { token, ok: false })) }
+      ipcRenderer.on('comic:flush', receive)
+      void invoke('comic:flush-ready')
+      return () => ipcRenderer.off('comic:flush', receive)
+    },
+    listProjects: () => invoke('comic:list'), openProject: id => invoke('comic:open', id),
+    openQuickWorkspace: () => invoke('comic:quick'), saveQuickToLibrary: id => invoke('comic:save-quick', id),
+    deleteProject: id => invoke('comic:delete', [id]), restoreProject: id => invoke('comic:restore', [id]),
+    deleteProjects: ids => invoke('comic:delete', ids), restoreProjects: ids => invoke('comic:restore', ids),
+    importProject: request => invoke('comic:import', request), exportProject: request => invoke('comic:export', request),
+    edit: request => invoke('comic:edit', request), run: request => invoke('comic:run', request),
+    listTasks: () => invoke('comic:tasks'), controlTask: (id, action) => invoke('comic:task-control', { id, action }),
+    image: (projectId, pageId, kind, maxPixels) => invoke('comic:image', { projectId, pageId, kind, ...(maxPixels ? { maxPixels } : {}) }),
+    thumbnail: (projectId, pageId) => invoke('comic:image', { projectId, pageId, kind: 'source', maxPixels: 40000 }),
+    listFonts: () => invoke('comic:fonts'), readFont: family => invoke('comic:read-font', family),
+    onChanged: callback => { const listener = (_: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value); ipcRenderer.on('comic:changed', listener); return () => ipcRenderer.off('comic:changed', listener) },
+  },
+  wordRules: {
+    snapshot: () => invoke('word-rules:snapshot'), command: request => invoke('word-rules:command', request),
+    testMatch: request => invoke('word-rules:test', request),
+    onChanged: callback => { const listener = (_: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value); ipcRenderer.on('word-rules:changed', listener); return () => ipcRenderer.off('word-rules:changed', listener) },
   },
   glossary: {
     snapshot: () => invoke('glossary:snapshot'),
@@ -319,7 +299,6 @@ const api: NolaTranslatorApi = {
     },
     sendHit: (interactive: boolean) => ipcRenderer.send('onboarding-card:hit', interactive),
   },
-  openWorkbench: surface => invoke('workbench:open', surface),
   cancelLanguageModel: id => invoke('app:language-model:cancel', id),
   releaseDirectModel: () => invoke('app:direct-model:release'),
   agentWorkspace: action => invoke('app:agent-workspace', action),

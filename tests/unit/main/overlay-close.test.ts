@@ -11,27 +11,42 @@ const electron = vi.hoisted(() => ({
 vi.mock('electron', () => ({
   ipcMain: { handle: (channel: string, fn: (...args: any[]) => any) => electron.handlers.set(channel, fn),
     removeHandler: (channel: string) => electron.handlers.delete(channel) },
-  BrowserWindow: { getAllWindows: () => [{ isDestroyed: () => false, webContents: { send: electron.send } }] },
+  BrowserWindow: { getAllWindows: () => [{ isDestroyed: () => false, webContents: { isDestroyed: () => false, isCrashed: () => false, mainFrame: { isDestroyed: () => false, detached: false, send: electron.send } } }] },
   net: {}, screen: {},
 }))
 let dispose: () => void
 afterEach(() => { dispose?.(); vi.clearAllMocks(); vi.restoreAllMocks() })
 
-function setup() {
+function setup(lazy = false) {
   configureIpcSenderValidation(() => undefined)
   const engine = Object.assign(new EventEmitter(), {
     currentState: 'ready', start: vi.fn(), stop: vi.fn().mockResolvedValue(undefined),
     request: vi.fn().mockImplementation(async (command) => ({ sessionId: 'session-1', type: command.type === 'startSession' ? 'sessionStarted' : 'sessionStopped' })),
   })
   const window = { hide: vi.fn(), show: vi.fn(), isDestroyed: () => false }
-  dispose = registerEngineIpc(engine as unknown as EngineProcess, () => window as any)
+  let created = !lazy
+  const getOverlayWindow = vi.fn((create = false) => { if (create) created = true; return created ? window as any : null })
+  dispose = registerEngineIpc(engine as unknown as EngineProcess, getOverlayWindow)
   const invoke = (channel: string, ...args: unknown[]) => electron.handlers.get(channel)!({}, ...args)
   const start = () => invoke(IPC_CHANNELS.startSession, {
     audioSource: { kind: 'defaultOutput' }, recognitionModelId: 'qwen3-asr-0.6b-hf',
     sourceLanguage: 'auto', targetLanguages: [], recognitionMode: 'realtime',
   })
-  return { engine, window, invoke, start }
+  return { engine, window, invoke, start, getOverlayWindow }
 }
+
+it('creates the caption renderer only when showing it, not when querying or hiding it', async () => {
+  const { invoke, window, getOverlayWindow } = setup(true)
+  expect(await invoke(IPC_CHANNELS.getOverlayVisibility)).toBe(false)
+  await invoke(IPC_CHANNELS.hideOverlay)
+  expect(getOverlayWindow).not.toHaveBeenCalledWith(true)
+  expect(window.hide).not.toHaveBeenCalled()
+  expect(await invoke(IPC_CHANNELS.showOverlay)).toBe(true)
+  expect(getOverlayWindow).toHaveBeenCalledWith(true)
+  expect(window.show).toHaveBeenCalledOnce()
+  await invoke(IPC_CHANNELS.hideOverlay)
+  expect(window.hide).toHaveBeenCalledOnce()
+})
 
 it('closes an idle overlay without starting the engine', async () => {
   const { engine, window, invoke } = setup()

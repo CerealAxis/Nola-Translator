@@ -1,6 +1,13 @@
 import type { DictionaryKey } from './zh-CN'
 
 const copy = {
+  preserveWords: ['禁翻词', '禁翻詞', '禁翻詞', 'Do not translate', '翻訳しない語句', '번역 제외 단어'],
+  subtitleBlockedWords: ['字幕屏蔽词', '字幕屏蔽詞', '字幕屏蔽詞', 'Subtitle blocked words', '字幕の伏せ字', '자막 차단 단어'],
+  comicPartiallyProcessed: ['部分页面未完成', '部分頁面未完成', '部分頁面未完成', 'Some pages remain unfinished', '未完了のページがあります', '완료되지 않은 페이지가 있습니다'],
+  comicStartProcessing: ['开始处理', '開始處理', '開始處理', 'Start processing', '処理を開始', '처리 시작'],
+  comicEditorOutOfMemory: ['编辑器因内存不足退出，请关闭不需要的窗口后重试。', '編輯器因記憶體不足結束，請關閉不需要的視窗後重試。', '編輯器因記憶體不足結束，請關閉不需要的視窗後重試。', 'The editor ran out of memory. Close unneeded windows and retry.', 'メモリ不足で編集画面が終了しました。不要なウィンドウを閉じて再試行してください。', '메모리 부족으로 편집기가 종료되었습니다. 불필요한 창을 닫은 후 다시 시도하세요.'],
+  comicEditorCrashed: ['编辑器进程异常退出，请重试打开。', '編輯器程序異常結束，請重新開啟。', '編輯器程序異常結束，請重新開啟。', 'The editor process exited unexpectedly. Try opening it again.', '編集プロセスが予期せず終了しました。開き直してください。', '편집기 프로세스가 예기치 않게 종료되었습니다. 다시 여세요.'],
+  comicNativeDraftFailed: ['译图与分层草稿同步失败。在编辑器中保存可重试。', '譯圖與分層草稿同步失敗。在編輯器中儲存可重試。', '譯圖與分層草稿同步失敗。在編輯器中儲存可重試。', 'The layered draft could not be synced. Save in the editor to retry.', '翻訳画像とレイヤー原稿を同期できませんでした。エディターで保存すると再試行できます。', '번역 이미지와 레이어 초안을 동기화하지 못했습니다. 편집기에서 저장하여 다시 시도하세요.'],
   experimentalInDevelopment: ['实验性功能，开发中', '實驗性功能，開發中', '實驗性功能，開發中', 'Experimental feature, in development', '実験的な機能、開発中', '실험 기능, 개발 중'],
   legacyTermsUnavailable: ['兼容模式无法应用同传术语。请使用实时后端的翻译模型，或停用适用于同传的术语库。', '相容模式無法套用同傳術語。請使用即時後端的翻譯模型，或停用適用於同傳的術語庫。', '兼容模式無法套用傳譯術語。請使用即時後端的翻譯模型，或停用傳譯術語庫。', 'Compatibility mode cannot apply live glossary terms. Use a realtime backend translation model or disable the live glossary.', '互換モードでは通訳用語を適用できません。リアルタイムバックエンドの翻訳モデルを使うか、通訳用の用語集を無効にしてください。', '호환 모드에서는 통역 용어를 적용할 수 없습니다. 실시간 백엔드 번역 모델을 사용하거나 통역용 용어집을 끄세요.'],
   unsupportedMtTerms: ['所选翻译服务不支持固定译法。请更换翻译模型，或关闭该术语库。', '所選翻譯服務不支援固定譯法。請更換翻譯模型，或關閉該術語庫。', '所選翻譯服務不支援固定譯法。請更換翻譯模型，或關閉該術語庫。', 'The selected translator cannot apply glossary terms. Choose another model or disable this library.', '選択した翻訳サービスは用語指定に対応していません。モデルを変更するか、用語集を無効にしてください。', '선택한 번역 서비스는 용어 지정을 지원하지 않습니다. 모델을 바꾸거나 용어집을 끄세요.'],

@@ -299,19 +299,20 @@ class AudioIngestion:
             self._sealed = False
             self._cv.notify_all()
 
-    def open_stream(self, stream_id: str, epoch: int, format: StreamFormat) -> None:
+    def open_stream(self, stream_id: str, epoch: int, format: StreamFormat) -> _StreamState:
         """Negotiate the format once (doc 09 stream_open); reopening the same
         id starts a fresh epoch context."""
         with self._cv:
             self._streams[stream_id] = _StreamState(stream_id=stream_id, epoch=epoch, format=format)
             self._cv.notify_all()
+            return self._streams[stream_id]
 
-    def close_stream(self, stream_id: str, *, eof: bool = False) -> list[AudioFrame]:
+    def close_stream(self, stream_id: str, *, eof: bool = False, expected: _StreamState | None = None) -> list[AudioFrame]:
         """Natural EOF flushes the normalizer tail frame (doc 04 §2: EOF must
         not drop recognized audio). Returns the flushed frames."""
         with self._cv:
             stream = self._streams.get(stream_id)
-            if stream is None:
+            if stream is None or expected is not None and stream is not expected:
                 return []
             if stream.natural_eof:
                 return []

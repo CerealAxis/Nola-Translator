@@ -54,9 +54,9 @@ export function TodoList({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="text-[13.5px] font-medium">{title}</span>
+          <span className="[font:var(--font-label)] font-medium">{title}</span>
           {description ? (
-            <p className="text-muted-foreground text-xs leading-4 break-words">
+            <p className="text-muted-foreground [font:var(--font-caption)] leading-4 break-words">
               {description}
             </p>
           ) : null}
@@ -80,7 +80,7 @@ export function TodoList({
             item.status !== "active" &&
             item.status !== "failed";
           const rowClassName =
-            "fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex items-start gap-2.5 py-0.5 text-[13.5px] duration-300 motion-reduce:animate-none";
+            "fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex items-start gap-2.5 py-0.5 [font:var(--font-label)] duration-300 motion-reduce:animate-none";
           const row = (
             <>
               <span
@@ -123,12 +123,12 @@ export function TodoList({
                 </span>
                 {item.status === "failed" ? (
                   item.reason ? (
-                    <p className="text-muted-foreground text-xs leading-4 break-words">
+                    <p className="text-muted-foreground [font:var(--font-caption)] leading-4 break-words">
                       {item.reason}
                     </p>
                   ) : null
                 ) : item.status !== "cancelled" && item.description ? (
-                  <p className="text-muted-foreground text-xs leading-4 break-words">
+                  <p className="text-muted-foreground [font:var(--font-caption)] leading-4 break-words">
                     {item.description}
                   </p>
                 ) : null}
@@ -157,7 +157,7 @@ export function TodoList({
           onClick={() => setExpanded((current) => !current)}
           className={cn(
             ghostButton,
-            "self-start px-2 py-1 text-xs font-medium",
+            "self-start px-2 py-1 [font:var(--font-caption)] font-medium",
           )}
         >
           {expanded ? "Show less" : `Show ${hiddenItems.length} more`}

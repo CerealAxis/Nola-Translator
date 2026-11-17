@@ -1,3 +1,4 @@
+import { emptyWordRules, protectTranslation, resolveWordRules, type WordRulesDocument } from '../shared/word-rules'
 import { randomUUID } from 'node:crypto'
 import { readFile, mkdir, writeFile, rename } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -27,6 +28,7 @@ interface ScreenTranslationOptions {
   settings(): AppSettings; inferModel(request: DirectModelRequest, signal: AbortSignal): Promise<DirectModelResult>
   publish(snapshot: ScreenSnapshot): void; activity?: FeatureActivity
   glossary?(): Promise<GlossaryDocument>
+  wordRules?(): Promise<WordRulesDocument>
 }
 export class ScreenTranslation {
   private state: ScreenSnapshot = { status: 'ready', config: screenConfigSchema.parse({}), sessionId: randomUUID(), epoch: 0, blocks: [], shortcutError: false, frames: 0, ocrMs: 0, translationMs: 0 }
@@ -53,6 +55,7 @@ export class ScreenTranslation {
   private observedSourceId?: string
   private overlayVisible = true
   private glossaryDocument = emptyGlossary()
+  private wordRulesDocument = emptyWordRules()
   private singleRead = false
   private readonly requestedRegions = new Set<string>()
   private savedScreenConfig?: ScreenConfig
@@ -198,7 +201,16 @@ export class ScreenTranslation {
     this.hashes.clear()
   }
 
+  async refreshWordRules(): Promise<void> {
+    if (!this.options.wordRules) return
+    const document = await this.options.wordRules()
+    if (document.matchingRevision === this.wordRulesDocument.matchingRevision) return
+    this.wordRulesDocument = document
+    for (const [regionId, result] of this.ocrResults) this.pipeline?.update(regionId, result.blocks, result.width, result.height, Date.now(), this.hashes.get(regionId) === this.observedHashes.get(regionId))
+  }
+
   async refreshGlossary(): Promise<void> {
+    await this.refreshWordRules()
     if (!this.options.glossary) return
     const document = await this.options.glossary()
     if (document.revision < this.glossaryDocument.revision) return
@@ -685,12 +697,14 @@ export class ScreenTranslation {
     const model = screenTranslationModel(this.state.config, this.options.settings())
     this.pipeline = new ScreenPipeline({ ...this.state.config, regions: this.captureRegions, model }, async (text, signal) => {
       const started = Date.now()
+      const context = this.state.gameId ? { scenario: 'game' as const, projectId: this.state.gameId } : { scenario: 'screen' as const }
+      const protection = protectTranslation(this.wordRulesDocument, text, this.state.config.sourceLanguage, context, this.state.config.excludedSelection)
       const result = await this.options.inferModel({ id: randomUUID(), kind: 'mt', model, taskMode: 'realtime',
-        text, source: this.state.config.sourceLanguage, target: this.state.config.targetLanguage, glossary: this.glossaryMatch(text).terms }, AbortSignal.any([signal, AbortSignal.timeout(25000)]))
+        text: protection.text, source: this.state.config.sourceLanguage, target: this.state.config.targetLanguage, glossary: this.glossaryMatch(text).terms }, AbortSignal.any([signal, AbortSignal.timeout(25000)]))
       if (epoch === this.state.epoch) this.state.translationMs = Date.now() - started
-      return result.text
+      return protection.restore(result.text)
     }, () => { if (epoch === this.state.epoch) { this.state.blocks = this.pipeline?.blocks() ?? []; this.publish() } },
-    () => { if (epoch === this.state.epoch) { if (this.state.error !== 'translationFailed') this.state.errorId = randomUUID(); this.state.error = 'translationFailed'; this.publish() } }, text => this.glossaryMatch(text).signature)
+    () => { if (epoch === this.state.epoch) { if (this.state.error !== 'translationFailed') this.state.errorId = randomUUID(); this.state.error = 'translationFailed'; this.publish() } }, text => this.glossaryMatch(text).signature + resolveWordRules(this.wordRulesDocument, { kind: 'preserve', text, language: this.state.config.sourceLanguage, context: this.state.gameId ? { scenario: 'game', projectId: this.state.gameId } : { scenario: 'screen' }, selection: this.state.config.excludedSelection }).signature)
   }
 
   private invalidate(): void {

@@ -258,6 +258,17 @@ def test_a04_conflicting_retransmit_is_rejected() -> None:
     assert outcome.reason == "conflicting_retransmit"
 
 
+def test_replaced_stream_is_not_closed_by_previous_connection() -> None:
+    fmt = StreamFormat(sample_rate=16_000, channels=1)
+    ingestion = make_ingestion()
+    old = ingestion.open_stream(STREAM, 0, fmt)
+    current = ingestion.open_stream(STREAM, 0, fmt)
+    ingestion.close_stream(STREAM, expected=old)
+    assert ingestion.accept(pcm_frame(0, 0, 320, fmt)).status == "accepted"
+    ingestion.close_stream(STREAM, expected=current)
+    assert ingestion.accept(pcm_frame(1, 320, 320, fmt)).status == "rejected"
+
+
 def test_a04_missing_seq_emits_audio_gap_and_resets_context() -> None:
     fmt = StreamFormat(sample_rate=16_000, channels=1)
     ingestion = make_ingestion()
@@ -616,6 +627,33 @@ def test_device_backend_delegates_to_capture() -> None:
     frames = asyncio.run(run())
     assert fake.started and fake.stopped
     assert len(frames) == 1
+
+
+async def test_cancelled_device_start_releases_capture() -> None:
+    import asyncio
+    import threading
+
+    started, finish = threading.Event(), threading.Event()
+
+    class FakeCapture:
+        stopped = False
+
+        def start(self):
+            started.set()
+            finish.wait()
+
+        def stop(self):
+            self.stopped = True
+
+    fake = FakeCapture()
+    backend = DeviceCaptureBackend(lambda: fake)
+    task = asyncio.create_task(backend.start())
+    assert await asyncio.to_thread(started.wait, 2)
+    task.cancel()
+    finish.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert fake.stopped
 
 
 def test_browser_tab_backend_normalizes_pushed_pcm() -> None:

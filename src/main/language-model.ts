@@ -20,7 +20,8 @@ export interface LanguageModelServices extends DirectModelServices {
 }
 
 /** The official AI SDK stream crosses IPC; provider secrets remain in the main process. */
-export function registerLanguageModelIpc(services: LanguageModelServices, allowed: (sender: WebContents) => boolean) {
+export function registerLanguageModelIpc(services: LanguageModelServices, allowed: (sender: WebContents) => boolean,
+  onRunningChange?: (running: boolean) => void) {
   const trusted = (event: Electron.IpcMainInvokeEvent) => allowed(event.sender) && event.senderFrame === event.sender.mainFrame
   ipcMain.handle('language-model:comics', async event => {
     if (!trusted(event) || !services.comicReader) throw new Error('Comic reader unavailable')
@@ -32,8 +33,14 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
     let resolve!: () => void
     const promise = new Promise<void>(done => { resolve = done })
     settled.set(id, { promise, resolve })
+    if (settled.size === 1) onRunningChange?.(true)
   }
-  const finish = (id: string) => { pending.delete(id); settled.get(id)?.resolve(); settled.delete(id) }
+  const finish = (id: string) => {
+    pending.delete(id)
+    settled.get(id)?.resolve()
+    settled.delete(id)
+    if (!settled.size) onRunningChange?.(false)
+  }
   ipcMain.handle('app:language-model:audio-result', (event, raw: unknown) => {
     if (!trusted(event)) throw new Error('Audio preparation access denied')
     resolveLanguageModelAudio(event.sender.id, raw)

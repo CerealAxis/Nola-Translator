@@ -1,3 +1,5 @@
+import { useWordRules } from '../settings/word-rules/useWordRules'
+import { maskSubtitleTracks } from '../../../shared/subtitle-word-rules'
 /**
  * Root of the caption window. `main.tsx` renders it for `?overlay=1`, outside
  * `AppShell`: this window is glass over someone else's screen, not a page of
@@ -53,6 +55,7 @@ export const CAPTION_SCHEMES = {
 export type CaptionScheme = keyof typeof CAPTION_SCHEMES
 
 export function OverlayRoot() {
+  const { document: wordRules } = useWordRules()
   const menuOpen = useStore(stores.settings, state => state.overlayMenuOpen)
   const { t } = useI18n()
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
@@ -341,7 +344,7 @@ export function OverlayRoot() {
                 <CaptionTrack
                   key={`source-${session.sessionId ?? 'idle'}-${config.layout}`}
                   kind="source"
-                  lines={sourceTrackLines}
+                  lines={maskSubtitleTracks(wordRules, sourceTrackLines, sourceLanguage)}
                   maxLines={sourceLines}
                   layout={config.layout}
                 />
@@ -353,7 +356,7 @@ export function OverlayRoot() {
                     key={`translation-${session.sessionId ?? 'idle'}-${config.layout}`}
                     kind="translation"
                     latencyKind={originalOnly && !config.showSource ? 'source' : 'translation'}
-                    lines={effectiveTranslationTrackLines}
+                    lines={maskSubtitleTracks(wordRules, effectiveTranslationTrackLines)}
                     maxLines={translationLines}
                     layout={config.layout}
                   />

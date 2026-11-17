@@ -61,7 +61,7 @@ export function ErrorState({
       {...props}
     >
       <CircleAlertIcon className="mt-0.5 size-4 shrink-0" />
-      <div>
+      <div className="min-w-0 flex-1">
         <p className="font-medium text-destructive">{title}</p>
         <p className="mt-0.5 text-sm text-destructive/90">
           {detail}
@@ -70,7 +70,7 @@ export function ErrorState({
       <button
         type="button"
         onClick={onRetry}
-        className="ms-auto flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+        className="ms-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-xl)] px-3 py-1 [font:var(--font-caption)] font-medium text-destructive transition-colors hover:bg-destructive/10"
       >
         <RefreshCwIcon className="size-3" />
         {retryLabel}

@@ -27,6 +27,7 @@ export const screenConfigSchema = z.object({
   captureMode: z.enum(['cursor', 'regions', 'window']).default('cursor'),
   strategy: z.enum(['auto', 'speed', 'quality']).default('auto'),
   glossarySelection: glossarySelectionSchema.default({ mode: 'auto' }),
+  excludedSelection: glossarySelectionSchema.optional(),
   sourceId: z.string().max(256).default(''), sourceName: z.string().max(256).default(''),
   windowIdentity: z.string().max(2048).default(''),
   regions: z.array(screenRegionSchema).max(MAX_SCREEN_REGIONS).default([]),

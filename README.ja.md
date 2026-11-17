@@ -1,184 +1,182 @@
 <div align="center">
   <img src="assets/brand/nola-logo.svg" alt="Nola Translator Logo" width="112" height="112">
   <h1>Nola Translator</h1>
-  <p>リアルタイム字幕・翻訳アプリ</p>
+  <p>ブラウザ拡張機能も提供するオープンソースのリアルタイム翻訳ソフトウェア</p>
   <p><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文（台灣）</a> · <a href="README.zh-HK.md">繁體中文（香港）</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a></p>
 </div>
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3-blue.svg?style=flat-square" alt="GPL v3 ライセンス"></a>
-  <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml/badge.svg" alt="ビルドワークフローの状態"></a>
-  <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://img.shields.io/badge/Actions-Download%20Artifacts-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="GitHub Actions の成果物をダウンロード"></a>
-  <a href="https://github.com/CerealAxis/Nola-Translator/releases"><img src="https://img.shields.io/github/v/release/CerealAxis/Nola-Translator?style=flat-square&label=Release" alt="最新の GitHub リリース"></a>
-  <a href="https://github.com/CerealAxis/Nola-Translator/releases/latest"><img src="https://img.shields.io/badge/Releases-Download%20Latest-2DA44E?style=flat-square&logo=github&logoColor=white" alt="最新リリースをダウンロード"></a>
+  <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml/badge.svg" alt="ビルド状況"></a>
+  <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://img.shields.io/badge/Actions-Download%20Artifacts-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="GitHub Actions の成果物"></a>
+  <a href="https://github.com/CerealAxis/Nola-Translator/releases"><img src="https://img.shields.io/github/v/release/CerealAxis/Nola-Translator?style=flat-square&label=Release" alt="最新リリース"></a>
+  <a href="https://github.com/CerealAxis/Nola-Translator/releases/latest"><img src="https://img.shields.io/badge/Releases-Download%20Latest-2DA44E?style=flat-square&logo=github&logoColor=white" alt="最新版をダウンロード"></a>
   <img src="https://img.shields.io/badge/QQ%E7%BE%A4-701699932-12B7F5?style=flat-square&logo=tencentqq&logoColor=white" alt="QQ グループ：701699932">
   <img src="https://img.shields.io/badge/Electron-43-47848F?style=flat-square&logo=electron&logoColor=white" alt="Electron">
   <img src="https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white" alt="React 19">
   <img src="https://img.shields.io/badge/Vite-7-7A5CFA?style=flat-square&logo=vite&logoColor=white" alt="Vite 7">
 </p>
 
+Nola Translator は、Windows デスクトップとブラウザに対応したリアルタイム翻訳アプリです。ローカル推論に加え、Qwen、MiniMax、OpenAI 互換 API、Google 翻訳、Microsoft Translator、Index Translate などのクラウドサービスを利用できます。リアルタイム字幕、会議通訳、漫画翻訳などの機能を提供します。
+
+## デモ
+
 <p align="center">
-  <img src="docs/public/screenshots/ja/home.png" alt="Nola Translator の画面プレビュー" width="1000">
+  <a href="https://nola.xaviermc.top/">
+    <img src="docs/public/screenshots/ja/home.png" alt="Nola Translator のオンラインデモを体験" width="1000">
+  </a>
 </p>
 
-## 概要
+> [!TIP]
+> クリックしてオンラインデモを体験してください
 
-Nola Translator は、ローカルモデルとクラウドモデルを使えるリアルタイム字幕・翻訳アプリです。お使いの環境や用途に合わせて、PC 上で音声認識・翻訳を行う方法と、クラウドモデルを利用する方法を選べます。
+## 仕組み
 
-## 機能
+```mermaid
+graph LR
+    A["音声<br/>マイク · システム音声"] --> B["Nola Translator"]
+    H["テキストと画像<br/>ウェブ · 画面 · ゲーム · 漫画"] --> B
+    B --> C{"処理方法を選択"}
+    C -->|"クラウド"| D["クラウド認識・翻訳サービス"]
+    C -->|"ローカル"| E["ローカルモデル<br/>認識 · 翻訳 · 音声合成"]
+    D --> F["字幕 · 訳文 · 翻訳音声"]
+    E --> F
+    F --> G["フローティングウィンドウ · ブラウザ<br/>会議 · ゲーム · 漫画"]
+```
 
-- **ローカルモデル:** Qwen3-ASR や SenseVoiceSmall などの認識モデル、HY-MT2 などの翻訳モデルをローカルで実行できます。Hugging Face の他のモデルを検索してインストールすることもできます。
-- **クラウドモデル:** Aliyun、MiniMax などのクラウド音声認識モデルに対応しています。OpenAI 互換 API、Anthropic、Ollama などの LLM プロトコルのほか、無料の MyMemory 翻訳サービスも利用できます。
-- **GPU アクセラレーション:** 利用可能な計算デバイスを検出し、認識と翻訳に別々のデバイスを設定できます。
-- **ブラウザー拡張機能:** Chrome と Edge 用の拡張機能で動画ページに二言語字幕を表示できます。デスクトップのシステム音声を入力ソースに設定することもできます。
-- **字幕オーバーレイ:** システム音声、選択したオーディオデバイス、またはマイクの音声を字幕にできます。字幕は独立したウィンドウに表示され、位置、文字サイズ、色、不透明度、原文と翻訳の配置を調整できます。
-- **柔軟な設定:** 必要なモデルをインストールし、認識・翻訳方式、言語の組み合わせ、計算デバイス、字幕スタイルを選択できます。API 認証情報はアプリ内に安全に保存されます。
-- **履歴とエクスポート:** 字幕履歴を保存し、TXT、SRT、WebVTT 形式でエクスポートできます。音声録音の保存は任意です。
+| | |
+|---|---|
+| **サービスプロバイダー** | Alibaba Cloud、MiniMax、OpenAI、Gemini、Anthropic、DeepSeek、Google Translate、Microsoft Translator、OpenAI 互換インターフェイス、Anthropic、Ollama など。|
+| **ローカルモデル** | 26 個の ASR モデル、17 個の翻訳モデル、16 個の TTS モデル、3 個の LLM モデル、17 個の OCR モデル、5 個の漫画検出・分類モデル、3 個の画像復元モデル |
+| **言語** | 60+ (音声認識) · 150+ (翻訳) · 29+ (音声合成) |
+| **対応環境** | Windows x64 · Chrome · Edge · Firefox |
+| **プライバシー** | ローカル推論はすべてデバイス上で実行されます。クラウドサービスの利用時は、関連する内容が選択したサービスプロバイダーに送信されます。 |
 
-## 画面プレビュー
-
-| ホーム | 字幕オーバーレイ | 動画字幕 |
-|---|---|---|
-| ![ホーム](docs/public/screenshots/ja/home.png) | ![フローティング字幕](docs/public/screenshots/ja/overlay-scene.png) | ![動画字幕](docs/public/screenshots/ja/browser-scene.png) |
-
-| ローカルモデルのインストール | 推論環境の設定 | ダークモード |
-|---|---|---|
-| ![ローカルモデルのインストール](docs/public/screenshots/ja/models.png) | ![推論環境の設定](docs/public/screenshots/zh-CN/compute-environment.png) | ![ダークモード](docs/public/screenshots/zh-CN/dark-mode.png) |
-
-字幕オーバーレイとブラウザー字幕の背景には、[Blender Foundation の *Tears of Steel*](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg) の映像を切り抜いて使用しています。[CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) に基づいています。
+> [!TIP]
+> ソフトウェアがサポートする言語は、選択したモデルによって決まります。モデルによってサポートされる言語機能が異なる場合があります。詳細については、ソフトウェアの設定を参照してください。
 
 ## インストール
 
-- [最新リリースをダウンロード](https://github.com/CerealAxis/Nola-Translator/releases/latest)
-
-対応 OS は Windows x64 です。EXE または MSI インストーラーを選べます。ほかのプラットフォームにも今後対応する予定です。
-
-- [ヘルプドキュメント](https://nola.xaviermc.top/ja/)
-
-## ローカル音声認識モデル
+Nola は**デスクトップアプリ**と**ブラウザ拡張機能**を提供します。デスクトップアプリはリアルタイム字幕、会議、画面、ゲーム、漫画に対応します。ブラウザ拡張機能はウェブページと動画字幕を翻訳でき、デスクトップのモデルにも接続できます。
 
 > [!TIP]
-> 認識・翻訳に使える言語は、選択したモデルによって異なります。以下の表は、アプリで推奨しているモデルの対応言語です。ほかにおすすめのモデルがあれば、GitHub の Issue でお知らせください。アプリへの追加を検討します。初めて使う方には、音声認識に **SenseVoiceSmall**、翻訳に **HY-MT2** がおすすめです。
+> デスクトップ上の会議通訳、画面翻訳、ゲーム翻訳、漫画翻訳機能は試験的に開発中のものです。
 
-| モデル | 言語数 | 詳細 |
-|---|---:|---|
-| Qwen3-ASR | 30 | 中国語、英語、広東語、アラビア語、ドイツ語、フランス語、スペイン語、ポルトガル語、インドネシア語、イタリア語、韓国語、ロシア語、タイ語、ベトナム語、日本語、トルコ語、ヒンディー語、マレー語、オランダ語、スウェーデン語、デンマーク語、フィンランド語、ポーランド語、チェコ語、フィリピノ語、ペルシア語、ギリシャ語、ハンガリー語、マケドニア語、ルーマニア語 |
-| SenseVoiceSmall | 5 | 中国語、英語、広東語、日本語、韓国語 |
-| Fun-ASR Nano | 4 | 中国語、英語、日本語、広東語 |
-| VibeVoice-ASR | 48 | 英語、中国語、スペイン語、ポルトガル語、ドイツ語、日本語、韓国語、フランス語、ロシア語、インドネシア語、スウェーデン語、イタリア語、ヘブライ語、オランダ語、ポーランド語、ノルウェー語、トルコ語、タイ語、アラビア語、ハンガリー語、カタロニア語、チェコ語、デンマーク語、ペルシア語、アフリカーンス語、ヒンディー語、フィンランド語、エストニア語、ギリシャ語、ルーマニア語、ベトナム語、ブルガリア語、アイスランド語、スロベニア語、スロバキア語、リトアニア語、スワヒリ語、ウクライナ語、ラトビア語、クロアチア語、ネパール語、セルビア語、フィリピノ語、マレー語、ウルドゥー語、モンゴル語、アルメニア語、ジャワ語 |
-| MiMo-V2.5-ASR | 3 | 中国語、英語、広東語 |
+| | デスクトップアプリ | ブラウザ拡張機能 |
+|---|---|---|
+| **機能** | モデルゲートウェイ、リアルタイム字幕、会議通訳、画面翻訳、ゲーム翻訳、漫画翻訳、ワークベンチ、用語集 | ウェブページ翻訳、動画字幕、文書翻訳、サービス構成、用語集 |
+| **利用シーン** | コンピュータオーディオ、会議ソフトウェア、画面コンテンツ、ゲーム、コミック | ウェブページと動画 |
+| **インストール方法** | インストールパッケージをダウンロードする | 拡張機能をダウンロードしてインストールする |
+| **対応環境** | Windows x64 | Chrome · Edge · Firefox |
 
-## ローカル翻訳モデル
+### デスクトップアプリ
 
-| モデル | 言語数 | 詳細 |
-|---|---:|---|
-| HY-MT2 | 38 | 簡体字中国語、繁体字中国語、英語、フランス語、ポルトガル語、スペイン語、日本語、トルコ語、ロシア語、アラビア語、韓国語、タイ語、イタリア語、ドイツ語、ベトナム語、マレー語、インドネシア語、フィリピノ語、ヒンディー語、ポーランド語、チェコ語、オランダ語、クメール語、ミャンマー語、ペルシア語、グジャラート語、ウルドゥー語、テルグ語、マラーティー語、ヘブライ語、ベンガル語、タミル語、ウクライナ語、チベット語、カザフ語、モンゴル語、ウイグル語、広東語 |
-| M2M100 418M | 100 | アフリカーンス語、アムハラ語、アラビア語、アストゥリアス語、アゼルバイジャン語、バシキール語、ベラルーシ語、ブルガリア語、ベンガル語、ブルトン語、ボスニア語、カタロニア語、セブアノ語、チェコ語、ウェールズ語、デンマーク語、ドイツ語、ギリシャ語、英語、スペイン語、エストニア語、ペルシア語、フラ語、フィンランド語、フランス語、西フリジア語、アイルランド語、スコットランド・ゲール語、ガリシア語、グジャラート語、ハウサ語、ヘブライ語、ヒンディー語、クロアチア語、ハイチ・クレオール語、ハンガリー語、アルメニア語、インドネシア語、イボ語、イロカノ語、アイスランド語、イタリア語、日本語、ジャワ語、ジョージア語、カザフ語、クメール語、カンナダ語、韓国語、ルクセンブルク語、ガンダ語、リンガラ語、ラオ語、リトアニア語、ラトビア語、マダガスカル語、マケドニア語、マラヤーラム語、モンゴル語、マラーティー語、マレー語、ミャンマー語、ネパール語、オランダ語、ノルウェー語、北ソト語、オック語、オディア語、パンジャブ語、ポーランド語、パシュトゥー語、ポルトガル語、ルーマニア語、ロシア語、シンド語、シンハラ語、スロバキア語、スロベニア語、ソマリ語、アルバニア語、セルビア語、スワジ語、スンダ語、スウェーデン語、スワヒリ語、タミル語、タイ語、フィリピノ語、ツワナ語、トルコ語、ウクライナ語、ウルドゥー語、ウズベク語、ベトナム語、ウォロフ語、コサ語、イディッシュ語、ヨルバ語、中国語、ズールー語 |
-| Index-Translate | 150 | 英語、中国語、ドイツ語、フランス語、スペイン語、日本語、韓国語、ポルトガル語、ロシア語、アラビア語、イタリア語、オランダ語、ポーランド語、ルーマニア語、スウェーデン語、トルコ語、ヒンディー語、ベトナム語、タイ語、インドネシア語、マレー語、フィリピノ語、ウクライナ語、ペルシア語、チェコ語、ギリシャ語、デンマーク語、ハンガリー語、フィンランド語、書面ノルウェー語、スロバキア語、ブルガリア語、ボスニア語、カタロニア語、ベンガル語、ヘブライ語、リトアニア語、スロベニア語、エストニア語、アルバニア語、ラトビア語、アゼルバイジャン語、クロアチア語、タミル語、ネパール語、ウルドゥー語、マケドニア語、セルビア語（キリル文字）、マラーティー語、ジョージア語、マラヤーラム語、カザフ語、アイスランド語、ガリシア語、カンナダ語、モロッコアラビア語、グジャラート語、ベラルーシ語、アフリカーンス語、アルメニア語、モンゴル語、クメール語、バスク語、ミャンマー語、ラテン語、ウズベク語（キリル文字）、テルグ語、オリヤ語、新ノルウェー語、ウズベク語、スワヒリ語、シンハラ語、キルギス語、ソマリ語、パンジャブ語、エジプトアラビア語、ウェールズ語、ノーマン語、パシュトゥー語、アイルランド語、セルビア語（ラテン文字）、ハウサ語、中央クルド語、マルタ語、広東語、タジク語、北クルド語、ベタウィ語、アムハラ語、ラオ語、ルクセンブルク語、フリシア語、ディビヒ語、エスペラント語、ルワンダ語、ナジュドアラビア語、フェロー語、マダガスカル語、アッサム語、シンド語、コサ語、トルクマン語、ハイチ・クレオール語、スコットランド・ゲール語、セブアノ語、イディッシュ語、ジャワ語、バシキール語、パプアモント語、マオリ語、ウイグル語、タタール語、チベット語、白苗語（モン族）、西アルメニア語、ヨルバ語、ズールー語、南クルド語、サモア語、コルシカ語、フィジー・ヒンディー語、スンダ語、チチワ語、イボ語、ハワイ語、ソト語、ミゾ語、ショナ語、チュワシュ語、南アゼルバイジャン語、ロマシュ語、ルンディ語、ヒンディー語（ラテン文字）、ヤクート語、ティグライニア語、アストゥリアス語、オック語、チム語（ハカ）、北サミ語、低地ドイツ語、オセティ語、ウルドゥー語（ラテン文字）、スイスドイツ語、アンガ語、レバノンアラビア語、オロモ語、ナポリ語、上ソブ語、ヒリギノン語、グリーランド語 |
+- [GitHub Releases](https://github.com/CerealAxis/Nola-Translator/releases)
+- [百度网盘](https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2)
+- [夸克网盘](https://pan.quark.cn/s/ef1e11262087)
 
-## ローカル音声合成
+### ブラウザ拡張機能
 
-| モデル | 言語数 | 詳細 |
-|---|---:|---|
-| Qwen3-TTS | 10 | 中国語、英語、日本語、韓国語、ドイツ語、フランス語、ロシア語、ポルトガル語、スペイン語、イタリア語 |
+Nola デスクトップアプリのブラウザ設定から、拡張機能のダウンロードと管理ができます。拡張機能には翻訳サービスを個別に設定できます。デスクトップのモデルを利用する場合は、アプリでブラウザ接続を有効にしてください。
 
-## クラウド音声認識モデル
+- [GitHub Releases](https://github.com/CerealAxis/Nola-Translator/releases)
+- [百度网盘](https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2)
+- [夸克网盘](https://pan.quark.cn/s/ef1e11262087)
 
-| プロバイダー | モデル | 対応言語 | 詳細 |
-|---|---|---|---|
-| Aliyun | Qwen3.5 / Qwen3.8 LiveTranslate | 60 | 中国語、英語、アラビア語、ドイツ語、フランス語、スペイン語、ポルトガル語、インドネシア語、イタリア語、韓国語、ロシア語、タイ語、ベトナム語、日本語、トルコ語、ヒンディー語、マレー語、オランダ語、ウルドゥー語、ノルウェー語(ブークモール)、スウェーデン語、デンマーク語、ヘブライ語、フィンランド語、ポーランド語、アイスランド語、チェコ語、フィリピノ語、ペルシア語、広東語、ギリシャ語、アフリカーンス語、アストゥリアス語、ベラルーシ語、ブルガリア語、ベンガル語、ボスニア語、カタロニア語、セブアノ語、エストニア語、ガリシア語、グジャラート語、クロアチア語、ハンガリー語、ジャワ語、カザフ語、カンナダ語、キルギス語、ラトビア語、マケドニア語、マラヤーラム語、マラーティー語、パンジャブ語、ルーマニア語、スロバキア語、スロベニア語、スワヒリ語、タジク語、アゼルバイジャン語、ウクライナ語。3.8 は入力言語を自動検出し、3.5 は入力言語を指定できます。 |
-| MiniMax | Speech-to-Text `asr-1.0` | 20 | アラビア語、広東語、中国語、英語、フィリピノ語、フランス語、ドイツ語、インドネシア語、イタリア語、日本語、韓国語、マレー語、ポーランド語、ポルトガル語、ロシア語、スペイン語、タイ語、トルコ語、ウクライナ語、ベトナム語 |
+<details>
+<summary>開発者モードで拡張機能をインストールする</summary>
 
-## クラウド翻訳モデル
+1. Nola のブラウザ設定またはプロジェクト公開ページから拡張機能をダウンロードします。
+2. 拡張ファイルを解凍します。
+3. ブラウザで拡張機能管理ページを開き、開発者モードを有効にします。
+4. 「解凍した拡張機能を読み込む」を選択し、解凍したフォルダーを選択します。
 
-| モデル | 言語数 | 詳細 |
-|---|---:|---|
-| Aliyun LiveTranslate | 60 | 自動検出 |
-| Index-Translate-35B-A3B | 150 | 英語、中国語、ドイツ語、フランス語、スペイン語、日本語、韓国語、ポルトガル語、ロシア語、アラビア語、イタリア語、オランダ語、ポーランド語、ルーマニア語、スウェーデン語、トルコ語、ヒンディー語、ベトナム語、タイ語、インドネシア語、マレー語、フィリピノ語、ウクライナ語、ペルシア語、チェコ語、ギリシャ語、デンマーク語、ハンガリー語、フィンランド語、書面ノルウェー語、スロバキア語、ブルガリア語、ボスニア語、カタロニア語、ベンガル語、ヘブライ語、リトアニア語、スロベニア語、エストニア語、アルバニア語、ラトビア語、アゼルバイジャン語、クロアチア語、タミル語、ネパール語、ウルドゥー語、マケドニア語、セルビア語（キリル文字）、マラーティー語、ジョージア語、マラヤーラム語、カザフ語、アイスランド語、ガリシア語、カンナダ語、モロッコアラビア語、グジャラート語、ベラルーシ語、アフリカーンス語、アルメニア語、モンゴル語、クメール語、バスク語、ミャンマー語、ラテン語、ウズベク語（キリル文字）、テルグ語、オリヤ語、新ノルウェー語、ウズベク語、スワヒリ語、シンハラ語、キルギス語、ソマリ語、パンジャブ語、エジプトアラビア語、ウェールズ語、ノーマン語、パシュトゥー語、アイルランド語、セルビア語（ラテン文字）、ハウサ語、中央クルド語、マルタ語、広東語、タジク語、北クルド語、ベタウィ語、アムハラ語、ラオ語、ルクセンブルク語、フリシア語、ディビヒ語、エスペラント語、ルワンダ語、ナジュドアラビア語、フェロー語、マダガスカル語、アッサム語、シンド語、コサ語、トルクマン語、ハイチ・クレオール語、スコットランド・ゲール語、セブアノ語、イディッシュ語、ジャワ語、バシキール語、パプアモント語、マオリ語、ウイグル語、タタール語、チベット語、白苗語（モン族）、西アルメニア語、ヨルバ語、ズールー語、南クルド語、サモア語、コルシカ語、フィジー・ヒンディー語、スンダ語、チチワ語、イボ語、ハワイ語、ソト語、ミゾ語、ショナ語、チュワシュ語、南アゼルバイジャン語、ロマシュ語、ルンディ語、ヒンディー語（ラテン文字）、ヤクート語、ティグライニア語、アストゥリアス語、オック語、チム語（ハカ）、北サミ語、低地ドイツ語、オセティ語、ウルドゥー語（ラテン文字）、スイスドイツ語、アンガ語、レバノンアラビア語、オロモ語、ナポリ語、上ソブ語、ヒリギノン語、グリーランド語 |
-| Microsoft Translator | 100+ | 公式の言語表を参照 |
-| Google 翻訳 | 100+ | 公式の言語表を参照 |
-| MyMemory 無料翻訳 | 100+ | 公式の言語表を参照 |
-| LLM API（OpenAI 互換／Anthropic／Ollama） | 選択したモデルに依存 | — |
+</details>
 
-## LLM API の設定
+### ソースからビルドする
 
-> [!TIP]
-> ここで設定する LLM プロトコルは翻訳に使用します。Aliyun と MiniMax の音声認識モデルには、「音声と認識」ページの専用接続設定と認証情報を使います。ローカルモデルを使う場合、API の設定は必要ありません。
-
-### 対応プロトコル
-
-次の API プロトコルに対応しています：
-
-| プロトコル |
-|---|
-| OpenAI Chat Completions |
-| OpenAI Responses |
-| Anthropic Messages |
-| Ollama Chat |
-
-### 設定例
-
-| サービス | API 形式 | API URL の例 | モデル ID の例 |
-|---|---|---|---|
-| DeepSeek | OpenAI Chat Completions | `https://api.deepseek.com` | `deepseek-flash` |
-| MiniMax | OpenAI Chat Completions | `https://api.minimax.io/v1` | `MiniMax-M3` |
-| MiMo | OpenAI Chat Completions | `https://api.xiaomimimo.com/v1` | `mimo-v2.6-pro` |
-
-### 設定手順
-
-![LLM 設定画面](docs/public/screenshots/zh-CN/llm-configuration.png)
-
-1. 翻訳設定で **クラウド翻訳** を選びます。
-2. プロバイダーが対応する **API 形式** を選択します。
-3. **API URL**、**API キー**、**モデル ID** を入力します。
-4. 必要に応じて、コンテキスト長と最大出力トークン数を調整します。
-
-## プロジェクト構成
-
-```text
-assets/brand/                  ロゴとブランド素材
-docs/                          VitePress 製品サイトと多言語ドキュメント
-engine/nola_translator_engine/  Python 音声・認識・翻訳エンジン
-engine/tests/                   Python テスト
-scripts/                        セットアップとビルドスクリプト
-src/main/                       Electron メインプロセス
-src/preload/                    IPC ブリッジ
-src/renderer/                   React インターフェース
-src/shared/                     共有契約と設定
-tests/                          アプリケーションのテスト
-```
-
-## 開発とビルド
+開発環境は Node.js 24、npm 11、Python 3.12 を使用します。
 
 ```powershell
-npm run typecheck
-npm test
-.\.venv\Scripts\python.exe -m pytest engine\tests
-npm run build
+git clone https://github.com/CerealAxis/Nola-Translator.git
+cd Nola-Translator
+npm ci
+npm run dev       # 開発
+npm run build     # デスクトップアプリをビルド
 ```
 
-Windows x64 インストーラーのビルド：
+## 機能
 
-```powershell
-npm run dist:win
-```
+### ローカル推論
+
+- **音声認識**：ローカルの ASR モデルで音声を文字に変換します。
+- **テキスト翻訳**：ローカル翻訳モデルで認識結果やその他のテキストを翻訳します。
+- **音声合成**：設定した音声合成モデルで翻訳音声を生成します。
+- **モデル管理**： オンデマンドでモデルをインストールし、コンピューティング デバイスを選択し、モデル ゲートウェイでモデルの機能と実行ステータスを管理します。
+
+### クラウドサービス
+
+| サービスまたはインターフェース | 主な目的 |
+|---|---|
+| **Alibaba Cloud LiveTranslate** | エンドツーエンドの音声翻訳 |
+| **Alibaba Cloud、MiniMax** | クラウド音声認識 |
+| **OpenAI互換インターフェース** | 互換性のあるクラウド言語モデルにアクセスして翻訳とテキスト処理を行う |
+| **Anthropic** | Anthropic Messages プロトコルを使用してモデルにアクセスする |
+| **Ollama** | Ollama モデルにアクセスする |
+| **無料翻訳サービス** | Microsoft Translator、Google Translate、Index Translate などの無料翻訳サービスを利用します。 |
+
+### 音声
+
+- **リアルタイム通訳**：マイク、システムオーディオ、または指定したアプリケーションから音声を収集し、リアルタイムの字幕と翻訳を生成します。
+- **会議通訳**： 会議の双方の発言を翻訳し、設定されたオーディオ デバイスを介して翻訳音声を再生または送信します。
+- **ブラウザ字幕**： タブオーディオまたはシステムオーディオを使用して、ウェブ動画の字幕を表示します。
+- **フローティング字幕**： 字幕を別ウィンドウで表示し、原文、翻訳、見た目を調整します。
+- **履歴とエクスポート**：リアルタイム通訳の記録の保存、字幕のエクスポート、必要に応じた音声の保存が可能です。
+
+### インターフェース
+
+- **多言語インターフェース**： 簡体字中国語、繁体字中国語、英語、日本語、韓国語をサポートし、システム言語に従うこともできます。
+- **ワークベンチ**： 設定されたモデルを対話、テキスト処理、その他のモデル機能の呼び出しに使用します。
+- **画面翻訳**：画面やウィンドウ内の文字領域を選び、元の位置に翻訳を表示します。
+- **ゲーム翻訳**： OCR、フック、またはクリップボードからゲーム テキストを取得し、フローティング ウィンドウを通じて翻訳を表示します。
+- **漫画翻訳**： コミックをインポートし、プロジェクト内で識別、翻訳、修復、組版、編集を実行します。
+- **用語集**： 用語を管理し、サポートされている翻訳シナリオで使用する用語を選択します。
 
 ## コントリビューション
 
-リポジトリを Fork し、ブランチを作成して変更を加え、Pull Request を送ってください。変更内容と実行したチェックを簡潔に記載してください。デザインとコードの規約は [DESIGN.md](DESIGN.md) と[コントリビューションガイド](https://nola.xaviermc.top/ja/contributing/)を参照してください。
+Issue や Pull Request を歓迎します。始める前に、[プロジェクトの開発規約](AGENTS.md)と[デザイン規範](docs/design-system/DESIGN.md)をご確認ください。
 
 ## スポンサー
 
-以下の方法でプロジェクトを支援できます。スポンサーには、質問への優先回答、個別サポート、スポンサー一覧やアプリ内での恒久的な紹介、機能のカスタマイズなどの特典があります。
+Nola Translator のその後の開発をサポートしたい場合は、次の方法でスポンサーになることができます。
 
-**1. 中国本土**
-- [愛発電（Afdian）](https://afdian.com/a/CerealAxis)
-
-**2. その他の地域**
+- [爱发电](https://afdian.com/a/CerealAxis)
 - [GitHub Sponsors](https://github.com/sponsors/CerealAxis/)
+
+## サポート
+
+- [Issues](https://github.com/CerealAxis/Nola-Translator/issues) — 問題を報告する
+- [Discussions](https://github.com/CerealAxis/Nola-Translator/discussions) — 質問してコミュニケーションを取る
+- [ヘルプドキュメント](https://nola.xaviermc.top/ja/docs) — ヘルプドキュメント
+
+## 参考プロジェクト
+
+| プロジェクト | ライセンス |
+| --- | --- |
+| [X-Translator](https://github.com/zhaoyx239/X-Translator) | [MIT](https://github.com/zhaoyx239/X-Translator#acknowledgements) |
+| [FluentRead](https://github.com/FluentRead/FluentRead) | [GPL-3.0](https://github.com/FluentRead/FluentRead/blob/main/LICENSE) |
+| [Sokuji](https://github.com/kizuna-ai-lab/sokuji) | [AGPL-3.0](https://github.com/kizuna-ai-lab/sokuji/blob/main/LICENSE) |
+| [Lumina](https://github.com/lumina-tl/lumina) | [MIT](https://github.com/lumina-tl/lumina/blob/main/LICENSE) |
+| [PhotoCraft](https://github.com/storytold/photocraft) | [MIT](https://github.com/storytold/photocraft/blob/main/LICENSE-MIT) または [Apache-2.0](https://github.com/storytold/photocraft/blob/main/LICENSE-APACHE) |
 
 ## ライセンス
 
-Nola Translator のコードは [GNU GPL v3.0 only](LICENSE) の下で公開されています。サードパーティ製コンポーネントとモデルには、それぞれのライセンスが適用されます。詳しくは [Third-Party Notices](THIRD_PARTY_NOTICES.md) をご覧ください。
+Nola Translator のオリジナルのソフトウェアコードは [GPL-3.0-only](LICENSE)、ドキュメントのオリジナル部分は [CC BY-SA 4.0](LICENSE-DOCUMENTATION) の下で提供されます。
+
+サードパーティのコンポーネント、モデル、フォント、アイコンなどには、それぞれのライセンスが適用されます。著作権とライセンスの詳細は[サードパーティ通知](THIRD_PARTY_NOTICES.md)および各ファイルの記載をご確認ください。
+
+Nola Translator の名称、ワードマーク、ロゴは、上記のオープンソースライセンスによるブランド使用許諾の対象外です。使用条件は[ブランド使用に関する声明](LICENSE-BRAND)をご確認ください。
+
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=CerealAxis/Nola-Translator&type=Date)](https://star-history.com/#CerealAxis/Nola-Translator)

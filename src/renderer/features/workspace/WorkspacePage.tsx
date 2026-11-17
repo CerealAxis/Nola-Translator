@@ -1,3 +1,4 @@
+import { useSubtitleSegments } from '../settings/word-rules/useSubtitleSegments'
 /** The quick-speak workspace: driven by the session store. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -50,6 +51,7 @@ function QuickWorkspacePage() {
   const { navigate } = useRoute()
 
   const session = useStore(sessionStore, (state) => state)
+  const subtitle = useSubtitleSegments(session.segments, session.interim)
   const settings = useStore(stores.settings, (state) => state.settings)
   const devices = useStore(stores.models, (state) => state.devices)
   const catalog = useAvailableModels()
@@ -341,8 +343,8 @@ function QuickWorkspacePage() {
               </CardHeader>
               <CaptionStage
                 className="nola-workspace-caption"
-                segments={session.segments}
-                interim={session.interim}
+                segments={subtitle.segments}
+                interim={subtitle.interim}
                 layout={layout}
                 displayMode={displayMode}
                 fontSize={FONT_STEPS[fontStep]}

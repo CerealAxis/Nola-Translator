@@ -444,7 +444,7 @@ class TranslationScheduler:
         state.committed.add(language)
 
     def _make_task(self, base_key: tuple[str, int, str], state: _Segment, language: str, task_class: str, matched: Any) -> _Task:
-        terms, term_key = self._glossary_terms(state.source["text"], language)
+        terms, term_key = self._glossary_terms(state.source["text"], language, state.source.get("language", "auto"))
         state.glossary_keys[language] = term_key
         if terms is None:
             raise ValueError(term_key)
@@ -475,9 +475,9 @@ class TranslationScheduler:
             glossary_generation=state.glossary_generations.get(language, 0),
         )
 
-    def _glossary_terms(self, text: str, language: str) -> tuple[list[GlossaryTerm] | None, str]:
+    def _glossary_terms(self, text: str, language: str, source_language: str = "auto") -> tuple[list[GlossaryTerm] | None, str]:
         try:
-            terms = self.glossary.match(text, language) if self.glossary else []
+            terms = self.glossary.match(text, language, source_language) if self.glossary else []
             return terms, _hash([term.model_dump() for term in terms]) if terms else ""
         except ValueError as error:
             return None, str(error)
@@ -485,7 +485,7 @@ class TranslationScheduler:
     async def refresh_glossary(self):
         for key, state in tuple(self._segments.items()):
             for lang in state.glossary_keys.keys() - state.committed:
-                _, signature = self._glossary_terms(state.source["text"], lang)
+                _, signature = self._glossary_terms(state.source["text"], lang, state.source.get("language", "auto"))
                 if signature == state.glossary_keys[lang]:
                     continue
                 state.glossary_keys[lang] = signature

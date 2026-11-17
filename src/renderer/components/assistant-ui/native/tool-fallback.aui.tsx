@@ -128,7 +128,7 @@ function ToolFallbackDuration({
     <span
       data-slot="tool-fallback-duration"
       className={cn(
-        "aui-tool-fallback-duration text-muted-foreground text-xs tabular-nums",
+        "aui-tool-fallback-duration text-muted-foreground [font:var(--font-caption)] tabular-nums",
         className,
       )}
       {...props}
@@ -257,7 +257,7 @@ function ToolFallbackArgs({
       className={cn("aui-tool-fallback-args", className)}
       {...props}
     >
-      <pre className="aui-tool-fallback-args-value bg-muted/50 text-foreground/90 rounded-md p-2.5 text-xs break-words whitespace-pre-wrap">
+      <pre className="aui-tool-fallback-args-value bg-muted/50 text-foreground/90 rounded-md p-2.5 [font:var(--font-caption)] break-words whitespace-pre-wrap">
         {argsText}
       </pre>
     </div>
@@ -296,10 +296,10 @@ function ToolFallbackResult({
       className={cn("aui-tool-fallback-result", className)}
       {...props}
     >
-      <p className="aui-tool-fallback-result-header text-muted-foreground text-xs font-medium">
+      <p className="aui-tool-fallback-result-header text-muted-foreground [font:var(--font-caption)] font-medium">
         Result:
       </p>
-      <pre className="aui-tool-fallback-result-content bg-muted/50 text-foreground/90 mt-1 rounded-md p-2.5 text-xs break-words whitespace-pre-wrap">
+      <pre className="aui-tool-fallback-result-content bg-muted/50 text-foreground/90 mt-1 rounded-md p-2.5 [font:var(--font-caption)] break-words whitespace-pre-wrap">
         {formatUnknownValue(result, 2)}
       </pre>
     </div>
@@ -602,7 +602,7 @@ function ToolFallbackApprovalQuestions({
           >
             <p className="aui-tool-fallback-approval-question-prompt text-foreground whitespace-pre-line">
               {question.header ? (
-                <span className="text-muted-foreground me-1.5 text-xs font-medium uppercase">
+                <span className="text-muted-foreground me-1.5 [font:var(--font-caption)] font-medium uppercase">
                   {question.header}
                 </span>
               ) : null}
@@ -635,7 +635,7 @@ function ToolFallbackApprovalQuestions({
                     >
                       <span>{option.label}</span>
                       {option.description ? (
-                        <span className="text-xs font-normal opacity-80">
+                        <span className="[font:var(--font-caption)] font-normal opacity-80">
                           {option.description}
                         </span>
                       ) : null}
@@ -962,7 +962,7 @@ function ToolFallbackApprovalImpl({
   const errorText = error ? (
     <p
       role="alert"
-      className="aui-tool-fallback-approval-error text-destructive text-xs whitespace-pre-line"
+      className="aui-tool-fallback-approval-error text-destructive [font:var(--font-caption)] whitespace-pre-line"
     >
       {error}
     </p>
@@ -1048,7 +1048,7 @@ function ToolFallbackApprovalImpl({
           <ul className="aui-tool-fallback-approval-confirm-grants flex flex-col gap-1">
             {confirming.grants.map((grant) => (
               <li key={grant}>
-                <code className="aui-tool-fallback-approval-confirm-grant bg-muted rounded px-1.5 py-0.5 text-xs">
+                <code className="aui-tool-fallback-approval-confirm-grant bg-muted rounded px-1.5 py-0.5 [font:var(--font-caption)]">
                   {grant}
                 </code>
               </li>

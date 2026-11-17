@@ -89,12 +89,10 @@ def create_app(
 
         screen_ocr = ScreenOcr(Path(os.environ["NOLA_TRANSLATOR_MODEL_DIR"]))
 
-    comic_service = None
-    if os.environ.get("NOLA_COMIC_DIR") and os.environ.get("NOLA_COMIC_FONT_PATH"):
-        from .comic import ComicService
-
-        comic_service = ComicService(Path(os.environ["NOLA_COMIC_DIR"]), screen_ocr,
-                                     Path(os.environ["NOLA_COMIC_FONT_PATH"]))
+    from .comics.service import ComicService
+    from .comics.api import build_comic_router
+    comic_service = ComicService(Path(os.environ["NOLA_COMIC_DIR"]),
+                                 Path(os.environ["NOLA_COMIC_FONT_PATH"]), screen_ocr) if os.environ.get("NOLA_COMIC_DIR") and os.environ.get("NOLA_COMIC_FONT_PATH") else None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -176,11 +174,7 @@ def create_app(
     # the same token during their handshake because a WebSocket scope has no
     # injectable Request.
     app.include_router(api.build_router(), dependencies=[Depends(_auth_dependency)])
-    if comic_service is not None:
-        from .comic import build_comic_router
-
-        app.include_router(build_comic_router(comic_service), prefix=api.API_PREFIX,
-                           dependencies=[Depends(_auth_dependency)])
+    app.include_router(build_comic_router(comic_service), prefix=api.API_PREFIX, dependencies=[Depends(_auth_dependency)])
     if screen_ocr is not None:
         from .screen_ocr import build_screen_ocr_router
 

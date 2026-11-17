@@ -44,7 +44,7 @@ export const collapsePanel =
 
 export const live = "text-primary";
 
-export const mono = "font-mono text-[11px] tracking-tight";
+export const mono = "[font:var(--font-caption)] tracking-normal";
 
 export function ShimmerLabel({
   active = true,

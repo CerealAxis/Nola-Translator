@@ -52,16 +52,16 @@ export function ReasoningEffort({
           </SliderControl>
         </SliderRoot>
         <div className="mt-2 grid" style={{ gridTemplateColumns: `repeat(${levels.length}, minmax(0, 1fr))` }}>
-          {levels.map(level => <span key={level.key} className="text-center text-[11px] text-muted-foreground">{level.label}</span>)}
+          {levels.map(level => <span key={level.key} className="text-center [font:var(--font-caption)] text-muted-foreground">{level.label}</span>)}
         </div>
       </div> : <div className={cn(field, "flex gap-0.5 rounded-full p-0.5")}>
         {levels.map((level) => {
           const active = level.key === selectedKey;
           const className = cn(
-            "flex-1 rounded-full py-1 text-xs font-medium transition-[background-color,color,scale] duration-150",
+            "flex-1 rounded-full py-1 [font:var(--font-caption)] font-medium transition-[background-color,color,scale] duration-150",
             onSelect && "active:scale-[0.97]",
             active
-              ? "bg-background text-foreground/90"
+              ? "bg-accent text-primary"
               : onSelect
                 ? "text-muted-foreground hover:text-foreground/70"
                 : "text-muted-foreground",

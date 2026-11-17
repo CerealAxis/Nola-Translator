@@ -262,7 +262,15 @@ class DeviceCaptureBackend(CaptureBackend):
 
     async def start(self) -> None:
         capture = self._capture_factory()
-        capture.start()  # type: ignore[attr-defined]
+        task = asyncio.create_task(asyncio.to_thread(capture.start))  # type: ignore[attr-defined]
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            try:
+                await task
+            finally:
+                await asyncio.to_thread(capture.stop)  # type: ignore[attr-defined]
+            raise
         self._capture = capture
 
     def stop(self) -> None:

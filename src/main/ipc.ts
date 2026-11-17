@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { BrowserWindow, ipcMain, net, screen } from 'electron'
 
 import type { AudioDevice, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmResult, ResourceRecord, SessionConfig } from '../shared/contracts'
+import type { EngineChannelEvent } from '../shared/bridge'
 import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
@@ -17,6 +18,7 @@ import { readHubModelCard } from './hub-model-card'
 import { resolveModelNetwork } from './network-region'
 import { SessionController } from './session-controller'
 import { openDefaultBrowser as launchDefaultBrowser } from './open-default-browser'
+import { sendToRenderer } from './window-options'
 
 export const IPC_CHANNELS = {
   listComputeDevices: 'engine:list-compute-devices',
@@ -78,7 +80,7 @@ export function prewarmConfigFrom(settings: AppSettings): PrewarmConfig {
 
 export function registerEngineIpc(
   engine: EngineProcess,
-  getOverlayWindow: () => BrowserWindow | null,
+  getOverlayWindow: (create?: boolean) => BrowserWindow | null,
   getTranslationCredential: (provider: CredentialProvider) => Promise<string> = async () => '',
   meetings: MeetingStore | null = null,
   getSettings: () => AppSettings = () => DEFAULT_SETTINGS,
@@ -333,7 +335,7 @@ export function registerEngineIpc(
 
   loggedHandle(IPC_CHANNELS.showOverlay, (_event, mode: unknown) => {
     if (!controller.canShowOverlay() || !canOpenOverlay()) return false
-    const window = getOverlayWindow()
+    const window = getOverlayWindow(true)
     if (!window) throw new Error('overlayWindowUnavailable')
     overlayCloseStopsSession = mode !== 'workspace'
     window.show()
@@ -378,9 +380,9 @@ export function registerEngineIpc(
   loggedHandle(IPC_CHANNELS.getVirtualCableDriverVersion, () => readVirtualCableDriverVersion())
   loggedHandle(IPC_CHANNELS.openDefaultBrowser, () => launchDefaultBrowser())
 
-  const broadcast = (event: EngineEvent): void => {
+  const broadcast = (event: EngineChannelEvent): void => {
     for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(IPC_CHANNELS.event, event)
+      sendToRenderer(window, IPC_CHANNELS.event, event)
     }
   }
 
@@ -418,9 +420,7 @@ export function registerEngineIpc(
     if (sessionEngine === engine && (state === 'recovering' || state === 'failed')) releaseSessionOnEngineLoss()
     // Inventory failures cannot end capture owned by the independent business process.
     if (sessionEngine !== engine && controller.busy && (state === 'recovering' || state === 'failed')) return
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(IPC_CHANNELS.event, { type: 'engineStateChanged', state })
-    }
+    broadcast({ type: 'engineStateChanged', state })
   }
   engine.on('state', forwardState)
   const sessionState = (state: EngineProcessState) => {

@@ -39,9 +39,9 @@ export function SpecSheet({
       {...props}
     >
       <div className="flex flex-col gap-0.5">
-        <span className="text-[13.5px] font-medium">{title}</span>
+        <span className="[font:var(--font-label)] font-medium">{title}</span>
         {subtitle && (
-          <span className="text-muted-foreground text-xs">{subtitle}</span>
+          <span className="text-muted-foreground [font:var(--font-caption)]">{subtitle}</span>
         )}
       </div>
 
@@ -56,7 +56,7 @@ export function SpecSheet({
             </span>
             <span
               className={cn(
-                "min-w-0 flex-1 text-end text-[13px] tabular-nums",
+                "min-w-0 flex-1 text-end [font:var(--font-caption)] tabular-nums",
                 row.emphasis
                   ? "text-foreground/95 font-medium"
                   : "text-foreground/70",

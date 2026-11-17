@@ -40,6 +40,27 @@ def test_catalog_is_immutable_and_verified():
     assert len(LAMA_MANGA.files[0].sha256) == 64
 
 
+def test_loading_assigns_verified_cpu_weights_without_allocating_random_network(tmp_path,monkeypatch):
+    torch=pytest.importorskip('torch')
+    from safetensors.torch import save_file
+    from nola_translator_engine.backend import lama_network
+    from nola_translator_engine.backend.comic_inpaint import _load_model
+    original=torch.nn.Conv2d(4,3,1)
+    path=tmp_path/'weights.safetensors'
+    save_file(original.state_dict(),str(path))
+    constructed=[]
+    def network(*args,**kwargs):
+        result=torch.nn.Conv2d(4,3,1)
+        constructed.append(result.weight.device.type)
+        return result
+    monkeypatch.setattr(lama_network,'FFCResNetGenerator',network)
+    loaded=_load_model(path)
+    assert constructed==['meta']
+    assert loaded.weight.device.type=='cpu'
+    assert torch.equal(loaded.weight,original.weight)
+    assert torch.equal(loaded.bias,original.bias)
+
+
 def test_real_installed_model_worker():
     import os
     root = os.environ.get("NOLA_TEST_INPAINT_MODEL_ROOT")

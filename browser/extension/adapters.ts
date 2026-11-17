@@ -28,6 +28,20 @@ function xPlayerContainer(video: HTMLVideoElement): HTMLElement | null {
 }
 const xHost = (hostname: string) => /^(?:www\.)?(?:x|twitter)\.com$/.test(hostname)
 
+// Adapted from FluentRead videoPlayerLocator.ts and videoPlayerBinding.ts, GPL-3.0:
+// https://github.com/FluentRead/FluentRead/tree/10a491e0e9c789c5662a9e00a52056a8040e7c42/src/features/video-subtitle/content
+function isVisibleVideo(video: HTMLVideoElement, view: Window): boolean {
+  const style = view.getComputedStyle(video)
+  const rect = video.getBoundingClientRect()
+  return video.isConnected && style.display !== 'none' && style.visibility !== 'hidden' && style.contentVisibility !== 'hidden'
+    && (rect.width > 0 && rect.height > 0 || video.offsetWidth > 0 && video.offsetHeight > 0)
+}
+
+export function playerIsInteractive(player: HTMLElement, document: Document): boolean {
+  const active = document.activeElement
+  return player.matches(':hover') || Boolean(active && (active === player || player.contains(active)))
+}
+
 /** Resolve only links owned by this article, excluding quoted posts nested inside it. */
 export function xVideoIdentity(video: HTMLVideoElement): string | null {
   const article = video.closest('article')
@@ -71,8 +85,7 @@ export function detectVideos(document: Document): HTMLVideoElement[] {
     for (const element of root.querySelectorAll('*')) if (element.shadowRoot) roots.push(element.shadowRoot)
   }
   const visible = videos.filter(video => {
-    const rect = video.getBoundingClientRect()
-    return video.isConnected && rect.width >= 160 && rect.height >= 90 && !video.hidden && document.pictureInPictureElement !== video
+    return isVisibleVideo(video, document.defaultView ?? window) && document.pictureInPictureElement !== video
   })
   if (xHost(document.location?.hostname ?? '')) {
     const selected = selectXVideo(visible, document.location.href)

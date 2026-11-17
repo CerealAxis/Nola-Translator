@@ -1,8 +1,13 @@
 import { ModelAvailabilityLabel } from '@/features/workspace/ModelAvailabilityLabel'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { AttachmentPrimitive, ComposerPrimitive, AuiIf, MessagePrimitive, ThreadPrimitive, useAui, useAuiState, useMessageTiming, type ToolCallMessagePart, type ToolCallMessagePartProps } from '@assistant-ui/react'
-import { Archive, BrainCircuit, ChevronLeft, ChevronRight, Ellipsis, Minus, PanelLeft, Pin, Plus, Search, Settings2, Square, X } from 'lucide-react'
-import { Composer, ComposerActions, ComposerAttachButton, ComposerAttachments, ComposerBar, ComposerContext, ComposerInput, ComposerMenu, ComposerMenuItem, ComposerModelTrigger, ComposerSend, ComposerToolbar, ComposerVoice, ComposerVoiceButton } from '@/components/assistant-ui/native/composer'
+import { ActionBarPrimitive, AttachmentPrimitive, BranchPickerPrimitive, ComposerPrimitive, AuiIf, MessagePrimitive, ThreadPrimitive, useAui, useAuiState, useMessageTiming, type ToolCallMessagePart, type ToolCallMessagePartProps } from '@assistant-ui/react'
+import { createPortal } from 'react-dom'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { NavigationItem } from '@/components/primitives/NavigationItem'
+import { SidebarGroup, SidebarMenu, SidebarMenuItem } from '@/components/ui/sidebar'
+import { ArrowLeft, Archive, BrainCircuit, ChevronLeft, ChevronRight, Check, Copy, Ellipsis, Pencil, Pin, Plus, Search, Settings2, SquarePen, X } from 'lucide-react'
+import { Composer, ComposerActions, ComposerAttachButton, ComposerAttachments, ComposerBar, ComposerContext, ComposerMenu, ComposerMenuItem, ComposerModelTrigger, ComposerSend, ComposerToolbar, ComposerVoice, ComposerVoiceButton } from '@/components/assistant-ui/native/composer'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ThreadList } from '@/components/assistant-ui/native/thread-list'
@@ -30,9 +35,8 @@ import { ErrorState } from '@/components/assistant-ui/native/error-state'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { useAttachmentSrc } from '@/hooks/use-attachment-src'
-import { ghostButton } from '@/components/assistant-ui/native/surfaces'
+import { ghostButton, iconSwap, iconSwapIn, iconSwapOut } from '@/components/assistant-ui/native/surfaces'
 import { useI18n } from '@/i18n'
-import { stores, useStore } from '@/store'
 import { notifyError } from '@/components/primitives/notify'
 import { languageName, LANGUAGE_CODES } from '../../../shared/languages'
 import type { CustomTranslationModel } from '../../../shared/settings'
@@ -40,7 +44,15 @@ import type { AgentWorkspaceSnapshot, WorkspaceAction } from '../../../shared/ag
 import type { PlaygroundConfig } from './demo-runtime'
 import type { PlaygroundModel } from './installed-models'
 
-export interface NativeAgentSurfaceProps {
+export interface WorkbenchPageProps {
+  active: boolean
+  sidebar: HTMLElement | null
+  heading: HTMLElement | null
+  actions: HTMLElement | null
+  onBack: () => void
+}
+
+export interface NativeAgentSurfaceProps extends WorkbenchPageProps {
   config: PlaygroundConfig
   onChange: (config: PlaygroundConfig) => void
   profiles: readonly CustomTranslationModel[]
@@ -58,24 +70,31 @@ export interface NativeAgentSurfaceProps {
 }
 
 const WorkbenchConfigContext = createContext<PlaygroundConfig | null>(null)
+const WorkbenchModelReadyContext = createContext(false)
+const WorkbenchBranchContext = createContext({ browsing: false, setBrowsing: (_value: boolean) => {} })
+const WorkbenchStorageContext = createContext('nola.local-call:')
+
+function messageDates(prefix: string, remoteId: string | undefined): Record<string, string> {
+  if (!remoteId) return {}
+  try { return JSON.parse(localStorage.getItem(`${prefix}message-dates:${JSON.stringify([remoteId, 'ai-sdk/v6'])}`) ?? '{}') as Record<string, string> }
+  catch { return {} }
+}
+
+function useMessageDates() {
+  const prefix = useContext(WorkbenchStorageContext)
+  const remoteId = useAuiState(state => state.threadListItem.remoteId)
+  const [, setRevision] = useState(0)
+  useEffect(() => {
+    const update = () => setRevision(value => value + 1)
+    window.addEventListener('nola-workbench-dates', update)
+    return () => window.removeEventListener('nola-workbench-dates', update)
+  }, [])
+  return messageDates(prefix, remoteId)
+}
 
 /** Connect runtime state and localized labels to the Elements components. */
 export function NativeAgentSurface(props: NativeAgentSurfaceProps) {
   const { t } = useI18n()
-  const theme = useStore(stores.settings, state => state.settings?.theme)
-  useEffect(() => {
-    if (!theme) return
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const apply = () => {
-      const dark = theme === 'dark' || theme === 'system' && media.matches
-      document.documentElement.dataset.theme = dark ? 'dark' : 'light'
-      document.documentElement.classList.toggle('dark', dark)
-      document.documentElement.classList.toggle('light', !dark)
-    }
-    apply()
-    media.addEventListener('change', apply)
-    return () => media.removeEventListener('change', apply)
-  }, [theme])
   const aui = useAui()
   const items = useAuiState(s => s.threads.threadItems)
   const activeId = useAuiState(s => s.threads.mainThreadId)
@@ -90,18 +109,36 @@ export function NativeAgentSurface(props: NativeAgentSurfaceProps) {
   const title = useAuiState(s => s.threadListItem.title)
   const first = useAuiState(s => s.thread.messages.find(message => message.role === 'user'))
   const remoteId = useAuiState(s => s.threadListItem.remoteId)
-  const [sidebar, setSidebar] = useState(true)
   const [headerMenu, setHeaderMenu] = useState(false)
   const [memoryOpen, setMemoryOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [threadQuery, setThreadQuery] = useState('')
-  const visibleItems = items.filter(item => item.status === 'regular' && (item.title ?? '').toLowerCase().includes(threadQuery.toLowerCase())).sort((a, b) => Number(Boolean(b.custom?.pinned)) - Number(Boolean(a.custom?.pinned)))
-  const currentItem = items.find(item => item.id === activeId)
+  const [, setDatesRevision] = useState(0)
   useEffect(() => {
-    document.documentElement.classList.add('native-agent-document')
-    return () => document.documentElement.classList.remove('native-agent-document')
+    const update = () => setDatesRevision(value => value + 1)
+    window.addEventListener('nola-workbench-dates', update)
+    return () => window.removeEventListener('nola-workbench-dates', update)
   }, [])
+  const storagePrefix = props.snapshot?.selectedProject ? `nola.local-call:project:${props.snapshot.selectedProject}:` : 'nola.local-call:'
+  let storedDates: Record<string, string> = {}
+  try {
+    const stored = JSON.parse(localStorage.getItem(`${storagePrefix}threads`) ?? '[]') as { remoteId: string; custom?: { createdAt?: string } }[]
+    storedDates = Object.fromEntries(stored.filter(item => item.custom?.createdAt).map(item => [item.remoteId, item.custom!.createdAt!]))
+  } catch { /* Missing or invalid metadata has no reliable date. */ }
+  const groupOf = (item: typeof items[number]) => {
+    const timestamps = Object.values(messageDates(storagePrefix, item.remoteId)).sort()
+    const value = timestamps.at(-1) ?? item.custom?.createdAt ?? (item.remoteId && storedDates[item.remoteId])
+    const date = typeof value === 'string' ? new Date(value) : null
+    if (!date || Number.isNaN(date.getTime())) return 0
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const yesterday = new Date(today)
+    yesterday.setDate(today.getDate() - 1)
+    return date >= today ? 0 : date >= yesterday ? 1 : 2
+  }
+  const visibleItems = items.filter(item => item.status === 'regular' && (item.title ?? '').toLowerCase().includes(threadQuery.toLowerCase())).sort((a, b) => groupOf(a) - groupOf(b) || Number(Boolean(b.custom?.pinned)) - Number(Boolean(a.custom?.pinned)))
+  const currentItem = items.find(item => item.id === activeId)
   useEffect(() => {
     if (title || !remoteId || !first) return
     const text = first.content.find(part => part.type === 'text')?.text
@@ -129,25 +166,24 @@ export function NativeAgentSurface(props: NativeAgentSurfaceProps) {
     else void runtime.archive()
     setHeaderMenu(false)
   }
-  return <div className="native-agent-app flex h-full min-h-0 bg-background text-foreground" data-testid="native-agent-app">
-    <aside className={`${sidebar ? 'w-[300px]' : 'w-16'} flex shrink-0 flex-col border-e border-border transition-[width] duration-200`}>
-      <div className={`native-window-drag flex h-14 shrink-0 items-center ${sidebar ? 'gap-3 px-4' : 'justify-center'}`}>
-        <button className={`${ghostButton} native-window-action size-8`} aria-label={t('workbench.toggleSidebar')} onClick={() => setSidebar(value => !value)}><PanelLeft className="size-4" aria-hidden="true" /></button>
-        {sidebar && <span className="text-sm font-medium">{t('workbench.chats')}</span>}
-      </div>
-      {sidebar ? <>
-        <div className="px-3 pt-3"><ComposerMenuItem className="w-full" onClick={() => { setMemoryOpen(false); void aui.threads.switchToNewThread() }}><Plus className="size-4" aria-hidden="true" />{t('workbench.newThread')}</ComposerMenuItem></div>
-        <div className="relative px-3 pt-2"><Search className="pointer-events-none absolute start-6 top-[18px] size-4 text-muted-foreground" aria-hidden="true" /><ComposerInput className="h-9 min-h-0 rounded-xl bg-foreground/[0.035] ps-9 text-sm" value={threadQuery} onChange={event => setThreadQuery(event.target.value)} placeholder={t('workbench.searchThreads')} /></div>
-        <div className="min-h-0 flex-1 overflow-auto px-3 pt-5"><ThreadList className="max-w-none" dateLabel={t('workbench.today')} threads={visibleItems.map(item => ({ id: item.id, title: item.title ?? t('workbench.newThread'), time: '', unread: item.isRunning, pinned: Boolean(item.custom?.pinned) }))} activeIndex={visibleItems.findIndex(item => item.id === activeId)} onActiveIndexChange={index => { setMemoryOpen(false); void aui.threads.switchToThread(visibleItems[index].id) }} onRename={(index, nextTitle) => { if (nextTitle.trim()) void aui.threads.item({ id: visibleItems[index].id }).rename(nextTitle.trim().slice(0, 80)) }} onPin={index => togglePin(visibleItems[index].id)} onArchive={index => { void aui.threads.item({ id: visibleItems[index].id }).archive() }} onDelete={index => { void aui.threads.item({ id: visibleItems[index].id }).delete() }} labels={{ more: t('workbench.moreOptions'), rename: t('workbench.renameThread'), pin: t('workbench.pin'), unpin: t('workbench.unpin'), archive: t('workbench.archive'), delete: t('workbench.delete') }} /></div>
-      </> : <div className="flex flex-col items-center gap-2 pt-2"><button className={`${ghostButton} native-window-action size-8`} aria-label={t('workbench.newThread')} onClick={() => aui.threads.switchToNewThread()}><Plus className="size-4" aria-hidden="true" /></button></div>}
-    </aside>
-    <div className="flex min-w-0 flex-1 flex-col">
-      <header className="native-window-drag flex h-14 shrink-0 items-center gap-3 border-b border-border px-5">
-        <div className="relative min-w-0 flex-1">
-          {renaming ? <input autoFocus value={titleDraft} onChange={event => setTitleDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') renameCurrent(titleDraft); if (event.key === 'Escape') setRenaming(false) }} onBlur={() => renameCurrent(titleDraft)} className="w-full bg-transparent text-[13.5px] outline-none" aria-label={t('workbench.renameThread')} /> : <span className="block truncate text-[13.5px]">{memoryOpen ? t('workbench.memory') : title || t('workbench.newThread')}</span>}
-        </div>
-        <Popover open={headerMenu} onOpenChange={setHeaderMenu}>
-          <PopoverTrigger render={<button className={`${ghostButton} native-window-action size-8`} aria-label={t('workbench.moreOptions')} aria-expanded={headerMenu} />}><Ellipsis className="size-4" aria-hidden="true" /></PopoverTrigger>
+  useEffect(() => {
+    if (!props.active) { setHeaderMenu(false); setRenaming(false) }
+  }, [props.active])
+  return <>
+    {props.active && props.sidebar && createPortal(<div className="nola-workbench-sidebar">
+      <SidebarGroup><SidebarMenu>
+        <SidebarMenuItem><NavigationItem icon={ArrowLeft} label={t('suite.back')} onPress={props.onBack} /></SidebarMenuItem>
+      </SidebarMenu></SidebarGroup>
+      <div className="nola-workbench-sidebar__search relative"><Input type="search" className="ps-9" value={threadQuery} onChange={event => setThreadQuery(event.target.value)} placeholder={t('workbench.searchThreads')} aria-label={t('workbench.searchThreads')} /><Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /></div>
+      <SidebarGroup><SidebarMenu><SidebarMenuItem><NavigationItem icon={SquarePen} label={t('workbench.newThread')} onPress={() => { setMemoryOpen(false); void aui.threads.switchToNewThread() }} /></SidebarMenuItem></SidebarMenu></SidebarGroup>
+      <div className="nola-workbench-sidebar__threads"><ThreadList className="max-w-none" dateLabel={t('workbench.earlier')} threads={visibleItems.map(item => ({ id: item.id, title: item.title ?? t('workbench.newThread'), time: '', dateLabel: t((['workbench.today', 'workbench.yesterday', 'workbench.earlier'] as const)[groupOf(item)]), unread: item.isRunning, pinned: Boolean(item.custom?.pinned) }))} activeIndex={visibleItems.findIndex(item => item.id === activeId)} onActiveIndexChange={index => { setMemoryOpen(false); void aui.threads.switchToThread(visibleItems[index].id) }} onRename={(index, nextTitle) => { if (nextTitle.trim()) void aui.threads.item({ id: visibleItems[index].id }).rename(nextTitle.trim().slice(0, 80)) }} onPin={index => togglePin(visibleItems[index].id)} onArchive={index => { void aui.threads.item({ id: visibleItems[index].id }).archive() }} onDelete={index => { void aui.threads.item({ id: visibleItems[index].id }).delete() }} labels={{ more: t('workbench.moreOptions'), rename: t('workbench.renameThread'), pin: t('workbench.pin'), unpin: t('workbench.unpin'), archive: t('workbench.archive'), delete: t('workbench.delete') }} /></div>
+    </div>, props.sidebar)}
+    {props.active && props.heading && createPortal(renaming
+      ? <input autoFocus value={titleDraft} onChange={event => setTitleDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') renameCurrent(titleDraft); if (event.key === 'Escape') setRenaming(false) }} onBlur={() => renameCurrent(titleDraft)} className="nola-no-drag w-full min-w-0 bg-transparent outline-none" aria-label={t('workbench.renameThread')} />
+      : <span className="block truncate">{memoryOpen ? t('workbench.memory') : title || t('workbench.newThread')}</span>, props.heading)}
+    {props.active && props.actions && createPortal(<>
+        <Popover open={props.active && headerMenu} onOpenChange={setHeaderMenu}>
+          <PopoverTrigger render={<Button variant="bare" size="icon" className="nola-titlebar-icon" aria-label={t('workbench.moreOptions')} aria-expanded={headerMenu} />}><Ellipsis className="size-4" aria-hidden="true" /></PopoverTrigger>
           <PopoverContent align="end" side="bottom" sideOffset={6} className="w-64 gap-0.5 rounded-2xl p-1.5">
             <ComposerMenuItem onClick={() => { void aui.threads.switchToNewThread(); setHeaderMenu(false) }}><Plus className="size-4" aria-hidden="true" />{t('workbench.newThread')}</ComposerMenuItem>
             <ComposerMenuItem disabled={visibleItems.findIndex(item => item.id === activeId) <= 0} onClick={() => { switchRelative(-1); setHeaderMenu(false) }}><ChevronLeft className="size-4" aria-hidden="true" />{t('workbench.previousThread')}</ComposerMenuItem>
@@ -155,18 +191,15 @@ export function NativeAgentSurface(props: NativeAgentSurfaceProps) {
             <ComposerMenuItem onClick={() => { setTitleDraft(title ?? ''); setRenaming(true); setHeaderMenu(false) }}><Settings2 className="size-4" aria-hidden="true" />{t('workbench.renameThread')}</ComposerMenuItem>
             <ComposerMenuItem onClick={toggleArchive}><Archive className="size-4" aria-hidden="true" />{t('workbench.archiveRestore')}</ComposerMenuItem>
             <ComposerMenuItem onClick={() => togglePin(activeId)}><Pin className="size-4" aria-hidden="true" />{t(currentItem?.custom?.pinned ? 'workbench.unpin' : 'workbench.pin')}</ComposerMenuItem>
-            <ComposerMenuItem onClick={() => { setSidebar(value => !value); setHeaderMenu(false) }}><PanelLeft className="size-4" aria-hidden="true" />{t('workbench.toggleSidebar')}</ComposerMenuItem>
             <ComposerMenuItem onClick={() => { document.querySelector<HTMLInputElement>('.aui-composer-input')?.focus(); setHeaderMenu(false) }}><Search className="size-4" aria-hidden="true" />{t('workbench.focusMessage')}</ComposerMenuItem>
             <ComposerMenuItem onClick={() => { setMemoryOpen(value => !value); setHeaderMenu(false) }}><BrainCircuit className="size-4" aria-hidden="true" />{t('workbench.memory')}</ComposerMenuItem>
           </PopoverContent>
         </Popover>
-        <button className={`${ghostButton} native-window-action size-8`} aria-label={t('titleBar.minimizeWindow')} onClick={() => { void window.nolaTranslator?.minimizeMainWindow() }}><Minus className="size-4" aria-hidden="true" /></button>
-        <button className={`${ghostButton} native-window-action size-8`} aria-label={t('titleBar.maximizeWindow')} onClick={() => { void window.nolaTranslator?.toggleMainWindowMaximize() }}><Square className="size-3.5" aria-hidden="true" /></button>
-        <button className={`${ghostButton} native-window-action size-8`} aria-label={t('common.close')} onClick={() => { void window.nolaTranslator?.closeMainWindow() }}><X className="size-4" aria-hidden="true" /></button>
-      </header>
-      <NativeConversation {...props} memoryOpen={memoryOpen} onMemoryClose={() => setMemoryOpen(false)} />
+    </>, props.actions)}
+    <div className="native-agent-app flex h-full min-h-0 flex-col text-foreground" data-testid="native-agent-app">
+      <WorkbenchStorageContext.Provider value={storagePrefix}><NativeConversation {...props} memoryOpen={memoryOpen} onMemoryClose={() => setMemoryOpen(false)} /></WorkbenchStorageContext.Provider>
     </div>
-  </div>
+  </>
 }
 
 function NativeConversation(props: NativeAgentSurfaceProps & { memoryOpen: boolean; onMemoryClose: () => void }) {
@@ -174,11 +207,13 @@ function NativeConversation(props: NativeAgentSurfaceProps & { memoryOpen: boole
   const aui = useAui()
   const empty = useAuiState(s => s.thread.messages.length === 0)
   const threadId = useAuiState(s => s.threads.mainThreadId)
+  const [browsing, setBrowsing] = useState(false)
+  useEffect(() => setBrowsing(false), [threadId])
   return <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col" data-testid="native-conversation">
     <ThreadPrimitive.Viewport data-hide-scrollbar className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6" turnAnchor="top" autoScroll>
       {props.memoryOpen ? <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6"><Breadcrumb aria-label={t('workbench.chats')} className="py-5"><BreadcrumbList><BreadcrumbItem><button type="button" className="rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring" onClick={props.onMemoryClose}>{t('workbench.chats')}</button></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{t('workbench.memory')}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb><div className="flex flex-1 items-start justify-center"><NativeAgentSettings page="memory" snapshot={props.snapshot} onAction={props.onAction} busy={props.busy} model={props.models.find(model => model.id === props.config.model)?.name ?? ''} onPrompt={() => undefined} memories={props.memories} onMemories={props.onMemories} /></div></div> : <div className="mx-auto flex min-h-full w-full max-w-3xl flex-1 flex-col">
-        {empty ? <div className="flex flex-1 flex-col items-center justify-center gap-6 py-8"><h1 className="text-2xl font-medium">{t('workbench.welcomeHeading')}</h1><div className="w-full px-6"><NativeComposer key={threadId} {...props} /></div></div> : <>
-          <WorkbenchConfigContext.Provider value={props.config}><div className="flex-1 py-8"><ThreadPrimitive.Messages components={{ UserMessage: NativeUserMessage, AssistantMessage: NativeAssistantMessage }} /></div></WorkbenchConfigContext.Provider>
+        {empty ? <div className="flex flex-1 flex-col items-center justify-center gap-6 py-8"><h1 className="[font:var(--font-title)]">{t('workbench.welcomeHeading')}</h1><div className="w-full px-6"><NativeComposer key={threadId} {...props} /></div></div> : <>
+          <WorkbenchBranchContext.Provider value={{ browsing, setBrowsing }}><WorkbenchConfigContext.Provider value={props.config}><WorkbenchModelReadyContext.Provider value={props.models.some(model => model.id === props.config.model && model.kind === props.config.kind)}><div className="flex-1 py-8"><ThreadPrimitive.Messages components={{ UserMessage: NativeUserMessage, UserEditComposer: NativeUserEditComposer, AssistantMessage: NativeAssistantMessage }} /></div></WorkbenchModelReadyContext.Provider></WorkbenchConfigContext.Provider></WorkbenchBranchContext.Provider>
           <div className="sticky bottom-0 w-full shrink-0 bg-background pb-5 pt-3"><NativeComposer key={threadId} {...props} /></div>
         </>}
       </div>}
@@ -192,28 +227,76 @@ function NativeMarkdown() {
 }
 
 function NativeUserMessage() {
+  const { t } = useI18n()
   const hasAttachments = useAuiState(s => !!s.message.attachments?.length)
-  return <div className="mb-8"><NativeDaySeparator /><MessagePrimitive.Root data-role="user" className="group/message flex w-full flex-col items-end gap-2"><div className={['flex min-w-0 max-w-full items-end gap-2', hasAttachments && 'w-full max-w-sm'].filter(Boolean).join(' ')}><div className={['min-w-0 rounded-2xl bg-foreground/[0.04] px-3.5 py-2 text-sm', hasAttachments ? 'w-full' : 'max-w-[85%]'].filter(Boolean).join(' ')}><MessagePrimitive.Attachments components={{ Image: NativeUserAttachment, File: NativeUserAttachment, Document: NativeUserAttachment }} /><MessagePrimitive.Parts components={{ Text: NativeMarkdown }} /></div><NativeMessageTimestamp /></div></MessagePrimitive.Root></div>
+  const copied = useAuiState(s => s.message.isCopied)
+  return <div className="mb-8"><NativeDaySeparator /><MessagePrimitive.Root data-role="user" className="group/message flex w-full flex-col items-end gap-2">
+    <div className={['min-w-0 rounded-2xl bg-muted px-3.5 py-2 [font:var(--font-body)]', hasAttachments ? 'w-full max-w-sm' : 'max-w-[85%]'].join(' ')}>
+      <MessagePrimitive.Attachments components={{ Image: NativeUserAttachment, File: NativeUserAttachment, Document: NativeUserAttachment }} /><MessagePrimitive.Parts components={{ Text: NativeMarkdown }} />
+    </div>
+    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100">
+      <BranchPickerPrimitive.Root hideWhenSingleBranch className="flex items-center gap-1 text-muted-foreground">
+        <BranchPickerPrimitive.Previous aria-label={t('workbench.previous')} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronLeft aria-hidden="true" className="size-4" /></BranchPickerPrimitive.Previous>
+        <span className="text-xs tabular-nums"><BranchPickerPrimitive.Number /> / <BranchPickerPrimitive.Count /></span>
+        <BranchPickerPrimitive.Next aria-label={t('workbench.next')} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronRight aria-hidden="true" className="size-4" /></BranchPickerPrimitive.Next>
+      </BranchPickerPrimitive.Root>
+      <ActionBarPrimitive.Root className="flex items-center gap-1">
+        <ActionBarPrimitive.Copy aria-label={t(copied ? 'workbench.copiedResponse' : 'workbench.copyMessage')} className={`${ghostButton} grid size-7 place-items-center ${copied ? 'text-chart-2' : ''}`}>
+          <Copy aria-hidden="true" className={`${iconSwap} size-3.5 ${copied ? iconSwapOut : iconSwapIn}`} />
+          <Check aria-hidden="true" className={`${iconSwap} size-3.5 ${copied ? iconSwapIn : iconSwapOut}`} />
+        </ActionBarPrimitive.Copy>
+        <ActionBarPrimitive.Edit aria-label={t('workbench.editMessage')} className={`${ghostButton} size-7`}><Pencil aria-hidden="true" className="size-3.5" /></ActionBarPrimitive.Edit>
+      </ActionBarPrimitive.Root>
+      <NativeMessageTimestamp />
+    </div>
+  </MessagePrimitive.Root></div>
+}
+
+function NativeUserEditComposer() {
+  const { t } = useI18n()
+  const aui = useAui()
+  const modelReady = useContext(WorkbenchModelReadyContext)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const attachments = useAuiState(s => s.composer.attachments)
+  return <div className="mb-8 w-full"><NativeDaySeparator /><ComposerPrimitive.Root className="flex w-full flex-col gap-2 rounded-[var(--radius-lg)] bg-muted p-3">
+    {attachments.length > 0 && <div className="flex flex-wrap gap-2"><ComposerPrimitive.Attachments components={{ Attachment: NativeComposerAttachment }} /></div>}
+    <ComposerPrimitive.Input autoFocus aria-label={t('workbench.editMessage')} className="min-h-16 w-full resize-y bg-transparent px-1 py-1 [font:var(--font-body)] outline-none" />
+    <div className="flex items-center gap-2">
+      <Button type="button" variant="bare" size="icon-sm" aria-label={t('workbench.addAttachment')} onClick={() => inputRef.current?.click()}><Plus aria-hidden="true" /></Button>
+      <input ref={inputRef} type="file" multiple className="hidden" onChange={event => { for (const file of event.target.files ?? []) void aui.composer.addAttachment(file).catch(error => notifyError(t('workbench.actionFailed'), { cause: error })); event.target.value = '' }} />
+      <div className="ms-auto flex gap-2">
+        <ComposerPrimitive.Cancel render={<Button type="button" variant="outline" size="sm" />}>{t('workbench.cancel')}</ComposerPrimitive.Cancel>
+        <Button type="button" size="sm" onClick={() => { if (!modelReady) notifyError(t('workbench.noModels')); else void aui.composer.send() }}>{t('workbench.send')}</Button>
+      </div>
+    </div>
+  </ComposerPrimitive.Root></div>
 }
 
 function NativeDaySeparator() {
   const { language } = useI18n()
   const current = useAuiState(state => state.message)
   const messages = useAuiState(state => state.thread.messages)
-  if (!current.createdAt) return null
+  const dates = useMessageDates()
+  const value = dates[current.id]
   const previous = messages[current.index - 1]
-  const date = current.createdAt
-  if (previous?.createdAt && previous.createdAt.toDateString() === date.toDateString()) return null
+  const previousValue = previous && dates[previous.id]
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  if (previousValue && new Date(previousValue).toDateString() === date.toDateString()) return null
   const day = date.toLocaleDateString(language, { year: 'numeric', month: 'long', day: 'numeric' })
   return <DaySeparator className="max-w-none [&>div>div:last-child]:min-h-0 [&>div>div:last-child]:gap-0 [&>div>div:last-child>span:first-child]:hidden [&>div>div:last-child>span:last-child]:hidden" messages={[{ id: current.id, day, time: '', role: 'assistant', text: '' }]} />
 }
 
 function NativeMessageTimestamp() {
   const { language } = useI18n()
-  const createdAt = useAuiState(state => state.message.createdAt)
-  if (!createdAt) return null
+  const id = useAuiState(state => state.message.id)
+  const dates = useMessageDates()
+  if (!dates[id]) return null
+  const createdAt = new Date(dates[id])
+  if (Number.isNaN(createdAt.getTime())) return null
   const time = createdAt.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })
-  return <time dateTime={createdAt.toISOString()} className="shrink-0 text-[11px] tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100">{time}</time>
+  return <time dateTime={createdAt.toISOString()} className="shrink-0 [font:var(--font-caption)] tabular-nums text-muted-foreground">{time}</time>
 }
 
 function NativeImage(props: Omit<React.ComponentProps<typeof Image>, 'labels'>) {
@@ -235,7 +318,9 @@ function NativeUserAttachment() {
 function NativeComposerAttachment() {
   const { t } = useI18n()
   const attachment = useAuiState(state => state.attachment)
+  const src = useAttachmentSrc()
   return <AttachmentPrimitive.Root className="flex min-w-0 max-w-full flex-col gap-1">
+    {src && <img src={src} alt={attachment.name} className="max-h-32 max-w-40 rounded-[var(--radius-md)] object-contain" />}
     <File.Root className="max-w-full min-w-0"><File.Icon mimeType={attachment.contentType} /><File.Name title={attachment.name}><AttachmentPrimitive.Name /></File.Name>{attachment.file && <File.Size bytes={attachment.file.size} />}<AttachmentPrimitive.Remove aria-label={t('workbench.removeAttachment', { name: attachment.name })} className={ghostButton}><X className="size-4" aria-hidden="true" /></AttachmentPrimitive.Remove></File.Root>
     {attachment.status.type === 'incomplete' && <p role="alert" className="text-sm text-destructive">{attachment.status.message || t('workbench.actionFailed')}</p>}
   </AttachmentPrimitive.Root>
@@ -288,9 +373,26 @@ function NativeReasoning() {
   return <ReasoningRoot variant="ghost" streaming={streaming}><ReasoningTrigger active={streaming} /><ReasoningContent><ReasoningText><NativeMarkdown /></ReasoningText></ReasoningContent></ReasoningRoot>
 }
 
+function NativeQuestionBranches() {
+  const { t } = useI18n()
+  const aui = useAui()
+  const user = useAuiState(s => s.thread.messages.slice(0, s.message.index).reverse().find(message => message.role === 'user'))
+  if (!user) return null
+  const message = aui.thread.message({ id: user.id })
+  const { branchCount, branchNumber } = message.getState()
+  if (branchCount < 2) return null
+  return <div className="flex items-center gap-1 text-muted-foreground">
+    <button type="button" aria-label={t('workbench.previous')} disabled={branchNumber <= 1} onClick={() => message.switchToBranch({ position: 'previous' })} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronLeft aria-hidden="true" className="size-4" /></button>
+    <span className="text-xs tabular-nums">{branchNumber} / {branchCount}</span>
+    <button type="button" aria-label={t('workbench.next')} disabled={branchNumber >= branchCount} onClick={() => message.switchToBranch({ position: 'next' })} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronRight aria-hidden="true" className="size-4" /></button>
+  </div>
+}
+
 function NativeAssistantMessage() {
   const { t } = useI18n()
   const config = useContext(WorkbenchConfigContext)
+  const modelReady = useContext(WorkbenchModelReadyContext)
+  const { browsing, setBrowsing } = useContext(WorkbenchBranchContext)
   const aui = useAui()
   const running = useAuiState(s => s.message.status?.type === 'running')
   const content = useAuiState(s => s.message.content)
@@ -314,23 +416,34 @@ function NativeAssistantMessage() {
     : config?.model.startsWith('resource:') ? t('workbench.localLlmError')
     : t('workbench.networkError')
   const [copied, setCopied] = useState(false)
-  const [reaction, setReaction] = useState<'up' | 'down' | null>(null)
-  const [more, setMore] = useState(false)
+  const retry = () => {
+    if (!modelReady) { notifyError(t('workbench.noModels')); return }
+    setBrowsing(false)
+    aui.message.reload()
+  }
+  const notifiedError = useRef('')
+  useEffect(() => {
+    if (!browsing && errorText && notifiedError.current !== errorText) notifyError(t('workbench.actionFailed'), { description: errorText })
+    notifiedError.current = errorText
+  }, [browsing, errorText, t])
   return <div className="mb-8"><NativeDaySeparator /><MessagePrimitive.Root data-role="assistant" className="group/message flex w-full flex-col items-start gap-3">
     <NativeMediaWorkflow />
     {running && !hasContent && <ThinkingIndicator role="status" label={t(audioRequest ? 'workbench.transcribingMedia' : 'workbench.thinkingProcess')} />}
-    {!running && !hasContent && !error && <p role="status" className="text-sm text-muted-foreground">{t('workbench.emptyResult')}</p>}
+    {!running && !hasContent && (!error || browsing) && <p role="status" className="text-sm text-muted-foreground">{t('workbench.emptyResult')}</p>}
     <MessagePrimitive.Parts components={{ Text: NativeMarkdown, Reasoning: NativeReasoning, tools: { Fallback: NativeTool }, File, Image: NativeImage, Source: Sources }} />
     {!hasWorkflow && <NativeMessageTiming />}
-    {error && <ErrorState
-      title={errorTitle}
+    {error && !browsing && <ErrorState
+      title={projectorDownloadStarted ? errorTitle : t('workbench.actionFailed')}
       detail={projectorDownloadStarted ? t('workbench.imageProjectorDownloadStarted') : missingProjector || projectorDownloadFailed ? t('workbench.imageProjectorMissingDetail')
-        : localTtsNoAudio ? `${t('workbench.localTtsNoAudio')} ${errorText}` : errorText}
+        : errorText === t('workbench.noModels') ? errorText : localTtsNoAudio ? `${t('workbench.localTtsNoAudio')} ${errorText}` : errorText ? `${errorTitle} ${errorText}` : errorTitle}
       retryLabel={t('workbench.retry')} retryingLabel={t('workbench.retrying')}
-      retrying={running} onRetry={() => aui.message.reload()}
+      retrying={running} onRetry={retry}
     />}
-    <NativeMessageTimestamp />
-    {!running && <div className="relative"><MessageActions labels={{ copied: t('workbench.copiedResponse'), copy: t('workbench.copyResponse'), helpful: t('workbench.helpfulResponse'), unhelpful: t('workbench.unhelpfulResponse'), regenerate: t('workbench.regenerateResponse'), more: t('workbench.moreOptions') }} copied={copied} reaction={reaction} regenerating={false} onCopy={() => { void navigator.clipboard.writeText(content.filter(part => part.type === 'text').map(part => part.text).join('\n')).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }} onReactionChange={value => { setReaction(value); if (value) aui.message.submitFeedback({ type: value === 'up' ? 'positive' : 'negative' }) }} onRegenerate={() => aui.message.reload()} onMore={() => setMore(value => !value)} />{more && <ComposerMenu open><ComposerMenuItem onClick={() => { aui.message.speak(); setMore(false) }}>{t('workbench.readAloud')}</ComposerMenuItem></ComposerMenu>}</div>}
+    {!running && <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100"><NativeQuestionBranches /><BranchPickerPrimitive.Root hideWhenSingleBranch className="flex items-center gap-1 text-muted-foreground">
+      <BranchPickerPrimitive.Previous onClick={() => setBrowsing(true)} aria-label={t('workbench.previous')} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronLeft aria-hidden="true" className="size-4" /></BranchPickerPrimitive.Previous>
+      <span className="text-xs tabular-nums"><BranchPickerPrimitive.Number /> / <BranchPickerPrimitive.Count /></span>
+      <BranchPickerPrimitive.Next onClick={() => setBrowsing(true)} aria-label={t('workbench.next')} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronRight aria-hidden="true" className="size-4" /></BranchPickerPrimitive.Next>
+    </BranchPickerPrimitive.Root><MessageActions labels={{ copied: t('workbench.copiedResponse'), copy: t('workbench.copyResponse'), helpful: t('workbench.helpfulResponse'), unhelpful: t('workbench.unhelpfulResponse'), regenerate: t('workbench.regenerateResponse'), more: t('workbench.moreOptions') }} copied={copied} regenerating={false} onCopy={() => { void navigator.clipboard.writeText(content.filter(part => part.type === 'text').map(part => part.text).join('\n')).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }} onRegenerate={retry} /><NativeMessageTimestamp /></div>}
   </MessagePrimitive.Root></div>
 }
 
@@ -340,7 +453,7 @@ function NativeMessageTiming() {
   const milliseconds = timing?.totalStreamTime
   if (milliseconds === undefined) return null
   const duration = milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${(milliseconds / 1000).toFixed(1)} s`
-  return <span className="text-[11px] tabular-nums text-muted-foreground">{t('workbench.nativeReplyTime', { duration })}</span>
+  return <span className="[font:var(--font-caption)] tabular-nums text-muted-foreground">{t('workbench.nativeReplyTime', { duration })}</span>
 }
 
 function errorDetail(error: unknown): string {
@@ -469,19 +582,19 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
   }
   return <Composer className="max-w-none" data-testid="native-composer">
     {!!savedDraft && !text && <DraftRestore draft={savedDraft} savedAt={t('workbench.nativeDraft')} onRestore={() => { aui.thread.composer().setText(savedDraft); setSavedDraft('') }} onDiscard={() => { setSavedDraft(''); try { localStorage.removeItem(`nola.native.draft:${threadId}`) } catch { /* Keep dismissing usable when storage is unavailable. */ } }} />}
-    {menu === 'models' && <ComposerMenu open anchor="models" className="max-h-[min(70vh,32rem)] overflow-y-auto"><p className="px-2.5 py-2 text-xs text-muted-foreground"><ModelAvailabilityLabel label={t('nav.modelGateway')} hint={t('gateway.modelNoneHint')} /></p><TooltipProvider>{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 text-xs text-muted-foreground">{t(`workbench.${kind}`)}</p>{props.modelCatalog.filter(model => model.kind === kind).map(model => {
+    {menu === 'models' && <ComposerMenu open anchor="models" className="max-h-[min(70vh,32rem)] overflow-y-auto"><p className="px-2.5 py-2 [font:var(--font-caption)] text-muted-foreground"><ModelAvailabilityLabel label={t('nav.modelGateway')} hint={t('gateway.modelNoneHint')} /></p><TooltipProvider>{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 [font:var(--font-caption)] text-muted-foreground">{t(`workbench.${kind}`)}</p>{props.modelCatalog.filter(model => model.kind === kind).map(model => {
       const available = props.models.some(item => item.id === model.id && item.kind === model.kind)
       const item = <ComposerMenuItem className="nola-menu-item" active={props.config.model === model.id} aria-disabled={!available} onClick={() => { if (available) pick({ model: model.id, kind: model.kind, images: model.images, voice: '' }) }}><span className="min-w-0 flex-1 truncate text-start">{model.name}</span><Badge variant={available ? 'success' : 'secondary'}>{t(available ? 'workbench.modelAvailable' : 'workbench.modelNotStarted')}</Badge></ComposerMenuItem>
       return available ? <div key={model.id}>{item}</div> : <Tooltip key={model.id}><TooltipTrigger render={item} /><TooltipContent>{t('gateway.modelGatewayStartHint')}</TooltipContent></Tooltip>
     })}</div>)}</TooltipProvider><ComposerMenuItem className="nola-menu-item" onClick={props.onConfigure}><Settings2 className="size-4" aria-hidden="true" />{t('nav.modelGateway')}</ComposerMenuItem></ComposerMenu>}
     {menu === 'effort' && <ComposerMenu open anchor="effort" className="w-80 gap-3 p-3"><ReasoningEffort variant="slider" levels={(['auto', 'low', 'medium', 'high'] as const).map(key => ({ key, label: t(key === 'auto' ? 'modelsSettingsUi.default' : `workbench.${key}`) }))} selectedKey={props.config.effort} title={t('workbench.reasoningTokens')} onSelect={effort => pick({ effort }, false)} /></ComposerMenu>}
-    {menu === 'language' && <ComposerMenu open anchor="language">{(props.config.kind === 'mt' ? targetCodes : sourceCodes).map(code => <ComposerMenuItem key={code} onClick={() => pick(props.config.kind === 'mt' ? { target: code } : { source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
-    {menu === 'source' && <ComposerMenu open anchor="source">{sourceCodes.map(code => <ComposerMenuItem key={code} onClick={() => pick({ source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
-    {menu === 'voice' && <ComposerMenu open anchor="voice">{props.voices.map(voice => <ComposerMenuItem key={voice} onClick={() => pick({ voice })}>{voice}</ComposerMenuItem>)}</ComposerMenu>}
+    {menu === 'language' && <ComposerMenu open anchor="language">{(props.config.kind === 'mt' ? targetCodes : sourceCodes).map(code => <ComposerMenuItem key={code} active={code === (props.config.kind === 'mt' ? props.config.target : props.config.source)} onClick={() => pick(props.config.kind === 'mt' ? { target: code } : { source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
+    {menu === 'source' && <ComposerMenu open anchor="source">{sourceCodes.map(code => <ComposerMenuItem key={code} active={code === props.config.source} onClick={() => pick({ source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
+    {menu === 'voice' && <ComposerMenu open anchor="voice">{props.voices.map(voice => <ComposerMenuItem key={voice} active={voice === props.config.voice} onClick={() => pick({ voice })}>{voice}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'context' && <ComposerMenu open align="end"><ContextBreakdown limit={contextWindow} segments={[{ label: t('workbench.inputTokens'), tokens: usage?.inputTokens ?? 0, tint: 'bg-chart-2' }, { label: t('workbench.outputTokens'), tokens: usage?.outputTokens ?? 0, tint: 'bg-chart-1' }]} /></ComposerMenu>}
     <ComposerBar>
       {attachments.length > 0 && <ComposerAttachments><ComposerPrimitive.Attachments components={{ Attachment: NativeComposerAttachment }} /></ComposerAttachments>}
-      {dictation ? <ComposerVoice recording={dictation.status.type === 'running'} seconds={seconds} /> : <ComposerPrimitive.Input data-slot="composer-input" className="aui-composer-input min-h-11 max-h-40 w-full resize-none bg-transparent px-3 py-2 text-[15px] caret-primary outline-none placeholder:text-muted-foreground" rows={1} addAttachmentOnPaste={false} placeholder={props.placeholder} readOnly={!props.config.model} onPaste={event => {
+      {dictation ? <ComposerVoice recording={dictation.status.type === 'running'} seconds={seconds} /> : <ComposerPrimitive.Input data-slot="composer-input" className="aui-composer-input min-h-11 max-h-40 w-full resize-none bg-transparent px-3 py-2 [font:var(--font-body)] caret-primary outline-none placeholder:text-muted-foreground" rows={1} addAttachmentOnPaste={false} placeholder={props.placeholder} readOnly={!props.config.model} onPaste={event => {
         const kind = props.config.kind
         if (kind === 'tts' || kind === 'mt' && !props.config.images) return
         const clipboard = event.clipboardData
@@ -506,15 +619,15 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
           void aui.thread.composer().addAttachment(attachment).catch(error => notifyError(t('workbench.actionFailed'), { cause: error }))
         }
       }} />}
-      <ComposerToolbar><ComposerActions>
+      <ComposerToolbar className="flex-wrap gap-2"><ComposerActions className="min-w-0 max-w-full flex-wrap">
         <ComposerAttachButton aria-label={t('workbench.addAttachment')} disabled={props.config.kind === 'tts' || props.config.kind === 'mt' && !props.config.images} onClick={() => inputRef.current?.click()} />
         <ComposerModelTrigger data-menu-anchor="models" model={selected?.name ?? t('workbench.noModels')} open={menu === 'models'} onClick={() => setMenu(menu === 'models' ? '' : 'models')} />
         {props.config.kind === 'llm' && <ComposerModelTrigger data-menu-anchor="effort" model={t(props.config.effort === 'auto' ? 'modelsSettingsUi.default' : `workbench.${props.config.effort as 'low' | 'medium' | 'high'}`)} open={menu === 'effort'} onClick={() => setMenu(menu === 'effort' ? '' : 'effort')} />}
-        {props.config.kind === 'llm' && <NativeComicSelector value={props.config.comicProjectId ?? null} disabled={preparing || running} onChange={comicProjectId => { cancelComicReads(); if (comicProjectId === null) props.onChange({ ...props.config, comicProjectId }); else pick({ comicProjectId }) }} />}
+        {props.config.kind === 'llm' && <NativeComicSelector active={props.active} value={props.config.comicProjectId ?? null} disabled={preparing || running} onChange={comicProjectId => { cancelComicReads(); if (comicProjectId === null) props.onChange({ ...props.config, comicProjectId }); else pick({ comicProjectId }) }} />}
         {props.config.kind === 'mt' && <ComposerModelTrigger data-menu-anchor="source" model={props.config.source === 'auto' ? t('workbench.auto') : languageName(props.config.source, language)} open={menu === 'source'} onClick={() => setMenu(menu === 'source' ? '' : 'source')} />}
         {(props.config.kind === 'asr' || props.config.kind === 'mt') && <ComposerModelTrigger data-menu-anchor="language" model={languageName(props.config.kind === 'mt' ? props.config.target : props.config.source, language)} open={menu === 'language'} onClick={() => setMenu(menu === 'language' ? '' : 'language')} />}
         {props.config.kind === 'tts' && <ComposerModelTrigger data-menu-anchor="voice" model={props.config.voice || t('workbench.voice')} open={menu === 'voice'} onClick={chooseVoices} />}
-      </ComposerActions><ComposerActions>
+      </ComposerActions><ComposerActions className="ms-auto shrink-0">
         {props.config.kind === 'llm' && <div><ComposerContext labels={{ context: t('workbench.contextUsage'), system: t('workbench.contextSystem'), tools: t('workbench.contextTools'), messages: t('workbench.contextMessages'), total: t('workbench.contextTotal') }} usage={{ system: 0, tools: 0, messages: (usage?.totalTokens ?? 0) / 1000, total: contextWindow / 1000 }} /></div>}
         <ComposerVoiceButton active={!!dictation} aria-label={t(dictation ? 'workbench.stopDictation' : 'workbench.record')} onClick={() => { if (dictation) aui.thread.composer().stopDictation(); else aui.thread.composer().startDictation() }} />
         <ComposerSend aria-label={t(running || preparing ? 'workbench.stopGenerating' : 'workbench.sendMessage')} className={running || preparing ? 'aui-composer-cancel' : 'aui-composer-send'} streaming={running || preparing} idle={!preparing && !text.trim() && !attachments.length} disabled={!running && !preparing && (!props.config.model || !text.trim() && !attachments.length)} onClick={send} />

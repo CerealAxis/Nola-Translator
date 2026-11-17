@@ -42,7 +42,7 @@ def export(out_dir: Path) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
 
-    app = create_app(control_token="export-only")
+    app = create_app(control_token="export-only", screen_ocr=object())
     openapi_path = out_dir / "openapi.json"
     openapi_path.write_text(
         json.dumps(app.openapi(), indent=2, ensure_ascii=False), encoding="utf-8"

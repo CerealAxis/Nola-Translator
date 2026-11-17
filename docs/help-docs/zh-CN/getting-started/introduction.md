@@ -1,9 +1,9 @@
 # 产品介绍
 
 <div align="center">
-  <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/assets/brand/nola-logo.svg" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/assets/brand/nola-logo.svg" alt="Nola Translator Logo" width="112" height="112"></a>
+  <img src="/docs-image/zh-CN/getting-started/introduction/nola-translator-logo.svg" alt="Nola Translator Logo" width="112" height="112">
   <h1>Nola Translator</h1>
-  <p>Nola Translator 是一个实时字幕与翻译软件</p>
+  <p>一款开源的实时翻译软件，提供浏览器插件版本</p>
   <p><a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.md">English</a> · 简体中文 · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-TW.md">繁體中文（台灣）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-HK.md">繁體中文（香港）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ja.md">日本語</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ko.md">한국어</a></p>
 </div>
 
@@ -12,128 +12,173 @@
   <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml/badge.svg" alt="构建工作流状态"></a>
   <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://img.shields.io/badge/Actions-Download%20Artifacts-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="从 GitHub Actions 下载"></a>
   <a href="https://github.com/CerealAxis/Nola-Translator/releases"><img src="https://img.shields.io/github/v/release/CerealAxis/Nola-Translator?style=flat-square&label=Release" alt="最新 GitHub 版本"></a>
-  <a href="./download-and-install"><img src="https://img.shields.io/badge/Releases-Download%20Latest-2DA44E?style=flat-square&logo=github&logoColor=white" alt="下载最新版本"></a>
+  <a href="https://github.com/CerealAxis/Nola-Translator/releases/latest"><img src="https://img.shields.io/badge/Releases-Download%20Latest-2DA44E?style=flat-square&logo=github&logoColor=white" alt="下载最新版本"></a>
   <img src="https://img.shields.io/badge/QQ%E7%BE%A4-701699932-12B7F5?style=flat-square&logo=tencentqq&logoColor=white" alt="QQ群：701699932">
   <img src="https://img.shields.io/badge/Electron-43-47848F?style=flat-square&logo=electron&logoColor=white" alt="Electron">
   <img src="https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white" alt="React 19">
   <img src="https://img.shields.io/badge/Vite-7-7A5CFA?style=flat-square&logo=vite&logoColor=white" alt="Vite 7">
 </p>
 
+Nola Translator 是一款跨平台实时翻译应用，支持 Windows 桌面端和浏览器端；支持本地推理；同时可以接入千问、MiniMax、OpenAI 兼容接口、谷歌翻译、微软翻译、Index Translate 等云端服务商。提供实时字幕、会议口译、漫画翻译等功能。
+
+## 演示
+
 <p align="center">
-  <img src="/docs-image/zh-CN/getting-started/introduction/home-screen.png" alt="主页界面" width="1000">
+  <a href="https://nola.xaviermc.top/">
+    <img src="/screenshots/zh-CN/home.png" alt="点击前往官网体验 Nola Translator" width="1000">
+  </a>
 </p>
 
-## 项目简介
+> [!TIP]
+> 点击体验在线演示
 
-Nola Translator 是一款实时字幕与翻译软件，支持本地模型和云端模型，可以根据需求使用本地算力进行字幕识别与翻译，或是选择接入云端模型进行识别和翻译。
+## 工作方式
 
-## 功能特性
+```mermaid
+graph LR
+    A["声音<br/>麦克风 · 系统音频"] --> B["Nola Translator"]
+    H["文字与图像<br/>网页 · 屏幕 · 游戏 · 漫画"] --> B
+    B --> C{"选择处理方式"}
+    C -->|"云端"| D["云端识别与翻译服务"]
+    C -->|"本地"| E["本地模型<br/>识别 · 翻译 · 语音合成"]
+    D --> F["字幕 · 译文 · 译音"]
+    E --> F
+    F --> G["浮窗 · 浏览器<br/>会议 · 游戏 · 漫画"]
+```
 
-- 本地模型支持：可本地运行 Qwen3-ASR、SenseVoiceSmall 等识别模型，以及 Hy-MT2 等翻译模型；软件也支持搜索安装Hugging Face上的其他模型。
-- 云端模型支持：支持阿里云、MiniMax等云端ASR模型；支持 OpenAI 兼容接口、Anthropic、Ollama 等 LLM 协议；也支持调用免费的MyMemory翻译服务。
-- GPU 加速：可检测可用的计算设备，并为识别和翻译分别配置设备。
-- 浏览器扩展：内置浏览器拓展插件，支持 Chrome 和 Edge，并在视频页面显示双语字幕；也可配置桌面系统音频作为输入。
-- 实时字幕浮层：支持系统输出设备、指定音频设备或麦克风；字幕可独立显示，支持调整位置、字号、颜色、透明度和原文译文布局。
-- 灵活配置：可按需安装模型，选择识别和翻译方式、语言方向、计算设备及字幕样式；API 凭据由应用安全存储。
-- 记录与导出：可保存字幕记录，并导出 TXT、SRT 和 WebVTT 格式；录音保存可自行开启。
+| | |
+|---|---|
+| **服务商** | 阿里云、MiniMax、OpenAI、Gemini、Anthropic、DeepSeek、Google 翻译、Microsoft Translator、OpenAI 兼容接口、Anthropic、Ollama 等|
+| **本地模型** | 26 个 ASR 模型、17 个翻译模型、16 个 TTS 模型、3 个 LLM 模型、17 个 OCR 模型、5 个漫画检测与分类模型、3 个图像修复模型 |
+| **语言** | 60+（语音识别）· 150+（翻译）· 29+（语音合成） |
+| **平台** | Windows x64 · Chrome · Edge · Firefox |
+| **隐私** | 本地推理 = 100% 设备端运行，使用云端服务时，相关内容会发送给所选服务商 |
 
-## 界面预览
-
-| 主页 | 悬浮字幕 | 视频字幕 |
-|---|---|---|
-| ![主页界面](/docs-image/zh-CN/getting-started/introduction/home-screen.png) | ![悬浮字幕界面](/docs-image/zh-CN/getting-started/introduction/floating-captions.png) | ![浏览器字幕界面](/docs-image/zh-CN/getting-started/introduction/browser-captions.png) |
-
-| 本地模型安装 | 推理环境设置 | 深色模式支持 |
-|---|---|---|
-| ![模型管理界面](/docs-image/zh-CN/getting-started/introduction/model-management.png) | ![计算环境设置](/docs-image/zh-CN/getting-started/introduction/compute-environment.png) | ![深色模式界面](/docs-image/zh-CN/getting-started/introduction/dark-mode.png) |
-
-悬浮字幕和视频字幕场景使用了 [Blender Foundation《Tears of Steel》](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg) 的裁切画面，依据 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) 授权使用。
+> [!TIP]
+> 软件支持的语言由所选择的模型决定，不同模型支持的语言能力可能不同，具体请以软件中的配置为准
 
 ## 安装
 
-- [百度网盘](https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2)
-- [夸克网盘](https://pan.quark.cn/s/ef1e11262087)
-- [Github](https://github.com/CerealAxis/Nola-Translator/releases/latest)
+Nola 提供**桌面应用**和**浏览器扩展**。桌面端覆盖实时字幕、会议、屏幕、游戏和漫画等场景；浏览器扩展提供网页翻译与视频字幕，并可连接桌面端调用模型能力。
 
 > [!TIP]
-> 如果可以的话希望大家优先通过夸克/百度网盘下载，网盘会为每笔转存给我结算费用，手机转存的单价更高，这笔费用能支持我的后续开发，谢谢大家
+> 桌面端的会议口译、屏幕翻译、游戏翻译、漫画翻译功能为实验性功能，正在开发中
 
-支持 Windows x64，可选择 EXE 或 MSI 安装程序；其他平台会在软件开发稳定后提供支持。
+| | 桌面应用 | 浏览器扩展 |
+|---|---|---|
+| **功能** | 模型网关、实时字幕、会议口译、屏幕翻译、游戏翻译、漫画翻译、工作台、术语库 | 网页翻译、视频字幕、文档翻译、服务配置、术语库 |
+| **使用场景** | 电脑音频、会议软件、屏幕内容、游戏和漫画 | 网页及视频 |
+| **安装方式** | 下载安装包 | 下载并安装扩展 |
+| **平台** | Windows x64 | Chrome · Edge · Firefox |
 
-## 模型支持的语言
+### 桌面应用
 
-识别、翻译和语音合成的语言支持由所选模型决定。完整模型清单和支持语言见[模型支持的语言](./model-languages.md)。
+- [Github Release](https://github.com/CerealAxis/Nola-Translator/releases)
+- [百度网盘](https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2)
+- [夸克网盘](https://pan.quark.cn/s/ef1e11262087)
 
-## LLM API 配置
+### 浏览器扩展
 
-> [!NOTE] 注意
-> 这里的 LLM 协议用于翻译。阿里云和 MiniMax ASR 模型使用“音频与识别”中的独立连接配置和凭据。本地模型无需配置。
+在 Nola 桌面端的浏览器设置中下载和管理扩展。扩展可以单独配置翻译服务；如需调用桌面端模型，请在软件中启用浏览器连接。
 
+- [Github Release](https://github.com/CerealAxis/Nola-Translator/releases)
+- [百度网盘](https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2)
+- [夸克网盘](https://pan.quark.cn/s/ef1e11262087)
 
-### 协议说明
+<details>
+<summary>在开发者模式下安装扩展</summary>
 
-软件支持以下 API 协议
+1. 从 Nola 的浏览器设置或项目发布页下载扩展。
+2. 解压扩展文件。
+3. 在浏览器中打开扩展管理页面，并启用开发者模式。
+4. 选择“加载已解压的扩展程序”，选择解压后的文件夹。
 
-| 协议 |
-|---|
-| OpenAI Chat Completions |
-| OpenAI Responses |
-| Anthropic Messages |
-| Ollama Chat |
+</details>
 
-### 填写示例
+### 从源码构建
 
-| 服务商 | API 格式 | API 地址示例 | 模型 ID 示例 |
-|---|---|---|---|
-| DeepSeek | OpenAI Chat Completions | `https://api.deepseek.com` | `deepseek-flash` |
-| MiniMax | OpenAI Chat Completions | `https://api.minimax.io/v1` | `MiniMax-M3` |
-| MiMo | OpenAI Chat Completions | `https://api.xiaomimimo.com/v1` | `mimo-v2.6-pro` |
-
-### 填写步骤
-
-![云端翻译连接设置](/docs-image/zh-CN/getting-started/introduction/cloud-translation-settings.png)
-
-1. 在翻译设置中选择 **云端翻译**。
-2. 选择与服务商匹配的 **API 格式**。
-3. 填写 **API 地址**、**API 密钥**和**模型 ID**。
-4. 按需调整上下文长度和最大输出 Token 数。
-
-## 项目结构
-
-```text
-assets/brand/                  Logo 与品牌资源
-docs/                          VitePress 产品官网与多语言文档
-engine/nola_translator_engine/  Python 音频、识别和翻译引擎
-engine/tests/                   Python 测试
-scripts/                        安装与构建脚本
-src/main/                       Electron 主进程
-src/preload/                    IPC 桥接
-src/renderer/                   React 界面
-src/shared/                     共享协议与设置
-tests/                          应用测试
-```
-
-## 开发与构建
+开发环境使用 Node.js 24、npm 11 和 Python 3.12。
 
 ```powershell
-npm run typecheck
-npm test
-.\.venv\Scripts\python.exe -m pytest engine\tests
-npm run build
+git clone https://github.com/CerealAxis/Nola-Translator.git
+cd Nola-Translator
+npm ci
+npm run dev       # 开发
+npm run build     # 构建桌面应用
 ```
 
-构建 Windows x64 安装包：
+## 功能
 
-```powershell
-npm run dist:win
-```
+### 本地推理
+
+- **语音识别**：使用本地 ASR 模型，将音频转换为文字。
+- **文本翻译**：使用本地翻译模型处理识别结果和其他文本。
+- **语音合成**：使用已配置的语音合成模型生成译音。
+- **模型管理**：按需安装模型，选择计算设备，并在模型网关中管理模型能力和运行状态。
+
+### 云端服务
+
+| 服务或接口 | 主要用途 |
+|---|---|
+| **阿里云 LiveTranslate** | 端到端语音翻译 |
+| **阿里云、MiniMax** | 云端语音识别 |
+| **OpenAI 兼容接口** | 接入兼容的云端语言模型，用于翻译和文本处理 |
+| **Anthropic** | 接入使用 Anthropic Messages 协议的模型 |
+| **Ollama** | 接入 Ollama 模型 |
+| **免费翻译服务** | 使用应用提供的免费翻译接口，如微软翻译、谷歌翻译、Index Translate等 |
+
+### 音频
+
+- **快速同传**：采集麦克风、系统音频或指定应用的声音，生成实时字幕和译文。
+- **会议口译**：翻译会议双方发言，通过配置的音频设备播放或发送译音。
+- **浏览器字幕**：使用标签页音频或系统音频，为网页视频显示字幕。
+- **悬浮字幕**：在独立窗口中显示字幕，调整原文、译文和外观。
+- **记录与导出**：保存同传记录，导出字幕，并按需保存录音。
+
+### 界面
+
+- **多语言界面**：支持简体中文、繁体中文、英语、日语和韩语，也可跟随系统语言。
+- **工作台**：使用已配置的模型进行对话、文本处理和其他模型能力调用。
+- **屏幕翻译**：选择屏幕或窗口中的文字区域，在原位置显示译文。
+- **游戏翻译**：从 OCR、Hook 或剪贴板获取游戏文本，通过浮窗显示译文。
+- **漫画翻译**：导入漫画，在工程中进行识别、翻译、修复、排版和编辑。
+- **术语库**：管理术语，并在支持的翻译场景中选择使用。
 
 ## 参与贡献
 
-Fork 仓库、创建分支、提交修改并发起 Pull Request。请简要描述修改内容及已运行的检查。设计和代码约定可参考[界面规范](https://github.com/CerealAxis/Nola-Translator/blob/main/DESIGN.md)与[项目规范](https://github.com/CerealAxis/Nola-Translator/blob/main/AGENTS.md)。
+欢迎提交 Issue 和 Pull Request。开始之前，请参考[项目工程规范](https://github.com/CerealAxis/Nola-Translator/blob/main/AGENTS.md)与[设计规范](https://github.com/CerealAxis/Nola-Translator/blob/main/docs/design-system/DESIGN.md)。
+
+## 赞助
+
+如果你希望支持 Nola Translator 的后续开发，可以通过以下方式赞助：
+
+- [爱发电](https://afdian.com/a/CerealAxis)
+- [GitHub Sponsors](https://github.com/sponsors/CerealAxis/)
+
+## 获取帮助
+
+- [Issues](https://github.com/CerealAxis/Nola-Translator/issues) — 报告问题
+- [Discussions](https://github.com/CerealAxis/Nola-Translator/discussions) — 提问与交流
+- [帮助文档](https://nola.xaviermc.top/zh-CN/docs) — 帮助文档
+
+## 参考项目
+
+| 项目 | 许可证 |
+| --- | --- |
+| [X-Translator](https://github.com/zhaoyx239/X-Translator) | [MIT](https://github.com/zhaoyx239/X-Translator#acknowledgements) |
+| [流畅阅读（FluentRead）](https://github.com/FluentRead/FluentRead) | [GPL-3.0](https://github.com/FluentRead/FluentRead/blob/main/LICENSE) |
+| [Sokuji](https://github.com/kizuna-ai-lab/sokuji) | [AGPL-3.0](https://github.com/kizuna-ai-lab/sokuji/blob/main/LICENSE) |
+| [Lumina](https://github.com/lumina-tl/lumina) | [MIT](https://github.com/lumina-tl/lumina/blob/main/LICENSE) |
+| [PhotoCraft](https://github.com/storytold/photocraft) | [MIT](https://github.com/storytold/photocraft/blob/main/LICENSE-MIT) 或 [Apache-2.0](https://github.com/storytold/photocraft/blob/main/LICENSE-APACHE) |
 
 ## 许可证
 
-Nola Translator 自有代码采用 [GNU GPL v3.0 only](https://github.com/CerealAxis/Nola-Translator/blob/main/LICENSE) 授权。第三方组件及模型适用各自的许可证，详见[第三方组件声明](https://github.com/CerealAxis/Nola-Translator/blob/main/THIRD_PARTY_NOTICES.md)。
+Nola Translator 的原创软件代码采用 [GPL-3.0-only](https://github.com/CerealAxis/Nola-Translator/blob/main/LICENSE)，文档中的原创内容采用 [CC BY-SA 4.0](https://github.com/CerealAxis/Nola-Translator/blob/main/LICENSE-DOCUMENTATION)。
+
+项目使用的第三方组件、模型、字体、图标及其他资源遵循各自的许可协议。相关版权和许可信息见[第三方组件声明](https://github.com/CerealAxis/Nola-Translator/blob/main/THIRD_PARTY_NOTICES.md)及对应文件中的说明。
+
+Nola Translator 的名称、文字标识及品牌标志不在上述开源许可证的品牌授权范围内。品牌标识的使用条件见[品牌使用声明](https://github.com/CerealAxis/Nola-Translator/blob/main/LICENSE-BRAND)。
+
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=CerealAxis/Nola-Translator&type=Date)](https://star-history.com/#CerealAxis/Nola-Translator)

@@ -98,7 +98,7 @@ export function PromptLibrary({
           aria-controls={listId}
           aria-autocomplete="list"
           aria-activedescendant={selected ? optionId(selected.id) : undefined}
-          className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+          className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent [font:var(--font-caption)] outline-none"
         />
       </div>
 
@@ -112,14 +112,14 @@ export function PromptLibrary({
           const className = cn(
             "flex items-center gap-2 rounded-xl px-2 py-1.5 text-start transition-colors",
             prompt.id === selectedId
-              ? "bg-foreground/[0.05]"
+              ? "bg-accent text-primary"
               : onSelect || onInsert
                 ? "hover:bg-foreground/[0.03]"
                 : undefined,
           );
           const content = (
             <>
-              <span className="min-w-0 flex-1 truncate text-[13px]">
+              <span className="min-w-0 flex-1 truncate [font:var(--font-caption)]">
                 {prompt.name}
               </span>
               {prompt.variables.length > 0 && (
@@ -166,7 +166,7 @@ export function PromptLibrary({
         })}
       </div>
       {matches.length === 0 && (
-        <span className="text-muted-foreground block px-2 py-3 text-center text-xs break-words">
+        <span className="text-muted-foreground block px-2 py-3 text-center [font:var(--font-caption)] break-words">
           Nothing matches “{query}”
         </span>
       )}
@@ -178,7 +178,7 @@ export function PromptLibrary({
             "fade-in animate-in flex flex-col gap-2 rounded-xl p-2.5 duration-200",
           )}
         >
-          <p className="text-foreground/65 text-xs leading-relaxed break-words">
+          <p className="text-foreground/65 [font:var(--font-caption)] leading-relaxed break-words">
             {selected.body}
           </p>
           {selected.variables.length > 0 && (

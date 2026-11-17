@@ -276,7 +276,7 @@ export function TerminalBlock({
     <div
       className={cn(
         ink ? "bg-foreground dark:bg-popover" : paper,
-        "w-full max-w-md overflow-hidden rounded-2xl font-mono text-xs",
+        "w-full max-w-md overflow-hidden rounded-2xl font-mono [font:var(--font-caption)]",
         className,
       )}
       {...props}
@@ -421,7 +421,7 @@ export function TerminalBlock({
             onClick={() => setExpanded((value) => !value)}
             className={cn(
               ghostButton,
-              "h-7 self-start px-2 text-xs",
+              "h-7 self-start px-2 [font:var(--font-caption)]",
               ink &&
                 "text-background/45 hover:text-background dark:text-muted-foreground dark:hover:text-foreground",
             )}

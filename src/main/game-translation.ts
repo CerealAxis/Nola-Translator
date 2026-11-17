@@ -7,6 +7,7 @@ import { gameCommandSchema, gameDocumentSchema, gameProfileSchema, type GameDocu
 import { screenConfigSchema, screenTranslationModel, type ScreenSnapshot } from '../shared/screen-translation'
 import { resolveGlossaryTerms } from '../shared/glossary-match'
 import { emptyGlossary, type GlossaryDocument } from '../shared/glossary'
+import { emptyWordRules, protectTranslation, type WordRulesDocument } from '../shared/word-rules'
 import type { AppSettings } from '../shared/settings'
 import type { DirectModelRequest, DirectModelResult } from '../shared/agent-workspace'
 import type { ModelGatewaySnapshot } from '../shared/model-gateway'
@@ -22,7 +23,7 @@ interface GameTranslationOptions {
   mainDir: string; configPath: string; screen: ScreenTranslation; settings(): AppSettings
   gatewaySnapshot(): Pick<ModelGatewaySnapshot, 'state' | 'availableModels'>
   inferModel(request: DirectModelRequest, signal: AbortSignal): Promise<DirectModelResult>
-  glossary?(): Promise<GlossaryDocument>; publish(snapshot: GameSnapshot): void
+  glossary?(): Promise<GlossaryDocument>; wordRules?(): Promise<WordRulesDocument>; publish(snapshot: GameSnapshot): void
   getMainWindow?(): BrowserWindow | null; activity?: FeatureActivity
   records?: MeetingStore
   hookRoot?: string
@@ -89,17 +90,21 @@ export class GameTranslation {
 
   async refreshGlossary(): Promise<void> {
     this.invalidateEmbedding()
-    if (!this.options.glossary || !this.lastText || !this.state.activeGameId || this.state.status !== 'running' || this.state.source === 'ocr') return
+    if (!this.lastText || !this.state.activeGameId || this.state.status !== 'running' || this.state.source === 'ocr') return
     const profile = this.profile(this.state.activeGameId), epoch = this.epoch
-    const match = resolveGlossaryTerms(await this.options.glossary(), { text: this.lastText, targetLanguage: profile.targetLanguage,
+    const match = resolveGlossaryTerms(await this.options.glossary?.() ?? emptyGlossary(), { text: this.lastText, targetLanguage: profile.targetLanguage,
       context: { scenario: 'game', projectId: profile.id }, selection: profile.glossarySelection })
-    if (epoch !== this.epoch || match.signature === this.effectiveSignature) return
+    const protection = protectTranslation(await this.options.wordRules?.() ?? emptyWordRules(), this.lastText, profile.sourceLanguage, { scenario: 'game', projectId: profile.id }, profile.excludedSelection)
+    const signature = match.signature + protection.signature
+    if (epoch !== this.epoch || signature === this.effectiveSignature) return
     this.abort.abort(); this.abort = new AbortController(); ++this.epoch
-    this.effectiveSignature = match.signature
+    this.effectiveSignature = signature
     this.state.lines = this.state.lines.filter(line => line.text !== this.lastText)
     this.pendingText = this.lastText
     this.publish(); void this.drain()
   }
+
+  async refreshWordRules(): Promise<void> { await this.refreshGlossary() }
 
   async command(raw: unknown): Promise<GameSnapshot> {
     await this.ready
@@ -345,10 +350,12 @@ export class GameTranslation {
     const inferences = this.inferences
     const glossary = resolveGlossaryTerms(await this.options.glossary?.() ?? emptyGlossary(), { text, targetLanguage: profile.targetLanguage,
       context: { scenario: 'game', projectId: profile.id }, selection: profile.glossarySelection })
+    const protection = protectTranslation(await this.options.wordRules?.() ?? emptyWordRules(), text, profile.sourceLanguage, { scenario: 'game', projectId: profile.id }, profile.excludedSelection)
     signal.throwIfAborted()
-    if (inferences === this.inferences && text === this.lastText) this.effectiveSignature = glossary.signature
-    return this.options.inferModel({ id: randomUUID(), kind: 'mt', model, text, source: profile.sourceLanguage, target: profile.targetLanguage,
+    if (inferences === this.inferences && text === this.lastText) this.effectiveSignature = glossary.signature + protection.signature
+    const result = await this.options.inferModel({ id: randomUUID(), kind: 'mt', model, text: protection.text, source: profile.sourceLanguage, target: profile.targetLanguage,
       taskMode: 'realtime', glossary: glossary.terms }, AbortSignal.any([signal, AbortSignal.timeout(25000)]))
+    return { ...result, text: protection.restore(result.text) }
   }
 
   private async embedTranslation(event: Extract<GameHookEvent, { type: 'embedRequest' }>): Promise<void> {

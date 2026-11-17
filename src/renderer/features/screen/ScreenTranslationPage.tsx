@@ -1,3 +1,4 @@
+import { WordRuleSelectionField } from '../settings/word-rules/WordRuleSelectionField'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Crop, Keyboard, Play, Save, Square, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
@@ -184,6 +185,7 @@ export function ScreenTranslationPage() {
           {config.captureMode === 'window' && select('screen-target-window', t('suite.selectWindow'), config.sourceId, sources.map(source => ({ value: source.id, label: source.name })), value => setConfig(previous => ({ ...previous, sourceId: value, sourceName: sources.find(source => source.id === value)?.name ?? '' })))}
           {select('screen-strategy', t('suite.strategy'), config.strategy, ['auto', 'speed', 'quality'].map(value => ({ value, label: t(`suite.${value as 'auto' | 'speed' | 'quality'}`) })), value => patch('strategy', value as ScreenConfig['strategy']))}
           <GlossarySelectionField className="nola-settings-field" value={config.glossarySelection} disabled={active || busy} onChange={value => patch('glossarySelection', value)} />
+          <WordRuleSelectionField value={config.excludedSelection ?? { mode: 'auto' }} disabled={active || busy} onChange={value => patch('excludedSelection', value)} />
           {config.captureMode === 'regions' && <Field className="nola-settings-field screen-regions-field"><FieldLabel htmlFor="screen-preset">{t('screen.regions')}</FieldLabel>
             <div className="screen-region-controls">
               <Select value={config.presetId || 'draft'} disabled={busy || snapshot?.status === 'editing' || !api} onValueChange={id => { if (id) void run({ action: 'loadPreset', id }, !canStop) }}>

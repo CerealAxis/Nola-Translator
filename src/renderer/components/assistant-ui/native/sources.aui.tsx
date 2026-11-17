@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { hostOf, safeHref } from "../utils/href";
 
 const sourceVariants = cva(
-  "inline-flex items-center justify-center gap-1 rounded-md text-xs font-medium transition-colors motion-reduce:transition-none [&_svg]:size-3 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-1 rounded-md [font:var(--font-caption)] font-medium transition-colors motion-reduce:transition-none [&_svg]:size-3 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -81,7 +81,7 @@ const SourceIcon = forwardRef<
         ref={ref}
         data-slot="source-icon-fallback"
         className={cn(
-          "bg-muted flex size-3 shrink-0 items-center justify-center rounded-sm text-[10px] font-medium",
+          "bg-muted flex size-3 shrink-0 items-center justify-center rounded-sm [font:var(--font-caption)] font-medium",
           className,
         )}
         {...props}

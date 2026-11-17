@@ -5,7 +5,7 @@ import type { EngineProcess } from '../../../src/main/engine-process'
 import { SessionController } from '../../../src/main/session-controller'
 
 const { send, handlers } = vi.hoisted(() => ({ send: vi.fn(), handlers: new Map<string, (...args: any[]) => any>() }))
-vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [{ isDestroyed: () => false, webContents: { send } }] },
+vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [{ isDestroyed: () => false, webContents: { isDestroyed: () => false, isCrashed: () => false, mainFrame: { isDestroyed: () => false, detached: false, send } } }] },
   ipcMain: { removeHandler: vi.fn() }, net: { fetch: vi.fn() }, screen: {} }))
 vi.mock('../../../src/main/logged-ipc', () => ({ loggedHandle: (channel: string, handler: (...args: any[]) => any) => handlers.set(channel, handler) }))
 vi.mock('../../../src/main/overlay-menu', () => ({ openOverlayMenu: vi.fn(), presentOverlayMenu: vi.fn(), closeOverlayMenu: vi.fn() }))

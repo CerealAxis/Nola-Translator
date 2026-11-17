@@ -4,38 +4,27 @@ import type { ComponentProps } from "react";
 import {
   CheckIcon,
   CopyIcon,
-  EllipsisIcon,
   RefreshCwIcon,
-  ThumbsDownIcon,
-  ThumbsUpIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ghostButton, iconSwap, iconSwapIn, iconSwapOut } from "./surfaces";
-
-export type Reaction = "up" | "down" | null;
 
 export interface MessageActionsProps extends Omit<
   ComponentProps<"div">,
   "children"
 > {
   copied: boolean;
-  reaction: Reaction;
   regenerating: boolean;
   onCopy: () => void;
-  onReactionChange: (reaction: Reaction) => void;
   onRegenerate: () => void;
-  onMore: () => void;
   labels: { copied: string; copy: string; helpful: string; unhelpful: string; regenerate: string; more: string };
 }
 
 export function MessageActions({
   copied,
-  reaction,
   regenerating,
   onCopy,
-  onReactionChange,
   onRegenerate,
-  onMore,
   labels,
   className,
   ...props
@@ -76,32 +65,6 @@ export function MessageActions({
       </button>
       <button
         type="button"
-        aria-label={labels.helpful}
-        aria-pressed={reaction === "up"}
-        onClick={() => onReactionChange(reaction === "up" ? null : "up")}
-        className={cn(
-          buttonClassName,
-          reaction === "up" &&
-            "bg-foreground/[0.06] text-foreground/90 dark:bg-foreground/[0.09]",
-        )}
-      >
-        <ThumbsUpIcon className="size-3.5" />
-      </button>
-      <button
-        type="button"
-        aria-label={labels.unhelpful}
-        aria-pressed={reaction === "down"}
-        onClick={() => onReactionChange(reaction === "down" ? null : "down")}
-        className={cn(
-          buttonClassName,
-          reaction === "down" &&
-            "bg-foreground/[0.06] text-foreground/90 dark:bg-foreground/[0.09]",
-        )}
-      >
-        <ThumbsDownIcon className="size-3.5" />
-      </button>
-      <button
-        type="button"
         aria-label={labels.regenerate}
         onClick={onRegenerate}
         className={buttonClassName}
@@ -112,14 +75,6 @@ export function MessageActions({
             regenerating && "animate-spin motion-reduce:animate-none",
           )}
         />
-      </button>
-      <button
-        type="button"
-        aria-label={labels.more}
-        onClick={onMore}
-        className={buttonClassName}
-      >
-        <EllipsisIcon className="size-3.5" />
       </button>
     </div>
   );

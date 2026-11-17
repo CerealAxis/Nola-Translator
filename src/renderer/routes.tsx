@@ -7,6 +7,7 @@
  * 路由表（与 `bridge` 的 `RouteId` 对齐）：
  *   #/                home
  *   #/workspace       workspace
+ *   #/workbench       workbench
  *   #/records         records
  *   #/records/:id     record
  *   #/models          models
@@ -16,17 +17,17 @@
  * 桌面应用里横向滑动的页面切换像在演示 PPT。
  */
 
-import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { Suspense, useCallback, useMemo, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { Empty } from '@/components/ui/empty'
 import { Spinner } from '@/components/ui/spinner'
 import type { RouteId } from '@/bridge'
 import { useI18n } from '@/i18n'
 
-export type SettingsTab = 'general' | 'audio' | 'appearance' | 'browser' | 'shortcuts' | 'engine' | 'storage' | 'glossary' | 'help' | 'developer'
+export type SettingsTab = 'general' | 'audio' | 'appearance' | 'browser' | 'shortcuts' | 'engine' | 'storage' | 'glossary' | 'preserve-words' | 'subtitle-words' | 'help' | 'developer'
 
 const ALL_SETTINGS_TABS: readonly SettingsTab[] = [
-  'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'help', 'developer',
+  'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'preserve-words', 'subtitle-words', 'help', 'developer',
 ]
 
 /**
@@ -75,6 +76,8 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab; id?: strin
       return '#/'
     case 'workspace':
       return '#/workspace'
+    case 'workbench':
+      return '#/workbench'
     case 'overlay':
       return '#/overlay'
     case 'meeting':
@@ -112,6 +115,7 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab; id?: strin
 const PARENT_ROUTES: Record<RouteId, RouteId | null> = {
   home: null,
   workspace: 'home',
+  workbench: 'home',
   overlay: 'home',
   meeting: 'home',
   'screen-translation': 'home',
@@ -145,6 +149,8 @@ export function parseRoute(hash: string): Route {
   switch (segments[0]) {
     case 'workspace':
       return { route: 'workspace', path: '#/workspace' }
+    case 'workbench':
+      return { route: 'workbench', path: '#/workbench' }
     case 'overlay':
       return { route: 'overlay', path: '#/overlay' }
     case 'video-captions':
@@ -175,9 +181,9 @@ export function parseRoute(hash: string): Route {
       return segments[1] === 'downloads' ? { route: 'models', modelsTab: 'downloads', path: '#/models/downloads' } : { route: 'models', path: '#/models' }
     case 'settings': {
       const tab = normalizeTab(segments[1])
-      if (tab === 'glossary' && segments[2]) {
+      if (['glossary', 'preserve-words', 'subtitle-words'].includes(tab) && segments[2]) {
         const glossaryLibraryId = safeDecode(segments[2])
-        return { route: 'settings', tab, glossaryLibraryId, path: `#/settings/glossary/${encodeURIComponent(glossaryLibraryId)}` }
+        return { route: 'settings', tab, glossaryLibraryId, path: `#/settings/${tab}/${encodeURIComponent(glossaryLibraryId)}` }
       }
       return { route: 'settings', tab, path: `#/settings/${tab}` }
     }
@@ -262,9 +268,10 @@ export function useRoute(): UseRoute {
 // -- 渲染 ---------------------------------------------------------------------
 
 /** 路由 id 到页面标题。文案是页面自己的名字，不是"占位"两个字。 */
-export const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title' | 'meeting.title' | 'screen.title' | 'suite.gameTitle' | 'suite.comicTitle'> = {
+export const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title' | 'meeting.title' | 'screen.title' | 'suite.gameTitle' | 'suite.comicTitle' | 'workbench.title'> = {
   home: 'nav.home',
   workspace: 'nav.workspace',
+  workbench: 'workbench.title',
   overlay: 'shellUi.overlay',
   meeting: 'meeting.title',
   'screen-translation': 'screen.title',
@@ -298,7 +305,9 @@ export function Routes({ pages }: RoutesProps): ReactNode {
       data-page={route}
       className="nola-page-enter nola-route-content"
     >
-      {render ? render() : <MissingPage title={t(ROUTE_TITLES[route])} label={t('common.loading')} />}
+      <Suspense fallback={<div className="flex h-full items-center justify-center" role="status" aria-label={t('common.loading')}><Spinner /></div>}>
+        {render ? render() : <MissingPage title={t(ROUTE_TITLES[route])} label={t('common.loading')} />}
+      </Suspense>
     </div>
   )
 }

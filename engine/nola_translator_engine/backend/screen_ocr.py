@@ -271,7 +271,7 @@ def recognition_quality(result: tuple[str, float]) -> float:
     return result[1] * math.sqrt(sum(not char.isspace() for char in result[0]))
 
 
-def detected_quads(probability, width: int, height: int):
+def detected_quads(probability, width: int, height: int, *, perspective: bool = False):
     import cv2
     import numpy as np
 
@@ -294,13 +294,28 @@ def detected_quads(probability, width: int, height: int):
             continue
         # DB detection shrinks text; expand the fitted rectangle by its area/perimeter.
         expand = bw * bh * 1.5 / max(bw + bh, 1)
-        points = cv2.boxPoints(((cx, cy), (bw + expand, bh + expand), angle)) * scale
+        if perspective and len(cv2.convexHull(contour)) >= 4:
+            # PaddleOCR's DB poly path keeps the contour before area/perimeter unclip.
+            distance = cv2.contourArea(contour) * 1.5 / max(cv2.arcLength(contour, True), 1)
+            radius = max(1, math.ceil(distance))
+            padding = radius + 2
+            expanded = np.zeros((box_height + 2*padding, box_width + 2*padding), np.uint8)
+            cv2.drawContours(expanded, [contour - [x-padding,y-padding]], -1, 255, -1)
+            distances = cv2.distanceTransform(255-expanded, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
+            expanded = (distances <= distance).astype(np.uint8) * 255
+            polygon = max(cv2.findContours(expanded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0], key=cv2.contourArea)
+            # Keep four nonparallel sides with OpenCV's convex polygon approximation.
+            points = (cv2.approxPolyN(polygon,4).reshape(4,2) + [x-padding,y-padding]) * scale
+        else:
+            points = cv2.boxPoints(((cx, cy), (bw + expand, bh + expand), angle)) * scale
         center = points.mean(axis=0)
         order = np.argsort(np.arctan2(points[:, 1] - center[1], points[:, 0] - center[0]))
         points = points[order]
         points = np.roll(points, -int(np.argmin(points.sum(axis=1))), axis=0)
         points[:, 0] = points[:, 0].clip(0, width - 1)
         points[:, 1] = points[:, 1].clip(0, height - 1)
+        if perspective and not cv2.isContourConvex(points.astype(np.float32)):
+            continue
         quads.append(points.astype(np.float32))
         if len(quads) >= MAX_BLOCKS:
             break
@@ -403,7 +418,7 @@ class ScreenOcr:
         self._cancel.clear()
         self._publish(state="running", phase="verify", progress=0)
         self._install = asyncio.create_task(self._run_install(network))
-        return self.status()
+        return await asyncio.to_thread(self.status)
 
     async def _run_install(self, network) -> None:
         async with self._lock:
@@ -457,7 +472,7 @@ class ScreenOcr:
         self._cancel.set()
         if self._install:
             await self._install
-        return self.status()
+        return await asyncio.to_thread(self.status)
 
     async def remove(self) -> dict:
         if self._loaded or self._lock.locked() or (self._install and not self._install.done()):
@@ -473,7 +488,7 @@ class ScreenOcr:
                 import shutil
                 await asyncio.to_thread(shutil.rmtree, directory)
             self._publish(state="idle")
-        return self.status()
+        return await asyncio.to_thread(self.status)
 
     def _session(self, path: Path):
         import onnxruntime as ort
@@ -542,7 +557,7 @@ class ScreenOcr:
             results.extend(batch)
         return results
 
-    def _detect_quads(self, image, directory):
+    def _detect_quads(self, image, directory, *, perspective=False):
         import cv2
         import numpy as np
 
@@ -554,9 +569,9 @@ class ScreenOcr:
                   np.array([0.229, 0.224, 0.225], dtype=np.float32)).transpose(2, 0, 1)[None]
         detector = self._session(directory / OCR_DETECTOR)
         prediction = detector.run(None, {detector.get_inputs()[0].name: tensor})[0]
-        return detected_quads(prediction, width, height)
+        return detected_quads(prediction, width, height, perspective=perspective)
 
-    def _recognize_quads(self, image, quads, directory, language, batch_size):
+    def _recognize_quads(self, image, quads, directory, language, batch_size, *, rotate_tall=True):
         import cv2
         import numpy as np
 
@@ -577,7 +592,7 @@ class ScreenOcr:
             target = np.array([[0, 0], [crop_width - 1, 0], [crop_width - 1, crop_height - 1], [0, crop_height - 1]], dtype=np.float32)
             pixels = cv2.warpPerspective(image, cv2.getPerspectiveTransform(quad, target), (crop_width, crop_height),
                                          borderMode=cv2.BORDER_REPLICATE)
-            return np.rot90(pixels) if crop_height > crop_width * 1.5 else pixels
+            return np.rot90(pixels) if rotate_tall and crop_height > crop_width * 1.5 else pixels
 
         recognized = []
         for offset in range(0, len(quads), batch_size):
@@ -612,6 +627,10 @@ class ScreenOcr:
             return self._detect_quads(image, self._verify())
         return await self._run_inference("auto", 1, False, detect)
 
+    async def detect_comic_polygons(self, image):
+        return await self._run_inference("auto", 1, False,
+            lambda: self._detect_quads(image, self._verify(), perspective=True))
+
     async def recognize_comic(self, image, quads, language):
         def recognize():
             return self._recognize_quads(image, quads, self._verify(), language, 5)
@@ -641,7 +660,13 @@ class ScreenOcr:
             lines = sorted((line + offset for line in lines),
                            key=lambda line: (-line[:, 0].mean(), line[:, 1].mean()) if vertical
                            else (line[:, 1].mean(), line[:, 0].mean()))
-            return self._recognize_quads(image, lines or [quad], directory, language, 5)
+            result = self._recognize_quads(image, lines or [quad], directory, language, 5)
+            if not any(text.strip() and confidence >= .75 for text, confidence in result):
+                # A tall single numeral is not a vertical text line; verify its upright crop.
+                upright = self._recognize_quads(image, [quad], directory, language, 1, rotate_tall=False)
+                if len(upright) == 1 and upright[0][0].strip().isdecimal() and upright[0][1] >= .75:
+                    return upright
+            return result
 
         return await self._run_inference(language, 1, False, recognize)
 
@@ -692,7 +717,7 @@ class ScreenOcr:
                 self._sessions.clear()
         finally:
             self._inference_gate.release(key)
-        return self.status()
+        return await asyncio.to_thread(self.status)
 
     async def load(self) -> dict:
         if self._closed or self._lock.locked() or self._inference_gate.active(self.spec.model_id) or (self._install and not self._install.done()):
@@ -724,7 +749,7 @@ class ScreenOcr:
                     self._loaded = False
                     self._sessions.clear()
                 raise
-        return self.status()
+        return await asyncio.to_thread(self.status)
 
 
     def variant(self, resource_id: str) -> ScreenOcr:
@@ -862,7 +887,7 @@ class MangaOcr(ScreenOcr):
                     self._loaded = False
                     self._sessions.clear()
                 raise
-        return self.status()
+        return await asyncio.to_thread(self.status)
 
     def _paragraph(self, image, quads):
         import cv2
@@ -876,7 +901,8 @@ class MangaOcr(ScreenOcr):
             return [('', 0.0)]
         crop_pixels = image[top:bottom, left:right].copy()
         polygon = np.zeros(crop_pixels.shape[:2], np.uint8)
-        cv2.fillPoly(polygon, [np.rint(np.asarray(quad) - [left,top]).astype(np.int32) for quad in quads], 255)
+        for quad in quads:
+            cv2.fillConvexPoly(polygon, np.rint(np.asarray(quad) - [left,top]).astype(np.int32), 255)
         # The paragraph AABB can include neighbouring author/artwork between its columns.
         crop_pixels[polygon == 0] = 255
         crop = Image.fromarray(cv2.cvtColor(crop_pixels, cv2.COLOR_BGR2RGB))
@@ -1000,7 +1026,7 @@ def build_screen_ocr_router(service: ScreenOcr) -> APIRouter:
 
     @router.get("")
     async def status(resource_id: str = OCR_RESOURCE_ID):
-        return service.variant(resource_id).status()
+        return await asyncio.to_thread(service.variant(resource_id).status)
 
     @router.post("")
     async def infer(body: OcrRequest, resource_id: str = OCR_RESOURCE_ID):

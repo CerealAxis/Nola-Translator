@@ -102,6 +102,43 @@ def test_detector_maps_rotated_quad_to_original_capture_pixels():
     assert np.all((quad[:, 0] >= 0) & (quad[:, 0] <= 255))
 
 
+def test_comic_polygon_output_keeps_trapezoid_perspective():
+    import cv2
+    probability = np.zeros((300, 240), dtype=np.float32)
+    trapezoid = np.array([[100,60],[130,65],[155,220],[65,205]], dtype=np.int32)
+    cv2.fillPoly(probability, [trapezoid], .95)
+    ordinary = screen_ocr.detected_quads(probability, 240, 300)[0]
+    perspective = screen_ocr.detected_quads(probability, 240, 300, perspective=True)[0]
+    ratio = lambda quad: np.linalg.norm(quad[1]-quad[0])/np.linalg.norm(quad[2]-quad[3])
+    assert ratio(ordinary) == pytest.approx(1, abs=.01)
+    assert ratio(perspective) < .8
+    assert cv2.isContourConvex(perspective)
+    assert np.array_equal(ordinary, screen_ocr.detected_quads(probability,240,300,perspective=False)[0])
+
+
+def test_comic_polygon_output_remains_bounded_at_image_edges():
+    import cv2
+    probability = np.zeros((100, 100), dtype=np.float32)
+    cv2.fillPoly(probability, [np.array([[0,0],[40,0],[70,99],[5,99]],np.int32)], .9)
+    result = screen_ocr.detected_quads(probability,100,100,perspective=True)
+    assert result
+    assert all(np.isfinite(quad).all() and quad.min() >= 0 and quad.max() <= 99 for quad in result)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('upright,expected', [(('1',.99),'1'),(('I',.99),'-'),(('1',.4),'-')])
+async def test_tall_comic_number_is_verified_upright_without_accepting_uncertain_letters(tmp_path,monkeypatch,upright,expected):
+    service=screen_ocr.ScreenOcr(tmp_path)
+    monkeypatch.setattr(service,'_verify',lambda:tmp_path)
+    monkeypatch.setattr(service,'_detect_quads',lambda *args:[])
+    monkeypatch.setattr(service,'_recognize_quads',lambda *args,rotate_tall=True:[('-',.44)] if rotate_tall else [upright])
+    async def run(language,concurrency,realtime,callback,*args):return callback(*args)
+    monkeypatch.setattr(service,'_run_inference',run)
+    image=np.full((100,100,3),255,np.uint8)
+    result=await service.recognize_comic_box(image,[[20,10],[40,10],[40,80],[20,80]],'ja',True)
+    assert result[0][0]==expected
+
+
 async def test_real_preprocessing_detection_crop_and_ctc_without_model_download(tmp_path, tiny_spec, monkeypatch):
     install_files(tmp_path, tiny_spec)
     service = screen_ocr.ScreenOcr(tmp_path)
@@ -222,6 +259,14 @@ async def test_realtime_inference_queues_serially_and_shutdown_waits(tmp_path, t
     with pytest.raises(asyncio.CancelledError):
         await task
     await closing
+
+
+def test_export_includes_screen_ocr(tmp_path, monkeypatch):
+    from nola_translator_engine.backend.export_schemas import export
+    monkeypatch.delenv("NOLA_TRANSLATOR_MODEL_DIR", raising=False)
+    export(tmp_path)
+    schema = json.loads((tmp_path / "openapi.json").read_text(encoding="utf-8"))
+    assert "/api/v2/screen/ocr" in schema["paths"]
 
 
 def test_private_api_auth_validation_and_missing_model(tmp_path, tiny_spec):
@@ -526,6 +571,9 @@ def test_manga_ocr_decodes_complete_paragraph_without_rotating_vertical_crop(tmp
     ocr._session = lambda path: Encoder() if 'encoder' in path.name else Decoder()
     image = np.full((200,100,3), 255, np.uint8)
     assert ocr._paragraph(image, [[[0,0],[100,0],[100,200],[0,200]]]) == [('helloworld', 1.0)]
+    # Overlapping text polygons form a union, not an even-odd hole.
+    assert ocr._paragraph(image, [[[0,0],[70,0],[70,200],[0,200]],
+                                 [[30,0],[100,0],[100,200],[30,200]]]) == [('helloworld', 1.0)]
     image[:,41:60] = 0
     assert ocr._paragraph(image, [[[0,0],[40,0],[40,200],[0,200]],
                                  [[61,0],[100,0],[100,200],[61,200]]]) == [('helloworld', 1.0)]

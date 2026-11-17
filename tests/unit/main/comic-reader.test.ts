@@ -1,13 +1,13 @@
 import { expect, it, vi } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { comicReadTools, type ComicReaderService } from '../../../src/main/comic-reader'
-import type { ComicProject } from '../../../src/shared/comic'
+import { comicConfigSchema, type ComicProject } from '../../../src/shared/comic'
 
 const book = randomUUID(), pageId = randomUUID()
 const project: ComicProject = { id: book, title: 'Book', revision: 3, updatedAt: '', pageCount: 1, chapterCount: 1,
-  config: { sourceLanguage: 'en', targetLanguage: 'zh', model: '', readingDirection: 'rtl', glossary: { mode: 'off' } },
+  config: comicConfigSchema.parse({ sourceLanguage: 'en', targetLanguage: 'zh', glossary: { mode: 'off' } }),
   chapters: [{ id: randomUUID(), title: 'Chapter' }], pages: [{ id: pageId, chapterId: '', name: '001.png', width: 100, height: 100, regions: [], status: 'imported', hasClean: false, hasRendered: false }],
-  jobs: [], canUndo: false, canRedo: false }
+  canUndo: false, canRedo: false }
 const reader = (): ComicReaderService => ({ listProjects: vi.fn(async () => []), openProject: vi.fn(async () => structuredClone(project)), readImage: vi.fn(async () => ({ data: 'aW1hZ2U=', width: 100, height: 100 })) })
 const options = { toolCallId: 'test', messages: [], context: undefined }
 

@@ -99,7 +99,10 @@ class DesktopCapture:
             return
         self._stopped = True
         try:
-            self._backend.stop()
+            if isinstance(self._backend, DeviceCaptureBackend):
+                await asyncio.to_thread(self._backend.stop)
+            else:
+                self._backend.stop()
         finally:
             self._ingestion.close_stream(self._stream_id, eof=eof)
 

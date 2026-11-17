@@ -11,8 +11,6 @@
 - 组件文档：[组件文档](./docs/design-system/components/index.md)
 - 工程规约：[编码与工程规约目录](./docs/design-system/engineering/index.md)
 - 产品帮助文档：[帮助文档](./docs/help-docs/zh-CN/docs.md)
-- shadcn/ui 官方文档：[llms.txt](./llms.txt)
-- assistant-ui 官方文档：https://www.assistant-ui.com/llms-full.txt
 - 项目 Skills：`./skills/`
 
 ## 1. 工作原则
@@ -78,13 +76,15 @@ src/
     game-translation.ts       游戏档案、OCR / Hook / 剪贴板翻译
     game-hook.ts              双位数 Hook 辅助进程与文本线程
     game-overlay.ts           游戏独立浮动字幕
-    comic.ts                  漫画 IPC、工程及任务生命周期
-    comic-editor.ts           漫画编辑窗口生命周期与保存握手
+    comic.ts                  漫画 IPC、文件授权与真实后端接线
+    comic-jobs.ts             漫画任务调度与取消
+    comic-model.ts            漫画翻译及校对模型接入
     comic-reader.ts           工作台漫画只读工具
+    word-rules-store.ts       全局禁翻词与字幕屏蔽词持久化
     glossary-store.ts         桌面术语库与原子保存
     desktop-data.ts           桌面数据登记、快照备份与恢复
     desktop-data-ipc.ts       数据操作权限及重启调度
-    workbench.ts              独立工作台窗口
+    workbench.ts              主应用工作台模型 IPC、鉴权与任务停止
     latency-window.ts         延迟检测窗口
     latency-session.ts        延迟采集点与会话汇总
     meeting-mode.ts           会议口译会话组
@@ -94,7 +94,7 @@ src/
     window-titles.ts          多语言窗口名称
 
   renderer/
-    application.tsx          页面及导航注册
+    application.tsx          主应用容器、页面及导航注册
     available-models.ts      模型目录与选择回退
     bridge/                  NolaBridge 数据出口
     store/                   5 个领域 Store
@@ -115,7 +115,8 @@ src/
       home/                  首页
       workspace/             工作区
       overlay/               悬浮字幕
-      workbench/             Agent 工作台
+      workbench/             主应用内 Agent 工作台
+        WorkbenchPage.tsx     Assistant-ui 持久会话运行时
         NativeAgentSurface.tsx
         native-agent-tools.tsx
         NativeAgentSettings.tsx
@@ -125,14 +126,13 @@ src/
       screen/                屏幕翻译
       game/                  游戏库、文本来源与浮动字幕
       comic/                 漫画书架、编辑器与阅读器
+        ComicFrontendPage.tsx  书架与阅读器入口
+        ComicTranslationWorkspace.tsx  漫画翻译与内嵌气泡编辑器
       settings/glossary/     术语库配置与场景选库控件
+      settings/word-rules/   禁翻词与字幕屏蔽词管理
       settings/DesktopDataGroup.tsx  数据占用、备份与恢复界面
       latency/               延迟检测 UI
 
-    workbench.html           工作台独立入口
-    workbench-entry.tsx
-    comic-editor.html         漫画翻译编辑器独立入口
-    comic-editor-entry.tsx
     latency.html             延迟检测独立入口
     latency-entry.tsx
     screen.html              屏幕翻译独立入口
@@ -146,8 +146,7 @@ engine/
     backend/
       gateway/               Provider、资源与 Worker
       screen_ocr.py          PP-OCRv5 mobile
-      comic.py               漫画工程、任务、修图与排版
-      comic_formats.py       PDF、图片型 EPUB 和 Kindle 漫画格式适配
+      comics/                漫画工程、任务、图像排版与文件格式
       comic_inpaint.py       漫画神经修复 Worker 的加载与释放
       lama_network.py        LaMa Manga 网络实现
       glossary.py            后端术语匹配与请求上下文
@@ -208,8 +207,10 @@ skills/                      项目 Skills
 
 **工作台**
 
-- 工作台窗口由 `src/main/workbench.ts` 注册。
-- 独立加载 `workbench.html` 和 `workbench-entry.tsx`，通过软件端的 `index.css` 加载主题及工作台样式。
+- 工作台通过 `#/workbench` 路由显示在主应用容器内，不创建独立窗口。
+- `application.tsx` 中的 `ApplicationShell` 按需加载并持续挂载 `WorkbenchPage.tsx`，切换页面仅隐藏工作台，保留会话、草稿和生成状态；离开工作台时停止麦克风采集。
+- 工作台通过 Portal 插槽复用 `AppShell` 的侧栏与标题栏，共用主应用的 `index.css`、主题及毛玻璃效果，不自行控制整页主题或窗口按钮。
+- `src/main/workbench.ts` 注册工作台模型 IPC，仅允许可信主应用窗口调用，按运行中的模型任务持有功能租约，并维护任务取消及退出清理。
 - 官方 Elements 源码位于 `components/assistant-ui/native/`。
 - Agent 界面、原生工具卡片及设置分别由 `NativeAgentSurface.tsx`、`native-agent-tools.tsx`、`NativeAgentSettings.tsx` 管理。
 - 旧聊天组件、旧侧栏和旧工作区组件已移除，不应重新依赖。

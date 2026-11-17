@@ -1,3 +1,7 @@
+import { ComicTranslation } from './comic'
+import { translateComicPage } from './comic-model'
+import { WordRulesStore } from './word-rules-store'
+import { wordRuleMutationSchema, wordRuleTestSchema, resolveWordRules, realtimeWordRulesSnapshot, protectTranslation } from '../shared/word-rules'
 import { generateText } from 'ai'
 import { FeatureActivity, type FeatureLease } from './feature-activity'
 import { ModelGateway } from './model-gateway'
@@ -7,8 +11,7 @@ import { GlossaryStore, realtimeGlossarySnapshot, assertLegacyRealtimeGlossary }
 import { DesktopDataManager } from './desktop-data'
 import { drainLoggedIpc } from './logged-ipc'
 import { registerDesktopDataIpc } from './desktop-data-ipc'
-import { ComicTranslation } from './comic'
-import { DEFAULT_COMIC_MODEL, isManagedComicVisualResource } from '../shared/comic'
+import { isManagedComicVisualResource } from '../shared/comic-resources'
 import { GameTranslation } from './game-translation'
 import { glossaryMutationSchema, glossaryTestSchema } from '../shared/glossary'
 import { resolveGlossaryTerms } from '../shared/glossary-match'
@@ -16,8 +19,7 @@ import { rememberWorkspaceWindow, registerWorkspaceView } from './workspace-view
 import { configureIpcSenderValidation, loggedHandle } from './logged-ipc'
 import { modelEngines, supportsSelectedEngine } from '../shared/model-engines'
 import { INDEX_TRANSLATE_MODEL_IDS } from '../shared/index-translate'
-import { registerWorkbench, isWorkbenchWindow } from './workbench'
-import { registerComicEditor } from './comic-editor'
+import { registerWorkbench } from './workbench'
 import { windowTitleForUrl } from '../shared/window-titles'
 import { resolveUiLanguage } from '../shared/languages'
 import { registerOnboardingCard } from './onboardingCard'
@@ -40,7 +42,7 @@ import { gatewayConcurrency, bindingIsLocal, resolveSessionModelBindings } from 
 import { meetingAudioTestRequestSchema, meetingModeSettingsSchema } from '../shared/meeting-mode'
 import type { SessionConfig } from '../shared/contracts'
 import type { MainErrorNotification } from '../shared/bridge'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import { handleMeetingAudio, MEETING_AUDIO_SCHEME, registerMeetingAudioScheme } from './audio-protocol'
 import { registerAppIpc, resetOverlayLock } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
@@ -71,7 +73,7 @@ import { registerOfflineIpc } from './offline-ipc'
 import { runOfflineModelWorker } from './offline-worker'
 import { SettingsStore } from './settings-store'
 import { SecureCredentialStore } from './secure-store'
-import { createMainWindowOptions, isAllowedRendererPermission, isTrustedRendererUrl, resolvePreloadPath, resolveWindowIconPath } from './window-options'
+import { createMainWindowOptions, isAllowedRendererPermission, isTrustedRendererUrl, resolvePreloadPath, resolveWindowIconPath, sendToRenderer } from './window-options'
 import { computeOverlayBounds, createOverlayWindowOptions, suppressSystemMenuOnRightClick } from './windows'
 import { prepareOverlayMenu } from './overlay-menu'
 import { resolveModelNetwork } from './network-region'
@@ -100,25 +102,25 @@ let flushDesktopData: (() => Promise<void>) | undefined
 let browserConnection: BrowserConnection | null = null
 let tray: NolaTray | null = null
 let gateway: ModelGateway | null = null
-let comicEditors: ReturnType<typeof registerComicEditor> | null = null
-let editorQuitPending = false
 let stopWorkbench: (() => Promise<void>) | null = null
 let stopOnboardingCard: (() => void) | null = null
 let stopSessions: (() => Promise<void>) | null = null
 let screenTranslation: ScreenTranslation | null = null
+let comicQuitPending = false
+let comicQuitFlushed = false
 let comicTranslation: ComicTranslation | null = null
 let gameTranslation: GameTranslation | null = null
 let screenOcr: BackendScreenOcr | undefined
 let closeBehavior: () => AppSettings['closeBehavior'] = () => 'tray'
 let requestQuit: () => void = () => app.quit()
 const activity = new FeatureActivity(snapshot => {
-  for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('feature-activity:changed', snapshot)
+  for (const window of BrowserWindow.getAllWindows()) sendToRenderer(window, 'feature-activity:changed', snapshot)
   tray?.activityChanged()
 })
 function assertFeatureSender(event: IpcMainInvokeEvent, mainOnly = false): void {
   const window = BrowserWindow.fromWebContents(event.sender)
   if (!window || window.isDestroyed() || event.senderFrame !== event.sender.mainFrame) throw new Error('Access denied')
-  if (mainOnly ? window !== mainWindow : ![mainWindow, workspaceWindow, overlayWindow].includes(window) && !isWorkbenchWindow(window)) throw new Error('Access denied')
+  if (mainOnly ? window !== mainWindow : ![mainWindow, workspaceWindow, overlayWindow].includes(window)) throw new Error('Access denied')
   if (!isTrustedRendererUrl(event.sender.getURL(), __dirname)) throw new Error('Access denied')
 }
 function showMainWindow(): void {
@@ -218,6 +220,9 @@ function createWorkspaceWindow(theme: AppSettings['theme']): void {
     window.hide()
   })
   window.on('closed', () => { if (workspaceWindow === window) workspaceWindow = null })
+  window.webContents.on('render-process-gone', () => {
+    if (!window.isDestroyed()) window.destroy()
+  })
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) void shell.openExternal(url)
     return { action: 'deny' }
@@ -230,7 +235,10 @@ function createWorkspaceWindow(theme: AppSettings['theme']): void {
   } else {
     workspaceReady = window.loadFile(join(__dirname, '../renderer/index.html'), { query: { workspace: '1', theme } })
   }
-  void workspaceReady.catch(error => console.error('workspace load failed', error))
+  void workspaceReady.catch(error => {
+    if (!window.isDestroyed()) window.destroy()
+    console.error('workspace load failed', error)
+  })
 }
 
 function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettings): void {
@@ -254,7 +262,7 @@ function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettin
     if (quitting || window.isDestroyed()) return
     const visible = window.isVisible()
     for (const target of BrowserWindow.getAllWindows()) {
-      if (!target.isDestroyed() && !target.webContents.isDestroyed() && target !== window) target.webContents.send('overlay:visibility-changed', visible)
+      if (target !== window) sendToRenderer(target, 'overlay:visibility-changed', visible)
     }
   }
   window.on('show', publishVisibility)
@@ -268,14 +276,19 @@ function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettin
     if (overlayWindow === window) overlayWindow = null
     publishVisibility()
   })
+  window.webContents.on('render-process-gone', () => {
+    if (!window.isDestroyed()) window.destroy()
+  })
+  let ready: Promise<void>
   if (process.env.ELECTRON_RENDERER_URL) {
     const url = new URL(process.env.ELECTRON_RENDERER_URL)
     url.searchParams.set('overlay', '1')
     url.searchParams.set('theme', theme)
-    void window.loadURL(url.toString())
+    ready = window.loadURL(url.toString())
   } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'), { query: { overlay: '1', theme } })
+    ready = window.loadFile(join(__dirname, '../renderer/index.html'), { query: { overlay: '1', theme } })
   }
+  void ready.catch(error => { if (!window.isDestroyed()) window.destroy(); console.error('overlay load failed', error) })
 }
 
 function showOverlayToast(notification: MainErrorNotification, source: BrowserWindow): void {
@@ -557,7 +570,6 @@ if (!hasSingleInstanceLock) {
       window.webContents.on('page-title-updated', event => { event.preventDefault(); updateTitle() })
       window.webContents.on('did-finish-load', updateTitle)
     })
-    comicEditors = registerComicEditor(() => settings.current().theme, __dirname, () => mainWindow, activity, undefined, () => resolveUiLanguage(settings.current().uiLanguage, app.getLocale()))
     if (initialSettings.modelStoragePath) await cleanupStorageCaches(initialSettings.modelStoragePath)
     const meetings = new MeetingStore(join(dataRoot, 'meetings'))
     const credentials = new SecureCredentialStore(join(dataRoot, 'credentials.json'), safeStorage)
@@ -767,11 +779,12 @@ if (!hasSingleInstanceLock) {
           finally { componentInstalling = false }
         }
       })
-    const getOverlayWindow = (): BrowserWindow => {
+    const getOverlayWindow = (create = false): BrowserWindow | null => {
       if (!overlayWindow || overlayWindow.isDestroyed()) {
+        if (!create) return null
         createOverlayWindow(settings.current().theme, settings.current().overlay)
       }
-      return overlayWindow!
+      return overlayWindow
     }
     const isOverlayVisible = (): boolean => !!overlayWindow && !overlayWindow.isDestroyed() && (overlayWindow.isVisible() || overlayWindow.isMinimized())
     const createSessionEngine = () => new EngineProcess({
@@ -883,14 +896,17 @@ if (!hasSingleInstanceLock) {
     let glossaryAck: { instanceId: string; revision: number } | undefined
     async function syncRealtimeGlossary(host: BackendSupervisor, document: Awaited<ReturnType<GlossaryStore['snapshot']>>) {
       const instanceId = host.instanceId
-      if (glossaryAck?.instanceId === instanceId && glossaryAck.revision >= document.matchingRevision) return
+      const rules = await wordRules.snapshot()
+      const revision = document.matchingRevision + rules.matchingRevision
+      if (glossaryAck?.instanceId === instanceId && glossaryAck.revision >= revision) return
+      const original = realtimeGlossarySnapshot(document)
       const response = await fetch(new URL('/api/v2/realtime/glossary', host.baseUrl), {
         method: 'PUT', headers: { ...host.authorizationHeader(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(realtimeGlossarySnapshot(document)), signal: AbortSignal.timeout(10000),
+        body: JSON.stringify({ revision, libraries: [...original.libraries, ...realtimeWordRulesSnapshot(rules)] }), signal: AbortSignal.timeout(10000),
       }).catch((cause: unknown) => { throw new Error('realtimeGlossarySyncFailed', { cause }) })
       if (!response.ok) throw new Error('realtimeGlossarySyncFailed')
-      if (host.instanceId === instanceId) glossaryAck = { instanceId, revision: Math.max(
-        glossaryAck?.instanceId === instanceId ? glossaryAck.revision : 0, document.matchingRevision) }
+      if (host.instanceId === instanceId) glossaryAck = { instanceId, revision }
+
     }
     const sessions: SessionController = new SessionController({
       engine: desktopEngine, audioTestEngine: engine, meetings, activity, useGateway: true,
@@ -1145,7 +1161,7 @@ if (!hasSingleInstanceLock) {
     screenOcr = new BackendScreenOcr({
       backend: () => backend ?? undefined, ensureBackend: ensureRealtimeBackend, settings: () => settings.current(),
       changed: resource => {
-        for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('engine:event', {
+        for (const window of BrowserWindow.getAllWindows()) sendToRenderer(window, 'engine:event', {
           protocolVersion: 1, type: 'resourceChanged', requestId: randomUUID(), resource,
         })
       },
@@ -1242,7 +1258,7 @@ if (!hasSingleInstanceLock) {
         finally { client.close() }
       }, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), getSettings: () => settings.current(), setEnabled: async enabled => {
       const saved = await settings.update({ browserConnection: { enabled } })
-      for (const window of BrowserWindow.getAllWindows()) window.webContents.send('settings:changed', saved)
+      for (const window of BrowserWindow.getAllWindows()) sendToRenderer(window, 'settings:changed', saved)
     } })
     void browserConnection.initialize(initialSettings.browserConnection.enabled).catch(error => console.error('browser connection initialization failed', error))
     closeBehavior = () => settings.current().closeBehavior
@@ -1287,9 +1303,9 @@ if (!hasSingleInstanceLock) {
     let gatewayLease: FeatureLease | null = null
     let gatewayStarting: Promise<unknown> | null = null
     const stopGateway = async () => {
+      await comicTranslation?.stop()
       await gameTranslation?.stop()
       await screenTranslation?.stop()
-      await comicTranslation?.stop()
       const pending = gatewayStarting
       if (browserSessions.usesLocalModels) await browserConnection?.stopCaptionService()
       await Promise.all([sessions, browserSessions].filter(controller => controller.usesLocalModels).map(controller => controller.stopCurrent()))
@@ -1348,7 +1364,7 @@ if (!hasSingleInstanceLock) {
       getCredential: provider => credentials.get(provider),
       getKey: () => credentials.get('model-gateway'), setKey: value => credentials.set('model-gateway', value),
       onChanged: snapshot => {
-        for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('model-gateway:changed', snapshot)
+        for (const window of BrowserWindow.getAllWindows()) sendToRenderer(window, 'model-gateway:changed', snapshot)
         if (snapshot.state === 'failed' || snapshot.state === 'stopped') { gatewayLease?.release(); gatewayLease = null }
       },
     })
@@ -1387,6 +1403,30 @@ if (!hasSingleInstanceLock) {
     loggedHandle('model-gateway:stop', async event => { assertFeatureSender(event, true); await stopGateway(); return gateway!.snapshot() })
     loggedHandle('model-gateway:reveal-key', event => { assertFeatureSender(event, true); return gateway!.revealKey() })
     loggedHandle('model-gateway:rotate-key', event => { assertFeatureSender(event, true); return gateway!.rotateKey() })
+    const wordRules = new WordRulesStore(join(dataRoot, 'word-rules.json'), event => {
+      for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('word-rules:changed', event)
+      void screenTranslation?.refreshWordRules().catch(error => console.error('[screen.words]', error))
+      void gameTranslation?.refreshWordRules().catch(error => console.error('[game.words]', error))
+    })
+    loggedHandle('word-rules:snapshot', event => {
+      if (gameTranslation?.ownsOverlay(event.sender.id)) {
+        if (event.senderFrame !== event.sender.mainFrame || !isTrustedRendererUrl(event.sender.getURL(), __dirname)) throw new Error('Access denied')
+      } else assertFeatureSender(event)
+      return wordRules.snapshot()
+    })
+    loggedHandle('word-rules:command', async (event, raw: unknown) => {
+      assertFeatureSender(event, true)
+      const document = await wordRules.command(wordRuleMutationSchema.parse(raw))
+      if (backend?.ready && ['interpretation', 'meeting', 'browser-captions'].some(owner => activity.has(owner as 'interpretation' | 'meeting' | 'browser-captions'))) {
+        try { await syncRealtimeGlossary(backend, await glossary.snapshot()) }
+        catch { throw new Error('wordRulesSavedSyncFailed') }
+      }
+      return document
+    })
+    loggedHandle('word-rules:test', async (event, raw: unknown) => {
+      assertFeatureSender(event, true)
+      return resolveWordRules(await wordRules.snapshot(), wordRuleTestSchema.parse(raw))
+    })
     const glossary = new GlossaryStore(join(dataRoot, 'glossary.json'), event => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('glossary:changed', event)
       void screenTranslation?.refreshGlossary().catch(error => console.error('[screen.glossary]', error))
@@ -1408,52 +1448,18 @@ if (!hasSingleInstanceLock) {
       assertFeatureSender(event, true)
       return resolveGlossaryTerms(await glossary.snapshot(), glossaryTestSchema.parse(request))
     })
-    let lastScreenStatus = ''
+    const comicModelConfigSignature = () => createHash('sha256').update(JSON.stringify({ translation: settings.current().translation, compute: settings.current().compute })).digest('hex')
     comicTranslation = new ComicTranslation({
-      activity,
+      activity, modelConfigSignature: comicModelConfigSignature,
       mainDir: __dirname, getMainWindow: () => mainWindow,
-      isEditorSender: (event, projectId) => comicEditors?.isEditorSender(event, projectId) ?? false,
-      backend: async () => {
-        await ensureRealtimeBackend()
-        if (!backend?.ready) throw new Error('backendUnavailable')
-        return backend
-      },
-      glossary: () => glossary.snapshot(),
-      prepareRun: async (request, project) => {
-        const current = settings.current()
-        const binding = project.config.model || DEFAULT_COMIC_MODEL
-        const needsMt = request.stage === 'full' || request.stage === 'translate'
-        const provider = needsMt ? backendCloudMt(binding) : undefined
-        const model = needsMt ? provider ?? (binding.startsWith('resource:') ? binding.slice('resource:'.length) : '') : ''
-        if (needsMt) {
-          if (!model || !isModelEnabled(current, 'mt', binding)) throw new Error('modelUnavailable')
-          const catalog = await gateway!.snapshotWithCatalog()
-          if (!catalog.availableModels?.mt?.some(item => item.binding === binding)) throw new Error('modelUnavailable')
-        }
-        let headers: Record<string, string> = {}
-        if (provider === 'custom-mt') {
-          const id = binding.slice('mt-custom:'.length)
-          if (!customModelsOf(current.translation).some(profile => profile.id === id)) throw new Error('modelUnavailable')
-          const translation = translationOptionsFor(current.translation, 'cloud', id)
-          if (!translation) throw new Error('modelUnavailable')
-          headers = backendMtHeaders({ ...translation, apiKey: await credentials.get(customCredentialSlot(id)) })
-        } else if (provider) headers = backendMtHeaders(translationOptionsFor(current.translation, provider))
-        const needsDetection = request.stage === 'detect' || (request.stage === 'clean' &&
-          project.pages.some(page => request.pageIds.includes(page.id) && page.status === 'imported' && !page.regions.length))
-        const needsOcr = request.stage === 'full' || request.stage === 'ocr' || needsDetection
-        const mtLease = needsMt ? await gateway!.acquireExternalMt(binding, () => comicTranslation!.stop()) : undefined
-        try {
-          const ocrLease = needsOcr ? await gateway!.acquireComicOcr(() => comicTranslation!.stop()) : undefined
-          return { model, headers, release: () => { ocrLease?.release(); mtLease?.release() },
-            ...(ocrLease ? { ocrResourceId: ocrLease.resourceId } : {}) }
-        } catch (error) { mtLease?.release(error); throw error }
-      },
-      publish: event => {
-        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('comic:changed', event)
-        comicEditors?.broadcast('comic:changed', event)
-      },
+      backend: async () => { await ensureRealtimeBackend(); if (!backend?.ready) throw new Error('backendUnavailable'); return backend },
+      glossary: () => glossary.snapshot(), wordRules: () => wordRules.snapshot(),
+      translate: (input, signal) => translateComicPage({ gateway: gateway!, modelConfigSignature: comicModelConfigSignature, glossary: () => glossary.snapshot(), wordRules: () => wordRules.snapshot() }, input, signal),
+      publish: event => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('comic:changed', event) },
     })
+    let lastScreenStatus = ''
     screenTranslation = new ScreenTranslation({
+      wordRules: () => wordRules.snapshot(),
       glossary: () => glossary.snapshot(),
       mainDir: __dirname, configPath: join(dataRoot, 'screen-translation.json'),
       gatewaySnapshot: () => gateway!.snapshot(),
@@ -1468,6 +1474,7 @@ if (!hasSingleInstanceLock) {
       },
     })
     gameTranslation = new GameTranslation({
+      wordRules: () => wordRules.snapshot(),
       records: meetings,
       mainDir: __dirname,
       hookRoot: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'build'), 'game-hook'),
@@ -1487,14 +1494,13 @@ if (!hasSingleInstanceLock) {
     loggedHandle('game:command', (event, command: unknown) => { assertFeatureSender(event, true); return gameTranslation!.command(command) })
     createMainWindow(initialSettings.theme)
     desktopData = new DesktopDataManager(dataRoot, safeStorage, app.getVersion(), () => settings.current().modelStoragePath || dataRoot)
-    flushDesktopData = async () => { await Promise.all([settings.flush(), credentials.flush(), glossary.flush(), meetings.flush()]) }
+    flushDesktopData = async () => { await Promise.all([settings.flush(), credentials.flush(), glossary.flush(), wordRules.flush(), meetings.flush()]) }
     disposeDesktopDataIpc = registerDesktopDataIpc(desktopData, {
       getWindow: () => mainWindow,
       busy: () => quitting || activity.snapshot().owner !== null || !!gameTranslation?.busy || componentInstalling || readPendingDataMigration() !== null,
       selectRoot: writeDataRootPointer,
     })
     disposeAppIpc = registerAppIpc({
-      isDevelopmentWindow: window => isWorkbenchWindow(window) || !!comicEditors?.isWindow(window),
       isDevelopmentBuild: !app.isPackaged,
       settings,
       initialSettings,
@@ -1504,7 +1510,7 @@ if (!hasSingleInstanceLock) {
         if (!gateway) return
         if (gateway.snapshot().state === 'running') await gateway.reconfigure()
         const snapshot = await gateway.snapshotWithCatalog()
-        for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('model-gateway:changed', snapshot)
+        for (const window of BrowserWindow.getAllWindows()) sendToRenderer(window, 'model-gateway:changed', snapshot)
       },
       meetings,
       audioProtocol: `${MEETING_AUDIO_SCHEME}://`,
@@ -1526,6 +1532,7 @@ if (!hasSingleInstanceLock) {
       },
       getWorkspaceWindow: () => workspaceWindow,
       showWorkspace: async () => {
+        // Defer the reader renderer until requested to reduce startup memory; keep it when hidden.
         if (!workspaceWindow || workspaceWindow.isDestroyed()) createWorkspaceWindow(settings.current().theme)
         await workspaceReady
         if (workspaceWindow?.isMinimized()) workspaceWindow.restore()
@@ -1561,9 +1568,9 @@ if (!hasSingleInstanceLock) {
         latencyWindow.finish()
       }
     })
-    createWorkspaceWindow(initialSettings.theme)
-    const workbench = registerWorkbench(() => settings.current().theme, __dirname, undefined, {
+    const workbench = registerWorkbench(() => mainWindow, __dirname, {
       comicReader: comicTranslation,
+
       supportsComicImages: profileId => settings.current().translation.customModels?.some(profile => profile.id === profileId && profile.images === true) === true,
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
       workspace: new AgentWorkspace(join(dataRoot, 'local-call')),
@@ -1578,6 +1585,11 @@ if (!hasSingleInstanceLock) {
             context: { scenario: 'tool' }, selection: { mode: 'auto' },
           })
           request = { ...request, glossary: terms }
+        }
+        if (request.kind === 'mt' && request.text && !inspect) {
+          const protectedText = protectTranslation(await wordRules.snapshot(), request.text, request.source ?? 'auto', { scenario: 'tool' })
+          const result = await gateway!.infer({ ...request, text: protectedText.text }, signal, inspect)
+          return { ...result, text: protectedText.restore(result.text ?? '') }
         }
         return gateway!.infer(request, signal, inspect)
       },
@@ -1605,8 +1617,6 @@ if (!hasSingleInstanceLock) {
       },
     })
     await tray.initialize()
-    // IPC 初始化可能已预建字幕窗，复用同一窗口以保留会话授权。
-    getOverlayWindow()
     void whenRuntimeReady().then(() => engine!.start()).catch((error) => {
       if (!quitting) console.error('engine environment initialization/start failed', error)
     })
@@ -1626,12 +1636,13 @@ if (!hasSingleInstanceLock) {
 
 app.on('window-all-closed', () => { if (quitting && !desktopData?.pending) app.quit() })
 app.on('before-quit', (event) => {
-  // Keep IPC and the backend alive until every independent editor has flushed its save queue.
-  if (!quitting && comicEditors?.hasWindows()) {
+  if (!quitting && comicTranslation && !comicQuitFlushed) {
     event.preventDefault()
-    if (!editorQuitPending) {
-      editorQuitPending = true
-      void comicEditors.stop().then(() => app.quit()).catch(error => console.error('comic editor shutdown failed', error)).finally(() => { editorQuitPending = false })
+    if (!comicQuitPending) {
+      comicQuitPending = true
+      void comicTranslation.flushRenderer().then(() => { comicQuitFlushed = true; app.quit() })
+        .catch(error => { showMainWindow(); console.error('[comic.save]', error instanceof Error ? error.message : 'failed') })
+        .finally(() => { comicQuitPending = false })
     }
     return
   }

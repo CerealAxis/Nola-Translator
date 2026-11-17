@@ -19,6 +19,8 @@ import { CaptionLine } from './CaptionLine'
 import { splitTranslationText } from './translationText'
 import type { TranslationTextParts } from './translationText'
 import { useCaptionLatency } from './use-caption-latency'
+import { useSubtitleCopy } from './useSubtitleCopy'
+import type { SubtitleCopyMetadata } from '../../../shared/subtitle-word-rules'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
@@ -108,6 +110,7 @@ export function CaptionStage({
 }: CaptionStageProps) {
   const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
+  useSubtitleCopy(scrollRef, [...segments, ...(interim ? [interim] : [])].some(segment => !!(segment as CaptionSegment & SubtitleCopyMetadata).subtitleSourceCopy || segment.translations.some(translation => !!(translation as typeof translation & SubtitleCopyMetadata).subtitleCopy)))
   useCaptionLatency(scrollRef, latencySessionId)
   const stickRef = useRef(true)
   const [following, setFollowing] = useState(true)
@@ -245,6 +248,8 @@ function Block({
 }) {
   const translation = translationTextOf(segment, translate)
   const parts = translationPartsOf(segment)
+  const sourceCopy = (segment as CaptionSegment & SubtitleCopyMetadata).subtitleSourceCopy
+  const targetCopy = (segment.translations.find(item => item.state !== 'failed' && item.text) as (typeof segment.translations[number] & SubtitleCopyMetadata) | undefined)?.subtitleCopy
   /*
    * A translation the engine did not layer is shown whole, in the foreground colour.
    * A layered one shows its confirmed part in the foreground and the tail in the muted
@@ -264,6 +269,7 @@ function Block({
         {showSource ? (
           <CaptionLine
             kind="source"
+            copySpans={sourceCopy}
             text={formatChineseCaption(segment.sourceText, segment.sourceLanguage ?? sourceLanguage)}
             distance={distance}
             interim={interim}
@@ -277,6 +283,7 @@ function Block({
         {showTranslation ? (
           <CaptionLine
             kind="translation"
+            copySpans={targetCopy}
             text={translationText}
             tail={parts?.tail}
             distance={distance}
@@ -298,6 +305,7 @@ function Block({
       {showSource ? (
         <CaptionLine
           kind="source"
+          copySpans={sourceCopy}
           text={formatChineseCaption(segment.sourceText, segment.sourceLanguage ?? sourceLanguage)}
           distance={distance}
           interim={interim}
@@ -312,6 +320,7 @@ function Block({
       {showTranslation ? (
         <CaptionLine
           kind="translation"
+          copySpans={targetCopy}
           text={translationText}
           tail={parts?.tail}
           distance={distance}

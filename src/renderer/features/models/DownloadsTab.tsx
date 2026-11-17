@@ -1,13 +1,14 @@
 import { Progress } from '@base-ui/react/progress'
-import { LoaderCircle } from 'lucide-react'
+import { CircleAlert, Download, Pause, Play, RotateCcw, X } from 'lucide-react'
 import { useState } from 'react'
 
 import { resourceStateOf } from '@/bridge'
 import type { ResourceRecord, ResourceRecordWithRate } from '@/bridge'
-import { StatusPill } from '@/components/primitives'
 import { notifyError, notifyRetryableFailure } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Spinner } from '@/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
 import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
@@ -58,118 +59,59 @@ export function DownloadsTab() {
         })
       }} />
 
-      <Card className="models-downloads"><CardContent>
-        {/* The table hooks carry the geometry: the column widths and the wrapping rules live in models.css. */}
-        <div className="table-root table-root--primary">
-          <div className="table__scroll-container">
-            <table className="table__content" aria-label={t('models.tabDownloads')}>
-              <thead className="table__header">
-                <tr>
-                  <th scope="col" className="table__column">{t('nav.models')}</th>
-                  <th scope="col" className="table__column">{t('models.size')}</th>
-                  <th scope="col" className="table__column">{t('models.stateLabel')}</th>
-                  <th scope="col" className="table__column">{t('records.columnActions')}</th>
-                </tr>
-              </thead>
-              <tbody className="table__body">
-                {rows.map((record) => (
-                  <Row
-                    key={record.resourceId}
-                    record={record}
-                    busy={busyIds.includes(record.resourceId)}
-                    onRetry={() => {
-                      if (record.kind !== 'ocrModel' && record.kind !== 'inpaintModel' && record.kind !== 'detectModel') { setDownloadTarget(record); return }
-                      void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => notifyError(t('models.downloadFailed'), { cause }))
-                    }}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </CardContent></Card>
+      <div className="models-downloads" role="list" aria-label={t('models.tabDownloads')}>
+        {rows.map(record => <DownloadCard
+          key={record.resourceId}
+          record={record}
+          busy={busyIds.includes(record.resourceId)}
+          onRetry={() => {
+            if (record.kind !== 'ocrModel' && record.kind !== 'inpaintModel' && record.kind !== 'detectModel') { setDownloadTarget(record); return }
+            void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => notifyError(t('models.downloadFailed'), { cause }))
+          }}
+        />)}
+      </div>
     </div>
   )
 }
 
-function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: boolean; onRetry: () => void }) {
+function DownloadCard({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: boolean; onRetry: () => void }) {
   const { t } = useI18n()
   const state = resourceStateOf(record)
   const failed = state === 'failed'
   const cancelling = record.state === 'cancelling'
+  const paused = record.state === 'paused'
   const total = record.downloadBytes ?? record.installedBytes
   const raw = record.progress ?? 0
   const value = Math.min(1, Math.max(0, raw > 1 ? raw / 100 : raw))
-  const done = Math.round(total * value)
-  /*
-   * A failed download is reported by the notice that says what went wrong, so the row
-   * says what is true about the model instead of repeating the failure in a pill.
-   */
-  const paused = record.state === 'paused'
   const label = failed ? t('models.notInstalled')
     : paused ? t('models.paused')
     : cancelling ? t('models.cancelling')
     : state === 'verifying' ? t('models.verifying')
     : state === 'queued' ? t('models.queued') : t('status.downloading')
-  const tone = failed ? 'neutral' : cancelling || paused ? 'warning' : 'accent'
-
-  return (
-    <tr className="table__row">
-      <td role="rowheader" className="table__cell">
-        <span className="nola-body-strong text-foreground">{record.name}</span>
-      </td>
-      <td className="table__cell"><span className="nola-caption tabular whitespace-nowrap">{formatBytes(total)}</span></td>
-      <td className="table__cell">
-        <div className="flex min-w-0 flex-col items-start gap-[var(--space-1)]">
-          {state !== 'downloading' ? <StatusPill label={label} tone={tone} live={!failed && !cancelling && !paused} /> : null}
-          {!failed && !cancelling ? <div className="flex w-full min-w-0 flex-col gap-[var(--space-1)]">
-            <Progress.Root className="w-full" value={value} min={0} max={1} aria-label={t('models.stateLabel')}>
-              <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm border border-border bg-surface-secondary">
-                <Progress.Indicator className="h-full rounded-sm bg-primary transition-[width] duration-[var(--dur-enter)]" />
-              </Progress.Track>
-            </Progress.Root>
-            <span className="nola-micro text-muted tabular">
-              {t('models.progress', { percent: Math.round(value * 100) })}
-              {' · '}
-              {formatBytes(done)}
-              {record.bytesPerSecond !== undefined ? <> · {t('models.downloadRate', { speed: formatBytes(record.bytesPerSecond) })}</> : null}
-            </span>
-          </div> : null}
-        </div>
-      </td>
-      <td className="table__cell">
-        <div className="flex flex-wrap items-center gap-[var(--space-2)]">
-          {failed ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={busy}
-              onClick={onRetry}
-            >
-              {busy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
-              {t('models.retry')}
-            </Button>
-          ) : null}
-          {!failed && !cancelling && record.kind !== 'ocrModel' && record.kind !== 'inpaintModel' && record.kind !== 'detectModel' ? <Button variant="secondary" size="sm" disabled={busy} onClick={() => {
-            void actions.models.manageResource(record.resourceId, paused ? 'resume' : 'pause').catch((cause: unknown) => {
-              notifyError(t('errors.engineOperationFailed'), { cause })
-            })
-          }}>{t(paused ? 'models.resume' : 'models.pause')}</Button> : null}
-            <Button
-              variant="tertiary"
-              size="sm"
-              disabled={busy || cancelling || (!failed && !record.cancellable)}
-              onClick={() => {
-                void actions.models.manageResource(record.resourceId, 'cancel').catch((cause: unknown) => {
-                  notifyError(t('errors.engineOperationFailed'), { cause })
-                })
-              }}
-            >
-              {cancelling ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
-              {t('models.cancelTask')}
-            </Button>
-        </div>
-      </td>
-    </tr>
-  )
+  const canPause = !failed && !cancelling && record.kind !== 'ocrModel' && record.kind !== 'inpaintModel' && record.kind !== 'detectModel'
+  return <Card size="sm" className="model-download-card" role="listitem">
+    <CardHeader className="model-download-card__header">
+      <span className="model-download-card__icon" aria-hidden="true">{busy || cancelling || (!paused && !failed && state !== 'queued') ? <Spinner /> : failed ? <CircleAlert /> : paused ? <Pause /> : <Download />}</span>
+      <div className="model-download-card__title">
+        <CardTitle>{record.name}</CardTitle>
+        <CardDescription>
+          {state === 'downloading' && !paused && !cancelling ? <>{formatBytes(Math.round(total * value))} / {formatBytes(total)}{record.bytesPerSecond !== undefined && <> · {t('models.downloadRate', { speed: formatBytes(record.bytesPerSecond) })}</>}</> : label}
+        </CardDescription>
+      </div>
+      <CardAction className="model-download-card__actions">
+        {failed && <Tooltip><TooltipTrigger render={<Button variant="bare" size="icon-sm" disabled={busy} aria-label={t('models.retry')} onClick={onRetry} />}><RotateCcw /></TooltipTrigger><TooltipContent>{t('models.retry')}</TooltipContent></Tooltip>}
+        {canPause && <Tooltip><TooltipTrigger render={<Button variant="bare" size="icon-sm" disabled={busy} aria-label={t(paused ? 'models.resume' : 'models.pause')} onClick={() => {
+          void actions.models.manageResource(record.resourceId, paused ? 'resume' : 'pause').catch((cause: unknown) => notifyError(t('errors.engineOperationFailed'), { cause }))
+        }} />}>{paused ? <Play /> : <Pause />}</TooltipTrigger><TooltipContent>{t(paused ? 'models.resume' : 'models.pause')}</TooltipContent></Tooltip>}
+        <Tooltip><TooltipTrigger render={<Button variant="bare" size="icon-sm" disabled={busy || cancelling || (!failed && !record.cancellable)} aria-label={t('models.cancelTask')} onClick={() => {
+          void actions.models.manageResource(record.resourceId, 'cancel').catch((cause: unknown) => notifyError(t('errors.engineOperationFailed'), { cause }))
+        }} />}><X /></TooltipTrigger><TooltipContent>{t('models.cancelTask')}</TooltipContent></Tooltip>
+      </CardAction>
+    </CardHeader>
+    {!failed && !cancelling && <CardContent>
+      <Progress.Root value={value} min={0} max={1} aria-label={t('models.progress', { percent: Math.round(value * 100) })}>
+        <Progress.Track className="model-download-card__track"><Progress.Indicator className="model-download-card__indicator" /></Progress.Track>
+      </Progress.Root>
+    </CardContent>}
+  </Card>
 }

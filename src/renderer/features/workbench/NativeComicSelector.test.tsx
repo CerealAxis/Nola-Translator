@@ -37,4 +37,8 @@ it('renders the menu in a portal and closes it with Escape', async () => {
   expect(screen.getByRole('button', { name: '不关联漫画' })).toHaveAttribute('data-selected', 'true')
   fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
   await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'))
+  fireEvent.click(trigger)
+  await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'true'))
+  view.rerender(<NativeComicSelector active={false} value={null} disabled={false} onChange={vi.fn()} />)
+  await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'))
 })

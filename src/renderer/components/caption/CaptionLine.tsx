@@ -7,7 +7,8 @@
  * three-step table: a step shows between rows 3 and 4 and readers notice the step.
  */
 
-import type { CSSProperties } from 'react'
+import { useId, type CSSProperties } from 'react'
+import type { SubtitleCopySpan } from '../../../shared/subtitle-word-rules'
 
 /** Floor for the ramp: earlier lines stop fading here rather than becoming unreadable. */
 export const FOCUS_FLOOR = 0.42
@@ -53,6 +54,7 @@ export interface CaptionLineProps {
   className?: string
   'data-testid'?: string
   latencySegmentId?: string
+  copySpans?: SubtitleCopySpan[]
 }
 
 /**
@@ -78,7 +80,9 @@ export function CaptionLine({
   className,
   'data-testid': testId,
   latencySegmentId,
+  copySpans,
 }: CaptionLineProps) {
+  const copyId = useId()
   const current = distance <= 0 && !interim
   const opacity = lineOpacity(distance) * (interim ? INTERIM_FADE : 1)
 
@@ -104,6 +108,8 @@ export function CaptionLine({
       data-testid={testId}
       data-latency-segment={latencySegmentId}
       data-latency-kind={latencySegmentId ? kind : undefined}
+      data-subtitle-copy-id={copySpans ? copyId : undefined}
+      data-subtitle-copy={copySpans ? JSON.stringify(copySpans) : undefined}
       // The 12px left slot holds the marker bar, which sits in the slot rather than over
       // the first stroke. `entering && !interim` is a hard condition: the engine revises
       // interim every 100-200ms, and replaying a 120ms animation at that rate is flicker.

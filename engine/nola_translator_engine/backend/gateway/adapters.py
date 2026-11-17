@@ -263,9 +263,13 @@ class LocalWorkerAdapter(Adapter):
     async def translate(
         self, instance: ModelInstance, ctx: CallContext, *, text: str, source: str, target: str
     ) -> TranslationResult:
-        payload: dict[str, Any] = {"text": text, "source": source, "target": target}
-        if ctx.translation_context.get("glossary"):
-            payload["glossary"] = [term.model_dump() for term in ctx.translation_context["glossary"]]
+        from ..glossary import protect_keep_terms
+
+        protected, restore = protect_keep_terms(text, ctx.translation_context.get("glossary") or [])
+        payload: dict[str, Any] = {"text": protected, "source": source, "target": target}
+        fixed_terms = [term.model_dump() for term in ctx.translation_context.get("glossary") or [] if term.mode != "keep"]
+        if fixed_terms:
+            payload["glossary"] = fixed_terms
         if instance.definition.capabilities.context.mode == "request_context":
             payload["history"] = bounded_translation_history(ctx.translation_context.get("history"))
         request = WorkerRequest(
@@ -275,7 +279,11 @@ class LocalWorkerAdapter(Adapter):
             payload=payload,
         )
         response = await self._call(instance, request, ctx, stage="mt")
-        return TranslationResult(text=str(response.get("text", "")), source=source, target=target)
+        try:
+            translated = restore(str(response.get("text", "")))
+        except ValueError as error:
+            raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="preserveTermsChanged", provider_code="preserveTermsChanged") from error
+        return TranslationResult(text=translated, source=source, target=target)
 
     async def tts_voices(self, instance: ModelInstance, ctx: CallContext) -> list[str]:
         request = WorkerRequest(
@@ -366,7 +374,11 @@ class _NetworkMtAdapter(Adapter):
             raise GatewayError(GatewayErrorCode.TIMEOUT, stage="mt", message="translation deadline expired")
         try:
             async with asyncio.timeout(timeout), aclosing(self._provider(instance, ctx.provider_options)) as provider:
-                terms = ctx.translation_context.get("glossary")
+                from ..glossary import protect_keep_terms
+
+                all_terms = ctx.translation_context.get("glossary") or []
+                protected, restore = protect_keep_terms(text, all_terms)
+                terms = [term for term in all_terms if term.mode != "keep"]
                 if terms:
                     from ...translation.network import _BudgetedChatProvider
                     from ..glossary import glossary_prompt
@@ -374,7 +386,8 @@ class _NetworkMtAdapter(Adapter):
                     if not isinstance(provider, _BudgetedChatProvider):
                         raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="mt", message="glossaryUnsupported")
                     provider.glossary_instructions = glossary_prompt(terms)
-                result = await provider.translate(text, source, target)
+                result = await provider.translate(protected, source, target)
+                translated = restore(result.text)
         except (TimeoutError, httpx.TimeoutException):
             raise GatewayError(GatewayErrorCode.TIMEOUT, stage="mt", message="translation provider timed out") from None
         except (GoogleTranslateError, MyMemoryError) as error:
@@ -390,13 +403,13 @@ class _NetworkMtAdapter(Adapter):
                 provider_code=error_code(error)[0],
             ) from None
         except ValueError as error:
-            if str(error) == "glossaryBudgetExceeded":
+            if str(error) in ("glossaryBudgetExceeded", "preserveTermsChanged"):
                 raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="mt", message=str(error), provider_code=str(error)) from None
             raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="translation provider failed") from None
         except (httpx.HTTPError, OSError, RuntimeError):
             raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="translation provider failed") from None
         ctx.cancel_token.raise_if_cancelled()
-        return TranslationResult(text=result.text, source=source, target=target)
+        return TranslationResult(text=translated, source=source, target=target)
 
 
 class CustomMtAdapter(_NetworkMtAdapter):
