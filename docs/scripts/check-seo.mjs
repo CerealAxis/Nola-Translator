@@ -116,6 +116,11 @@ for (const file of sourcePages) {
   }
 }
 
+check(sitemap.documentElement.namespaceURI === 'http://www.sitemaps.org/schemas/sitemap/0.9',
+  'sitemap.xml', 'invalid sitemap XML namespace')
+const stylesheet = [...sitemap.childNodes].find(node => node.target === 'xml-stylesheet')
+check(stylesheet?.data === 'type="text/css" href="sitemap.css"' && files.has('sitemap.css'),
+  'sitemap.xml', 'missing browser stylesheet')
 check(entries.length > 0 && entries.length === urls.size, 'sitemap.xml', 'empty sitemap or duplicate URLs')
 for (const entry of entries) {
   const url = entry.querySelector('loc').textContent

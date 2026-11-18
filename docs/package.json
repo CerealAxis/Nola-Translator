@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "npm run demo:build && vitepress dev .",
-    "build": "npm run typecheck && npm run demo:build && node --max-old-space-size=7168 ./node_modules/vitepress/bin/vitepress.js build .",
+    "build": "npm run typecheck && npm run demo:build && node --max-old-space-size=7168 ./node_modules/vitepress/bin/vitepress.js build . && node scripts/style-sitemap.mjs",
     "demo:build": "node scripts/build-demo.mjs",
     "typecheck": "node ../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "preview": "vitepress preview .",

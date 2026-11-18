@@ -1,0 +1,42 @@
+@namespace sitemap url("http://www.sitemaps.org/schemas/sitemap/0.9");
+
+sitemap|urlset {
+  display: block;
+  max-inline-size: 72rem;
+  margin-inline: auto;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: Canvas;
+  color: CanvasText;
+  color-scheme: light dark;
+  font: 1rem / 1.5 system-ui, sans-serif;
+}
+
+sitemap|urlset::before {
+  display: block;
+  margin-block-end: 1rem;
+  content: "Nola Translator Sitemap";
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+sitemap|url {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  padding-block: 0.5rem;
+  border-block-start: 1px solid color-mix(in srgb, CanvasText 18%, Canvas);
+}
+
+sitemap|loc {
+  flex: 1 1 27rem;
+  overflow-wrap: anywhere;
+}
+
+sitemap|lastmod {
+  color: color-mix(in srgb, CanvasText 75%, Canvas);
+  font-variant-numeric: tabular-nums;
+}
+
+sitemap|url > :not(sitemap|loc, sitemap|lastmod) {
+  display: none;
+}
