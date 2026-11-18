@@ -2,6 +2,7 @@
 title: Task card（任务卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在可折叠的卡片查看委派任务的当前状态，展开后阅读执行记录与结果。"
 ---
 
 # Task card（任务卡片）

@@ -2,6 +2,7 @@
 title: Image gallery（图片集）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用网格展示多张图片，点击后可在同一查看器中浏览。"
 ---
 
 # Image gallery（图片集）

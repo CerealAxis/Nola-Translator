@@ -2,6 +2,7 @@
 title: Checkpoints（检查点）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在任务的检查点列表中查看当前进度，并选择恢复到某个已保存的状态。"
 ---
 
 # Checkpoints（检查点）

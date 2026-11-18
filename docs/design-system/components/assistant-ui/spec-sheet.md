@@ -2,6 +2,7 @@
 title: Spec sheet（规格表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "为单个对象呈现标签和数值对应的规格表，方便快速查看对象的结构化属性。"
 ---
 
 # Spec sheet（规格表）

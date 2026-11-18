@@ -2,6 +2,7 @@
 title: Flight tracker（航班追踪）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "航班卡片显示出发地、目的地、准点状态、航程进度和预计剩余时间。"
 ---
 
 # Flight tracker（航班追踪）

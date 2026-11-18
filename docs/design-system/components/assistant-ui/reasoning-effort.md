@@ -2,6 +2,7 @@
 title: Reasoning effort（推理强度）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在发出请求前选择模型的推理强度，并查看当前任务消耗的推理预算。"
 ---
 
 # Reasoning effort（推理强度）

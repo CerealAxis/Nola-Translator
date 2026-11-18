@@ -2,6 +2,7 @@
 title: Menubar（菜单栏）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "桌面应用中常见的常驻菜单，可快速访问一组固定命令。"
 ---
 
 # Menubar（菜单栏）

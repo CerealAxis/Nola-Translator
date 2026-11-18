@@ -35,21 +35,17 @@ export function usePreferences(): [Preferences, UiLanguage, ReturnType<typeof br
   const locale = resolveUiLanguage(settings.uiLanguage, navigator.language)
   useEffect(() => {
     const colorScheme = matchMedia('(prefers-color-scheme: dark)')
-    const reducedTransparency = matchMedia('(prefers-reduced-transparency: reduce)')
     const update = () => {
       const root = document.documentElement
       root.lang = locale
       root.dataset.theme = settings.theme === 'auto' ? colorScheme.matches ? 'dark' : 'light' : settings.theme
-      root.dataset.nolaGlass = settings.liquidGlass && !reducedTransparency.matches ? 'on' : 'off'
     }
     colorScheme.addEventListener('change', update)
-    reducedTransparency.addEventListener('change', update)
     update()
     return () => {
       colorScheme.removeEventListener('change', update)
-      reducedTransparency.removeEventListener('change', update)
     }
-  }, [locale, settings.theme, settings.liquidGlass])
+  }, [locale, settings.theme])
   return [settings, locale, browserText(settings.uiLanguage)]
 }
 

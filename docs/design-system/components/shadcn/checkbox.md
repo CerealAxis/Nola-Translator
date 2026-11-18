@@ -2,6 +2,7 @@
 title: Checkbox（复选框）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "通过复选框为独立选项提供选中与取消选择操作，并查看常用状态示例。"
 ---
 
 # Checkbox（复选框）

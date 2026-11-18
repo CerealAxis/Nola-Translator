@@ -2,6 +2,7 @@
 title: 多语言与数据格式
 pageClass: nola-vis-doc nola-vis-writing
 editLink: false
+description: "让用户以熟悉的语言阅读界面，以所选区域的格式理解数据。原文、译文、文件名和代码各自保留正确的语言与书写方式。"
 ---
 
 # 多语言与数据格式

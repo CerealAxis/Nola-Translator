@@ -2,6 +2,7 @@
 title: Shared conversation（共享对话）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "以只读方式展示共享会话，并提供发起自己会话的入口。"
 ---
 
 # Shared conversation（共享对话）

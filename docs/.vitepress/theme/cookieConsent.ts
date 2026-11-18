@@ -1,5 +1,8 @@
 import type { Translation } from 'vanilla-cookieconsent'
+import type { InjectionKey, Ref } from 'vue'
 import type { Locale } from './content'
+
+export const languageNoticeReadyKey: InjectionKey<Ref<boolean>> = Symbol('languageNoticeReady')
 
 interface ConsentCopy {
   title: string

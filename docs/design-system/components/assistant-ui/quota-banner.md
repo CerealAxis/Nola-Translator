@@ -2,6 +2,7 @@
 title: Quota banner（配额横幅）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在配额提示条显示当前用量和预计重置时间，并在适用时提供升级入口。"
 ---
 
 # Quota banner（配额横幅）

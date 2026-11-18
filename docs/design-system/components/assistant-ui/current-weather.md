@@ -2,6 +2,7 @@
 title: Current weather（当前天气）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "天气卡片突出当前温度，并提供天气状况和体感温度。"
 ---
 
 # Current weather（当前天气）

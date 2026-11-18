@@ -2,6 +2,7 @@
 title: 包容性
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "从不同用户的使用目标和处境出发设计内容。检查文字、图像和操作时，考虑语言、文化、能力和生活经历如何影响理解。"
 ---
 
 # 包容性

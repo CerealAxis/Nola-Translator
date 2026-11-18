@@ -2,6 +2,7 @@
 title: 动态效果
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "动态效果能够解释状态变化、提供反馈，并帮助人们理解界面中元素的关系。让每一次变化都有明确的用途。"
 ---
 
 # 动态效果

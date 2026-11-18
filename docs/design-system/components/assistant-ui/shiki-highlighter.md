@@ -2,6 +2,7 @@
 title: Shiki highlighter（Shiki 高亮）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "为 Markdown 代码块提供 Shiki 高亮，支持流式代码、固定主题和特定行高亮。"
 ---
 
 # Shiki highlighter（Shiki 高亮）

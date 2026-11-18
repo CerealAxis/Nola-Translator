@@ -2,6 +2,7 @@
 title: Popover（浮层详情）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "通过按钮触发，在 Portal 中显示丰富内容。"
 ---
 
 # Popover（浮层详情）

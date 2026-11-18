@@ -2,6 +2,7 @@
 title: Streaming text（流式文本）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "随回复生成逐步显示文字，短暂强调刚到达的内容，帮助读者跟上更新。"
 ---
 
 # Streaming text（流式文本）

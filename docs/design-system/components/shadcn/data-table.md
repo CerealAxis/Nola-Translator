@@ -2,6 +2,7 @@
 title: Data Table（数据表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用 TanStack Table 构建的功能强大的表格和数据网格。"
 ---
 
 # Data Table（数据表）

@@ -2,6 +2,7 @@
 title: Accordion（折叠组）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用折叠组把相关内容按标题分组，通过展开或收起标题显示对应面板。"
 ---
 
 # Accordion（折叠组）

@@ -4,7 +4,7 @@ import type { Rectangle } from 'electron'
 
 export interface ScreenTargetState {
   available: boolean; foreground: boolean; identity: string; bounds: Rectangle
-  candidates: Array<{ bounds: Rectangle; width: number; height: number }>
+  clientBounds?: Rectangle; clientPixels?: Rectangle
 }
 
 /** Query native window identity and geometry in one hidden, long-lived Windows helper. */
@@ -32,6 +32,7 @@ public static class NolaScreenTarget {
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
   [StructLayout(LayoutKind.Sequential)] public struct Message { public IntPtr Window; public uint Id; public UIntPtr WParam; public IntPtr LParam; public uint Time; public Point Position; public uint Private; }
   public delegate void WinEventProc(IntPtr hook, uint eventType, IntPtr window, int objectId, int childId, uint threadId, uint time);
   [DllImport("user32.dll")] public static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc callback, uint processId, uint threadId, uint flags);
@@ -54,7 +55,9 @@ public static class NolaScreenTarget {
   }
 }
 '@
-[void][NolaScreenTarget]::SetProcessDPIAware()
+try {
+  if ([NolaScreenTarget]::SetThreadDpiAwarenessContext([IntPtr](-4)) -eq [IntPtr]::Zero) { [void][NolaScreenTarget]::SetProcessDPIAware() }
+} catch { [void][NolaScreenTarget]::SetProcessDPIAware() }
 $targetHandle = [IntPtr]${handle}
 [NolaScreenTarget]::Watch($targetHandle)
 while ($true) {
@@ -92,7 +95,7 @@ while ($true) {
         const client = { x: value.clientX, y: value.clientY, width: Math.max(1, value.clientWidth), height: Math.max(1, value.clientHeight) }
         changed({ available: value.available === true && value.width > 0 && value.height > 0, foreground: value.foreground === true,
           identity: value.identity, bounds: screen.screenToDipRect(null, physical),
-          candidates: [physical, client].map(bounds => ({ bounds: screen.screenToDipRect(null, bounds), width: bounds.width, height: bounds.height })),
+          clientBounds: screen.screenToDipRect(null, client), clientPixels: client,
         })
       } catch { /* Native initialization diagnostics are not protocol frames. */ }
     }

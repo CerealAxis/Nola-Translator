@@ -50,7 +50,6 @@ function install(): void {
   const page = createPageTranslation(translator)
   const subtitles = createSubtitleTranslation(translator, () => refresh())
   const colorScheme = matchMedia('(prefers-color-scheme: dark)')
-  const reducedTransparency = matchMedia('(prefers-reduced-transparency: reduce)')
   let preferences = DEFAULT_PREFERENCES
   const notifyError = (code: string) => {
     recordDiagnostic('content', code)
@@ -408,11 +407,9 @@ function install(): void {
     const state = store.getSnapshot()
     const language = resolveUiLanguage(preferences.uiLanguage, navigator.language)
     const t = browserText(preferences.uiLanguage)
-    const glass = preferences.liquidGlass && !reducedTransparency.matches ? 'on' : 'off'
-    for (const { host, mount } of surfaces) {
+    for (const { host } of surfaces) {
       host.lang = language
       host.dataset.theme = preferences.theme === 'auto' ? colorScheme.matches ? 'dark' : 'light' : preferences.theme
-      if (mount.dataset.nolaGlass !== glass) mount.dataset.nolaGlass = glass
     }
     const video = state.selectedVideo ?? state.videos[0]
     const fullscreen = deepFullscreenElement(document)
@@ -661,7 +658,6 @@ function install(): void {
   chrome.storage.onChanged.addListener(glossaryChanged)
   configureTranslationLimits(); page.configure(preferences); subtitles.configure(preferences)
   colorScheme.addEventListener('change', refresh)
-  reducedTransparency.addEventListener('change', refresh)
   const onCommand = (message: unknown, sender: ChromeSender, reply: (response: unknown) => void) => {
     if (!(sender?.url?.startsWith(chrome.runtime.getURL('')) && !sender.tab) || typeof message !== 'object' || message === null || !('type' in message)) return
     if (message.type === 'siteAccessChanged') {
@@ -705,7 +701,6 @@ function install(): void {
       () => { unobservePreferences(); chrome.storage.onChanged.removeListener(glossaryChanged) },
       () => {
         colorScheme.removeEventListener('change', refresh)
-        reducedTransparency.removeEventListener('change', refresh)
         chrome.runtime.onMessage.removeListener(onCommand)
       },
       () => { for (const name of playerEvents) window.removeEventListener(name, refresh, true) },

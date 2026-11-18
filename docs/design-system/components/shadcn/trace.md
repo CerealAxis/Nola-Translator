@@ -2,6 +2,7 @@
 title: Trace（轨迹）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用于构建推理过程、工具调用、来源等内容的基础组件。"
 ---
 
 # Trace（轨迹）

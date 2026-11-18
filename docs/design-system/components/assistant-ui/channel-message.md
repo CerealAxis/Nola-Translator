@@ -2,6 +2,7 @@
 title: Channel message（频道消息）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "频道消息卡片组合频道名、时间、作者头像与 Markdown 正文。"
 ---
 
 # Channel message（频道消息）

@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { app, BrowserWindow, desktopCapturer, ipcMain, nativeImage, screen } from 'electron'
 import { build } from 'esbuild'
+import { startScreenCaptureBackend } from './screen-capture-backend.mjs'
 
 // Native capture/input acceptance uses a controlled visible target, with stubbed OCR/translation only.
 // The solid source box lets the test locate its physical bounds independently of overlay geometry.
@@ -28,9 +29,10 @@ const until = async (condition, label, timeout = 15000) => {
   }
 }
 const evidence = [], diagnostics = []
-let actualFrames = 0, target, service, server, gateway, ocrClient
+let actualFrames = 0, target, service, server, gateway, ocrClient, captureBackend
 void app.whenReady().then(async () => {
 try {
+  captureBackend = await startScreenCaptureBackend()
   ipcMain.handle('app:get-settings', () => DEFAULT_SETTINGS)
   app.on('web-contents-created', (_event, contents) => contents.on('console-message', details => diagnostics.push({ message: details.message, level: details.level })))
   server = createServer(async (request, response) => {
@@ -72,14 +74,23 @@ try {
   await gateway.start()
   assert.equal(gateway.snapshot().services.ocr.state, 'ready')
   service = new ScreenTranslation({ mainDir: resolve('out/main'), configPath: resolve(output, `screen-translation-${process.pid}.json`), settings: () => DEFAULT_SETTINGS,
+    gatewaySnapshot: () => ({ state: gateway.snapshot().state, availableModels: { mt: [
+      { binding: 'cloud:google', kind: 'mt', name: 'Fixture MT', origin: 'cloud', free: true },
+    ] } }),
     prepareOcr: async () => gateway.acquireOcr(), inferOcr: (request, signal) => gateway.inferOcr(request, signal),
+    captureScreen: captureBackend.capture,
     inferModel: async () => ({ text: '屏幕文字已翻译 123' }), publish: snapshot => { diagnostics.push({ status: snapshot.status, error: snapshot.error, frames: snapshot.frames }) },
   })
   const display = screen.getDisplayMatching(target.getBounds())
   const desktop = (await desktopCapturer.getSources({types:['screen'],thumbnailSize:{width:0,height:0}})).find(item=>item.display_id===String(display.id))
   assert(desktop)
-  await service.configure({ display: { id:String(display.id),width:display.bounds.width,height:display.bounds.height,scale:display.scaleFactor }, sourceId: desktop.id, sourceName: desktop.name, regions: [{ id: '8ddba01d-f7dd-4ea2-b24e-0a3220212420', x: 0, y: 0, width: 1, height: 1 }], sourceLanguage: 'en', targetLanguage: 'zh', model: 'cloud:google', intervalMs: 250 })
-  await service.configure({ ...service.snapshot().config, regions: [{ id: '8ddba01d-f7dd-4ea2-b24e-0a3220212420', x: 0, y: 0, width: 1, height: 1 }] })
+  const fixtureBounds = target.getContentBounds()
+  const fixedRegion = { id: '8ddba01d-f7dd-4ea2-b24e-0a3220212420',
+    x: (fixtureBounds.x - display.bounds.x) / display.bounds.width,
+    y: (fixtureBounds.y - display.bounds.y) / display.bounds.height,
+    width: fixtureBounds.width / display.bounds.width, height: fixtureBounds.height / display.bounds.height }
+  await service.configure({ captureMode: 'regions', display: { id:String(display.id),width:display.bounds.width,height:display.bounds.height,scale:display.scaleFactor }, sourceId: desktop.id, sourceName: desktop.name, sourceLanguage: 'en', targetLanguage: 'zh', model: 'cloud:google', processingMode: 'cascade', intervalMs: 250 })
+  await service.configure({ ...service.snapshot().config, regions: [fixedRegion] })
   await service.start()
   assert.equal(target.isContentProtected(), false, 'Normal application windows remain capturable'); target.focus()
   await until(() => service.snapshot().blocks.some(block => block.status === 'ready'), 'real capture → OCR transport → translation → overlay', 20000)
@@ -102,17 +113,12 @@ try {
   await wait(600)
   assert(target.isFocused(), 'Overlay updates must not steal native focus')
   assert(service.overlay && !service.overlay.isFocusable())
-  assert.equal(service.overlay.isContentProtected(), true)
-  evidence.push({ check: 'real video capture, rendering, content protection and focus', passed: true, actualFrames })
+  await until(() => !service.overlay.isContentProtected(), 'overlay is recordable between captures')
+  evidence.push({ check: 'real GDI capture, rendering, temporary content protection and focus', passed: true, actualFrames })
   await service.overlay.webContents.executeJavaScript('document.fonts.ready.then(() => true)')
-  // Capture protection intentionally hides the overlay from screenshots; disable it only for this fixture's visual check.
-  service.overlay.setContentProtection(false)
-  try {
-    await wait(250)
-    let rendered
-    await until(async () => { rendered = await service.overlay.webContents.capturePage(); return rendered.toBitmap().some((channel, index) => index % 4 !== 3 && channel > 32) }, 'translated overlay paints native pixels', 5000)
-    await writeFile(resolve(output, 'overlay.png'), rendered.toPNG())
-  } finally { service.overlay.setContentProtection(true) }
+  let rendered
+  await until(async () => { rendered = await service.overlay.webContents.capturePage(); return rendered.toBitmap().some((channel, index) => index % 4 !== 3 && channel > 32) }, 'translated overlay paints native pixels', 5000)
+  await writeFile(resolve(output, 'overlay.png'), rendered.toPNG())
 
   if (process.platform === 'win32') {
     await target.webContents.executeJavaScript('document.addEventListener("mousemove", event => { if (event.buttons) window.inputCounts.drag = (window.inputCounts.drag || 0) + 1 })')
@@ -203,7 +209,7 @@ $hit
   assert.equal(service.snapshot().status,'paused')
   await service.stop()
   assert.equal(service.snapshot().status, 'ready')
-  assert.equal(service.capture, undefined); assert.equal(service.overlay, undefined)
+  assert.equal(service.overlay, undefined)
   assert.equal(gateway.snapshot().services.ocr.state, 'ready')
   evidence.push({ check: 'stop tears down capture and overlay while OCR stays loaded in Model Gateway', passed: true })
   await writeFile(resolve(output, 'report.json'), JSON.stringify({ passed: true, evidence, diagnostics }, null, 2))
@@ -214,6 +220,7 @@ $hit
   process.exitCode = 1
 } finally {
   await service?.dispose()
+  captureBackend?.close()
   await gateway?.dispose()
   ocrClient?.dispose()
   if (target && !target.isDestroyed()) target.destroy()

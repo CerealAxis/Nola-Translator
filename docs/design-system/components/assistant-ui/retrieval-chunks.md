@@ -2,6 +2,7 @@
 title: Retrieval chunks（检索片段）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在最终回答生成前列出检索到的文档片段，并显示各片段的相关度。"
 ---
 
 # Retrieval chunks（检索片段）

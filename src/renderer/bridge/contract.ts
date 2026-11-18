@@ -313,8 +313,6 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'screenTranslation.command': 'ipc',
   'screenTranslation.onChanged': 'ipc',
   'screenTranslation.windowBootstrap': 'ipc',
-  'screenTranslation.frame': 'ipc',
-  'screenTranslation.captureError': 'ipc',
   'workspaceView.read': 'ipc',
   'workspaceView.update': 'ipc',
   'onboardingCard.available': 'ipc',

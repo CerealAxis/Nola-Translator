@@ -2,6 +2,7 @@
 title: Context（上下文）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在编辑器工具栏显示上下文窗口的用量，并查看分项。"
 ---
 
 # Context（上下文）

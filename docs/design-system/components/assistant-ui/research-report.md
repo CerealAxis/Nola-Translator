@@ -2,6 +2,7 @@
 title: Research report（研究报告）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在会话中按章节逐步呈现研究报告，让读者把各节内容与对应的来源对照。"
 ---
 
 # Research report（研究报告）

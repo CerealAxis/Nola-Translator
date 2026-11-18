@@ -1,21 +1,34 @@
 <script setup lang="ts">
 import DefaultTheme from 'vitepress/theme'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useData } from 'vitepress'
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch, watchEffect } from 'vue'
+import { useData, withBase } from 'vitepress'
 import Giscus from '@giscus/vue'
 import CookieConsent from './CookieConsent.vue'
+import { languageNoticeReadyKey } from './cookieConsent'
 import { copy } from './content'
 import { localeOfPath } from './siteLocale'
 import type { Locale } from './content'
 
-const { page, lang, isDark, frontmatter } = useData()
-const backToTop = computed(() => copy[localeOfPath(`/${page.value.relativePath}`, '/')].documentation.backToTop)
+const { page, lang, isDark, frontmatter, theme } = useData()
+const locale = computed(() => localeOfPath(`/${page.value.relativePath}`, '/'))
+const backToTop = computed(() => copy[locale.value].documentation.backToTop)
+const breadcrumbs = computed<{ text: string; path: string }[]>(() => frontmatter.value.breadcrumbs ?? [])
+const breadcrumbLabels: Record<Locale, string> = {
+  'zh-CN': '面包屑导航', 'zh-TW': '導覽路徑', 'zh-HK': '導覽路徑',
+  en: 'Breadcrumb', ja: 'パンくずリスト', ko: '탐색 경로',
+}
+watchEffect(() => {
+  // The design system has one language, so its switcher should link to localized homepages.
+  theme.value.i18nRouting = !page.value.relativePath.startsWith('vis/')
+}, { flush: 'sync' })
 const pageViewsLabel = computed(() => ({
   'zh-CN': '本页浏览量', 'zh-TW': '本頁瀏覽量', 'zh-HK': '本頁瀏覽量',
   en: 'Page views', ja: 'ページビュー', ko: '페이지 조회수',
 } satisfies Record<Locale, string>)[lang.value as Locale])
 const showPageViews = ref(false)
 const analyticsAllowed = ref(false)
+const languageNoticeReady = ref(false)
+provide(languageNoticeReadyKey, languageNoticeReady)
 const pageViews = ref<number>()
 const nearbyScrollbars = new Set<HTMLElement>()
 function hideScrollbars() {
@@ -95,13 +108,22 @@ const categoryId = 'DIC_kwDOUvoCYs4DIc6Z'
 <template>
   <DefaultTheme.Layout>
     <template #doc-before>
+      <nav v-if="breadcrumbs.length > 1" class="nola-doc-breadcrumb" :aria-label="breadcrumbLabels[locale]">
+        <ol>
+          <li v-for="(item, index) in breadcrumbs" :key="item.path">
+            <span v-if="index > 0" aria-hidden="true">›</span>
+            <a v-if="index < breadcrumbs.length - 1" :href="withBase(item.path)">{{ item.text }}</a>
+            <span v-else aria-current="page">{{ item.text }}</span>
+          </li>
+        </ol>
+      </nav>
       <div class="nola-doc-meta">
         <time v-if="page.lastUpdated" :datetime="new Date(page.lastUpdated).toISOString()">{{ new Date(page.lastUpdated).toLocaleDateString(lang) }}</time>
         <span v-if="pageViews !== undefined" class="nola-doc-views"><span>{{ pageViewsLabel }}</span> <span>{{ pageViews }}</span></span>
       </div>
     </template>
     <template #doc-after>
-      <div class="nola-doc-discussion" v-if="frontmatter.comments !== false">
+      <div class="nola-doc-discussion" v-if="frontmatter.comments !== false" data-nosnippet>
         <Giscus :key="page.relativePath" :repo="repo" :repo-id="repoId" category="Ideas" :category-id="categoryId" mapping="pathname" strict="0" reactions-enabled="1" emit-metadata="1" input-position="bottom" :theme="isDark ? 'dark' : 'light'" :lang="lang" loading="lazy" />
       </div>
     </template>
@@ -109,5 +131,25 @@ const categoryId = 'DIC_kwDOUvoCYs4DIc6Z'
       <a class="nola-doc-top" href="#VPContent">↑ {{ backToTop }}</a>
     </template>
   </DefaultTheme.Layout>
-  <CookieConsent @analytics-change="analyticsAllowed = $event" />
+  <CookieConsent
+    @analytics-change="analyticsAllowed = $event"
+    @language-notice-ready="languageNoticeReady = $event"
+  />
 </template>
+
+<style scoped>
+.nola-doc-breadcrumb {
+  margin-block-end: var(--label-gap, .5rem);
+  color: var(--vp-c-text-2);
+}
+.nola-doc-breadcrumb ol,
+.nola-doc-breadcrumb li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--label-gap, .5rem);
+}
+.nola-doc-breadcrumb li { max-width: 100%; overflow-wrap: anywhere; }
+.nola-doc-breadcrumb a:hover { text-decoration: underline; }
+.nola-doc-breadcrumb [aria-current="page"] { color: var(--vp-c-text-1); }
+</style>

@@ -2,6 +2,7 @@
 title: Connection state（连接状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在会话中提示连接、重连或连接中断状态，并为可恢复的中断提供继续操作。"
 ---
 
 # Connection state（连接状态）

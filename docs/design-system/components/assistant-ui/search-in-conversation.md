@@ -2,6 +2,7 @@
 title: Search in conversation（对话内搜索）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在已打开的会话里搜索消息正文，浏览匹配内容并跳到相应消息。"
 ---
 
 # Search in conversation（对话内搜索）

@@ -2,6 +2,7 @@
 title: Chart（图表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在助手回复中逐步显示面积图、折线图或柱状图的数据点，并为图表加上标题、汇总数值和变化量。"
 ---
 
 # Chart（图表）

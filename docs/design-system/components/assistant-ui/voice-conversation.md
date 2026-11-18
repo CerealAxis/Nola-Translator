@@ -2,6 +2,7 @@
 title: Voice conversation（语音对话）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "展示语音通话的连接、聆听和发言状态，提供打断与结束操作。"
 ---
 
 # Voice conversation（语音对话）

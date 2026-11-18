@@ -2,6 +2,7 @@
 title: Message actions（消息操作）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "提供复制、评价和重新生成操作，并即时反馈操作结果。"
 ---
 
 # Message actions（消息操作）

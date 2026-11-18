@@ -1,3 +1,7 @@
+---
+description: "查看 Nola Translator 為中國內地及其他地區提供的贊助渠道，了解贊助者可獲得的支援。"
+---
+
 # 贊助
 
 > [!WARNING]

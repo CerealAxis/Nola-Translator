@@ -1,8 +1,12 @@
+---
+description: "See how Nola Translator transcribes and translates audio on desktop and in the browser, try the interactive demo, and explore installation and model support."
+---
+
 # Product Overview
 
 <div align="center">
   <img src="/docs-image/en/getting-started/introduction/nola-translator-logo.svg" alt="Nola Translator Logo" width="112" height="112">
-  <h1>Nola Translator</h1>
+  <p class="intro-product-name"><strong>Nola Translator</strong></p>
   <p>Open-source real-time translation for desktop and browser</p>
   <p><a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.md">English</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-CN.md">简体中文</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-TW.md">繁體中文（台灣）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-HK.md">繁體中文（香港）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ja.md">日本語</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ko.md">한국어</a></p>
 </div>

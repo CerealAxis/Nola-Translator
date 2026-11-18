@@ -2,6 +2,7 @@
 title: Code runner（代码运行器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在助手回复里展示待运行的代码，用户确认运行后可在同一卡片查看输出结果。"
 ---
 
 # Code runner（代码运行器）

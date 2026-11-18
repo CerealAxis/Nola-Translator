@@ -2,6 +2,7 @@
 title: Bubble（消息气泡）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在消息气泡中展示对话内容，支持变体、对齐、分组、回应和可折叠内容。"
 ---
 
 # Bubble（消息气泡）

@@ -2,6 +2,7 @@
 title: Thread search（会话搜索）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "跨会话搜索标题或摘要，查看匹配结果并打开对应的对话记录。"
 ---
 
 # Thread search（会话搜索）

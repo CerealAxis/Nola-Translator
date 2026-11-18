@@ -1,3 +1,7 @@
+---
+description: "Nola Translator 도움말에서 설치와 자막 기능, 문제 해결, 기여 방법, 개발자 문서와 이용 약관을 찾아보세요."
+---
+
 # 도움말 문서
 
 Nola Translator 도움말 문서입니다.

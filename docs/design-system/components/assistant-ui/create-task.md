@@ -2,6 +2,7 @@
 title: Create task（创建任务）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "简短的任务表单收集标题、说明和截止日期，再提交创建动作。"
 ---
 
 # Create task（创建任务）

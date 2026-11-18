@@ -4,11 +4,12 @@ import { Accordion } from '@base-ui/react/accordion'
 import { Menu } from '@base-ui/react/menu'
 import { AnimatedThemeToggler } from '../../../src/renderer/components/ui/animated-theme-toggler'
 import { Button } from '../../../src/renderer/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../src/renderer/components/ui/card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../src/renderer/components/ui/card'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '../../../src/renderer/components/ui/select'
 import { ArrowDown, ArrowUpRight, ChevronDown, Globe2, Menu as MenuIcon, Monitor, Terminal, Check, Github, Sparkle, Star } from 'lucide-react'
 import { copy, downloadSources, downloadUrl, license, localeNames, localePath, repositoryUrl } from './content'
 import type { LandingCopy, Locale } from './content'
-import { autoLocaleNames, detectSiteLocale, localizedSitePath, readLocalePreference, saveLocalePreference } from './siteLocale'
+import { autoLocaleNames, detectSiteLocale, homePath, languagePrompt, readLocalePreference, saveLocalePreference } from './siteLocale'
 import { LandingFeatureSections } from './LandingFeatureSections'
 import { landingContent } from './landing-content'
 import type { LocalePreference } from './siteLocale'
@@ -20,22 +21,50 @@ export interface LandingPageProps {
   locale: Locale
   base: string
   dark: boolean
+  languageNoticeReady: boolean
   onToggleTheme: () => void
 }
 export interface DemoFrameProps { locale: Locale; base: string; dark: boolean; text: LandingCopy['demo']; page?: string }
 
-export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPageProps) {
+const browserLocale = () => detectSiteLocale(navigator.languages.length ? navigator.languages : [navigator.language])
+
+export function LandingPage({ locale, base, dark, languageNoticeReady, onToggleTheme }: LandingPageProps) {
   const t = copy[locale]
   const landing = landingContent[locale]
   const themeLabel = dark ? t.nav.themeToLight : t.nav.themeToDark
   const site = useRef<HTMLDivElement>(null)
+  const languageTrigger = useRef<HTMLButtonElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const [languagePreference, setLanguagePreference] = useState<LocalePreference>(readLocalePreference)
+  const [languageSuggestion, setLanguageSuggestion] = useState<{ locale: Locale; selected: Locale }>()
+
+  useEffect(() => {
+    if (location.pathname !== base && location.pathname !== `${base}index.html`) return
+    try {
+      if (sessionStorage.getItem('nola-language-prompt-dismissed')) return
+    } catch { /* Preferences still work in the current page. */ }
+    const preference = readLocalePreference()
+    const suggestion = preference === 'auto' ? browserLocale() : preference
+    if (suggestion && suggestion !== locale) setLanguageSuggestion({ locale: suggestion, selected: suggestion })
+  }, [base, locale])
+
+  const dismissLanguagePrompt = () => {
+    setLanguageSuggestion(undefined)
+    try {
+      sessionStorage.setItem('nola-language-prompt-dismissed', 'true')
+    } catch { /* The current prompt is already dismissed. */ }
+    languageTrigger.current?.focus()
+  }
   const selectLanguage = (preference: LocalePreference) => {
     saveLocalePreference(preference)
     setLanguagePreference(preference)
-    const next = preference === 'auto' ? detectSiteLocale(navigator.languages.length ? navigator.languages : [navigator.language]) : preference
-    const path = localizedSitePath(location.pathname, next, base)
+    if (preference === 'auto') {
+      const suggestion = browserLocale()
+      setLanguageSuggestion(suggestion && suggestion !== locale ? { locale: suggestion, selected: suggestion } : undefined)
+      return
+    }
+    setLanguageSuggestion(undefined)
+    const path = homePath(preference, base)
     if (path !== location.pathname) location.href = `${path}${location.search}${location.hash}`
   }
   const docUrl = `${base}${localePath(locale).slice(1)}docs`
@@ -57,11 +86,11 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
   return <div ref={site} className="nola-site" lang={locale}>
     <a className="site-skip z-overlay" href="#main">{t.nav.skip}</a>
     <header className={['site-nav', 'z-sticky', scrolled && 'site-nav--scrolled'].filter(Boolean).join(' ')}>
-      <a className="site-brand" href={`${base}${localePath(locale).slice(1)}`}><img src={`${base}nola-logo.svg`} alt="" /><span>Nola Translator</span></a>
+      <a className="site-brand" href={homePath(locale, base)}><img src={`${base}nola-logo.svg`} alt="" /><span>Nola Translator</span></a>
       <nav className="site-nav-links" aria-label={t.nav.menu}><a href="#product">{t.nav.product}</a><a href="#features">{t.nav.scenarios}</a><a href="#download">{t.nav.download}</a><a href={docUrl}>{t.nav.docs}</a><a href={`${base}vis/`}>{t.nav.designDocs}</a></nav>
       <div className="site-nav-end">
         <Menu.Root>
-          <Menu.Trigger render={<Button variant="secondary" size="sm" />} className="site-locale" aria-label={t.nav.language}><Globe2 aria-hidden="true" /><span>{languagePreference === 'auto' ? autoLocaleNames[locale] : localeNames[locale]}</span><ChevronDown aria-hidden="true" /></Menu.Trigger>
+          <Menu.Trigger ref={languageTrigger} render={<Button variant="secondary" size="sm" />} className="site-locale" aria-label={t.nav.language}><Globe2 aria-hidden="true" /><span>{languagePreference === 'auto' ? autoLocaleNames[locale] : localeNames[locale]}</span><ChevronDown aria-hidden="true" /></Menu.Trigger>
           <Menu.Portal><Menu.Positioner className="z-dropdown" sideOffset={4} align="end"><Menu.Popup className="site-locale-menu" aria-label={t.nav.language}>
             <Menu.RadioGroup value={languagePreference} onValueChange={(next: LocalePreference) => selectLanguage(next)}>
               <Menu.RadioItem value="auto">{autoLocaleNames[locale]}<Menu.RadioItemIndicator><Check aria-hidden="true" /></Menu.RadioItemIndicator></Menu.RadioItem>
@@ -82,6 +111,40 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
         </Menu.Root>
       </div>
     </header>
+    {languageNoticeReady && languageSuggestion && <Card
+      className="site-language-prompt z-overlay"
+      lang={languageSuggestion.locale}
+      role="region"
+      aria-labelledby="site-language-title"
+      aria-describedby="site-language-description"
+      data-nosnippet
+    >
+      <CardHeader>
+        <CardTitle id="site-language-title" role="heading" aria-level={2}>{copy[languageSuggestion.locale].nav.language}</CardTitle>
+        <CardDescription id="site-language-description">
+          {languagePrompt[languageSuggestion.locale].description}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Select
+          items={localeNames}
+          modal={false}
+          value={languageSuggestion.selected}
+          onValueChange={selected => { if (selected) setLanguageSuggestion({ ...languageSuggestion, selected }) }}
+        >
+          <SelectTrigger className="site-language-select" aria-labelledby="site-language-title"><SelectValue /></SelectTrigger>
+          <SelectContent side="top" className="site-language-options">
+            <SelectGroup>
+              {Object.entries(localeNames).map(([value, label]) => <SelectItem key={value} value={value} lang={value}>{label}</SelectItem>)}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </CardContent>
+      <CardFooter className="site-language-actions">
+        <Button onClick={() => selectLanguage(languageSuggestion.selected)}>{languagePrompt[languageSuggestion.locale].confirm}</Button>
+        <Button variant="secondary" onClick={dismissLanguagePrompt}>{languagePrompt[languageSuggestion.locale].dismiss}</Button>
+      </CardFooter>
+    </Card>}
     <main id="main">
       <section id="product" className="site-hero">
         <div className="site-hero-art" aria-hidden="true"><span className="site-hero-orb" /><span className="site-hero-orb site-hero-orb--second" /><span className="site-hero-ribbon" /><span className="site-hero-ribbon site-hero-ribbon--second" />
@@ -147,7 +210,7 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
 
       <section className="site-final" data-reveal><div className="site-final-orb" aria-hidden="true" /><p className="site-kicker">NOLA TRANSLATOR</p><h2>{t.final.title}</h2><p>{t.final.body}</p><DownloadSourceButton locale={locale} label={t.nav.download} className="site-final-link"><WindowsIcon />{t.final.cta}<ArrowDown aria-hidden="true" /></DownloadSourceButton></section>
     </main>
-    <footer className="site-footer site-shell"><div><a className="site-brand" href={`${base}${localePath(locale).slice(1)}`}><img src={`${base}nola-logo.svg`} alt="" />Nola Translator</a><p>{t.footer.tagline}</p></div><nav aria-label={t.nav.menu}><a href={docUrl}>{t.nav.docs}</a><a href={downloadUrl}>{t.footer.releases}</a><a href={repositoryUrl}><Github aria-hidden="true" />GitHub</a></nav><div className="site-footer-bottom"><span>{t.footer.copyright}</span><a href={`${repositoryUrl}/blob/main/LICENSE`}>{license}</a></div></footer>
+    <footer className="site-footer site-shell"><div><a className="site-brand" href={homePath(locale, base)}><img src={`${base}nola-logo.svg`} alt="" />Nola Translator</a><p>{t.footer.tagline}</p></div><nav aria-label={t.nav.menu}><a href={docUrl}>{t.nav.docs}</a><a href={downloadUrl}>{t.footer.releases}</a><a href={repositoryUrl}><Github aria-hidden="true" />GitHub</a></nav><div className="site-footer-bottom"><span>{t.footer.copyright}</span><a href={`${repositoryUrl}/blob/main/LICENSE`}>{license}</a></div></footer>
   </div>
 }
 
@@ -316,7 +379,7 @@ export function DemoFrame({ locale, base, dark, text, page = 'home' }: DemoFrame
     window.addEventListener('nola-demo-page', navigate)
     return () => { observer.disconnect(); window.removeEventListener('message', receive); window.removeEventListener('nola-demo-page', navigate) }
   }, [])
-  return <div className="site-demo-window">
+  return <div className="site-demo-window" data-nosnippet>
     <div ref={viewport} className="site-demo-viewport" style={{ '--demo-scale': scale } as CSSProperties}>
       <iframe ref={frame} key={locale} src={`${base}demo/index.html?locale=${locale}&page=${page}&theme=${initialTheme}#/`} title={`Nola Translator — ${text.hint}`} style={{ visibility: ready ? 'visible' : 'hidden' }} />
       {!ready ? <div className="site-demo-loading"><img src={`${base}screenshots/${locale}/home${dark ? '-dark' : ''}.png`} alt="" /><span>{text.loading}</span></div> : null}

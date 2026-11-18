@@ -2,6 +2,7 @@
 title: 简化交互
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "把工具放在操作对象附近，并为常用目标留出容易点击的范围。"
 ---
 
 # 简化交互

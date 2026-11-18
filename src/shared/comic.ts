@@ -265,6 +265,7 @@ export interface ComicTask {
   failedPageIds?: string[]
   error?: string
   stage?: string
+  activePageId?: string
 }
 export const comicTaskSchema: z.ZodType<ComicTask> = z.object({
   id, bookId: id, kind: comicWorkflowSchema, pages: z.array(id),
@@ -272,6 +273,7 @@ export const comicTaskSchema: z.ZodType<ComicTask> = z.object({
   progress: z.number().min(0).max(100), createdAt: z.string(),
   changes: z.array(z.object({ id, from: z.string(), to: z.string() })).optional(),
   failedPageIds: z.array(id).optional(), error: z.string().optional(), stage: z.string().optional(),
+  activePageId: id.optional(),
 })
 export const comicImportSchema = z
   .object({

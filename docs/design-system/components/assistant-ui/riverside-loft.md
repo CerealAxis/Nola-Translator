@@ -2,6 +2,7 @@
 title: Riverside Loft（河畔阁楼）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "住宿卡片组合房源照片、位置、入住人数和评分。预订按钮用动作载荷传递房源标识。"
 ---
 
 # Riverside Loft（河畔阁楼）

@@ -140,8 +140,22 @@ html.nola-scrollbar-near:has(.VPDoc),
   padding: 12px 14px 12px 16px;
   background: var(--vp-c-bg-soft);
 }
-:root { --site-loader-size: 96px; --site-loader-mark: 40px; --site-loader-gap: 24px; --site-loader-bar: 4px; --site-loader-wave-height: 24px; }
-.site-loading { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--site-loader-gap); color: var(--foreground); font: var(--nola-text-display); background: radial-gradient(ellipse at center, color-mix(in oklch, var(--accent) 8%, var(--background)), var(--background) 65%); }
+.site-loading {
+  --site-loader-size: 96px;
+  --site-loader-mark: 40px;
+  --site-loader-gap: 24px;
+  --site-loader-bar: 4px;
+  --site-loader-wave-height: 24px;
+  display: none;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--site-loader-gap);
+  color: var(--foreground);
+  font: var(--nola-text-display);
+  background: radial-gradient(ellipse at center, color-mix(in oklch, var(--accent) 8%, var(--background)), var(--background) 65%);
+}
 .site-loading p { margin: 0; font-family: var(--font-ui); font-weight: 600; }
 .site-loader-symbol { position: relative; display: grid; place-items: center; width: var(--site-loader-size); height: var(--site-loader-size); }
 .site-loader-symbol img { width: var(--site-loader-mark); height: var(--site-loader-mark); animation: site-loader-breathe 2.4s ease-in-out infinite; }
@@ -154,10 +168,37 @@ html.nola-scrollbar-near:has(.VPDoc),
 @keyframes site-loader-turn { to { transform: rotate(360deg); } }
 @keyframes site-loader-breathe { 50% { transform: translateY(-4px); opacity: .75; } }
 @keyframes site-loader-wave { 0%, 100% { transform: scaleY(.25); opacity: .4; } 50% { transform: scaleY(1); opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .site-loader-symbol img, .site-loader-orbit, .site-loader-wave i { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .site-loader-symbol img, .site-loader-orbit, .site-loader-wave i { animation: none; }
+}
+
+.site-loading-fallback {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--panel-gap, 1rem);
+  padding: var(--page-content-padding, 1.5rem);
+  color: var(--foreground);
+  background: var(--background);
+  text-align: center;
+}
+.site-loading-fallback h1 {
+  font-size: var(--text-h1, 2.25rem);
+  line-height: var(--leading-h1, 2.5rem);
+  font-weight: var(--font-weight-extrabold, 800);
+}
+.site-loading-fallback p { max-width: 62ch; }
+.site-loading-links { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--panel-gap, 1rem); }
+.site-loading-fallback a { color: var(--vp-c-brand-1); text-decoration: underline; text-underline-offset: .2em; }
+@media (scripting: enabled) {
+  .site-home-loading > .site-loading { display: flex; }
+  .site-home-loading > .site-loading-fallback { display: none; }
+}
+.vp-doc .intro-product-name { font-size: var(--text-h2, 1.875rem); line-height: var(--leading-h2, 2.25rem); }
 
 /* Map the library's own theme variables to the site's semantic colors. */
-#cc-main {
+:is(#cc-main, .site-language-prompt) {
   --cc-font-family: var(--font-ui);
   --cc-z-index: var(--z-overlay);
   --cc-bg: var(--surface);

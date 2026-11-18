@@ -64,7 +64,7 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
   const status = !state.connected ? 'statusDisconnected' : !compatible ? 'extensionVersionMismatch' : state.status === 'starting' ? 'starting' : state.status === 'stopping' ? 'stopping' : running ? (state.playbackPaused ? 'statusWaitingForPlayback' : 'statusRecognizing') : available ? 'statusReady' : 'captionServiceOff'
   const title = view === 'settings' ? t('subtitleSettings') : view === 'style' ? t('subtitleStyle') : view === 'download' ? t('downloadSrt') : view === 'study' ? t('transcript') : t('button')
   const link = (next: typeof view, label: string, Icon: typeof Captions, disabled = false) => <Button variant="bare" size="sm" className="nola-subtitle-menu-item" disabled={disabled} onClick={() => setView(next)}><Icon aria-hidden="true" /><span>{label}</span><ChevronRight aria-hidden="true" /></Button>
-  return <section ref={panel} tabIndex={-1} className="nola-panel nola-subtitle-menu nola-glass-popup" aria-label={t('button')} onKeyDown={event => {
+  return <section ref={panel} tabIndex={-1} className="nola-panel nola-subtitle-menu nola-popup-surface" aria-label={t('button')} onKeyDown={event => {
     if (event.key !== 'Escape' || event.defaultPrevented) return
     event.stopPropagation()
     if (view === 'main') store.closePanel()

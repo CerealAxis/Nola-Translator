@@ -2,6 +2,7 @@
 title: Table（表格）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用表格展示结构化数据，组合表头、表体、数据行、单元格和说明。"
 ---
 
 # Table（表格）

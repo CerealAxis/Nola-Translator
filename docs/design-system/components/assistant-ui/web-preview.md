@@ -2,6 +2,7 @@
 title: Web preview（网页预览）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在会话中显示由调用方提供的网页预览，配有地址栏、刷新按钮和在新标签页打开的入口。"
 ---
 
 # Web preview（网页预览）

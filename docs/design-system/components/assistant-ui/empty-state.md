@@ -2,6 +2,7 @@
 title: Empty state（空状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在聊天还没有消息时显示欢迎内容，并提供可以直接带入输入框的建议。"
 ---
 
 # Empty state（空状态）

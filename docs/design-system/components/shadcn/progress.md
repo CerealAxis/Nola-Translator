@@ -2,6 +2,7 @@
 title: Progress（进度条）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用条状指示器展示任务的完成比例，例如下载、上传或处理流程的进度。"
 ---
 
 # Progress（进度条）

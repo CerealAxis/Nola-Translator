@@ -2,6 +2,7 @@
 title: Regenerate with（切换模型重新生成）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "保持同一条用户消息，切换用于生成回复的模型，再比较不同模型的回答。"
 ---
 
 # Regenerate with（切换模型重新生成）

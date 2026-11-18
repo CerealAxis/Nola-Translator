@@ -18,13 +18,12 @@ import { useNolaTheme } from '@/components/primitives'
 import { notifyError } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { SliderControl, SliderIndicator, SliderRoot, SliderThumb, SliderTrack } from '@/components/ui/slider'
 import { useI18n } from '@/i18n'
 import type { UiLanguagePreference } from '@/i18n'
 import { updateSettings } from '@/store'
 import { GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_NODES, GITHUB_PROXY_OFF, findGithubProxyNode } from '../../../../shared/github-proxies'
 import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_NODES, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFF, PYTORCH_WHEEL_MIRRORS } from '../../../../shared/pypi-mirrors'
-import { DEFAULT_SETTINGS, GLASS_CONTROLS, UI_FONTS, type GlassControl, type UiFont } from '../../../../shared/settings'
+import { DEFAULT_SETTINGS, UI_FONTS, type UiFont } from '../../../../shared/settings'
 import { loadInterfaceFont } from '@/theme/interface-font'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
@@ -32,7 +31,6 @@ import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 export function GeneralTab({ settings }: SettingsPanelProps) {
   const { t, uiLanguage, setLanguage } = useI18n()
   const reduceMotion = settings.appearance?.reduceMotion ?? false
-  const glassEnabled = settings.appearance?.liquidGlass !== false
   const [fontBusy, setFontBusy] = useState(false)
   const [fontFallback, setFontFallback] = useState(document.documentElement.dataset.fontState === 'error')
   useEffect(() => {
@@ -93,33 +91,6 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
             options={[{ value: 'compact', label: t('settings.densityCompact') }, { value: 'comfortable', label: t('settings.densityComfortable') }]}
             onChange={value => { if (value === 'compact' || value === 'comfortable') void saveAppearance({ density: value }) }} />
         </SettingsRow>
-        <SettingsRow label={t('settings.liquidGlass')}>
-          <SettingSwitch
-            isSelected={glassEnabled}
-            ariaLabel={t('settings.liquidGlass')}
-            onChange={liquidGlass => {
-              void updateSettings({ appearance: { liquidGlass } }).catch(() => undefined)
-            }}
-          />
-        </SettingsRow>
-        {(Object.keys(GLASS_CONTROLS) as GlassControl[]).map(key => {
-          const { initial, min, max, unit } = GLASS_CONTROLS[key]
-          const label = t(`settings.${key}`)
-          const value = settings.appearance?.[key] ?? initial
-          return (
-            <SettingsRow key={key} label={label}>
-              <div className="settings-glass-slider">
-                <SliderRoot value={value} min={min} max={max} disabled={!glassEnabled}
-                  onValueChange={next => { void updateSettings({ appearance: { [key]: next } }).catch(() => undefined) }}>
-                  <SliderControl>
-                    <SliderTrack><SliderIndicator /><SliderThumb aria-label={label} aria-valuetext={`${value}${unit}`} /></SliderTrack>
-                  </SliderControl>
-                </SliderRoot>
-                <span aria-hidden="true" className="settings-glass-slider__value">{value}{unit}</span>
-              </div>
-            </SettingsRow>
-          )
-        })}
         <SettingsRow label={t('settings.reduceMotion')}>
           <SettingSwitch
             isSelected={reduceMotion}
@@ -184,8 +155,7 @@ function ThemeRow() {
 /**
  * Mirror sources and proxying for every outbound download.
  *
- * The three proxy switches stay disabled while the address is empty: a switch reading "on" while
- * every download path still ignores the proxy is the most misleading state this group could show.
+ * Proxy scopes are shown when an address has been saved.
  */
 function NetworkGroup({ settings }: SettingsPanelProps) {
   const { t } = useI18n()
@@ -226,10 +196,10 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
           void updateSettings({ network: { proxyUrl } }).catch(() => undefined)
         }}
       />
+      {proxyConfigured && <>
       <SettingsRow label={t('settings.proxyForPip')}>
         <SettingSwitch
           isSelected={network.proxyForPip}
-          isDisabled={!proxyConfigured}
           ariaLabel={t('settings.proxyForPip')}
           onChange={(proxyForPip) => {
             void updateSettings({ network: { proxyForPip } }).catch(() => undefined)
@@ -239,7 +209,6 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
       <SettingsRow label={t('settings.proxyForModelDownload')}>
         <SettingSwitch
           isSelected={network.proxyForModelDownload}
-          isDisabled={!proxyConfigured}
           ariaLabel={t('settings.proxyForModelDownload')}
           onChange={(proxyForModelDownload) => {
             void updateSettings({ network: { proxyForModelDownload } }).catch(() => undefined)
@@ -249,13 +218,13 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
       <SettingsRow label={t('settings.proxyForRuntimeDownload')}>
         <SettingSwitch
           isSelected={network.proxyForRuntimeDownload}
-          isDisabled={!proxyConfigured}
           ariaLabel={t('settings.proxyForRuntimeDownload')}
           onChange={(proxyForRuntimeDownload) => {
             void updateSettings({ network: { proxyForRuntimeDownload } }).catch(() => undefined)
           }}
         />
       </SettingsRow>
+      </>}
       <SettingsRow label={t('settings.pypiMirror')} desc={t('settings.pypiMirrorHint')} descriptionTooltip>
         <SettingSelect
           value={findPypiMirrorNode(network.pypiMirrorUrl) ?? PYPI_MIRROR_AUTO}

@@ -2,6 +2,7 @@
 title: Syntax highlighter（语法高亮）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用按语言加载的语法高亮器渲染 Markdown 代码块。"
 ---
 
 # Syntax highlighter（语法高亮）

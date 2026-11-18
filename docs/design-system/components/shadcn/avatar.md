@@ -2,6 +2,7 @@
 title: Avatar（头像）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用头像图像标识用户，并为图片加载失败或缺少图片的情况提供姓名缩写等回退内容。"
 ---
 
 # Avatar（头像）

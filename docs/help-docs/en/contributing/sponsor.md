@@ -1,3 +1,7 @@
+---
+description: "Find the official Nola Translator sponsorship options for mainland China and other regions, with details on sponsor benefits."
+---
+
 # Sponsorship
 
 > [!WARNING]

@@ -2,6 +2,7 @@
 title: Toggle（切换按钮）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用一个可按下和释放的按钮切换双态选项，清楚显示当前是否选中。"
 ---
 
 # Toggle（切换按钮）

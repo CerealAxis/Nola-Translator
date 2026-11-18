@@ -5,6 +5,7 @@ import type { NolaBridge } from '@/bridge'
 import { createComicTestBridge } from './comic-test-fixture'
 import {
   failedComicPages,
+  processingComicPages,
   flushComicSaves,
   discardComicSaves,
   importComicFiles,
@@ -24,6 +25,26 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
 })
+
+it('includes every claimed image while leaving queued and non-image jobs out', async () => {
+  const { api, book } = createComicTestBridge(3)
+  const project = book()
+  const [first, second, third] = project.pages
+  const task = await api.run({
+    projectId: project.id,
+    expectedRevision: project.revision,
+    kind: 'normal',
+    pageIds: [first.id, second.id, third.id],
+  })
+  expect(processingComicPages(project.id, [
+    { ...task, status: 'running', activePageId: first.id },
+    { ...task, status: 'pausing', activePageId: second.id },
+    { ...task, status: 'running', activePageId: third.id, kind: 'ocr' },
+    { ...task, status: 'queued', activePageId: third.id },
+    { ...task, status: 'running', activePageId: third.id, bookId: crypto.randomUUID() },
+  ])).toEqual(new Set([first.id, second.id]))
+})
+
 it('shares pending preview requests and ignores an old page resolving after navigation', async () => {
   const fixture = createComicTestBridge()
   vi.spyOn(store, 'getBridge').mockReturnValue({

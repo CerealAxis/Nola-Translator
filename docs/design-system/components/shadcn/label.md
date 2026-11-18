@@ -2,6 +2,7 @@
 title: Label（标签）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用标签给输入控件提供可见名称和程序化关联，帮助用户理解需要填写的内容。"
 ---
 
 # Label（标签）

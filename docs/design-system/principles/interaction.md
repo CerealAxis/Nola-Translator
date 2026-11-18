@@ -2,6 +2,7 @@
 title: 直截了当
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "需要编辑哪里，就在那里的内容附近提供输入。减少为了修改一项内容而跳转页面的步骤。"
 ---
 
 # 直截了当

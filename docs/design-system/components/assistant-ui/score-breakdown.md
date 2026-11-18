@@ -2,6 +2,7 @@
 title: Score breakdown（评分明细）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "结合总分、评语和各项指标展示评分结果，解释每个维度对结果的影响。"
 ---
 
 # Score breakdown（评分明细）

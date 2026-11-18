@@ -2,6 +2,7 @@
 title: Heat graph（热力图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用热力格呈现每日活动数量，包含月份、星期、图例和提示。"
 ---
 
 # Heat graph（热力图）

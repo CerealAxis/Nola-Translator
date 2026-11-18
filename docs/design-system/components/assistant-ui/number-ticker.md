@@ -2,6 +2,7 @@
 title: Number ticker（数字滚动）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用每一位数字的滚动过渡显示数值更新，适用于计数器和实时变化的指标。"
 ---
 
 # Number ticker（数字滚动）

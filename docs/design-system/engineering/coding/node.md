@@ -1,6 +1,7 @@
 ---
 group: 代码风格
 order: 6
+description: "查看 Node.js 版本选择、模块风格、安全规约和工程实践，了解与 ESLint 配合的检查方式。"
 ---
 
 # Node.js 编码规约

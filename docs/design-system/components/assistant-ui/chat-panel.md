@@ -2,6 +2,7 @@
 title: Chat panel（聊天面板）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "将聊天消息、输入区域和运行状态组合成完整聊天面板。"
 ---
 
 # Chat panel（聊天面板）

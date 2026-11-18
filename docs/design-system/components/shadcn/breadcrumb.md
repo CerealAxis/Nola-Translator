@@ -2,6 +2,7 @@
 title: Breadcrumb（面包屑导航）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用面包屑导航显示当前页面在网站中的层级，并提供返回上级页面的链接。"
 ---
 
 # Breadcrumb（面包屑导航）

@@ -2,6 +2,7 @@
 title: Button Group（按钮组合）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用按钮组把一系列相关按钮放在同一容器中，并呈现一致的分组边界。"
 ---
 
 # Button Group（按钮组合）

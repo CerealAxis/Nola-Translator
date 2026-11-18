@@ -2,6 +2,7 @@
 title: Conversation map（对话分支图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用刻度表示整条对话，每轮一个刻度。当前阅读轮次突出显示，悬停预览内容，点击可跳到对应轮次。"
 ---
 
 # Conversation map（对话分支图）

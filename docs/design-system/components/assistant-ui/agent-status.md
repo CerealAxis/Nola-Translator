@@ -2,6 +2,7 @@
 title: Agent status（代理状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "以状态胶囊显示代理的工作进度，运行时版可展开任务托盘。"
 ---
 
 # Agent status（代理状态）

@@ -2,6 +2,7 @@
 title: Schedule（计划任务）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "展示定时任务的下一次执行、历史记录和暂停开关。"
 ---
 
 # Schedule（计划任务）

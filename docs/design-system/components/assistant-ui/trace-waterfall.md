@@ -2,6 +2,7 @@
 title: Trace waterfall（追踪瀑布图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用瀑布图展示一次运行中各操作的相对起点、耗时和结果。"
 ---
 
 # Trace waterfall（追踪瀑布图）

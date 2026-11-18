@@ -2,6 +2,7 @@
 title: Elicitation form（信息征询表单）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "工具暂停执行时，通过表单收集服务器缺少的信息。"
 ---
 
 # Elicitation form（信息征询表单）

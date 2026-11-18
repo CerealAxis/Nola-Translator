@@ -2,6 +2,7 @@
 title: Empty（空状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用空状态组件说明当前列表或页面为空，并按需要提供插图、标题、说明和下一步操作。"
 ---
 
 # Empty（空状态）

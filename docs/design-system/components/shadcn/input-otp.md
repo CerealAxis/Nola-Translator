@@ -2,6 +2,7 @@
 title: Input OTP（一次性密码输入）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用一次性密码字段分别输入验证码字符，支持键盘操作和粘贴完整代码。"
 ---
 
 # Input OTP（一次性密码输入）

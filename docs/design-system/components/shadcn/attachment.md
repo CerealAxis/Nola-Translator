@@ -2,6 +2,7 @@
 title: Attachment（附件）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "显示文件或图像附件，包含媒体、元数据、上传状态和操作。"
 ---
 
 # Attachment（附件）

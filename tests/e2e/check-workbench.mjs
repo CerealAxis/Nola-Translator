@@ -336,13 +336,6 @@ if (!process.versions.electron) {
       await click('[data-testid="native-composer"] [data-menu-anchor="effort"]')
       await evaluate(`document.querySelector('[data-testid="native-composer"]').parentElement.style.transform=''`)
       await screenshot('embedded-' + theme)
-      await evaluate(`window.nolaTranslator.updateSettings({appearance:{...${JSON.stringify(settings.appearance)},liquidGlass:false}})`)
-      await waitFor(`document.documentElement.dataset.nolaGlass==='off'`)
-      assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).backdropFilter`), 'none')
-      await assertSelectionContrast()
-      await screenshot('embedded-' + theme + '-solid')
-      await evaluate(`window.nolaTranslator.updateSettings({appearance:{...${JSON.stringify(settings.appearance)},liquidGlass:true}})`)
-      await waitFor(`document.documentElement.dataset.nolaGlass==='on'`)
       assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).backdropFilter`), 'none')
     }
     for (const [width, height, zoom] of [[760,600,1],[1180,780,2]]) {

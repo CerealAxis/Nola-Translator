@@ -2,6 +2,7 @@
 title: Guardrail notice（防护提示）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "说明助手无法执行某项请求的原因，并给出可行的替代操作。"
 ---
 
 # Guardrail notice（防护提示）

@@ -108,6 +108,25 @@ it('does not mount an image without a source while a page is loading', async () 
     document.querySelector('.comic-workflow__thumbnail [data-slot="skeleton"]'),
   ).toBeInTheDocument()
 })
+
+it('shows canvas labels only when comparing the original and translated images', async () => {
+  setup()
+  await screen.findByRole('heading', { name: '图片概览' })
+  expect(
+    within(screen.getByRole('region', { name: '译图' })).queryByText('译图'),
+  ).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: '原图' }))
+  expect(
+    within(screen.getByRole('region', { name: '原图' })).queryByText('原图'),
+  ).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: '双图对照' }))
+  for (const label of ['原图', '译图']) {
+    expect(
+      within(screen.getByRole('region', { name: label })).getByText(label),
+    ).toBeVisible()
+  }
+})
+
 it('offers only MT for normal translation and only LLMs for LLM translation and proofreading', async () => {
   vi.mocked(useAvailableModels).mockReturnValue({
     mt: [
@@ -198,6 +217,49 @@ it('edits the selected bubble and confines OCR to that bubble', async () => {
     ),
   )
 })
+
+it('uses the same visible bubble order for the canvas, inspector and list', async () => {
+  const fixture = createComicTestBridge()
+  const page = fixture.book().pages[0]
+  const [first] = page.regions
+  const makeRegion = (sourceText: string, ignored = false) => ({
+    ...first,
+    id: crypto.randomUUID(),
+    sourceText,
+    targetText: null,
+    ignored,
+  })
+  page.regions = [
+    makeRegion('1', true),
+    first,
+    makeRegion('2', true),
+    makeRegion('第二段'),
+    makeRegion('第三段'),
+  ]
+  setup(fixture)
+  await screen.findByText('图片概览')
+  await userEvent.click(screen.getByRole('button', { name: '进入编辑' }))
+  expect(screen.getByRole('heading', { name: '气泡 1 / 3' })).toBeVisible()
+  expect(screen.getByLabelText('原文 · OCR 结果')).toHaveValue(first.sourceText)
+  expect(screen.queryByRole('button', { name: '气泡 4' })).toBeNull()
+  const next = screen.getByRole('button', { name: '下一个气泡' })
+  await userEvent.click(next)
+  expect(screen.getByLabelText('原文 · OCR 结果')).toHaveValue('第二段')
+  await userEvent.click(next)
+  expect(screen.getByRole('heading', { name: '气泡 3 / 3' })).toBeVisible()
+  expect(next).toBeDisabled()
+  await userEvent.click(screen.getByRole('button', { name: '上一个气泡' }))
+  await userEvent.click(screen.getByRole('tab', { name: '气泡' }))
+  const list = screen.getByRole('list')
+  expect(within(list).getAllByRole('listitem')).toHaveLength(3)
+  await userEvent.click(within(list).getByRole('button', { name: '气泡 2 ↑' }))
+  await flushComicSaves(fixture.book().id)
+  expect(
+    fixture.book().pages[0].regions.map((region) => region.sourceText),
+  ).toEqual(['1', '第二段', '2', first.sourceText, '第三段'])
+  expect(screen.getByRole('heading', { name: '气泡 1 / 3' })).toBeVisible()
+})
+
 it('keeps user input when saving fails and exposes retry', async () => {
   const notify = vi.spyOn(notices, 'notifyError').mockReturnValue('save-error')
   const fixture = setup()
@@ -239,7 +301,7 @@ it('reports layout warnings only with Toasts', async () => {
   ).toBeNull()
 })
 
-it('reports task progress in Toasts without an inline progress bar', async () => {
+it('shows the generation placeholder only for the active output page', async () => {
   const loading = vi
     .spyOn(notices, 'notifyLoading')
     .mockReturnValue('comic-task')
@@ -259,10 +321,13 @@ it('reports task progress in Toasts without an inline progress bar', async () =>
     ),
   )
   expect(document.querySelector('.comic-workflow__progress')).toBeNull()
+  expect(document.querySelector('[data-slot="image-generation"]')).toBeNull()
   const [job] = await fixture.api.listTasks()
+  const [first, second] = fixture.book().pages
   await act(async () => {
     job.status = 'running'
     job.progress = 50
+    job.activePageId = first.id
     fixture.changed()
   })
   await waitFor(() =>
@@ -272,9 +337,32 @@ it('reports task progress in Toasts without an inline progress bar', async () =>
       expect.objectContaining({ variant: 'loading' }),
     ),
   )
+  await userEvent.click(screen.getByRole('button', { name: '双图对照' }))
+  const original = screen.getByRole('region', { name: '原图' })
+  const translated = screen.getByRole('region', { name: '译图' })
+  expect(
+    within(translated).getByRole('status', { name: '处理中' }),
+  ).not.toHaveTextContent('处理中')
+  expect(original.querySelector('[data-slot="image-generation"]')).toBeNull()
+  const activeThumbnail = screen.getByRole('button', { name: '图片 1 · 处理中' })
+  expect(activeThumbnail).toBeVisible()
+  expect(activeThumbnail.parentElement).not.toHaveTextContent('处理中')
+  expect(screen.getByRole('button', { name: '图片 2' })).toBeVisible()
+  await act(async () => {
+    job.activePageId = second.id
+    fixture.changed()
+  })
+  await waitFor(() =>
+    expect(translated.querySelector('[data-slot="image-generation"]')).toBeNull(),
+  )
+  await userEvent.click(screen.getByRole('button', { name: '图片 2 · 处理中' }))
+  expect(
+    await within(translated).findByRole('status', { name: '处理中' }),
+  ).toBeVisible()
   await act(async () => {
     job.status = 'completed'
     job.progress = 100
+    delete job.activePageId
     fixture.changed()
   })
   await waitFor(() =>
@@ -283,6 +371,7 @@ it('reports task progress in Toasts without an inline progress bar', async () =>
       expect.anything(),
     ),
   )
+  expect(document.querySelector('[data-slot="image-generation"]')).toBeNull()
   expect(
     within(
       document.querySelector('.comic-workflow__main') as HTMLElement,

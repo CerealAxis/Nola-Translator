@@ -1,3 +1,7 @@
+---
+description: "对照 Nola Translator 的硬件、计算平台和软件运行条件，选择合适的版本及本地或云端运行方式。"
+---
+
 # 环境配置
 
 > [!WARNING]  

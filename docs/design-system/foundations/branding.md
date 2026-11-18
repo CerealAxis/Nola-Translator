@@ -2,6 +2,7 @@
 title: 品牌
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "产品名称、标志、用语和控件共同形成品牌识别，让用户在不同窗口中认出熟悉的内容与操作。"
 ---
 
 # 品牌

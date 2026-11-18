@@ -2,6 +2,7 @@
 title: 对比
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "对比让主要内容先被看到。差别应足够明显，可通过按钮样式、字号、间距和状态变化形成。"
 ---
 
 # 对比

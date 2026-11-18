@@ -2,6 +2,7 @@
 title: Order tracking（订单追踪）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "订单卡片用时间线展示已下单、已打包和配送中等阶段，并提供物流和支持入口。"
 ---
 
 # Order tracking（订单追踪）

@@ -2,6 +2,7 @@
 title: Memory（记忆）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "查看助手为当前会话保留的记忆条目，并从列表中移除无需继续使用的条目。"
 ---
 
 # Memory（记忆）

@@ -2,6 +2,7 @@
 title: Command palette（命令面板）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在命令面板搜索可用操作，查看匹配结果并通过键盘或指针执行所选命令。"
 ---
 
 # Command palette（命令面板）

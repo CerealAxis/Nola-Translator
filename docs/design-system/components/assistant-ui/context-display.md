@@ -2,6 +2,7 @@
 title: Context display（上下文显示）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用环形、条形或文本显示模型的上下文占用量，展开后可查看明细。"
 ---
 
 # Context display（上下文显示）

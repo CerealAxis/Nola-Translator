@@ -2,6 +2,7 @@
 title: Markdown text（Markdown 文本）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "把助手的文本消息渲染成 Markdown，支持标题、列表、链接、引用、表格与带复制按钮的代码块。"
 ---
 
 # Markdown text（Markdown 文本）

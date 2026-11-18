@@ -9,8 +9,7 @@ import { VitepressDemoBox, VitepressDemoPlaceholder } from 'vitepress-demo-plugi
 import 'nprogress-v2/dist/index.css'
 import 'vitepress-demo-plugin/style.css'
 import 'vitepress-markdown-timeline/dist/theme/index.css'
-import { localePath } from './content'
-import { detectSiteLocale, localizedSitePath, localeOfPath, readLocalePreference, saveLocalePreference } from './siteLocale'
+import { isHomePath, localeOfPath, saveLocalePreference } from './siteLocale'
 import './style.css'
 import '../../media-src/vis/design-demo.css'
 import './style/index.css'
@@ -29,29 +28,22 @@ export default {
     const base = siteData.value.base
     NProgress.configure({ showSpinner: false })
     router.onAfterRouteChanged = () => { NProgress.done() }
-    const preference = readLocalePreference()
-    const locale = preference === 'auto' ? detectSiteLocale(navigator.languages.length ? navigator.languages : [navigator.language]) : preference
-    const target = localizedSitePath(location.pathname, locale, base)
-    if (location.pathname === base && target !== location.pathname) location.replace(`${target}${location.search}${location.hash}`)
     // VitePress's document-language links should persist the same preference as the homepage menu.
     router.onBeforeRouteChange = href => {
       const pathname = new URL(href, location.href).pathname
       const currentPath = location.pathname
       const currentLocale = localeOfPath(currentPath, base)
       const nextLocale = localeOfPath(pathname, base)
-      if (nextLocale !== currentLocale) saveLocalePreference(nextLocale)
-
-      const isHomePath = (path: string) => {
-        const normalized = path.endsWith('/') ? path : `${path}/`
-        return normalized === `${base}${localePath(localeOfPath(path, base)).slice(1)}`
-      }
+      if (nextLocale !== currentLocale && !pathname.startsWith(`${base}vis/`)) saveLocalePreference(nextLocale)
 
       // The homepage and docs use global stylesheets that should not survive SPA transitions between them.
-      if (isHomePath(currentPath) !== isHomePath(pathname)) {
+      const currentIsHome = isHomePath(currentPath, base)
+      const nextIsHome = isHomePath(pathname, base)
+      if (currentIsHome !== nextIsHome) {
         location.assign(href)
         return false
       }
-      if (!isHomePath(currentPath) && !isHomePath(pathname)) NProgress.start()
+      if (!currentIsHome && !nextIsHome) NProgress.start()
     }
   },
 } satisfies Theme

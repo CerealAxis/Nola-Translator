@@ -2,6 +2,7 @@
 title: Spinner（加载指示器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用旋转指示器表达正在等待的状态，可在按钮或内容区域与状态文字一起使用。"
 ---
 
 # Spinner（加载指示器）

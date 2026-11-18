@@ -2,6 +2,7 @@
 title: Activity graph（活动图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用日历热力图展示近半年的任务活动，按色阶区分每日运行次数，并在网格上方查看统计总量。"
 ---
 
 # Activity graph（活动图）

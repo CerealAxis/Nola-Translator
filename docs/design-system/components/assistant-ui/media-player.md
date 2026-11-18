@@ -2,6 +2,7 @@
 title: Media player（媒体播放器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在消息或页面内播放媒体文件和链接，通过播放器控件控制录音或视频片段。"
 ---
 
 # Media player（媒体播放器）

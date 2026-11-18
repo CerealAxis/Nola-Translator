@@ -46,6 +46,9 @@ jobs:
       - name: Build documentation site
         run: npm run docs:build
 
+      - name: Validate documentation SEO
+        run: node docs/scripts/check-seo.mjs
+
       - name: Include custom domain
         run: cp docs/CNAME docs/dist/CNAME
 

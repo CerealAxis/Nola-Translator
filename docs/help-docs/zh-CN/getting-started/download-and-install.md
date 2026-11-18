@@ -1,3 +1,7 @@
+---
+description: "查看 Nola Translator 正式版和测试版的下载渠道，按所在地区选择官网、GitHub 或网盘。"
+---
+
 # 下载与安装
 
 > [!WARNING]

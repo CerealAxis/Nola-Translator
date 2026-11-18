@@ -1,3 +1,7 @@
+---
+description: "Browse Nola Translator help by task, from setup and caption tools to troubleshooting, contributions, developer resources, and legal information."
+---
+
 # Help Documentation
 
 This is the help documentation for Nola Translator.

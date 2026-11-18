@@ -2,6 +2,7 @@
 title: Hover Card（悬停卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在鼠标悬停链接或触发元素时显示内容预览，帮助读者在打开目标前了解上下文。"
 ---
 
 # Hover Card（悬停卡片）

@@ -2,6 +2,7 @@
 title: Mentions（提及）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在输入框键入 @ 查找人员或其他可引用对象，选中后将对应提及插入草稿。"
 ---
 
 # Mentions（提及）

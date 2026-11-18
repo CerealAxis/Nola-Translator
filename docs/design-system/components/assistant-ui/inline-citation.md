@@ -2,6 +2,7 @@
 title: Inline citation（行内引用）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在回答正文插入编号引用，鼠标悬停或键盘聚焦时可查看该处引用的来源。"
 ---
 
 # Inline citation（行内引用）

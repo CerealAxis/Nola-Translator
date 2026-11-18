@@ -2,6 +2,7 @@
 title: Reviewable diff（可审阅差异）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "逐块审阅代码差异，决定保留或舍弃，再应用选中的改动。"
 ---
 
 # Reviewable diff（可审阅差异）

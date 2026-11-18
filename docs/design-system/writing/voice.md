@@ -2,6 +2,7 @@
 title: 界面用语
 pageClass: nola-vis-doc nola-vis-writing
 editLink: false
+description: "界面文字让用户认出对象、理解选项，并知道下一步可以做什么。使用熟悉的词，把当前任务需要的信息放在前面。"
 ---
 
 # 界面用语

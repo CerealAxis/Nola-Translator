@@ -2,6 +2,7 @@
 title: Draft restore（恢复草稿）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "提示用户恢复之前保存的未发送草稿，或将它丢弃。"
 ---
 
 # Draft restore（恢复草稿）

@@ -2,6 +2,7 @@
 title: Web search（网页搜索）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在助手会话中查看当前查询词、搜索进度，以及陆续返回的网站标题和来源。"
 ---
 
 # Web search（网页搜索）

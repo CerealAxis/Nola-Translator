@@ -2,6 +2,7 @@
 title: Permission grant（权限授予）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在授权卡片中列出请求的能力、适用范围和有效时长，帮助用户在授权前了解影响。"
 ---
 
 # Permission grant（权限授予）

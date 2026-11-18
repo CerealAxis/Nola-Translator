@@ -2,6 +2,7 @@
 title: Draft email（邮件草稿）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用邮件草稿表单查看发件人、填写收件人、主题和正文，并在确认后提交。"
 ---
 
 # Draft email（邮件草稿）

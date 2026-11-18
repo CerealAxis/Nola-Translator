@@ -2,6 +2,7 @@
 title: Speaker identity（发言者身份）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在对话行中用名称与标识区分用户、助手和不同模型，并查看带工具调用的消息示例。"
 ---
 
 # Speaker identity（发言者身份）

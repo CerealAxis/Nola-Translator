@@ -235,15 +235,20 @@ def test_restore_brush_uses_source_pixels(service, tmp_path):
 def test_task_pause_resume_results_and_stale_attempt(service, tmp_path):
   book = save(service, imported(service, tmp_path), [bubble()])
   task = service.create_job(JobRequest(projectId=book['id'], expectedRevision=book['revision'], kind='translate', pageIds=[book['pages'][0]['id']]))
+  assert 'activePageId' not in service.public_job(task)
   service.control(task['id'], 'pause')
   assert service.claim() is None
   service.control(task['id'], 'resume')
   claim = service.claim()
+  running = service.public_job(service.repository.jobs()[0])
+  assert running['activePageId'] == claim['pageId']
+  assert 'active' not in running
   attempt = Attempt(attemptId=claim['attemptId'], pageId=claim['pageId'])
   prepared = asyncio.run(service.prepare(task['id'], attempt))
   region = prepared['page']['regions'][0]
   result = asyncio.run(service.complete(task['id'], Completion(**attempt.model_dump(), translations=[{'id':region['id'],'text':'真实翻译'}])))
   assert result['status'] == 'completed' and result['progress'] == 100
+  assert 'activePageId' not in service.public_job(result)
   assert service.repository.get(book['id'])['pages'][0]['regions'][0]['targetText'] == '真实翻译'
   with pytest.raises(ValueError, match='staleAttempt'):
     asyncio.run(service.complete(task['id'], Completion(**attempt.model_dump(), translations=[])))

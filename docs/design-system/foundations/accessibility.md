@@ -2,6 +2,7 @@
 title: 无障碍
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "让用户能看见、听见或通过辅助技术感知内容，并用熟悉的方式完成操作。设计时同时考虑长期的能力差异和日常情境，例如屏幕反光、环境嘈杂或只能单手操作。"
 ---
 
 # 无障碍

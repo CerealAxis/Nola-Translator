@@ -2,6 +2,7 @@
 title: Tool group（工具分组）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "把连续的工具调用收纳在一个可展开的组里，并显示数量和运行状态。"
 ---
 
 # Tool group（工具分组）

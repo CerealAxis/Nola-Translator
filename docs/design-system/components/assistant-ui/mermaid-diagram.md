@@ -2,6 +2,7 @@
 title: Mermaid diagram（Mermaid 图表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "从 Mermaid 代码生成图表，提供流式生成状态和放大预览。"
 ---
 
 # Mermaid diagram（Mermaid 图表）

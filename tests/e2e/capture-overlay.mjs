@@ -126,6 +126,8 @@ void app.whenReady().then(async () => {
     window.webContents.send('settings:changed', settings)
     await window.webContents.executeJavaScript(`document.querySelector('.nola-caption-card').setAttribute('data-hover', 'true')`)
     await delay(200)
+    const backdropFilter = await window.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.nola-caption-controls-row')).backdropFilter`)
+    expectTrue('caption toolbar has no backdrop filter', backdropFilter === 'none', { scheme, backdropFilter })
     for (const paused of [false, true]) {
       const control = await window.webContents.executeJavaScript(`(() => {
         const button = document.querySelector('.nola-caption-mic')

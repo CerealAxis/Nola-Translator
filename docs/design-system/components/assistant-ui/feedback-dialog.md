@@ -2,6 +2,7 @@
 title: Feedback dialog（反馈对话框）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "提交负面评价时，收集用户选择的原因和补充说明。"
 ---
 
 # Feedback dialog（反馈对话框）

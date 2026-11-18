@@ -140,6 +140,7 @@ import {
   controlComicTask,
   exportComicBook,
   failedComicPages,
+  processingComicPages,
   historyComicBook,
   importComicFiles,
   saveQuickComicToLibrary,
@@ -153,6 +154,7 @@ import {
   prefetchComicImage,
   comicTextQuad,
   comicWithTextQuad,
+  visibleComicRegions,
 } from './comic-data'
 import {
   useComicPrototypeText,
@@ -256,9 +258,13 @@ export function ComicTranslationWorkspace({
       active = false
     }
   }, [t])
-  const [selected, setSelected] = useState<string[]>(
-    page?.regions[0] ? [page.regions[0].id] : [],
+  const visibleRegions = visibleComicRegions(page?.regions)
+  const [selection, setSelected] = useState<string[] | null>(null)
+  const selected = (selection ?? []).filter((id) =>
+    visibleRegions.some((region) => region.id === id),
   )
+  if (!selected.length && selection?.length !== 0 && visibleRegions[0])
+    selected.push(visibleRegions[0].id)
   const [selectedPages, setSelectedPages] = useState<string[]>([])
   const [tool, setTool] = useState<ComicCanvasTool>('select')
   const [view, setView] = useState('translated')
@@ -326,22 +332,17 @@ export function ComicTranslationWorkspace({
   const setRepairMethod = (repairMethod: string) =>
     updateConfig({ repairMethod: repairMethod as ComicConfig['repairMethod'] })
   useEffect(() => {
-    if (
-      page &&
-      (!currentId ||
-        !selected.some((id) => page.regions.some((region) => region.id === id)))
-    ) {
+    if (page && page.id !== currentId) {
       setCurrentId(page.id)
-      setSelected(page.regions[0] ? [page.regions[0].id] : [])
+      setSelected(null)
     }
   }, [page?.id, currentId])
   const canvasRegion = useRef<HTMLDivElement>(null)
   const originalScroll = useRef<HTMLDivElement>(null),
     translatedScroll = useRef<HTMLDivElement>(null)
-  const region = page?.regions.find((item) => item.id === selected[0])
+  const region = visibleRegions.find((item) => item.id === selected[0])
   const pageIndex = book?.pages.findIndex((item) => item.id === page?.id) ?? 0
-  const regionIndex =
-    page?.regions.findIndex((item) => item.id === region?.id) ?? -1
+  const regionIndex = visibleRegions.findIndex((item) => item.id === region?.id)
   const queueJobs = jobs.filter(
     (job) => !['completed', 'cancelled'].includes(job.status),
   )
@@ -376,9 +377,8 @@ export function ComicTranslationWorkspace({
       notifyError(t('suite.actionFailed'), { cause: error })
       return
     }
-    const next = book?.pages.find((item) => item.id === id)
     setCurrentId(id)
-    setSelected(next?.regions[0] ? [next.regions[0].id] : [])
+    setSelected(null)
     setTool('select')
     setKana(false)
   }
@@ -387,11 +387,11 @@ export function ComicTranslationWorkspace({
     if (next) setPage(next.id)
   }
   const selectRegion = (id: string, multiple = false) =>
-    setSelected((previous) =>
+    setSelected(
       multiple
-        ? previous.includes(id)
-          ? previous.filter((item) => item !== id)
-          : [...previous, id]
+        ? selected.includes(id)
+          ? selected.filter((item) => item !== id)
+          : [...selected, id]
         : [id],
     )
   const changeRegion = (next: ComicRegion) => {
@@ -738,6 +738,8 @@ export function ComicTranslationWorkspace({
       </Empty>
     )
   const activePage = page
+  const processingPages = processingComicPages(projectId, jobs)
+  const processingLabel = p('processing')
   const selectedRangeItems = [
     { value: 'current', label: p('current') },
     { value: 'all', label: p('all') },
@@ -832,12 +834,15 @@ export function ComicTranslationWorkspace({
     )
   }
   const canvas = (original: boolean) => (
-    <section className="comic-workflow__image-panel">
-      <div className="comic-workflow__panel-heading">
-        <span className="shrink-0 whitespace-nowrap">
+    <section
+      className="comic-workflow__image-panel"
+      aria-label={original ? p('source') : p('result')}
+    >
+      {view === 'dual' && (
+        <div className="comic-workflow__panel-heading">
           {original ? p('source') : p('result')}
-        </span>
-      </div>
+        </div>
+      )}
       <div
         ref={original ? originalScroll : translatedScroll}
         className="comic-workflow__image-scroll"
@@ -872,6 +877,11 @@ export function ComicTranslationWorkspace({
             projectId={projectId}
             page={activePage}
             original={original}
+            processing={
+              !original && processingPages.has(page.id)
+                ? processingLabel
+                : undefined
+            }
             editable={editing}
             selected={selected}
             tool={tool}
@@ -1723,14 +1733,14 @@ export function ComicTranslationWorkspace({
                       aria-label={p('previousBubble')}
                       disabled={regionIndex <= 0}
                       onClick={() =>
-                        selectRegion(page.regions[regionIndex - 1].id)
+                        selectRegion(visibleRegions[regionIndex - 1].id)
                       }
                     >
                       <ChevronLeft />
                     </Button>,
                   )}
-                  <h2>
-                    {p('bubble')} {regionIndex + 1} / {page.regions.length}
+                  <h2 aria-live="polite">
+                    {p('bubble')} {regionIndex + 1} / {visibleRegions.length}
                   </h2>
                   {iconTooltip(
                     p('nextBubble'),
@@ -1740,10 +1750,10 @@ export function ComicTranslationWorkspace({
                       aria-label={p('nextBubble')}
                       disabled={
                         regionIndex < 0 ||
-                        regionIndex >= page.regions.length - 1
+                        regionIndex >= visibleRegions.length - 1
                       }
                       onClick={() =>
-                        selectRegion(page.regions[regionIndex + 1].id)
+                        selectRegion(visibleRegions[regionIndex + 1].id)
                       }
                     >
                       <ChevronRight />
@@ -1924,7 +1934,7 @@ export function ComicTranslationWorkspace({
                   </TabsContent>
                   <TabsContent value="bubbles">
                     <ol className="comic-workflow__bubble-list">
-                      {page.regions.map((item, index) => (
+                      {visibleRegions.map((item, index) => (
                         <li key={item.id}>
                           <Button
                             variant={
@@ -1947,10 +1957,11 @@ export function ComicTranslationWorkspace({
                             disabled={index === 0}
                             onClick={() => {
                               const regions = [...page.regions]
-                              ;[regions[index - 1], regions[index]] = [
-                                regions[index],
-                                regions[index - 1],
-                              ]
+                              const previous = visibleRegions[index - 1]
+                              const from = regions.indexOf(item)
+                              const to = regions.indexOf(previous)
+                              regions[to] = item
+                              regions[from] = previous
                               saveComicBook({
                                 ...book,
                                 pages: book.pages.map((item) =>
@@ -1975,7 +1986,7 @@ export function ComicTranslationWorkspace({
           <aside className="comic-workflow__thumbnails">
             <h2>{p('overview')}</h2>
             <div className="comic-workflow__thumbnail-list">
-              {book.pages.map((item) => (
+              {book.pages.map((item, index) => (
                 <div
                   key={item.id}
                   className="comic-workflow__thumbnail"
@@ -1984,15 +1995,20 @@ export function ComicTranslationWorkspace({
                   <button
                     type="button"
                     onClick={() => setPage(item.id)}
-                    aria-label={`${p('page')} ${book.pages.indexOf(item) + 1}`}
+                    aria-label={`${p('page')} ${index + 1}${processingPages.has(item.id) ? ` · ${processingLabel}` : ''}`}
                     aria-pressed={page.id === item.id}
                   >
                     <ComicFrontendImage
                       projectId={projectId}
                       page={item}
-                      kind={item.hasRendered ? 'rendered' : 'source'}
+                      kind={
+                        item.hasRendered ? 'rendered' : item.hasClean ? 'clean' : 'source'
+                      }
+                      processing={
+                        processingPages.has(item.id) ? processingLabel : undefined
+                      }
                     />
-                    <span>{book.pages.indexOf(item) + 1}</span>
+                    <span>{index + 1}</span>
                   </button>
                   <label>
                     <Checkbox.Root
@@ -2005,14 +2021,15 @@ export function ComicTranslationWorkspace({
                             : previous.filter((id) => id !== item.id),
                         )
                       }
-                      aria-label={`${p('selectPage')} ${book.pages.indexOf(item) + 1}`}
+                      aria-label={`${p('selectPage')} ${index + 1}`}
                     >
                       <Checkbox.Indicator>
                         <Check />
                       </Checkbox.Indicator>
                     </Checkbox.Root>
                     <span>
-                      {item.hasRendered ? t('suite.jobCompleted') : p('ready')}
+                      {!processingPages.has(item.id) &&
+                        (item.hasRendered ? t('suite.jobCompleted') : p('ready'))}
                     </span>
                   </label>
                 </div>
@@ -2240,7 +2257,11 @@ export function ComicTranslationWorkspace({
                   onChange={setRange}
                 />
                 <div className="comic-workflow__export-summary">
-                  <ComicFrontendImage projectId={projectId} page={page} />
+                  <ComicFrontendImage
+                    projectId={projectId}
+                    page={page}
+                    processing={processingPages.has(page.id) ? processingLabel : undefined}
+                  />
                   <div>
                     <strong>{book.title}</strong>
                     <p>

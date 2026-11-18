@@ -2,6 +2,7 @@
 title: File（文件）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "以简洁的行展示文件，包含文件名、类型与大小等信息。"
 ---
 
 # File（文件）

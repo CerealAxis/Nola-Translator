@@ -2,6 +2,7 @@
 title: 重复
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "同一功能反复出现时，使用相同的名称、外观和操作方式，用户便能认出它们的关系。"
 ---
 
 # 重复

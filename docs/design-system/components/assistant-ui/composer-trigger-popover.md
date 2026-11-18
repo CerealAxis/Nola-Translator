@@ -2,6 +2,7 @@
 title: Composer trigger popover（编辑器触发浮层）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在输入区键入触发字符后，打开可按类别浏览、搜索并选择的弹层。"
 ---
 
 # Composer trigger popover（编辑器触发浮层）

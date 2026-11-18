@@ -51,3 +51,38 @@ it('uses placeholders for the bookshelf and each cover until its image is ready'
   fireEvent.load(image)
   expect(image.parentElement).toHaveAttribute('data-state', 'ready')
 })
+
+it('shows active translation in the reader even before the first result is saved', async () => {
+  const { api, book, changed } = createComicTestBridge(1)
+  const project = book()
+  const [page] = project.pages
+  page.hasRendered = false
+  page.hasClean = false
+  const job = await api.run({
+    projectId: project.id,
+    expectedRevision: project.revision,
+    kind: 'normal',
+    pageIds: [page.id],
+  })
+  job.status = 'running'
+  job.activePageId = page.id
+  vi.spyOn(store, 'getBridge').mockReturnValue({ comic: api } as unknown as NolaBridge)
+  render(<TooltipProvider><ComicTranslationPage api={api} projectId={project.id} /></TooltipProvider>)
+
+  const frame = await screen.findByRole('region', { name: '漫画画布' })
+  expect(frame.querySelector('[data-slot="image-generation"]')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '译图' }))
+  const placeholder = await within(frame).findByRole('status', { name: '处理中' })
+  expect(placeholder).toBeVisible()
+  expect(placeholder).not.toHaveTextContent('处理中')
+  expect(api.image).not.toHaveBeenCalledWith(project.id, page.id, 'rendered', expect.anything())
+
+  await act(async () => {
+    job.status = 'completed'
+    delete job.activePageId
+    page.hasRendered = true
+    changed()
+  })
+  expect(frame.querySelector('[data-slot="image-generation"]')).toBeNull()
+  expect(await within(frame).findByRole('img')).toBeVisible()
+})

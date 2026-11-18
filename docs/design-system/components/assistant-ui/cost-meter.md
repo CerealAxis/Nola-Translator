@@ -2,6 +2,7 @@
 title: Cost meter（费用计量）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "按任务步骤显示本次会话的运行成本，在查看各阶段用量时还能对照累计消耗。"
 ---
 
 # Cost meter（费用计量）

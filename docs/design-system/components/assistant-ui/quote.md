@@ -2,6 +2,7 @@
 title: Quote（引用）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "选择消息中的文字，通过浮动工具条引用，并在输入区预览引用内容。"
 ---
 
 # Quote（引用）

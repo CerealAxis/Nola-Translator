@@ -2,6 +2,7 @@
 title: Map（地图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在回答中呈现地图标记和路线，并提供可选择的地点列表用于定位。"
 ---
 
 # Map（地图）

@@ -2,6 +2,7 @@
 title: Input Group（输入框组合）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "把文字、图标、按钮或说明放入同一输入组，以便在填写前后访问相关操作。"
 ---
 
 # Input Group（输入框组合）

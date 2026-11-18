@@ -2,6 +2,7 @@
 title: Math（数学公式）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在助手回复中显示数学表达式和分步推导，将每个公式与相应的说明对应起来。"
 ---
 
 # Math（数学公式）

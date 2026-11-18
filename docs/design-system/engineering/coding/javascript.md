@@ -1,6 +1,7 @@
 ---
 group: 代码风格
 order: 3
+description: "查看 JavaScript 的代码风格、语言特性、命名与注释规约，以及 ES5 兼容场景的参考。"
 ---
 
 # JavaScript 编码规约

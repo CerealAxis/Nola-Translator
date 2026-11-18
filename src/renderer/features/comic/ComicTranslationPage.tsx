@@ -66,7 +66,12 @@ import type {
   ComicProject,
   ComicProjectSummary,
 } from '../../../shared/comic'
-import { comicApi, useComicImage } from './comic-data'
+import {
+  comicApi,
+  processingComicPages,
+  useComicImage,
+  useComicTasks,
+} from './comic-data'
 import { useComicPrototypeText } from './comic-prototype-copy'
 import { comicErrorMessage } from './comic-errors'
 import { ComicBooksLoading, ComicImage, ComicProjectLoading } from './ComicLoading'
@@ -155,33 +160,35 @@ function BookCover({
 }
 
 function ReaderImage({
-  projectId,
-  page,
-  kind,
   visible,
+  ...props
 }: {
   projectId: string
   page: ComicPage
   kind: 'source' | 'rendered'
   visible: boolean
+  processing?: string
 }) {
   if (!visible) return null
-  return <LoadedReaderImage projectId={projectId} page={page} kind={kind} />
+  return <LoadedReaderImage {...props} />
 }
 function LoadedReaderImage({
   projectId,
   page,
   kind,
+  processing,
 }: {
   projectId: string
   page: ComicPage
   kind: 'source' | 'rendered'
+  processing?: string
 }) {
   const image = useComicImage(
     projectId,
     page,
     kind === 'rendered' && !page.hasRendered && page.hasClean ? 'clean' : kind,
     4_000_000,
+    !processing,
   )
   return (
     <ComicImage
@@ -190,8 +197,56 @@ function LoadedReaderImage({
       failed={image.failed}
       retry={image.retry}
       showStatus
+      processing={processing}
     />
   )
+}
+
+function ComicToolbarValue({ label, value, suffix, onCommit }: {
+  label: string
+  value: number
+  suffix: string
+  onCommit: (value: number) => void
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const input = useRef<HTMLInputElement>(null)
+  const editing = draft !== null
+
+  useLayoutEffect(() => {
+    if (editing) input.current?.select()
+  }, [editing])
+
+  return <Input
+    ref={input}
+    className="comic-toolbar-edit"
+    aria-label={label}
+    type="text"
+    inputMode="numeric"
+    spellCheck={false}
+    value={draft ?? `${value}${suffix}`}
+    onMouseDown={event => {
+      if (event.button === 0 && !editing) {
+        event.preventDefault()
+        event.currentTarget.focus()
+      }
+    }}
+    onFocus={() => setDraft(String(value))}
+    onChange={event => setDraft(event.currentTarget.value)}
+    onBlur={event => {
+      const text = event.currentTarget.value.trim()
+      const number = Number(text)
+      if (editing && /^\d+$/.test(text) && Number.isSafeInteger(number)) onCommit(number)
+      setDraft(null)
+    }}
+    onKeyDown={event => {
+      if (event.key === 'Enter' || event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        if (event.key === 'Escape') event.currentTarget.value = ''
+        event.currentTarget.blur()
+      }
+    }}
+  />
 }
 
 function ComicReader({
@@ -205,6 +260,7 @@ function ComicReader({
 }) {
   const { t } = useI18n(),
     p = useComicPrototypeText()
+  const processingPages = processingComicPages(projectId, useComicTasks())
   const [project, setProject] = useState<ComicProject>()
   const [failed, setFailed] = useState(false)
   const [current, setCurrent] = useState(
@@ -347,7 +403,7 @@ function ComicReader({
               <ToggleGroupItem
                 value="rendered"
                 disabled={
-                  !project.pages.some(
+                  processingPages.size === 0 && !project.pages.some(
                     (item) => item.hasRendered || item.hasClean,
                   )
                 }
@@ -366,22 +422,11 @@ function ComicReader({
               >
                 <Minus />
               </Button>
-              <Input
-                className="comic-toolbar-edit"
-                aria-label={t('suite.comicZoomValue')}
-                type="number"
-                min={10}
-                max={800}
+              <ComicToolbarValue
+                label={t('suite.comicZoomValue')}
                 value={Math.max(10, Math.round(scale * 100))}
-                onChange={(event) => {
-                  if (event.target.value)
-                    setZoom(
-                      Math.min(
-                        8,
-                        Math.max(0.1, event.target.valueAsNumber / 100),
-                      ),
-                    )
-                }}
+                suffix="%"
+                onCommit={value => setZoom(Math.min(8, Math.max(0.1, value / 100)))}
               />
               <Button
                 variant="bare"
@@ -436,18 +481,12 @@ function ComicReader({
               >
                 <ChevronLeft />
               </Button>
-              <Input
-                className="comic-toolbar-edit"
-                type="number"
-                min={1}
-                max={project.pages.length}
+              <ComicToolbarValue
+                label={t('suite.comicJumpToPage')}
                 value={pageIndex + 1}
-                aria-label={t('suite.comicJumpToPage')}
-                onChange={(event) => {
-                  if (event.target.value) jump(event.target.valueAsNumber - 1)
-                }}
+                suffix={`/${project.pages.length}`}
+                onCommit={value => jump(value - 1)}
               />
-              <span className="type-muted">/{project.pages.length}</span>
               <Button
                 variant="bare"
                 size="icon-sm"
@@ -524,6 +563,11 @@ function ComicReader({
                 projectId={projectId}
                 page={item}
                 kind={kind}
+                processing={
+                  kind === 'rendered' && processingPages.has(item.id)
+                    ? p('processing')
+                    : undefined
+                }
                 visible={
                   visible.has(item.id) || Math.abs(index - pageIndex) <= 1
                 }

@@ -2,6 +2,7 @@
 title: Thread list（会话列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "显示已有会话，并支持切换、新建、重命名、归档和删除。页首预览可在运行时版与独立版之间切换。"
 ---
 
 # Thread list（会话列表）

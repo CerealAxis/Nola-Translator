@@ -2,6 +2,7 @@
 title: Message Scroller（消息滚动区）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "聊天滚动容器，支持锚定对话轮次、打开已保存的会话记录、跟随流式回复、无跳动加载历史记录，以及跳转到任意消息。"
 ---
 
 # Message Scroller（消息滚动区）

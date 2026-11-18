@@ -2,6 +2,7 @@
 title: Comparison（比较）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "并排比较选项和各项特征，标出推荐方案，并说明推荐理由。"
 ---
 
 # Comparison（比较）

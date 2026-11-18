@@ -2,6 +2,7 @@
 title: Conference session（会议议程）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "议程卡片介绍分享主题、时间和地点，并为两位讲者提供详情入口。"
 ---
 
 # Conference session（会议议程）

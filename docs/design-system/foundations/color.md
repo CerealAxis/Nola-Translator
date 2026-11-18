@@ -2,6 +2,7 @@
 title: 颜色
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "颜色能够突出重要信息、帮助识别操作，并传达状态。以中性色组织界面，让蓝色承担操作和选择的含义。"
 ---
 
 # 颜色

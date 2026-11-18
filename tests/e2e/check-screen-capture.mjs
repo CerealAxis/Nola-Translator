@@ -4,8 +4,9 @@ import { resolve } from 'node:path'
 import { createRequire } from 'node:module'
 import { app, BrowserWindow, desktopCapturer, ipcMain, nativeImage } from 'electron'
 import { build } from 'esbuild'
+import { startScreenCaptureBackend } from './screen-capture-backend.mjs'
 
-// Real Electron capture, native target tracking and overlay; deterministic test-only OCR/MT.
+// Real Windows screenshots, native target tracking and overlay with deterministic OCR/MT.
 const output = resolve('artifacts/screen-capture')
 await mkdir(output, { recursive: true })
 app.setPath('userData', resolve(output, `cache-${process.pid}`))
@@ -18,10 +19,11 @@ const until = async (condition, label, timeout = 15000) => {
   const started = Date.now()
   while (!await condition()) { if (Date.now() - started > timeout) throw new Error(`Timeout: ${label}`); await wait(50) }
 }
-let service, target, released = 0, captures = 0
+let service, target, captureBackend, released = 0, captures = 0
 const evidence = [], diagnostics = []
 void app.whenReady().then(async () => {
 try {
+  captureBackend = await startScreenCaptureBackend()
   ipcMain.handle('app:get-settings', () => DEFAULT_SETTINGS)
   app.on('web-contents-created', (_event, contents) => contents.on('console-message', details => { if (details.level >= 2) diagnostics.push(details.message) }))
   target = new BrowserWindow({ width: 600, height: 340, x: 120, y: 120, show: true, frame: false, webPreferences: { contextIsolation: true, nodeIntegration: false } })
@@ -33,6 +35,7 @@ try {
   service = new ScreenTranslation({ mainDir: resolve('out/main'), configPath: resolve(output, `config-${process.pid}.json`), settings: () => DEFAULT_SETTINGS,
     gatewaySnapshot: () => ({ state: 'running', availableModels: { mt: [{ binding: 'cloud:google', kind: 'mt', name: 'Test MT', origin: 'cloud', free: true }] } }),
     prepareOcr: async () => () => { released++ },
+    captureScreen: captureBackend.capture,
     inferOcr: async request => {
       const image = nativeImage.createFromDataURL(request.image), { width, height } = image.getSize(), pixels = image.toBitmap()
       assert(width > 100 && height > 100)
@@ -42,26 +45,28 @@ try {
       await wait(500)
       return { width, height, blocks: [{ id: 'fixture', text, confidence: .99, quad: [[10, 10], [280, 10], [280, 50], [10, 50]] }] }
     },
-    inferModel: async request => ({ text: `translated-${request.text}` }), publish: () => {} })
+    inferModel: async request => {
+      if (request.text === 'blue') await wait(300)
+      return { text: `translated-${request.text}` }
+    }, publish: () => {} })
   assert(!(await service.sources()).some(item => item.id === source.id), 'Nola-owned windows are excluded from the user picker')
   await service.configure(screenConfigSchema.parse({ captureMode: 'window', sourceId: source.id, processingMode: 'cascade', model: 'cloud:google', sourceLanguage: 'en', targetLanguage: 'zh', intervalMs: 250 }))
   await service.start(); target.focus()
   await until(() => service.snapshot().blocks.some(block => block.translation === 'translated-red' && !block.hidden), 'real capture and overlay')
-  assert(service.snapshot().visualProbes.length > 0, 'actual rendered glyphs produce visual evidence')
   for (let sample = 0; sample < 20; sample++) {
     await wait(100)
-    assert(service.snapshot().blocks.some(block => block.translation === 'translated-red' && !block.hidden), 'animated background does not withdraw verified text')
+    assert(service.snapshot().blocks.some(block => block.translation === 'translated-red' && !block.hidden), 'repeated OCR does not replace unchanged text')
   }
-  evidence.push({ check: 'continuous 60ms background animation publishes slow 500ms OCR and retains verified glyphs', passed: true })
+  evidence.push({ check: 'animated background with unchanged OCR text preserves the region translation', passed: true })
   assert(captures > 0)
-  assert(service.overlay.isContentProtected())
+  await until(() => !service.overlay.isContentProtected(), 'overlay is recordable between captures')
   assert(!service.overlay.isFocusable())
   assert(service.toolbar.isContentProtected())
-  evidence.push({ check: 'window video capture, owned source exclusion, overlay protection and nonfocus', passed: true, captures })
+  evidence.push({ check: 'window GDI capture, owned source exclusion, temporary overlay protection and nonfocus', passed: true, captures })
   await until(async () => (await service.overlay.webContents.executeJavaScript('document.body.textContent')).includes('translated-red'), 'overlay DOM')
   const changedAt = Date.now()
   await target.webContents.executeJavaScript('clearInterval(window.animation); document.body.style.background="rgb(20,20,180)"; document.body.textContent="Changed text 101"')
-  await until(() => !service.snapshot().blocks.some(block => block.translation === 'translated-red' && !block.hidden), 'stale text withdraws while OCR is pending')
+  await until(() => !service.snapshot().blocks.some(block => block.translation === 'translated-red' && !block.hidden), 'stale text withdraws when OCR commits a new revision')
   const withdrawnMs = Date.now() - changedAt
   await until(async () => !(await service.overlay.webContents.executeJavaScript('document.body.textContent')).includes('translated-red'), 'old text removed from final DOM')
   await until(() => service.snapshot().blocks.some(block => block.translation === 'translated-blue' && !block.hidden), 'new actual captured frame translated')
@@ -80,13 +85,12 @@ try {
   await until(() => target.isFocused(), 'restored target focus')
   await until(() => service.sourceAvailable, 'restored native source is available')
   await wait(300)
-  assert.equal(service.snapshot().status, service.targetForeground ? 'running' : 'waiting')
-  evidence.push({ check: 'native move, stable identity across title changes, minimize and restore foreground gating', passed: true, restoredNativeForeground: service.targetForeground })
+  assert.equal(service.snapshot().status, 'running')
+  evidence.push({ check: 'native move, stable identity across title changes, minimize and restore', passed: true, restoredNativeForeground: service.targetForeground })
   target.destroy(); target = undefined
-  await until(() => service.snapshot().status === 'error' && !service.capture, 'target exit stops capture')
+  await until(() => service.snapshot().status === 'error' && !service.overlay, 'target exit stops capture')
   await service.stop()
   assert.equal(released, 1)
-  assert.equal(service.capture, undefined)
   assert.equal(service.overlay, undefined)
   evidence.push({ check: 'target exit and stop release capture and OCR reservation', passed: true })
   await writeFile(resolve(output, 'report.json'), JSON.stringify({ passed: true, evidence, diagnostics, modelInference: 'deterministic test fixture' }, null, 2))
@@ -96,6 +100,7 @@ try {
   console.error(error); process.exitCode = 1
 } finally {
   await service?.dispose()
+  captureBackend?.close()
   if (target && !target.isDestroyed()) target.destroy()
   app.exit(process.exitCode ?? 0)
 }

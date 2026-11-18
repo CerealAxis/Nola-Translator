@@ -2,6 +2,7 @@
 title: Image（图片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "显示消息里的图像，也可独立预览图像或标记生成来源。"
 ---
 
 # Image（图片）

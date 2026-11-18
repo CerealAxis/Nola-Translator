@@ -2,6 +2,7 @@
 title: Timestamps（时间戳）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在长会话使用日期分隔相邻消息，并通过时间标记查看单条消息的时间。"
 ---
 
 # Timestamps（时间戳）

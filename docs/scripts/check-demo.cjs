@@ -44,14 +44,13 @@ async function main() {
   const until = source => js(`new Promise((resolve, reject) => { const deadline = Date.now() + 15000; const check = () => { if (${source}) resolve(); else if (Date.now() > deadline) reject(new Error(${JSON.stringify(source)})); else setTimeout(check, 50) }; check() })`)
   const settle = () => js('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
   const finishTransitions = () => js(`Promise.all([document, document.querySelector('iframe')?.contentDocument].filter(Boolean).flatMap(doc => doc.getAnimations().filter(animation => animation.effect?.getTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => undefined))))`)
-  const loadDocument = async target => {
-    // Third-party comments must not hold the site's own theme check behind the window load event.
-    win.webContents.stop()
+  const loadDocument = async (target, navigate = () => win.loadURL(target)) => {
+    await until("document.readyState === 'complete'")
     const domReady = new Promise(resolve => win.webContents.once('dom-ready', resolve))
-    void win.loadURL(target).catch(error => { if (error.code !== 'ERR_ABORTED') errors.push(String(error)) })
+    void navigate().catch(error => { if (error.code !== 'ERR_ABORTED' && error.errno !== -3) errors.push(String(error)) })
     let timeout
     try {
-      await Promise.race([domReady, new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error(`DOM readiness timed out: ${target}`)), 15000) })])
+      await Promise.race([domReady, new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error(`DOM readiness timed out: ${target}`)), 30000) })])
     } finally { clearTimeout(timeout) }
   }
   const capture = async name => {
@@ -68,11 +67,55 @@ async function main() {
   }
   try {
     nativeTheme.themeSource = 'light'
-    await win.webContents.session.clearStorageData({ storages: ['localstorage'] })
+    await win.webContents.session.clearStorageData({ storages: ['localstorage', 'cookies'] })
+    const prompt = "document.querySelector('.site-language-prompt')"
+    const languageSelect = `${prompt}.querySelector('[role="combobox"]')`
+    const languageValue = `${languageSelect}.querySelector('[data-slot="select-value"]')`
+    await win.webContents.debugger.sendCommand('Page.enable')
+    const setBrowserLanguage = browserLanguage => win.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', {
+      source: `Object.defineProperty(navigator, 'languages', { configurable: true, value: [${JSON.stringify(browserLanguage)}] })`,
+    })
+    const initialLanguage = await setBrowserLanguage('zh-CN')
     win.setContentSize(1920, 1080)
-    // Enter the detected locale directly; its automatic redirect aborts Electron's initial load promise.
-    await loadDocument(`${url}en/`)
+    const requests = win.webContents.session.webRequest
+    let resumeLanding
+    requests.onBeforeRequest({ urls: [`${url}assets/chunks/LandingPage*.js`] }, (_details, callback) => {
+      resumeLanding = () => callback({})
+    })
+    try {
+      await loadDocument(url)
+      await until("document.querySelector('.site-loading')?.offsetHeight > 0")
+      assert.equal(await js("getComputedStyle(document.querySelector('.site-loading-fallback')).display"), 'none')
+      assert.equal(await js("getComputedStyle(document.querySelector('.site-loader-orbit')).animationName"), 'site-loader-turn')
+      assert.equal(await js("getComputedStyle(document.querySelector('.site-loader-wave i')).animationName"), 'site-loader-wave')
+    } finally {
+      requests.onBeforeRequest(null)
+      resumeLanding?.()
+    }
     await until("document.querySelector('.site-demo-window iframe')?.style.visibility === 'visible'")
+    assert.equal(await js("document.querySelector('.site-loading, .site-loading-fallback')"), null)
+    console.log('PASS: animated homepage loader transitions directly to the interactive homepage')
+    assert.equal(await js('document.documentElement.lang'), 'en')
+    const necessary = "[...document.querySelectorAll('#cc-main button')].find(button => button.textContent.trim() === 'Necessary only')"
+    await until(`Boolean(${necessary})`)
+    const cookieBox = "document.querySelector('#cc-main .cm')"
+    await until(`getComputedStyle(${cookieBox}).visibility === 'visible'`)
+    assert.equal(await js(`Boolean(${prompt})`), false, 'Cookie consent is shown before the language notice')
+    const cookieStyle = await js(`['right', 'bottom', 'backgroundColor', 'borderRadius', 'boxShadow'].map(key => getComputedStyle(${cookieBox})[key])`)
+    await capture('website-cookie-notice')
+    await js(`(${necessary}).click()`)
+    await until(`${prompt}?.lang === 'zh-CN'`)
+    assert.equal(await js(`getComputedStyle(${cookieBox}).visibility`), 'hidden')
+    assert.deepEqual(await js(`['right', 'bottom', 'backgroundColor', 'borderRadius', 'boxShadow'].map(key => getComputedStyle(${prompt})[key])`), cookieStyle)
+    assert.equal(await js(`${languageValue}.textContent.trim()`), '简体中文')
+    assert.ok(await js(`(() => {
+      const [confirm, dismiss] = ${prompt}.querySelectorAll('.site-language-actions button')
+      return confirm.offsetWidth === dismiss.offsetWidth && confirm.getBoundingClientRect().bottom < dismiss.getBoundingClientRect().top
+    })()`), 'language actions use the same stacked layout as the Cookie notice')
+    await capture('website-language-notice-zh-CN')
+    await js(`${prompt}.querySelector('button[data-variant="secondary"]').click()`)
+    await until(`!${prompt}`)
+    await win.webContents.debugger.sendCommand('Page.removeScriptToEvaluateOnNewDocument', { identifier: initialLanguage.identifier })
     assert.ok(await js("document.querySelector('.site-theme') !== null"), 'homepage needs a theme toggle')
     const demo = "document.querySelector('.site-demo-window iframe').contentDocument"
     const sidebar = `${demo}.querySelector('[data-slot=sidebar]')`
@@ -164,7 +207,8 @@ async function main() {
     await js("Object.defineProperty(navigator, 'languages', { configurable: true, value: ['fr-FR'] }); document.querySelector('.site-locale').click()")
     await until("[...document.querySelectorAll('[role=menuitemradio]')].some(item => item.textContent.includes('Auto detect'))")
     await js("[...document.querySelectorAll('[role=menuitemradio]')].find(item => item.textContent.includes('Auto detect')).click()")
-    assert.equal(await js("location.pathname"), '/en/', 'unsupported browser language falls back to English')
+    assert.equal(await js("location.pathname"), '/', 'unsupported browser language keeps the English homepage')
+    assert.equal(await js("document.querySelector('.site-language-prompt')"), null)
     assert.equal(await js("document.querySelector('.site-locale span').textContent"), 'Auto detect')
     const missingPosters = await js(`Promise.all(['zh-CN','zh-TW','zh-HK','en','ja','ko'].flatMap(locale => ['home','workspace','models','overlay-scene','browser-scene'].map(async page => {
       const path = '${url}screenshots/' + locale + '/' + page + '-dark.png';
@@ -175,6 +219,87 @@ async function main() {
       win.setContentSize(...size)
       await geometry(`site dark ${size.join('x')}`)
     }
+
+    await js("localStorage.removeItem('nola-site-language'); sessionStorage.removeItem('nola-language-prompt-dismissed')")
+    const languageDescriptions = {
+      'zh-CN': '想以您的语言查看本页吗？',
+      'zh-TW': '您想要檢視此頁面的 正體中文（繁體）版本嗎？',
+      'zh-HK': '想以您的語言瀏覽此頁嗎？',
+      ko: '한국어로 현재 페이지를 보시겠습니까?',
+      ja: 'このページを日本語で表示しますか?',
+    }
+    for (const [browserLanguage, locale] of [['en-US', 'en'], ['zh-CN', 'zh-CN'], ['zh-Hant-TW', 'zh-TW'], ['zh-Hant-HK', 'zh-HK'], ['ko-KR', 'ko'], ['ja-JP', 'ja']]) {
+      const { identifier } = await setBrowserLanguage(browserLanguage)
+      try {
+        await loadDocument(`${url}?locale-check=${locale}`)
+        await until("document.querySelector('.site-locale')")
+        assert.equal(await js('navigator.languages[0]'), browserLanguage)
+        assert.equal(await js('location.pathname'), '/')
+        assert.equal(await js('document.documentElement.lang'), 'en')
+        if (locale === 'en') assert.equal(await js(`${prompt}?.lang ?? null`), null)
+        else {
+          await until(`${prompt}?.lang === ${JSON.stringify(locale)}`)
+          assert.equal(await js(`${prompt}.querySelector('[data-slot="card-description"]').textContent.trim()`), languageDescriptions[locale])
+          assert.ok(await js(`${languageSelect}.querySelector('svg').getBoundingClientRect().width > 0`))
+        }
+        if (locale === 'ja') {
+          assert.equal(await js(`${prompt}.getAttribute('role')`), 'region')
+          assert.equal(await js(`${prompt}.contains(document.activeElement)`), false)
+          assert.equal(await js(`getComputedStyle(${prompt}).position`), 'fixed')
+          win.webContents.setZoomFactor(2)
+          const checkPromptGeometry = async () => {
+            await geometry('Japanese language notice at 200%')
+            assert.ok(await js(`(() => {
+              const {left, top, right, bottom} = ${prompt}.getBoundingClientRect()
+              return left > 0 && top > 0 && right < innerWidth && bottom < innerHeight
+            })()`))
+          }
+          await checkPromptGeometry()
+          assert.ok(await js(`[...${prompt}.querySelectorAll('.site-language-actions button')].every(button => button.offsetHeight >= 42 && getComputedStyle(button).borderRadius === '18px')`))
+          await capture('website-language-prompt-dark')
+          win.webContents.setZoomFactor(1)
+          await settle()
+          const heroTop = await js("document.querySelector('.site-hero-wordmark').getBoundingClientRect().top")
+          await js(`${prompt}.querySelector('button[data-variant="secondary"]').click()`)
+          await until(`!${prompt} && document.activeElement.classList.contains('site-locale')`)
+          assert.equal(await js("document.querySelector('.site-hero-wordmark').getBoundingClientRect().top"), heroTop)
+          await loadDocument(`${url}?locale-check=dismissed`)
+          await until("document.querySelector('.site-locale')")
+          assert.equal(await js(`${prompt}?.lang ?? null`), null)
+          await js("document.querySelector('.site-theme').click()")
+          await until("!document.documentElement.classList.contains('dark')")
+          await finishTransitions()
+          await js("sessionStorage.removeItem('nola-language-prompt-dismissed')")
+          await loadDocument(`${url}?locale-check=confirmed`)
+          await until(`${prompt}?.lang === 'ja'`)
+          win.webContents.setZoomFactor(2)
+          await checkPromptGeometry()
+          await capture('website-language-prompt-light')
+          win.webContents.setZoomFactor(1)
+          assert.equal(await js(`${languageValue}.textContent.trim()`), '日本語')
+          await js(`${languageSelect}.click()`)
+          const options = "document.querySelector('.site-language-options')"
+          await until(`${options}?.querySelectorAll('[role="option"]').length === 6`)
+          await js(`${options}.querySelector('[role="option"][lang="zh-TW"]').click()`)
+          await until(`!${options} && ${languageValue}.textContent.includes('台灣')`)
+          assert.equal(await js('location.pathname'), '/')
+          assert.equal(await js(`${prompt}.lang`), 'ja')
+          await loadDocument(`${url}zh-TW/`, () => js(`setTimeout(() => ${prompt}.querySelector('button[data-variant="default"]').click(), 50); true`))
+          await until("location.pathname === '/zh-TW/' && document.querySelector('.site-locale')")
+          assert.equal(await js(`${prompt}?.lang ?? null`), null)
+          await loadDocument(`${url}ja/`)
+          await until("location.pathname === '/ja/' && document.querySelector('.site-locale')")
+          assert.equal(await js(`${prompt}?.lang ?? null`), null)
+          await until(`${demo}?.querySelector('[aria-labelledby="nola-home-releases-title"]')?.textContent.includes('リリースのお知らせはありません。')`)
+          await js("document.querySelector('.site-theme').click()")
+          await until("document.documentElement.classList.contains('dark')")
+          await finishTransitions()
+        }
+      } finally {
+        await win.webContents.debugger.sendCommand('Page.removeScriptToEvaluateOnNewDocument', { identifier })
+      }
+    }
+    console.log('PASS: English homepage and localized language suggestions')
     await js("localStorage.setItem('nola-site-language', 'en')")
     await loadDocument(`${url}en/getting-started/`)
     await until("document.querySelector('.VPDoc') && document.documentElement.classList.contains('dark')")
@@ -195,6 +320,62 @@ async function main() {
         [14,20,'400',dark ? 0.28 : 0], [14,20,'600',0]], `product typography preview in ${dark ? 'dark' : 'light'} theme`)
     }
     console.log('PASS: eight product typography styles in both preview themes')
+    win.setContentSize(1440, 960)
+    await loadDocument(`${url}vis/components/shadcn/typography.html`)
+    const preview = '.vitepress-demo-plugin-preview'
+    await until(`document.querySelector('${preview} blockquote') && document.querySelector('.markdown-alert-note .markdown-alert-title svg')`)
+    await until(`[...document.querySelectorAll('${preview}')].every(frame => frame.firstElementChild?.firstElementChild)`)
+    const typography = await js(`(() => {
+      const h1 = getComputedStyle(document.querySelector('${preview} h1'));
+      const quote = getComputedStyle(document.querySelector('${preview} blockquote'));
+      const note = getComputedStyle(document.querySelector('.markdown-alert-note'));
+      const icon = getComputedStyle(document.querySelector('.markdown-alert-note .markdown-alert-title svg'));
+      return [h1.fontSize, h1.webkitTextFillColor, h1.color, h1.backgroundImage,
+        quote.borderInlineStartWidth, quote.backgroundColor, note.borderInlineStartWidth, icon.fill === icon.color];
+    })()`)
+    assert.equal(typography[0], '36px')
+    assert.equal(typography[1], typography[2], 'the preview title uses product text, not the article gradient')
+    assert.deepEqual(typography.slice(3), ['none', '2px', 'rgba(0, 0, 0, 0)', '0px', true])
+    await capture('component-typography')
+    await loadDocument(`${url}vis/components/shadcn/alert-dialog.html`)
+    const trigger = '[data-slot="alert-dialog-trigger"]'
+    const popup = '[data-slot="alert-dialog-content"]'
+    const description = '[data-slot="alert-dialog-description"]'
+    const firstTrigger = `document.querySelector('${preview}')?.querySelector('${trigger}')`
+    await until(firstTrigger)
+    await js(`${firstTrigger}.click()`)
+    await until(`document.querySelector('${popup}')?.checkVisibility()`)
+    for (const dark of [false, true]) {
+      await js(`document.documentElement.classList.toggle('dark', ${dark})`)
+      await finishTransitions()
+      const colorsAndType = await js(`(() => {
+        const root = document.querySelector('${preview}');
+        const portal = document.querySelector('${popup}').closest('[data-base-ui-portal]');
+        const description = document.querySelector('${description}');
+        const probe = document.createElement('span');
+        probe.className = 'text-muted-foreground';
+        root.append(probe);
+        const inlineColor = getComputedStyle(probe).color;
+        probe.remove();
+        const style = getComputedStyle(description);
+        return [getComputedStyle(portal).colorScheme, style.color, inlineColor, style.fontSize,
+          style.lineHeight, style.fontFamily === getComputedStyle(root).fontFamily];
+      })()`)
+      const mutedColor = dark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.65)'
+      assert.deepEqual(colorsAndType, [dark ? 'dark' : 'light', mutedColor, mutedColor, '14px', '20px', true])
+      await capture(`component-alert-dialog-${dark ? 'dark' : 'light'}`)
+    }
+    win.setContentSize(760, 820)
+    win.webContents.setZoomFactor(2)
+    await settle()
+    await finishTransitions()
+    const fits = await js(`(() => {
+      const rect = document.querySelector('${popup}').getBoundingClientRect();
+      return rect.left > 0 && rect.right < innerWidth && rect.top > 0 && rect.bottom < innerHeight;
+    })()`)
+    assert.ok(fits, 'the alert dialog fits a narrow viewport at 200%')
+    await capture('component-alert-dialog-narrow-200')
+    console.log('PASS: component preview colors, popups, typography isolation and callouts')
     assert.deepEqual(errors, [], 'renderer console errors')
     assert.deepEqual(failedRequests, [], 'failed resource requests')
     console.log('PASS: website sidebar, themes, iframe state, contrast, language fallback and responsive layout')
@@ -204,8 +385,7 @@ async function main() {
     await fs.writeFile(path.join(output, 'failure.txt'), JSON.stringify({ error: error.stack ?? String(error), errors, failedRequests, state: await js("({ url: location.href, page: document.querySelector('[data-page]')?.getAttribute('data-page'), buttons: [...document.querySelectorAll('button')].map(item => ({ text: item.textContent.trim(), label: item.getAttribute('aria-label'), disabled: item.disabled })), text: document.body.innerText })").catch(cause => ({ diagnosticError: String(cause) })) }, null, 2))
     throw error
   } finally {
-    win.destroy()
-    app.quit()
+    if (win.webContents.debugger.isAttached()) win.webContents.debugger.detach()
   }
 }
-main().catch(error => { console.error(error); app.exit(1) })
+main().then(() => process.exit(0)).catch(error => { console.error(error); process.exit(1) })

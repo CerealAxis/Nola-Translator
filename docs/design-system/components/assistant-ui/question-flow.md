@@ -2,6 +2,7 @@
 title: Question flow（问答流程）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "按步骤呈现多个问题并收集答案，让用户完成问题流程后统一提交。"
 ---
 
 # Question flow（问答流程）

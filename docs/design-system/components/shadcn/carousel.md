@@ -2,6 +2,7 @@
 title: Carousel（轮播）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "基于 Embla 构建，带动效和滑动手势的轮播。"
 ---
 
 # Carousel（轮播）

@@ -2,6 +2,7 @@
 title: Code diff（代码差异）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在对话中显示统一差异，并区分新增和删除的代码。"
 ---
 
 # Code diff（代码差异）

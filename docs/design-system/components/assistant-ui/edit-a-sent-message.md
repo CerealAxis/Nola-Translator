@@ -2,6 +2,7 @@
 title: Edit a sent message（编辑已发送消息）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "就地编辑已发送消息，并在保存前提示会移除多少条后续回复。"
 ---
 
 # Edit a sent message（编辑已发送消息）

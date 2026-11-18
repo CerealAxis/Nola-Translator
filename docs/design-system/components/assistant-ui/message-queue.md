@@ -2,6 +2,7 @@
 title: Message queue（消息队列）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在回复生成期间查看等待发送的消息，并在轮到某条消息之前取消发送。"
 ---
 
 # Message queue（消息队列）

@@ -20,6 +20,9 @@ import type {
   ComicWorkflow,
 } from '../../../shared/comic'
 
+export const visibleComicRegions = (regions: ComicRegion[] = []) =>
+  regions.filter((region) => !region.ignored)
+
 let books: ComicProject[] = []
 let tasks: ComicTask[] = []
 const listeners = new Set<() => void>()
@@ -326,6 +329,18 @@ export function failedComicPages(id: string, jobs: ComicTask[]) {
   }
   return [...new Set([...failed.values()].flatMap((pages) => [...pages]))]
 }
+export function processingComicPages(id: string, jobs: ComicTask[]) {
+  const pages = new Set<string>()
+  for (const job of jobs) {
+    if (
+      job.bookId === id &&
+      job.activePageId &&
+      (job.status === 'running' || job.status === 'pausing') &&
+      ['normal', 'visual', 'translate', 'erase', 'repair'].includes(job.kind)
+    ) pages.add(job.activePageId)
+  }
+  return pages
+}
 export async function applyComicProof(id: string, jobId: string) {
   await flushComicSaves(id)
   enqueue(id, { action: 'applyProof', jobId })
@@ -546,6 +561,7 @@ export function useComicImage(
   page: ComicPage,
   kind: 'source' | 'clean' | 'rendered',
   maxPixels = 4_000_000,
+  enabled = true,
 ) {
   const { t } = useI18n()
   const key = imageKey(projectId, page, kind, maxPixels)
@@ -561,6 +577,7 @@ export function useComicImage(
     setAttempt((value) => value + 1)
   }
   useEffect(() => {
+    if (!enabled) return
     let active = true
     let notice: string | undefined
     const cached = imageCache.get(key)
@@ -587,7 +604,7 @@ export function useComicImage(
       active = false
       if (notice) dismissNotice(notice)
     }
-  }, [key, projectId, page.id, page.name, kind, maxPixels, attempt, t])
+  }, [key, projectId, page.id, page.name, kind, maxPixels, attempt, t, enabled])
   return {
     src: value.key === key ? value.src ?? imageCache.get(key) : imageCache.get(key),
     failed: value.key === key && value.failed,

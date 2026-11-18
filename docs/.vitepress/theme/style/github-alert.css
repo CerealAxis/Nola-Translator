@@ -16,6 +16,10 @@
   font-weight: 600;
 }
 
+.nola-vis-doc .markdown-alert-title > svg {
+  fill: currentColor;
+}
+
 .vp-doc .markdown-alert-note {
   background: var(--custom-block-note-bg);
 }

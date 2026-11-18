@@ -2,6 +2,7 @@
 title: Orb（球形指示器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用语音圆球呈现实时通话的连接、静音和说话状态，从界面上辨认当前通话阶段。"
 ---
 
 # Orb（球形指示器）

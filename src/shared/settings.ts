@@ -158,23 +158,14 @@ export type RecordingSettings = {
   keepAudio: boolean
 }
 
-export const GLASS_CONTROLS = {
-  glassBlur: { min: 0, max: 36, initial: 18, unit: 'px' },
-  glassOpacity: { min: 35, max: 95, initial: 58, unit: '%' },
-  glassSaturation: { min: 75, max: 200, initial: 165, unit: '%' },
-} as const
-
-export type GlassControl = keyof typeof GLASS_CONTROLS
-
 export const UI_FONTS = ['system', 'Noto Sans SC', 'Noto Sans TC', 'Noto Sans HK', 'Noto Sans JP', 'Noto Sans KR'] as const
 export type UiFont = typeof UI_FONTS[number]
 
-export type AppearancePrefs = Record<GlassControl, number> & {
+export type AppearancePrefs = {
   interfaceFont: UiFont
   density: 'compact' | 'comfortable'
   /** Set on the main window's document by the settings tab, so the caption overlay keeps animating. */
   reduceMotion: boolean
-  liquidGlass: boolean
 }
 
 /**
@@ -408,10 +399,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     interfaceFont: 'system',
     density: 'compact',
     reduceMotion: false,
-    liquidGlass: true,
-    glassBlur: GLASS_CONTROLS.glassBlur.initial,
-    glassOpacity: GLASS_CONTROLS.glassOpacity.initial,
-    glassSaturation: GLASS_CONTROLS.glassSaturation.initial,
   },
   overlay: {
     mode: 'bottom',

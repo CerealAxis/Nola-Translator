@@ -4,18 +4,29 @@
   --doc-shadow: 0 8px 24px color-mix(in srgb, var(--vp-c-text-1) 8%, transparent);
 }
 .VPDoc .content-container { animation: doc-enter var(--doc-motion-duration) ease-out; }
-.vp-doc ::selection { background: var(--vp-c-brand-soft); }
-.vp-doc h2 { transition: color var(--doc-motion-duration); }
-.vp-doc h2:hover { color: var(--vp-c-brand-1); }
-.vp-doc img:not([src*="shields.io"]):not([src$="badge.svg"]) { border-radius: var(--doc-radius); }
-.vp-doc div[class*="language-"] { box-shadow: var(--doc-shadow); }
+.vp-doc :not(:where(.nola-vis-doc .vitepress-demo-plugin-preview *))::selection { background: var(--vp-c-brand-soft); }
+.vp-doc h2:not(:where(.nola-vis-doc .vitepress-demo-plugin-preview *)) {
+  transition: color var(--doc-motion-duration);
+}
+.vp-doc h2:not(:where(.nola-vis-doc .vitepress-demo-plugin-preview *)):hover {
+  color: var(--vp-c-brand-1);
+}
+.vp-doc img:not([src*="shields.io"]):not([src$="badge.svg"]):not(:where(.nola-vis-doc .vitepress-demo-plugin-preview *)) {
+  border-radius: var(--doc-radius);
+}
+.vp-doc div[class*="language-"]:not(:where(.nola-vis-doc .vitepress-demo-plugin-preview *)) {
+  box-shadow: var(--doc-shadow);
+}
 .vp-doc .linkcard { margin: 16px 0; border: 1px solid var(--vp-c-divider); border-radius: var(--doc-radius); }
 .vp-doc .linkcard:hover { background: var(--vp-c-brand-soft); }
 .vp-doc .linkcard .logo img { width: 48px; height: 48px; }
 .VPDoc .nola-doc-meta { color: var(--vp-c-text-3); font-size: 13px; margin-bottom: 16px; font-variant-numeric: tabular-nums; }
 .VPDoc .nola-doc-discussion { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--vp-c-divider); }
 .VPDoc .nola-doc-top { display:block; color:var(--vp-c-text-2); font-size:12px; margin-top:24px; }
-.VPDoc a:focus-visible { outline: 2px solid var(--vp-c-brand-1); outline-offset: 4px; }
+.VPDoc a:not(:where(.nola-vis-doc .vitepress-demo-plugin-preview *)):focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 4px;
+}
 html:has(.VPDoc) .medium-zoom-overlay { z-index: 2147483000; }
 html:has(.VPDoc) .medium-zoom-image--opened { z-index: 2147483001; }
 html:has(.VPDoc) #nprogress .bar { background: var(--vp-c-brand-1); }

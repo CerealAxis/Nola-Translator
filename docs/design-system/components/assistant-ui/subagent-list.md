@@ -2,6 +2,7 @@
 title: Subagent list（子代理列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "汇总并行子代理，显示各自的进度与最终汇总代理。"
 ---
 
 # Subagent list（子代理列表）

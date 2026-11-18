@@ -2,6 +2,7 @@
 title: 深色模式
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "深色模式以较暗的表面呈现界面，在保留内容层次的同时减少明亮背景。浅色与深色应提供同样完整的阅读和操作体验。"
 ---
 
 # 深色模式

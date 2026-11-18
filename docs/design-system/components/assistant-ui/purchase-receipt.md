@@ -2,6 +2,7 @@
 title: Purchase receipt（购买收据）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "购买收据用状态徽标提示完成，并列出商品、数量、预计送达时间和付款信息。"
 ---
 
 # Purchase receipt（购买收据）

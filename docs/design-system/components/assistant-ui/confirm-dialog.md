@@ -2,6 +2,7 @@
 title: Confirm dialog（确认对话框）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "紧凑的确认卡片提示删除不可撤销，并提供确认和取消两项操作。"
 ---
 
 # Confirm dialog（确认对话框）

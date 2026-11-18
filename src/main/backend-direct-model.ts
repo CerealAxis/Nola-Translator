@@ -11,7 +11,8 @@ import type { GatewayWorkerResult } from './model-gateway-worker'
 import { backendError, backendFailure, readBackendFailure } from './backend-error'
 import { resourceSchema } from '../shared/schemas'
 import type { AppSettings } from '../shared/settings'
-import { screenAppearanceSchema, type ScreenOcrRequest, type ScreenOcrResult, type ScreenOcrStatus } from '../shared/screen-translation'
+import { screenBlurPatchSchema, screenCaptureResultSchema, type ScreenCaptureRequest,
+  type ScreenCaptureResult, type ScreenOcrRequest, type ScreenOcrResult, type ScreenOcrStatus } from '../shared/screen-translation'
 import { resolveModelNetwork } from './network-region'
 
 const catalog = z.object({ models: z.array(z.object({
@@ -216,7 +217,7 @@ export async function inferBackendModel(
 const screenOcrResult = z.object({ width: z.number().positive(), height: z.number().positive(), blocks: z.array(z.object({
   id: z.union([z.string(), z.number()]).transform(String), text: z.string().max(64000), confidence: z.number().min(0).max(1),
   quad: z.array(z.tuple([z.number().finite(), z.number().finite()])).length(4),
-  appearance: screenAppearanceSchema.optional(),
+  ink: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), patches: screenBlurPatchSchema.array().max(1).optional(),
 })).max(2048) })
 const screenOcrStatus = z.object({ installed: z.boolean(), state: z.string(),
   progress: z.number().nullish().transform(value => value ?? undefined), error: z.string().nullish().transform(value => value ?? undefined),
@@ -238,6 +239,27 @@ export class BackendScreenOcr {
     settings(): AppSettings
     changed(resource: ResourceRecord): void
   }) {}
+
+  async capture(request: ScreenCaptureRequest, signal: AbortSignal): Promise<ScreenCaptureResult> {
+    const backend = this.options.backend()
+    if (!backend?.ready) throw new Error('backendUnavailable')
+    const response = await fetch(new URL('/api/v2/screen/capture', backend.baseUrl), {
+      method: 'POST',
+      headers: { ...backend.authorizationHeader(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
+    })
+    if (!response.ok) throw new Error('captureFailed')
+    return screenCaptureResultSchema.parse(await response.json())
+  }
+
+  async releaseCapture(sessionId: string): Promise<void> {
+    const backend = this.options.backend()
+    if (!backend?.ready) return
+    await fetch(new URL(`/api/v2/screen/capture/${sessionId}`, backend.baseUrl), {
+      method: 'DELETE', headers: backend.authorizationHeader(), signal: AbortSignal.timeout(2000),
+    })
+  }
 
   private async request(path = '', method = 'GET', body?: unknown, signal?: AbortSignal, resourceId = 'pp-ocrv5-mobile-onnx'): Promise<unknown> {
     await this.options.ensureBackend()

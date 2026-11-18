@@ -117,7 +117,7 @@ def _effective_device(resource_id: str, provider: str) -> str:
 class OcrRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     image: str = Field(min_length=24, max_length=MAX_IMAGE_BYTES * 4 // 3 + 64)
-    appearance: bool = False
+    overlay: bool = False
     task_mode: Literal["realtime", "offline"] = "realtime"
     max_concurrency: int = Field(default=1, ge=1, le=5)
     language: str = Field(default="auto", min_length=1, max_length=32, pattern=r"^[a-zA-Z][a-zA-Z0-9-]*$")
@@ -191,60 +191,61 @@ def decode_image(data_url: str):
     return image
 
 
-def screen_text_appearance(image, quad: list) -> dict:
-    """Repair glyph pixels with OpenCV Telea inpainting; preserve the surrounding screenshot."""
+def _add_overlay_patches(image, blocks):
     import cv2
     import numpy as np
 
-    image_height, image_width = image.shape[:2]
-    points = np.asarray(quad, dtype=np.float32)
-    x, y, width, height = cv2.boundingRect(points)
-    margin = max(3, min(12, min(width, height) // 4))
-    left, top = max(0, x - margin), max(0, y - margin)
-    right, bottom = min(image_width, x + width + margin), min(image_height, y + height + margin)
-    crop = image[top:bottom, left:right].copy()
-    h, w = crop.shape[:2]
-    polygon = np.zeros((h, w), np.uint8)
-    cv2.fillConvexPoly(polygon, np.rint(points - [left, top]).astype(np.int32), 255)
-    ring = crop[polygon == 0]
-    sample = ring if len(ring) else crop.reshape(-1, 3)
-    # Coarse color bins resist anti-aliasing and isolated artwork pixels in the sampling ring.
-    bins = (sample.astype(np.int32) // 16)
-    keys = bins[:, 0] * 256 + bins[:, 1] * 16 + bins[:, 2]
-    dominant = np.bincount(keys, minlength=4096).argmax()
-    background = np.median(sample[keys == dominant], axis=0)
-    distance = np.linalg.norm(crop.astype(np.float32) - background, axis=2)
-    inside = distance[polygon > 0]
-    threshold = float(np.clip(np.percentile(inside, 98) * .45, 25, 60)) if len(inside) else 60
-    ink = (distance > threshold) & (polygon > 0)
-    pixels = crop[ink]
-    color = np.median(pixels, axis=0) if len(pixels) else (255 - background)
     def luminance(bgr):
-        rgb = np.asarray(bgr, dtype=np.float32)[::-1] / 255
-        linear = np.where(rgb <= .04045, rgb / 12.92, ((rgb + .055) / 1.055) ** 2.4)
-        return float(linear @ [.2126, .7152, .0722])
-    bg_luma, fg_luma = luminance(background), luminance(color)
-    if (max(bg_luma, fg_luma) + .05) / (min(bg_luma, fg_luma) + .05) < 4.5:
-        color = np.array([0, 0, 0] if bg_luma > .179 else [255, 255, 255])
-    mask = cv2.dilate(ink.astype(np.uint8) * 255, np.ones((5, 5), np.uint8))
-    if np.count_nonzero(ink) > np.count_nonzero(polygon) * .65:
-        kernel = max(7, min(51, height // 2) | 1)
-        repaired = cv2.GaussianBlur(crop, (kernel, kernel), 0)
-    else:
-        repaired = cv2.inpaint(crop, mask, 3, cv2.INPAINT_TELEA)
-    yy, xx = np.indices((h, w))
-    edge = np.minimum.reduce([xx + 1, yy + 1, w - xx, h - yy])
-    alpha = np.minimum(1, edge / max(1, margin)) * 255
-    patch = cv2.cvtColor(repaired, cv2.COLOR_BGR2BGRA)
-    patch[:, :, 3] = alpha.astype(np.uint8)
-    ok, encoded = cv2.imencode('.png', patch)
-    def hex_color(bgr):
-        return '#' + ''.join(f'{int(v):02x}' for v in np.clip(bgr, 0, 255)[::-1])
-    return {"color": hex_color(color), "background": hex_color(background), "patches": [{
-        "image": "data:image/png;base64," + base64.b64encode(encoded).decode('ascii'),
-        "x": left / image_width, "y": top / image_height,
-        "width": w / image_width, "height": h / image_height,
-    }] if ok else []}
+        rgb = bgr[::-1] / 255
+        linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+        return linear @ [0.2126, 0.7152, 0.0722]
+
+    height, width = image.shape[:2]
+    remaining = 8 * 1024 * 1024
+    for block in blocks:
+        quad = np.asarray(block["quad"], dtype=np.float32)
+        line_height = (np.linalg.norm(quad[3] - quad[0]) + np.linalg.norm(quad[2] - quad[1])) / 2
+        sigma = float(np.clip(line_height * 0.32, 3, 24))
+        x, y, w, h = cv2.boundingRect(quad)
+        halo = round(sigma * 3) + 4
+        left, top = max(0, x - halo), max(0, y - halo)
+        right, bottom = min(width, x + w + halo), min(height, y + h + halo)
+        if right <= left or bottom <= top:
+            continue
+        crop = image[top:bottom, left:right]
+        mask = np.zeros(crop.shape[:2], dtype=np.uint8)
+        cv2.fillConvexPoly(mask, np.rint(quad - [left, top]).astype(np.int32), 255)
+        inside = mask > 0
+        if not inside.any():
+            continue
+        blurred = cv2.GaussianBlur(crop, (0, 0), sigmaX=sigma)
+        feather = cv2.GaussianBlur(cv2.dilate(mask, np.ones((5, 5), np.uint8)), (0, 0), 1)
+        feather[inside] = 255
+
+        # Keep the source foreground when it remains readable over the softened pixels.
+        original, softened = crop[inside].astype(float), blurred[inside].astype(float)
+        difference = np.linalg.norm(original - softened, axis=1)
+        foreground = np.median(original[difference >= np.quantile(difference, 0.9)], axis=0)
+        fg, bg = luminance(foreground), luminance(np.median(softened, axis=0))
+        if (max(fg, bg) + 0.05) / (min(fg, bg) + 0.05) < 4.5:
+            foreground = [255] * 3 if bg < 0.179 else [0] * 3
+
+        patch = cv2.cvtColor(blurred, cv2.COLOR_BGR2BGRA)
+        patch[:, :, 3] = feather
+        rows, cols = np.nonzero(feather)
+        x0, x1, y0, y1 = cols.min(), cols.max() + 1, rows.min(), rows.max() + 1
+        ok, encoded = cv2.imencode(".png", patch[y0:y1, x0:x1])
+        if not ok or encoded.size > 2 * 1024 * 1024:
+            continue
+        remaining -= encoded.size
+        if remaining < 0:
+            break
+        block["ink"] = "#" + "".join(f"{int(round(channel)):02x}" for channel in foreground[::-1])
+        block["patches"] = [{
+            "image": "data:image/png;base64," + base64.b64encode(encoded).decode("ascii"),
+            "x": (left + x0) / width, "y": (top + y0) / height,
+            "width": (x1 - x0) / width, "height": (y1 - y0) / height,
+        }]
 
 
 def ctc_decode(prediction, characters: list[str]) -> tuple[str, float]:
@@ -613,9 +614,8 @@ class ScreenOcr:
         for quad, (text, confidence) in zip(quads, self._recognize_quads(image, quads, directory, request.language, batch_size)):
             if text.strip() and confidence >= 0.5:
                 blocks.append({"id": str(len(blocks)), "text": text, "confidence": round(confidence, 5), "quad": quad.round(2).tolist()})
-        if request.appearance:
-            for block in blocks:
-                block["appearance"] = screen_text_appearance(image, block["quad"])
+        if request.overlay:
+            _add_overlay_patches(image, blocks)
         return {"blocks": blocks, "width": width, "height": height}
 
     async def infer(self, request: OcrRequest) -> dict:
@@ -971,9 +971,9 @@ class MangaOcr(ScreenOcr):
                 if text.strip():
                     block = {'id': str(len(blocks)), 'text': text, 'confidence': confidence,
                              'quad': quad.round(2).tolist()}
-                    if request.appearance:
-                        block['appearance'] = screen_text_appearance(image, block['quad'])
                     blocks.append(block)
+            if request.overlay:
+                _add_overlay_patches(image, blocks)
             return {'blocks': blocks, 'width': image.shape[1], 'height': image.shape[0]}
         return await self._run_inference(request.language, request.max_concurrency,
                                          request.task_mode == 'realtime', recognize)

@@ -1,3 +1,7 @@
+---
+description: "查閱 Nola Translator 幫助文件，按需要找到安裝與模型設定、字幕功能、疑難排解、參與貢獻及軟件協議。"
+---
+
 # 說明文件
 
 這裏存放 Nola Translator 的說明文件。

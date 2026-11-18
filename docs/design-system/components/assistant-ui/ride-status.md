@@ -2,6 +2,7 @@
 title: Ride status（行程状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "行程卡片突出预计抵达时间，并显示车辆、上车地点与司机信息。"
 ---
 
 # Ride status（行程状态）

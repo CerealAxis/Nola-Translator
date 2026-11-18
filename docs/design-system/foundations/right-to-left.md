@@ -2,6 +2,7 @@
 title: 从右到左
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "从右到左的语言需要相应的界面排列。导航、控件和短文本沿界面的阅读方向组织，长段落按自身语言阅读。"
 ---
 
 # 从右到左

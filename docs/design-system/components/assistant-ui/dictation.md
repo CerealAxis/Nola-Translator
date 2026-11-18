@@ -2,6 +2,7 @@
 title: Dictation（语音输入）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在聊天输入框启动语音听写，跟踪录音波形，并将识别结果放回草稿。"
 ---
 
 # Dictation（语音输入）

@@ -2,6 +2,7 @@
 title: Tool timeline（工具时间线）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "沿时间顺序展示工具操作、涉及的目标，以及每一步产生的文件变更统计。"
 ---
 
 # Tool timeline（工具时间线）

@@ -2,6 +2,7 @@
 title: App 图标
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "鲜明、简洁的 App 图标帮助用户在桌面、任务栏、搜索结果和通知中找到应用。同一个图标在不同位置出现时，应保留容易辨认的轮廓和核心图形。"
 ---
 
 # App 图标

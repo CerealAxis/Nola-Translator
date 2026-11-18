@@ -2,13 +2,15 @@
 title: Typography（字体排印）
 pageClass: nola-vis-doc shadcn-base-doc shadcn-typography-doc
 editLink: false
+description: "查看标题、段落、列表和代码等排版样式，以及如何组织文档与界面的文字层级。"
 ---
 
 # Typography（字体排印）
 
 标题、段落、列表等内容的排版样式。
 
-本页展示 shadcn/ui 上游的排版示例。开发 Nola 产品界面时使用[字体排印基础规范](../../foundations/typography)中的八种样式及深浅色规则。
+> [!NOTE]
+> 本页沿用 shadcn/ui 的示例内容，预览应用[字体排印基础规范](../../foundations/typography)中的 Nola 排版样式。
 
 <demo react="shadcn-base/typography-demo.tsx" />
 

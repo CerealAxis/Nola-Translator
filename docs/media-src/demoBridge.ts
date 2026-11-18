@@ -162,6 +162,7 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
     app: {
       showWorkspace: async () => onWorkspace(),
       openDefaultBrowser: async () => { location.hash = '#/video-captions' },
+      listRecentReleases: async () => [],
       checkLatestRelease: async () => ({ currentVersion: 'Demo', latestVersion: null, updateAvailable: false, releaseName: null, releaseNotes: '', releaseUrl: null }),
       openReleasePage: done,
     },

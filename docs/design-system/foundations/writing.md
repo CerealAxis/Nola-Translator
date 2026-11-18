@@ -2,6 +2,7 @@
 title: 编写
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "文字帮助用户认出内容、判断下一步并从错误中恢复。开始写之前先看页面里的操作顺序，再决定标题、标签和说明各自承担什么。"
 ---
 
 # 编写

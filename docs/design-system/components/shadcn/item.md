@@ -2,6 +2,7 @@
 title: Item（条目）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在一行内排列媒体、标题、描述和相关操作，按需要组合成信息列表。"
 ---
 
 # Item（条目）

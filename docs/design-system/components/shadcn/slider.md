@@ -2,6 +2,7 @@
 title: Slider（滑块）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在给定范围内拖动或使用键盘调整数值，适用于需要直观调节的设置。"
 ---
 
 # Slider（滑块）

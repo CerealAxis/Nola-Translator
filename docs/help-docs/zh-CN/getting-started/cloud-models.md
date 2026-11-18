@@ -1,3 +1,7 @@
+---
+description: "查看 Nola Translator 云端语音识别和机器翻译的模型配置方式，了解服务入口和使用时的资源要求。"
+---
+
 # 云端模型配置
 
 > [!WARNING]  

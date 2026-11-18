@@ -2,6 +2,7 @@
 title: Onboarding（首次引导）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "通过分步引导介绍聊天界面的常用功能，让用户完成引导后进入会话。"
 ---
 
 # Onboarding（首次引导）

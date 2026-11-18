@@ -2,6 +2,7 @@
 title: Geo map（地理地图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "根据坐标绘制瓦片地图和路线，并提供可访问的地点列表。"
 ---
 
 # Geo map（地理地图）

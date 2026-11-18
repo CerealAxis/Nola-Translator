@@ -2,6 +2,7 @@
 title: Sources（来源）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "为回答引用的网页与文档展示来源标签或卡片，便于识别并打开原始资料。"
 ---
 
 # Sources（来源）

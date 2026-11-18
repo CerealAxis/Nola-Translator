@@ -1470,6 +1470,8 @@ if (!hasSingleInstanceLock) {
       gatewaySnapshot: () => gateway!.snapshot(),
       getMainWindow: () => mainWindow,
       prepareOcr: async () => gateway!.acquireOcr(), inferOcr: (request, signal) => gateway!.inferOcr(request, signal),
+      captureScreen: (request, signal) => screenOcr!.capture(request, signal),
+      releaseScreenCapture: sessionId => screenOcr!.releaseCapture(sessionId),
       settings: () => settings.current(), inferModel: (request, signal) => gateway!.infer(request, signal), activity,
       publish: snapshot => {
         for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) {

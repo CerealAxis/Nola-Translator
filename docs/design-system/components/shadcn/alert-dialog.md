@@ -2,6 +2,7 @@
 title: Alert Dialog（警告对话框）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用重要内容打断用户操作，并要求用户作出回应的模态对话框。"
 ---
 
 # Alert Dialog（警告对话框）

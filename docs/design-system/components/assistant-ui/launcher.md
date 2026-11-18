@@ -2,6 +2,7 @@
 title: Launcher（启动器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "将聊天入口折叠为浮动按钮，打开后展示建议和开始操作。"
 ---
 
 # Launcher（启动器）

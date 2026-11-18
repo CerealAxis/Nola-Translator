@@ -2,6 +2,7 @@
 title: Drawer（抽屉）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用抽屉从页面边缘展开补充内容或操作，查看方向、关闭方式和与表单组合的示例。"
 ---
 
 # Drawer（抽屉）

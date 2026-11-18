@@ -2,6 +2,7 @@
 title: Job progress（任务进度）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "跟踪分阶段任务的实时进度，并在结束后显示结果回执。"
 ---
 
 # Job progress（任务进度）

@@ -2,6 +2,7 @@
 title: 巧用过渡
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "内容出现、消失或改变时，过渡能引导视线。其余内容留在原处，给用户一个参照。"
 ---
 
 # 巧用过渡

@@ -2,6 +2,7 @@
 title: Thinking indicator（思考指示器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在助手回复之前提示当前处理步骤，可附上已用时间以说明任务仍在进行。"
 ---
 
 # Thinking indicator（思考指示器）

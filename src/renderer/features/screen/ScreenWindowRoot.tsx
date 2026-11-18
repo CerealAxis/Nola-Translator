@@ -6,11 +6,10 @@ import { Badge } from '@/components/ui/badge'
 import { ShortcutKeys } from '@/components/primitives/ShortcutKeys'
 import { EDITOR_SHORTCUT_DEFAULTS, matchesShortcut, shortcutFromEvent } from '../../../shared/keyboard-shortcuts'
 import { cn } from '@/lib/utils'
-import { MAX_SCREEN_REGIONS, type ScreenFrame, ScreenRegion, ScreenSnapshot, ScreenTranslationBridge, ScreenWindowBootstrap } from '../../../shared/screen-translation'
+import { MAX_SCREEN_REGIONS, type ScreenRegion, type ScreenSnapshot, type ScreenTranslationBridge, type ScreenWindowBootstrap } from '../../../shared/screen-translation'
 import { drawnRegion, movedRegion, resizeRegionEdge } from './region-geometry'
-import { layoutScreenOverlay, visibleScreenBlocks, type OverlayLayout } from './overlay-layout'
+import { layoutScreenOverlay, type OverlayLayout } from './overlay-layout'
 import { ScreenToolbar } from './ScreenToolbar'
-import { matchesScreenTextProbe } from '../../../shared/screen-visual-probe'
 import type { GameTranslationBridge } from '../../../shared/game-translation'
 import { GameOverlay } from '../game/GameOverlay'
 
@@ -31,77 +30,10 @@ function ScreenSurface({ api }: { api: ScreenTranslationBridge }) {
     return () => { active = false; dispose() }
   }, [api])
   if (!bootstrap || !snapshot) return null
-  if (bootstrap.role === 'capture') return <ScreenCapture api={api} snapshot={snapshot} />
   if (bootstrap.role === 'editor') return <ScreenRegionEditor api={api} snapshot={snapshot} />
   if (bootstrap.role === 'toolbar') return <ScreenToolbar api={api} snapshot={snapshot} />
   if (bootstrap.role === 'regions') return <div className="screen-region-highlights">{snapshot.config.regions.map(region => <div key={region.id} style={{ left: `${region.x * 100}%`, top: `${region.y * 100}%`, width: `${region.width * 100}%`, height: `${region.height * 100}%` }} />)}</div>
   return <ScreenOverlay snapshot={snapshot} />
-}
-
-function ScreenCapture({ api, snapshot }: { api: ScreenTranslationBridge; snapshot: ScreenSnapshot }) {
-  const current = useRef(snapshot)
-  current.current = snapshot
-  useEffect(() => {
-    let regionOffset = 0
-    let observationOffset = 0
-    let nextOcrAt = 0
-    let disposed = false, stream: MediaStream | undefined, timer: ReturnType<typeof setTimeout> | undefined
-    const video = document.createElement('video')
-    video.muted = true
-    const canvas = document.createElement('canvas')
-    const context = canvas.getContext('2d', { willReadFrequently: true })!
-    const capture = async () => {
-      if (disposed) return
-      const state = current.current
-      try {
-        if (video.videoWidth && video.videoHeight && state.status === 'running') {
-          const frame: ScreenFrame = { sessionId: state.sessionId, epoch: state.epoch, width: video.videoWidth, height: video.videoHeight, regions: [], observed: [], checked: [] }
-          const encode = performance.now() >= nextOcrAt
-          if (encode) nextOcrAt = performance.now() + state.config.intervalMs
-          let bytes = 0
-          const regions = state.captureRegions ?? state.config.regions
-          const count = regions.length
-          for (let index = 0; index < Math.min(count, 8); index++) {
-            const region = regions[((encode ? regionOffset : observationOffset) + index) % count]
-            const sx = Math.floor(region.x * video.videoWidth), sy = Math.floor(region.y * video.videoHeight)
-            const sw = Math.max(1, Math.floor(region.width * video.videoWidth)), sh = Math.max(1, Math.floor(region.height * video.videoHeight))
-            const scale = Math.min(1, 1920 / sw, 1080 / sh)
-            canvas.width = Math.max(1, Math.round(sw * scale)); canvas.height = Math.max(1, Math.round(sh * scale))
-            context.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
-            const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
-            const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', pixels))
-            const hash = [...digest].map(byte => byte.toString(16).padStart(2, '0')).join('')
-            frame.observed!.push({ regionId: region.id, hash })
-            for (const probe of state.visualProbes ?? []) if (probe.regionId === region.id) {
-              frame.checked!.push({ id: probe.id, matches: matchesScreenTextProbe({ data: pixels, width: canvas.width, height: canvas.height }, probe) })
-            }
-            if (!encode) continue
-            const image = canvas.toDataURL('image/png')
-            if (bytes + image.length > 32 * 1024 * 1024 && frame.regions.length) break
-            bytes += image.length
-            frame.regions.push({ regionId: region.id, hash, image })
-          }
-          if (encode) regionOffset = count ? (regionOffset + frame.regions.length) % count : 0
-          else observationOffset = count ? (observationOffset + Math.min(count, 8)) % count : 0
-          // Observations keep invalidating stale overlays while OCR is still running.
-          if (!disposed) void api.frame(frame).catch(() => { if (!disposed) void api.captureError().catch(() => {}) })
-        }
-      } catch { if (!disposed) await api.captureError().catch(() => {}) }
-      finally { if (!disposed) timer = setTimeout(() => { void capture() }, 100) }
-    }
-    void (async () => {
-      try {
-        stream = await navigator.mediaDevices.getDisplayMedia({ audio: false, video: { frameRate: { ideal: 10, max: 10 } } })
-        if (disposed) { stream.getTracks().forEach(track => track.stop()); return }
-        stream.getVideoTracks()[0]?.addEventListener('ended', () => { if (!disposed) void api.captureError().catch(() => {}) })
-        video.srcObject = stream
-        await video.play()
-        await capture()
-      } catch { if (!disposed) await api.captureError().catch(() => {}) }
-    })()
-    return () => { disposed = true; if (timer) clearTimeout(timer); stream?.getTracks().forEach(track => track.stop()); video.pause(); video.srcObject = null }
-  }, [api, snapshot.config.sourceId])
-  return null
 }
 
 type Drag = { id: string; pointerId: number; kind: 'draw' | 'move' | 'resize'; edge?: string; start: { x: number; y: number }; original?: ScreenRegion }
@@ -190,16 +122,23 @@ function ScreenOverlay({ snapshot }: { snapshot: ScreenSnapshot }) {
     }
     update(); window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
-  }, [blocks, config.fontSize, config.showSource])
+  }, [blocks, config.fontSize, config.showSource, snapshot.captureRegions, config.regions])
   return <div className="screen-overlay" data-slot="screen-overlay" aria-hidden="true">
-    {snapshot.status === 'running' && visibleScreenBlocks(blocks).filter(block => !block.appearancePending).flatMap(block => block.appearance?.patches ?? []).map((patch, index) => <img key={index} className="screen-overlay__patch" src={patch.image} alt="" style={{ left: `${patch.x * 100}%`, top: `${patch.y * 100}%`, width: `${patch.width * 100}%`, height: `${patch.height * 100}%`, opacity: config.opacity }} />)}
-    {snapshot.status === 'running' && layout.map(block => <div key={block.id} className="screen-overlay__block" data-overflow={block.overflow || undefined}
-      style={{ left: block.x, top: block.y, width: block.width, height: block.height,
-        '--screen-font-size': `${block.fontSize}px`, '--screen-opacity': `${config.opacity * 100}%`, '--screen-text-padding': `${block.padding}px`,
-      } as CSSProperties}>
-      <div className="screen-overlay__text" style={{ color: blocks.find(item => item.id === block.id)?.appearancePending ? 'var(--foreground)' : blocks.find(item => item.id === block.id)?.appearance?.color, background: blocks.find(item => item.id === block.id)?.appearancePending ? 'var(--surface)' : blocks.find(item => item.id === block.id)?.appearance?.patches.length ? 'transparent' : blocks.find(item => item.id === block.id)?.appearance?.background, width: block.textWidth, height: block.textHeight, transform: `translate(-50%, -50%) rotate(${block.angle}deg)` }}>
-        <p lang={config.targetLanguage} dir="auto">{block.text}</p>
-      </div>
-    </div>)}
+    {snapshot.status === 'running' && <>
+      {layout.flatMap(block => block.patches?.map((patch, index) => <img key={`${block.id}:${index}`}
+        className="screen-overlay__blur" alt="" src={patch.image} style={{
+          left: `${patch.x * 100}%`, top: `${patch.y * 100}%`, width: `${patch.width * 100}%`,
+          height: `${patch.height * 100}%`, opacity: config.opacity,
+        }} />) ?? [])}
+      {layout.map(block => <div key={block.id} className="screen-overlay__block" data-overflow={block.overflow || undefined}
+        style={{ left: block.x, top: block.y, width: block.width, height: block.height, color: block.ink,
+          '--screen-font-size': `${block.fontSize}px`, '--screen-text-padding': `${block.padding}px`,
+        } as CSSProperties}>
+        <div className="screen-overlay__text" style={{ width: block.textWidth, height: block.textHeight,
+          transform: `translate(-50%, -50%) rotate(${block.angle}deg)` }}>
+          <p lang={config.targetLanguage} dir="auto">{block.text}</p>
+        </div>
+      </div>)}
+    </>}
   </div>
 }

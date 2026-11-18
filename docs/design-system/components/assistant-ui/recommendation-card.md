@@ -2,6 +2,7 @@
 title: Recommendation card（建议卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在对话里提出建议，解释理由，并允许用户接受或查看备选项。"
 ---
 
 # Recommendation card（建议卡片）

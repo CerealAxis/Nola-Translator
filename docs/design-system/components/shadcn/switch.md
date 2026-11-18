@@ -2,6 +2,7 @@
 title: Switch（即时开关）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "通过开关控制二元设置，并直接显示该设置当前开启还是关闭。"
 ---
 
 # Switch（即时开关）

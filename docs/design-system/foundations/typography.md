@@ -2,6 +2,7 @@
 title: 字体排印
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "桌面端、浏览器扩展和产品组件预览使用八种文字样式。页面标题、分区标题和嵌套标题分别表达内容层级。同一页的窗口栏、侧栏和操作按钮使用 Body。"
 ---
 
 # 字体排印

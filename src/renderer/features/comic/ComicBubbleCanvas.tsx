@@ -11,6 +11,7 @@ import {
   comicSaving,
   comicTextQuad,
   comicWithTextQuad,
+  visibleComicRegions,
 } from './comic-data'
 import { validComicQuad } from '../../../shared/comic'
 import { useComicPrototypeText } from './comic-prototype-copy'
@@ -24,6 +25,7 @@ interface CanvasProps {
   page: ComicPage
   original?: boolean
   editable?: boolean
+  processing?: string
   selected: string[]
   tool?: ComicCanvasTool
   brushSize?: number
@@ -45,6 +47,7 @@ export function ComicBubbleCanvas({
   page,
   original = false,
   editable = false,
+  processing,
   selected,
   tool = 'select',
   brushSize = 24,
@@ -112,7 +115,7 @@ export function ComicBubbleCanvas({
         : page.hasClean
           ? 'clean'
           : 'source'
-  const image = useComicImage(projectId, page, kind)
+  const image = useComicImage(projectId, page, kind, undefined, !processing)
   const [points, setPoints] = useState<[number, number][]>([])
   const point = (event: PointerEvent): [number, number] => {
     const rect = root.current!.getBoundingClientRect()
@@ -289,7 +292,7 @@ export function ComicBubbleCanvas({
     setDraft(null)
     setPoints([])
   }
-  const regions = page.regions.map((region) =>
+  const regions = visibleComicRegions(page.regions).map((region) =>
     draft?.id === region.id ? draft : region,
   )
   if (draft?.id === 'drawing') regions.push(draft)
@@ -310,6 +313,7 @@ export function ComicBubbleCanvas({
         failed={image.failed}
         retry={image.retry}
         showStatus
+        processing={processing}
       />
       {!original && (
         <svg
@@ -330,9 +334,8 @@ export function ComicBubbleCanvas({
           )}
         </svg>
       )}
-      {regions
-        .filter((region) => editable && !region.ignored)
-        .map((region, index) => (
+      {editable &&
+        regions.map((region, index) => (
           <button
             key={region.id}
             type="button"
@@ -431,18 +434,21 @@ export function ComicFrontendImage({
   projectId,
   page,
   kind = 'rendered',
+  processing,
 }: {
   projectId: string
   page: ComicPage
   kind?: 'source' | 'clean' | 'rendered'
+  processing?: string
 }) {
-  const image = useComicImage(projectId, page, kind, 400_000)
+  const image = useComicImage(projectId, page, kind, 400_000, !processing)
   return (
     <ComicImage
       src={image.src}
       alt={page.name}
       failed={image.failed}
       aspectRatio={`${page.width} / ${page.height}`}
+      processing={processing}
     />
   )
 }

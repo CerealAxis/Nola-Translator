@@ -22,6 +22,22 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); detachSettingsStore(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
+it('shows proxy scope switches only when a proxy address is configured', () => {
+  const labels = ['将代理应用到 Pip', '将代理应用到模型下载', '将代理应用到组件下载']
+  const { rerender } = render(<GeneralTab settings={DEFAULT_SETTINGS} />)
+
+  for (const label of labels) expect(screen.queryByRole('switch', { name: label })).not.toBeInTheDocument()
+
+  rerender(<GeneralTab settings={{ ...DEFAULT_SETTINGS, network: {
+    ...DEFAULT_SETTINGS.network, proxyUrl: 'http://127.0.0.1:7890', proxyForPip: true,
+  } }} />)
+  for (const label of labels) expect(screen.getByRole('switch', { name: label })).toBeEnabled()
+  expect(screen.getByRole('switch', { name: labels[0] })).toBeChecked()
+
+  rerender(<GeneralTab settings={{ ...DEFAULT_SETTINGS, network: { ...DEFAULT_SETTINGS.network, proxyUrl: '  ' } }} />)
+  for (const label of labels) expect(screen.queryByRole('switch', { name: label })).not.toBeInTheDocument()
+})
+
 it('reuses device results when the compute tab is opened again', () => {
   settingsStore.setState({ settings: DEFAULT_SETTINGS, loaded: true, computeSnapshot: { devices: [], notes: [], torchVersion: '', activePlan: null } })
   const runtime = vi.spyOn(settingsActions, 'loadRuntimeComponents')

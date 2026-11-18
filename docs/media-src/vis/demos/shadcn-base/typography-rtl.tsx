@@ -141,16 +141,16 @@ export function TypographyRtl() {
 
   return (
     <div dir={dir}>
-      <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight text-balance">
+      <h1 className="scroll-m-20 type-h1 text-balance">
         {t.title}
       </h1>
-      <p className="text-xl text-muted-foreground [&:not(:first-child)]:mt-6">
+      <p className="type-muted [&:not(:first-child)]:mt-6">
         {t.leadParagraph}
       </p>
-      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0">
+      <h2 className="mt-10 scroll-m-20 border-b pb-2 type-h2 transition-colors first:mt-0">
         {t.kingsPlan}
       </h2>
-      <p className="leading-7 [&:not(:first-child)]:mt-6">
+      <p className="type-body [&:not(:first-child)]:mt-6">
         {t.kingThought}{" "}
         <a
           href="#"
@@ -160,13 +160,13 @@ export function TypographyRtl() {
         </a>
         {t.taxJokes}
       </p>
-      <blockquote className="mt-6 border-s-2 ps-6 italic">
+      <blockquote className="mt-6 border-s-2 border-border ps-6 type-body italic">
         {t.blockquote}
       </blockquote>
-      <h3 className="mt-8 scroll-m-20 text-2xl font-semibold tracking-tight">
+      <h3 className="mt-8 scroll-m-20 type-h3">
         {t.jokeTax}
       </h3>
-      <p className="leading-7 [&:not(:first-child)]:mt-6">
+      <p className="type-body [&:not(:first-child)]:mt-6">
         {t.subjectsNotAmused}
       </p>
       <ul className="my-6 ms-6 list-disc [&>li]:mt-2">
@@ -174,16 +174,16 @@ export function TypographyRtl() {
         <li>{t.level2}</li>
         <li>{t.level3}</li>
       </ul>
-      <p className="leading-7 [&:not(:first-child)]:mt-6">{t.stoppedTelling}</p>
-      <h3 className="mt-8 scroll-m-20 text-2xl font-semibold tracking-tight">
+      <p className="type-body [&:not(:first-child)]:mt-6">{t.stoppedTelling}</p>
+      <h3 className="mt-8 scroll-m-20 type-h3">
         {t.jokestersRevolt}
       </h3>
-      <p className="leading-7 [&:not(:first-child)]:mt-6">{t.sneaking}</p>
-      <p className="leading-7 [&:not(:first-child)]:mt-6">{t.discovered}</p>
-      <h3 className="mt-8 scroll-m-20 text-2xl font-semibold tracking-tight">
+      <p className="type-body [&:not(:first-child)]:mt-6">{t.sneaking}</p>
+      <p className="type-body [&:not(:first-child)]:mt-6">{t.discovered}</p>
+      <h3 className="mt-8 scroll-m-20 type-h3">
         {t.peoplesRebellion}
       </h3>
-      <p className="leading-7 [&:not(:first-child)]:mt-6">{t.uplifted}</p>
+      <p className="type-body [&:not(:first-child)]:mt-6">{t.uplifted}</p>
       <div className="my-6 w-full overflow-y-auto">
         <table className="w-full">
           <thead>
@@ -212,8 +212,8 @@ export function TypographyRtl() {
           </tbody>
         </table>
       </div>
-      <p className="leading-7 [&:not(:first-child)]:mt-6">{t.realized}</p>
-      <p className="leading-7 [&:not(:first-child)]:mt-6">{t.moral}</p>
+      <p className="type-body [&:not(:first-child)]:mt-6">{t.realized}</p>
+      <p className="type-body [&:not(:first-child)]:mt-6">{t.moral}</p>
     </div>
   )
 }

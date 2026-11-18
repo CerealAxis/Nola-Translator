@@ -2,6 +2,7 @@
 title: Calendar（日历）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用日历组件呈现日期和月份，并按需要启用单日选择或日期范围选择。"
 ---
 
 # Calendar（日历）

@@ -2,6 +2,7 @@
 title: Terminal block（终端输出块）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在会话中逐行展示终端输出，命令结束后在同一面板标明退出状态。"
 ---
 
 # Terminal block（终端输出块）

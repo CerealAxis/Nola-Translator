@@ -2,6 +2,7 @@
 title: 操作名称
 pageClass: nola-vis-doc nola-vis-writing
 editLink: false
+description: "用户应能从名称预判操作结果。按钮写动作，菜单和链接说明将打开的内容，确认操作写清影响的对象。"
 ---
 
 # 操作名称

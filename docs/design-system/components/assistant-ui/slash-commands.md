@@ -2,6 +2,7 @@
 title: Slash commands（斜杠命令）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在聊天输入框键入斜杠打开命令列表，查找可用命令并在当前会话中执行。"
 ---
 
 # Slash commands（斜杠命令）

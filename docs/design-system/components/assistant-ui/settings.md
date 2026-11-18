@@ -2,6 +2,7 @@
 title: Settings（设置）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在助手设置面板集中查看聊天偏好、功能开关和模型选择。"
 ---
 
 # Settings（设置）

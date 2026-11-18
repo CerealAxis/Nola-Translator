@@ -2,6 +2,7 @@
 title: Link preview（链接预览）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用紧凑卡片显示链接标题和摘要，便于决定是否打开。"
 ---
 
 # Link preview（链接预览）

@@ -7,7 +7,7 @@ import { useIsomorphicLayoutEffect } from "../utils/useIsomorphicLayoutEffect";
 
 export const paper = "bg-card text-card-foreground ring-1 ring-foreground/10 forced-colors:border";
 
-export const floating = "nola-glass-popup bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/5 dark:ring-foreground/10";
+export const floating = "nola-popup-surface bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/5 dark:ring-foreground/10";
 
 export const field =
   "bg-muted forced-colors:border";

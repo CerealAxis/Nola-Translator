@@ -2,6 +2,7 @@
 title: Message（消息）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在会话中显示消息，支持可选头像、顶部与底部区域以及对齐方式。"
 ---
 
 # Message（消息）

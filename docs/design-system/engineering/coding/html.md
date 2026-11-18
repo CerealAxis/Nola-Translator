@@ -1,6 +1,7 @@
 ---
 group: 代码风格
 order: 1
+description: "查看 HTML 的缩进、属性、语义结构、表单与图片可访问性等编码要求。"
 ---
 
 # HTML 编码规约

@@ -2,6 +2,7 @@
 title: Table reservation（餐桌预订）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "餐桌预订表单收集姓名、人数、日期、座位偏好和提醒选项，并通过卡片的确认操作提交。"
 ---
 
 # Table reservation（餐桌预订）

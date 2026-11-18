@@ -2,6 +2,7 @@
 title: Loader（加载指示器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在助手生成第一段内容前，用九宫格动画和状态文案提示用户正在等待。"
 ---
 
 # Loader（加载指示器）

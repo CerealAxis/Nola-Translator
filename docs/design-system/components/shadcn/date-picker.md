@@ -2,6 +2,7 @@
 title: Date Picker（日期选择器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "组合弹出层与日历，为表单提供单个日期、日期范围和常用预设。"
 ---
 
 # Date Picker（日期选择器）

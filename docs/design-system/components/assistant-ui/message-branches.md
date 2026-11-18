@@ -2,6 +2,7 @@
 title: Message branches（消息分支）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在同一条消息的多个生成版本间切换，同时保留阅读位置。"
 ---
 
 # Message branches（消息分支）

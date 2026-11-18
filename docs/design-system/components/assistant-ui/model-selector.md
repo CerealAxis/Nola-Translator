@@ -2,6 +2,7 @@
 title: Model selector（模型选择器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "从分组模型中选择当前模型，支持搜索、能力说明和推理强度。"
 ---
 
 # Model selector（模型选择器）

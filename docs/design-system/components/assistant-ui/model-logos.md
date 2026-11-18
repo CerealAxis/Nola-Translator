@@ -2,6 +2,7 @@
 title: Model logos（模型标志）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "为模型选项提供供应商的 SVG 标志，也可单独渲染这些标志。"
 ---
 
 # Model logos（模型标志）

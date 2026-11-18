@@ -2,12 +2,14 @@
 title: Button（按钮）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "查看 Nola Translator 中按钮的样式、尺寸、图标、加载和禁用状态，以及如何通过按钮触发操作。"
 ---
 
 # Button（按钮）
 
 显示按钮或外观类似按钮的组件。
 
+> [!NOTE]
 > **Nola 产品使用限制**：本页保留通用 shadcn/ui 能力介绍，实际开发以 [DESIGN.md](../../DESIGN) 和本地 `src/renderer/components/ui/button.tsx` 为准。产品按钮统一使用 18px 圆角，浅深色与所有尺寸一致；文字使用 Body，尺寸与密度不改变字号。产品不开放 `ghost`，不使用全圆角按钮。下文涉及这些能力的通用示例不属于产品推荐用法。
 
 <demo react="shadcn-base/button-demo.tsx" />

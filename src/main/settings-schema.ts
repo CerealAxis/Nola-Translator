@@ -7,19 +7,8 @@ import { LANGUAGE_CODES } from '../shared/languages'
 import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from '../shared/pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { computeSettingsPatchSchema } from '../shared/compute'
-import { GLASS_CONTROLS, REALTIME_S2S_MODELS, RECOGNITION_MODEL_IDS, UI_FONTS, type GlassControl } from '../shared/settings'
+import { REALTIME_S2S_MODELS, RECOGNITION_MODEL_IDS, UI_FONTS } from '../shared/settings'
 import { meetingModeSettingsSchema } from '../shared/meeting-mode'
-
-function glassControlSchema(key: GlassControl) {
-  const { min, max } = GLASS_CONTROLS[key]
-  return z.number().int().min(min).max(max)
-}
-
-export const glassSettingsShape = {
-  glassBlur: glassControlSchema('glassBlur'),
-  glassOpacity: glassControlSchema('glassOpacity'),
-  glassSaturation: glassControlSchema('glassSaturation'),
-}
 
 export const desktopTypographyShape = {
   interfaceFont: z.enum(UI_FONTS),
@@ -122,8 +111,6 @@ export const settingsPatchSchema = z.object({
     interfaceFont: desktopTypographyShape.interfaceFont.optional(),
     density: desktopTypographyShape.density.optional(),
     reduceMotion: z.boolean().optional(),
-    liquidGlass: z.boolean().optional(),
-    ...glassSettingsShape,
   }).partial().optional(),
   overlay: z.object({
     mode: z.enum(['free', 'top', 'bottom']).optional(),

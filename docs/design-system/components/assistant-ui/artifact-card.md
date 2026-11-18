@@ -2,6 +2,7 @@
 title: Artifact card（产物卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "展示正在生成或已完成的产物，提供标题和实时字数。"
 ---
 
 # Artifact card（产物卡片）

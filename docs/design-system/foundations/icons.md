@@ -2,6 +2,7 @@
 title: 图标
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "图标用精简的图形表达一个概念，帮助用户认出操作、对象与状态。界面中的图标应与相邻文字、控件和其他图标保持协调。"
 ---
 
 # 图标

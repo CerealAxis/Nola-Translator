@@ -2,6 +2,7 @@
 title: Typing indicator（输入指示器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在聊天面板显示三个圆点，提示助手正在输入或即将开始回复。"
 ---
 
 # Typing indicator（输入指示器）

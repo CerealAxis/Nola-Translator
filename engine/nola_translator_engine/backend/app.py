@@ -176,6 +176,8 @@ def create_app(
     # injectable Request.
     app.include_router(api.build_router(), dependencies=[Depends(_auth_dependency)])
     app.include_router(build_comic_router(comic_service), prefix=api.API_PREFIX, dependencies=[Depends(_auth_dependency)])
+    from .screen_capture import build_screen_capture_router
+    app.include_router(build_screen_capture_router(), prefix=api.API_PREFIX, dependencies=[Depends(_auth_dependency)])
     if screen_ocr is not None:
         from .screen_ocr import build_screen_ocr_router
 

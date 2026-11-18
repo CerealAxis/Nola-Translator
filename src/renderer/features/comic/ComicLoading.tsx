@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { ArrowLeft, ImageOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ImageGeneration } from '@/components/assistant-ui/native/image-generation'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useI18n } from '@/i18n'
 
@@ -13,6 +14,7 @@ export function ComicImage({
   fallback,
   aspectRatio,
   showStatus = false,
+  processing,
 }: {
   src?: string
   alt: string
@@ -22,13 +24,16 @@ export function ComicImage({
   fallback?: ReactNode
   aspectRatio?: string
   showStatus?: boolean
+  processing?: string
 }) {
   const { t } = useI18n()
   const [result, setResult] = useState<{ src: string; loaded: boolean }>()
   const decoded = src && result?.src === src ? result.loaded : undefined
-  const status = failed || decoded === false || (!src && !loading)
-    ? 'unavailable'
-    : decoded ? 'ready' : 'loading'
+  const status = processing
+    ? 'processing'
+    : failed || decoded === false || (!src && !loading)
+      ? 'unavailable'
+      : decoded ? 'ready' : 'loading'
 
   return (
     <div
@@ -37,7 +42,7 @@ export function ComicImage({
       data-state={status}
       aria-busy={status === 'loading' || undefined}
     >
-      {src && status !== 'unavailable' && (
+      {src && status !== 'unavailable' && status !== 'processing' && (
         <img
           key={src}
           src={src}
@@ -47,7 +52,9 @@ export function ComicImage({
           onError={() => setResult({ src, loaded: false })}
         />
       )}
-      {status === 'unavailable' ? (
+      {status === 'processing' ? (
+        <ImageGeneration label={showStatus ? processing : undefined} />
+      ) : status === 'unavailable' ? (
         <div className="comic-image__fallback">
           {retry ? (
             <Button

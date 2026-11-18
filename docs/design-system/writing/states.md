@@ -2,6 +2,7 @@
 title: 状态与反馈文案
 pageClass: nola-vis-doc nola-vis-writing
 editLink: false
+description: "反馈告诉用户任务到了哪一步，以及接下来可以做什么。把结果放在相关内容附近，用简短、准确的文字说明当前状态。"
 ---
 
 # 状态与反馈文案

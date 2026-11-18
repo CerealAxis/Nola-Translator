@@ -2,6 +2,7 @@
 title: Select（单选列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用选择器从预设选项中选择值，为表单提供可展开的选项列表。"
 ---
 
 # Select（单选列表）

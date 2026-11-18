@@ -2,6 +2,7 @@
 title: Data table（数据表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用可排序的数据表展示结构化工具结果和应用数据。"
 ---
 
 # Data table（数据表）

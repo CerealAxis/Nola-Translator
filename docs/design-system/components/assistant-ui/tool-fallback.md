@@ -2,6 +2,7 @@
 title: Tool fallback（工具默认展示）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "未注册专用界面的工具调用使用默认卡片，展示状态、参数、结果和需要用户处理的请求。"
 ---
 
 # Tool fallback（工具默认展示）

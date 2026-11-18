@@ -2,6 +2,7 @@
 title: 即时反应
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "输入或点击后，界面应立即回应。短操作在原处显示结果。耗时任务持续说明进展。"
 ---
 
 # 即时反应

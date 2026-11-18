@@ -149,7 +149,7 @@ export function TextActions({ selection, preferences, dismiss }: { selection: Te
   }
   return <section className="nola-text-actions" style={{ opacity: preferences.selectionOpacity }} aria-label={t(selection.target ? 'translateInput' : 'translateSelection')} onKeyDown={event => { if (event.key === 'Escape' && !more) dismiss() }}>
     {busy && target && <span ref={indicator} role="status" aria-label={t('translating')} className="pointer-events-none fixed grid place-items-center rounded-[var(--radius-xl)] bg-nola-ui-background p-1 text-nola-ui-primary"><Spinner className="animate-spin" /></span>}
-    <div className="nola-selection-toolbar nola-glass-popup" role="toolbar" aria-label={t('selection')} aria-busy={busy} onPointerDown={event => { if (event.pointerType === 'mouse') event.preventDefault() }} onKeyDown={event => {
+    <div className="nola-selection-toolbar nola-popup-surface" role="toolbar" aria-label={t('selection')} aria-busy={busy} onPointerDown={event => { if (event.pointerType === 'mouse') event.preventDefault() }} onKeyDown={event => {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
       const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
       const index = buttons.indexOf(event.target as HTMLButtonElement)
@@ -168,7 +168,7 @@ export function TextActions({ selection, preferences, dismiss }: { selection: Te
       </Popover>
     </div>
     <div ref={setMenuContainer} style={{ display: 'contents' }} />
-    {result && <div className="nola-selection-result nola-glass-popup" aria-live="polite">
+    {result && <div className="nola-selection-result nola-popup-surface" aria-live="polite">
       <div className="nola-selection-result-actions">
         {(selection.target || preferences.selectionCopy) && result && <Button variant="bare" size="icon-sm" aria-label={t('copyTranslation')} title={t('copyTranslation')} onClick={() => void copy()}><Copy /></Button>}
         <Button variant="bare" size="icon-sm" aria-label={t('close')} title={t('close')} onClick={dismiss}><X /></Button>

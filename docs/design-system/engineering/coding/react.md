@@ -1,6 +1,7 @@
 ---
 group: 代码风格
 order: 5
+description: "查看 React 和 JSX 的代码风格、Props、状态、Hooks 和无障碍编码规约。"
 ---
 
 # React 编码规约

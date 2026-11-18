@@ -2,6 +2,7 @@
 title: Direction（阅读方向）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "为应用设置文本方向的 Provider 组件。"
 ---
 
 # Direction（阅读方向）

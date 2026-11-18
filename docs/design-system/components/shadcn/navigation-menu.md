@@ -2,6 +2,7 @@
 title: Navigation Menu（导航菜单）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在网站主导航组织一组链接，通过导航项打开关联内容和子链接。"
 ---
 
 # Navigation Menu（导航菜单）

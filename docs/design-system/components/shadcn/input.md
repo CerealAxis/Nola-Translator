@@ -2,6 +2,7 @@
 title: Input（单行输入）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用于表单和用户数据录入的文本输入组件，内置样式和无障碍功能。"
 ---
 
 # Input（单行输入）

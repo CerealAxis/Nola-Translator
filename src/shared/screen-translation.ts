@@ -5,7 +5,6 @@ import type { AppSettings } from './settings'
 import { defaultModelBinding } from './model-policy'
 import { normalizeModelBinding } from './model-gateway'
 import { glossarySelectionSchema } from './glossary'
-import type { ScreenTextProbe } from './screen-visual-probe'
 
 export const MAX_SCREEN_REGIONS = 64
 
@@ -25,7 +24,7 @@ export type ScreenRegionSet = z.infer<typeof screenRegionSetSchema>
 export type ScreenRegionPreset = z.infer<typeof screenPresetSchema>
 export const screenConfigSchema = z.object({
   captureMode: z.enum(['cursor', 'regions', 'window']).default('cursor'),
-  strategy: z.enum(['auto', 'speed', 'quality']).default('auto'),
+  ocrMode: z.enum(['period', 'analysis', 'trigger']).default('period'),
   glossarySelection: glossarySelectionSchema.default({ mode: 'auto' }),
   excludedSelection: glossarySelectionSchema.optional(),
   sourceId: z.string().max(256).default(''), sourceName: z.string().max(256).default(''),
@@ -36,7 +35,7 @@ export const screenConfigSchema = z.object({
   sourceLanguage: z.string().min(1).max(32).regex(/^[a-zA-Z][a-zA-Z0-9-]*$/).default('auto'),
   targetLanguage: z.string().min(1).max(32).default('zh'), model: z.string().max(512).default(''),
   processingMode: z.enum(['default', 'cascade']).optional(),
-  intervalMs: z.number().int().min(250).max(3000).default(600),
+  intervalMs: z.number().int().min(100).max(100000).default(1500),
   fontSize: z.union([z.literal(0), z.number().int().min(12).max(36)]).default(0), opacity: z.number().min(0.35).max(1).default(1),
   showSource: z.boolean().default(false),
   toggleShortcut: z.string().max(100).default('CommandOrControl+Shift+F8'),
@@ -62,23 +61,25 @@ export interface ScreenTextBlock {
   id: string; regionId: string; text: string; translation?: string; revision: number;
   x: number; y: number; width: number; height: number; angle: number;
   quad?: number[][];
-  appearance?: ScreenAppearance; hidden?: boolean; appearancePending?: boolean;
-  visualId?: string;
-  status: 'stabilizing' | 'translating' | 'ready' | 'error'
+  lineHeight?: number;
+  patches?: ScreenBlurPatch[];
+  ink?: string;
+  hidden?: boolean;
+  status: 'translating' | 'ready' | 'error'
 }
 export type ScreenStatus = 'ready' | 'starting' | 'running' | 'paused' | 'waiting' | 'editing' | 'error'
 export type ScreenError = 'captureFailed' | 'targetUnavailable' | 'targetChanged' | 'ocrFailed' | 'ocrMissing' | 'ocrNotReady' | 'ocrCorrupt' | 'ocrRuntimeUnavailable' | 'translationFailed' | 'shortcutConflict' | 'invalidConfig' | 'backendUnavailable' | 's2sUnsupported' | 'gatewayNotReady' | 'translationModelMissing' | 'translationModelNotReady' | 'regionsMissing' | 'sameLanguage'
 export interface ScreenOcrStatus { installed: boolean; state: string; progress?: number; error?: string; languages?: string[]; resource?: ResourceRecord }
-export const screenAppearanceSchema = z.object({
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/), background: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-  patches: z.array(z.object({ image: z.string().startsWith('data:image/png;base64,').max(8 * 1024 * 1024),
-    x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().positive().max(1), height: z.number().positive().max(1) })).max(256),
+export const screenBlurPatchSchema = z.object({
+  image: z.string().startsWith('data:image/png;base64,').max(3 * 1024 * 1024),
+  x: z.number().min(0).max(1), y: z.number().min(0).max(1),
+  width: z.number().positive().max(1), height: z.number().positive().max(1),
 })
-export type ScreenAppearance = z.infer<typeof screenAppearanceSchema>
-export interface ScreenOcrRequest { image: string; language: string; appearance?: boolean; taskMode?: 'realtime' | 'offline' }
+export type ScreenBlurPatch = z.infer<typeof screenBlurPatchSchema>
+export interface ScreenOcrRequest { image: string; language: string; overlay?: boolean; taskMode?: 'realtime' | 'offline' }
 export interface ScreenOcrResult {
   width: number; height: number;
-  blocks: Array<{ id: string; text: string; confidence: number; quad: Array<[number, number]>; appearance?: ScreenAppearance }>
+  blocks: Array<{ id: string; text: string; confidence: number; quad: Array<[number, number]>; ink?: string; patches?: ScreenBlurPatch[] }>
 }
 export interface ScreenSnapshot {
   status: ScreenStatus; config: ScreenConfig; sessionId: string; epoch: number;
@@ -87,7 +88,6 @@ export interface ScreenSnapshot {
   presets?: ScreenRegionPreset[]; regionsVisible?: boolean;
   captureRegions?: ScreenRegion[]; overlayVisible?: boolean;
   gameId?: string;
-  visualProbes?: ScreenTextProbe[];
 }
 export const screenCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('configure'), config: screenConfigSchema }),
@@ -103,20 +103,28 @@ export const screenCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('cancelEdit') }),
 ])
 export type ScreenCommand = z.input<typeof screenCommandSchema>
-export const screenFrameSchema = z.object({
-  sessionId: z.string().uuid(), epoch: z.number().int().nonnegative(), width: z.number().int().min(1).max(16384), height: z.number().int().min(1).max(16384),
-  regions: z.array(z.object({ regionId: z.string().uuid(), image: z.string().startsWith('data:image/png;base64,').max(24 * 1024 * 1024), hash: z.string().max(64) })).max(MAX_SCREEN_REGIONS),
-  observed: z.array(z.object({ regionId: z.string().uuid(), hash: z.string().max(64) })).max(MAX_SCREEN_REGIONS).optional(),
-  checked: z.array(z.object({ id: z.string().uuid(), matches: z.boolean() })).max(2048).optional(),
-}).refine(frame => frame.regions.reduce((total, region) => total + region.image.length, 0) <= 48 * 1024 * 1024)
-export type ScreenFrame = z.infer<typeof screenFrameSchema>
-export interface ScreenWindowBootstrap { role: 'capture' | 'editor' | 'overlay' | 'regions' | 'toolbar'; snapshot: ScreenSnapshot }
+export interface ScreenCaptureRequest {
+  session_id: string;
+  epoch: number;
+  mode: ScreenConfig['ocrMode'];
+  manual: boolean;
+  target: string;
+  overlay: string;
+  composition_changed: boolean;
+  owner_pid: number;
+  regions: Array<{ id: string; x: number; y: number; width: number; height: number }>;
+}
+export const screenCaptureResultSchema = z.object({
+  frames: z.array(z.object({ id: z.string().uuid(), image: z.string().startsWith('data:image/png;base64,').max(24 * 1024 * 1024) })).max(MAX_SCREEN_REGIONS),
+  hide_overlay: z.boolean().optional(),
+  unavailable: z.boolean().optional(),
+}).refine(result => result.frames.reduce((total, region) => total + region.image.length, 0) <= 48 * 1024 * 1024)
+export type ScreenCaptureResult = z.infer<typeof screenCaptureResultSchema>
+export interface ScreenWindowBootstrap { role: 'editor' | 'overlay' | 'regions' | 'toolbar'; snapshot: ScreenSnapshot }
 export interface ScreenTranslationBridge {
   snapshot(): Promise<ScreenSnapshot>
   sources(): Promise<ScreenSource[]>
   command(command: ScreenCommand): Promise<ScreenSnapshot>
   onChanged(callback: (snapshot: ScreenSnapshot) => void): () => void
   windowBootstrap(): Promise<ScreenWindowBootstrap>
-  frame(frame: ScreenFrame): Promise<void>
-  captureError(): Promise<void>
 }

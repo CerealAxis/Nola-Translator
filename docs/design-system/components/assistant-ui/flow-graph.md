@@ -2,6 +2,7 @@
 title: Flow graph（流程图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用节点和连线展示流程的运行顺序、并行分支和汇合位置，查看流程推进情况。"
 ---
 
 # Flow graph（流程图）

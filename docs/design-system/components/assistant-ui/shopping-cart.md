@@ -2,6 +2,7 @@
 title: Shopping cart（购物车）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "购物车卡片列出商品、小计、税费与总额，并提供继续添加和购买操作。"
 ---
 
 # Shopping cart（购物车）

@@ -15,7 +15,7 @@
 
 /* 页面标题用 Logo 同款渐变。标题里的锚点图标由 VitePress 注入，
    必须还原文字填充色，否则它会跟着标题一起变透明。 */
-.VPDoc h1 {
+.VPDoc h1:not(:where(.nola-vis-doc .vitepress-demo-plugin-preview *)) {
   background: linear-gradient(120deg, #168bd9 15%, #2255c7 85%);
   background-clip: text;
   -webkit-background-clip: text;
@@ -27,7 +27,7 @@
 }
 
 /* VitePress 给正文所有链接加下划线，在语言表格这类密集内容里会连成一片。 */
-.vp-doc a {
+.vp-doc a:not(:where(.nola-vis-doc .vitepress-demo-plugin-preview *)) {
   text-decoration: none;
 }
 

@@ -1,3 +1,7 @@
+---
+description: "查看 Nola Translator 在中国大陆及其他地区的官方赞助渠道，并了解页面列出的赞助权益。"
+---
+
 # 赞助
 
 > [!WARNING]  

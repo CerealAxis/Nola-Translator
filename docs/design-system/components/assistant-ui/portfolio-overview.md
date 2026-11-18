@@ -2,6 +2,7 @@
 title: Portfolio overview（投资组合概览）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "投资组合卡片结合关键数字、带坐标轴的柱状图和持仓表格。"
 ---
 
 # Portfolio overview（投资组合概览）

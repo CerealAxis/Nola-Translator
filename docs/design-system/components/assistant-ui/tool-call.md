@@ -2,6 +2,7 @@
 title: Tool call（工具调用）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "把单次工具调用的请求与结果放在可展开的区域里。"
 ---
 
 # Tool call（工具调用）

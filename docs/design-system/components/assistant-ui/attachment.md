@@ -2,6 +2,7 @@
 title: Attachment（附件）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在消息草稿和已发送消息中展示文件或图片附件，通过预览、添加和移除操作管理附件。"
 ---
 
 # Attachment（附件）

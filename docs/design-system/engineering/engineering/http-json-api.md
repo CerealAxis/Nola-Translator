@@ -1,6 +1,7 @@
 ---
 group: 工程实践
 order: 2.3
+description: "查看 HTTP JSON API 的请求与响应约定，包括状态码、错误结构和 JSON 数据格式。"
 ---
 
 # HTTP JSON API 规范

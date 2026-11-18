@@ -1,8 +1,12 @@
+---
+description: "Nola Translator のデスクトップ版とブラウザー拡張で音声を認識・翻訳する仕組みを紹介します。デモ、インストール方法、対応機能を確認できます。"
+---
+
 # 製品紹介
 
 <div align="center">
   <img src="/docs-image/ja/getting-started/introduction/nola-translator-logo.svg" alt="Nola Translator Logo" width="112" height="112">
-  <h1>Nola Translator</h1>
+  <p class="intro-product-name"><strong>Nola Translator</strong></p>
   <p>ブラウザ拡張機能も提供するオープンソースのリアルタイム翻訳ソフトウェア</p>
   <p><a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.md">English</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-CN.md">简体中文</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-TW.md">繁體中文（台灣）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-HK.md">繁體中文（香港）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ja.md">日本語</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ko.md">한국어</a></p>
 </div>

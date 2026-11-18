@@ -27,12 +27,21 @@ it('keeps translations at their source positions even when nearby blocks overlap
   for (const [index, item] of layout.entries()) {
     expect(item.x).toBeCloseTo(input[index].x * 800)
     expect(item.y).toBeCloseTo(input[index].y * 600)
-    expect(item.textWidth).toBeCloseTo(input[index].width * 800)
+    expect(item.textWidth).toBeGreaterThanOrEqual(input[index].width * 800)
     expect(item.fontSize).toBeGreaterThanOrEqual(12)
     expect(item.text).toBe(input[index].translation)
   }
   const alone = layoutScreenOverlay([input[1]], { width: 800, height: 600 }, 24, false, measure, 8)[0]
   expect(layout[1]).toEqual(alone)
+})
+
+it('moves an expanded translation back into its selection when the source is at the edge', () => {
+  const item = { ...block('edge', 'translated word '.repeat(12), 0.62), x: 0.6, width: 0.15, height: 0.04 }
+  const selected = { id: item.regionId, x: 0.25, y: 0.3, width: 0.5, height: 0.36 }
+  const [layout] = layoutScreenOverlay([item], { width: 500, height: 400 }, 20, false, measure, 8, [selected])
+  expect(layout.y).toBeLessThan(item.y * 400)
+  expect(layout.y).toBeGreaterThanOrEqual(selected.y * 400)
+  expect(layout.y + layout.height).toBeLessThanOrEqual((selected.y + selected.height) * 400 + 0.01)
 })
 
 it('fits extra lines from the same origin and bounds dense translations to the screen', () => {

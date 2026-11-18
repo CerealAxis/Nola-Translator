@@ -2,6 +2,7 @@
 title: Kbd（键盘按键）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "以键帽样式显示单个按键和键盘快捷键，并把组合键分组呈现。"
 ---
 
 # Kbd（键盘按键）

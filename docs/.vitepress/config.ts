@@ -11,62 +11,19 @@ import { withMermaid } from 'vitepress-plugin-mermaid'
 import { generateSidebar } from 'vitepress-sidebar'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { copy, docsNav, localeNames, localePath, downloadUrl, repositoryUrl, siteUrl, license, type Locale } from './theme/content'
+import { copy, docsNav, localeNames, localePath, downloadUrl, repositoryUrl, license, type Locale } from './theme/content'
 import { normalizeEmptyIsCss } from '../scripts/normalize-empty-is-css.mjs'
 import { shadcnDemoEntry } from './shadcn-demo-entry'
+import { siteSeo } from './seo'
+import { defaultLocale, homePath } from './theme/siteLocale'
 
 const base = process.env.DOCS_BASE ?? '/'
 const shadcnPreview = fileURLToPath(new URL('../media-src/vis/shadcn-base/', import.meta.url)).replace(/\\/g, '/')
 const demoPortal = 'body:has(.nola-vis-doc) :is([data-base-ui-portal], [data-assistant-preview-portal])'
-const demoScope = `:where(.nola-vis-doc .vitepress-demo-plugin-preview > div, ${demoPortal})`
+const demoScope = `:is(.nola-vis-doc .vitepress-demo-plugin-preview, ${demoPortal})`
 const glassRoot = /^:is\(:root,\s*\.nola-extension\)/
 
-// Search engines and social previews need a per-page URL, which the static head array cannot provide.
-const localeSegments: Record<Locale, string> = { 'zh-CN': 'zh-CN', 'zh-TW': 'zh-TW', 'zh-HK': 'zh-HK', en: 'en', ja: 'ja', ko: 'ko' }
-const socialLocales: Record<Locale, string> = { 'zh-CN': 'zh_CN', 'zh-TW': 'zh_TW', 'zh-HK': 'zh_HK', en: 'en_US', ja: 'ja_JP', ko: 'ko_KR' }
-
-const dropLocaleSegment = (relativePath: string, locale: Locale) => relativePath.startsWith(`${locale}/`) ? relativePath.slice(locale.length + 1) : relativePath
-
-const routeFor = (locale: Locale, rest: string) => {
-  const segment = localeSegments[locale]
-  const clean = `${segment ? `${segment}/` : ''}${rest}`.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
-  return `${base}${clean}`.replace(/\/{2,}/g, '/')
-}
-
-function transformHead({ pageData }: { pageData: { relativePath: string; title?: string; description?: string } }) {
-  const leading = pageData.relativePath.split('/')[0]
-  const locale = (Object.keys(localeSegments) as Locale[]).find(name => localeSegments[name] === leading) ?? 'zh-CN'
-  const rest = dropLocaleSegment(pageData.relativePath, locale)
-  const isVis = pageData.relativePath.startsWith('vis/')
-  const canonical = pageData.relativePath === 'index.md' ? `${siteUrl}${base}` : isVis
-    ? `${siteUrl}${base}${rest.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')}`
-    : `${siteUrl}${routeFor(locale, rest)}`
-  const title = pageData.title ? `${pageData.title} | Nola Translator` : 'Nola Translator'
-  const description = pageData.description || copy[locale].hero.subtitle
-  const image = `${siteUrl}${base}screenshots/${locale === 'zh-CN' ? 'zh-CN' : locale}/home.png`
-
-  const tags: import('vitepress').HeadConfig[] = [
-    ['link', { rel: 'canonical', href: canonical }],
-    ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:site_name', content: 'Nola Translator' }],
-    ['meta', { property: 'og:locale', content: socialLocales[locale] }],
-    ['meta', { property: 'og:title', content: title }],
-    ['meta', { property: 'og:description', content: description }],
-    ['meta', { property: 'og:url', content: canonical }],
-    ['meta', { property: 'og:image', content: image }],
-    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
-    ['meta', { name: 'twitter:title', content: title }],
-    ['meta', { name: 'twitter:description', content: description }],
-    ['meta', { name: 'twitter:image', content: image }],
-  ]
-  if (!isVis) {
-    for (const alternate of Object.keys(localeSegments) as Locale[]) {
-      tags.push(['link', { rel: 'alternate', hreflang: alternate, href: `${siteUrl}${routeFor(alternate, rest)}` }])
-    }
-    tags.push(['link', { rel: 'alternate', hreflang: 'x-default', href: `${siteUrl}${routeFor('zh-CN', rest)}` }])
-  }
-  return tags
-}
+const seo = siteSeo(base)
 const workspace = fileURLToPath(new URL('../..', import.meta.url))
 
 const searchTranslations = {
@@ -133,7 +90,7 @@ const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(lo
     description: text.hero.subtitle,
     themeConfig: {
       nav: [
-        { text: text.nav.home, link: path },
+        { text: text.nav.home, link: homePath(locale, '/') },
         { text: text.nav.designDocs, link: '/vis/' },
         { text: text.nav.docs, link: path + 'docs' },
         { text: text.nav.download, link: downloadUrl },
@@ -157,6 +114,7 @@ const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(lo
 export default withMermaid(defineConfig({
   base,
   title: 'Nola Translator',
+  titleTemplate: false,
   description: copy['zh-CN'].hero.subtitle,
   lang: 'zh-CN',
   srcDir: '.',
@@ -169,9 +127,13 @@ export default withMermaid(defineConfig({
   cleanUrls: true,
   appearance: true,
   lastUpdated: true,
-  sitemap: { hostname: siteUrl },
-  transformHead,
+  sitemap: seo.sitemap,
+  transformHead: seo.transformHead,
+  transformHtml(html, _id, { pageData }) {
+    if (pageData.relativePath === 'index.md') return html.replace('<html lang="zh-CN"', `<html lang="${defaultLocale}"`)
+  },
   transformPageData(page) {
+    seo.registerPage(page)
     if (page.relativePath.startsWith('vis/')) {
       const classes = page.frontmatter.pageClass
       if (typeof classes !== 'string' || !classes.split(/\s+/).includes('shadcn-base-doc')) {
@@ -209,7 +171,7 @@ export default withMermaid(defineConfig({
         includeFiles: [/vp-doc\.css/, /base\.css/],
         prefix: `:not(:where(.vp-raw, .vp-raw *, ${demoPortal}, ${demoPortal} *))`,
       }),
-      // Give each preview and its portals the same theme without restyling the site.
+      // Preview utilities must take precedence over the homepage's identically named utilities.
       postcssIsolateStyles({
         includeFiles: [/[/\\]vis[/\\]design-demo\.css(?:\?|$)/],
         prefix: demoScope,

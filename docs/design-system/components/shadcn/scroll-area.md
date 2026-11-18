@@ -2,6 +2,7 @@
 title: Scroll Area（滚动区域）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "保留原生滚动行为，在可滚动容器中统一滚动条外观和布局。"
 ---
 
 # Scroll Area（滚动区域）

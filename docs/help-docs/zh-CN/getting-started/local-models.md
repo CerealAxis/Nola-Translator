@@ -1,3 +1,7 @@
+---
+description: "了解如何在 Nola Translator 中安装现有模型或导入本地文件，并在选择模型前确认运行环境。"
+---
+
 # 本地模型配置
 
 > [!WARNING]  

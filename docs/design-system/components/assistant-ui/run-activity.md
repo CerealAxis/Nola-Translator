@@ -2,6 +2,7 @@
 title: Run activity（运行活动）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "实时汇总运行状态，按发生顺序展示说明和工具调用，并保留最终回答。"
 ---
 
 # Run activity（运行活动）

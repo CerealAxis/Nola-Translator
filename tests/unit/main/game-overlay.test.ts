@@ -64,7 +64,7 @@ it('tracks Hook target geometry and gates Alt-Tab, minimize and replaced HWND id
   const { overlay, unavailable } = create()
   overlay.begin('session', 'window:123:0')
   const targetChanged = vi.mocked(observeScreenWindow).mock.calls[0][1]
-  const state: ScreenTargetState = { available: true, foreground: true, identity: 'original', bounds: { x: 100, y: 150, width: 800, height: 600 }, candidates: [] }
+  const state: ScreenTargetState = { available: true, foreground: true, identity: 'original', bounds: { x: 100, y: 150, width: 800, height: 600 } }
   overlay.update({ ...snapshot(), source: 'hook' }); expect(windows[0].visible).toBe(false)
   targetChanged(state); expect(windows[0].visible).toBe(true)
   expect(windows[0].setBounds).toHaveBeenLastCalledWith({ x: 160, y: 540, width: 680, height: 180 })

@@ -2,6 +2,7 @@
 title: Server panel（服务器面板）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "查看服务器连接状态、可用能力和需要用户处理的事项。"
 ---
 
 # Server panel（服务器面板）

@@ -2,6 +2,7 @@
 title: Combobox（可搜索选择）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "把可输入的搜索字段与选项列表组合起来，通过键入筛选并选择建议。"
 ---
 
 # Combobox（可搜索选择）

@@ -2,6 +2,7 @@
 title: Context Menu（右键菜单）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在用户右键点击目标时展示与目标有关的操作，通过项目或子菜单选择命令。"
 ---
 
 # Context Menu（右键菜单）

@@ -2,6 +2,7 @@
 title: Context breakdown（上下文明细）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "按类型拆分 token 使用量，显示上下文窗口的占用情况。"
 ---
 
 # Context breakdown（上下文明细）

@@ -1,3 +1,7 @@
+---
+description: "查看 Nola Translator 帮助文档的写作要求，涵盖受众、术语、中英文混排、标题层级及截图和示例。"
+---
+
 # 编写规范
 
 > [!WARNING]  

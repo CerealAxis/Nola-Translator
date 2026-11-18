@@ -2,6 +2,7 @@
 title: Marker（标记）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在会话中显示行内状态、系统提示、带边框的行或带标签的分隔线。"
 ---
 
 # Marker（标记）

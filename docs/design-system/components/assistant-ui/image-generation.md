@@ -2,6 +2,7 @@
 title: Image generation（图像生成）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在图像生成时显示网格占位，再逐步呈现清晰结果。"
 ---
 
 # Image generation（图像生成）

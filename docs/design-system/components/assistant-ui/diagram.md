@@ -2,6 +2,7 @@
 title: Diagram（示意图）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "给已有图形加上标题与缩放控件，支持放大、缩小、重置比例和展开图形。"
 ---
 
 # Diagram（示意图）

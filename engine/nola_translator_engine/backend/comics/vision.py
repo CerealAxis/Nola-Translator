@@ -206,6 +206,49 @@ def block_vertical(shapes):
   return votes*2 > len(shapes)
 
 
+def block_text_groups(lines, bubbles):
+  by_bubble = {}
+  for line in lines:
+    center = tuple(line.mean(axis=0))
+    bubble = next((index for index, points in enumerate(bubbles)
+      if cv2.pointPolygonTest(points, center, False) >= 0), None)
+    by_bubble.setdefault(bubble, []).append(line)
+  outside = by_bubble.pop(None, [])
+  inside = list(by_bubble.values())
+  return inside + split_vertical_text(outside) if outside else inside
+
+
+def split_vertical_text(lines):
+  if len(lines) < 2:
+    return [lines]
+  starts = np.min(lines, axis=1)
+  ends = np.max(lines, axis=1)
+  widths, heights = (ends - starts).T
+  if np.count_nonzero(heights > widths * 1.4) <= len(lines) / 2:
+    return [lines]
+  centers = (starts + ends) / 2
+  for axis in (0, 1):
+    order = np.argsort(centers[:, axis])
+    for cut in range(1, len(order)):
+      before, after = order[:cut], order[cut:]
+      left = before[np.argmax(ends[before, axis])]
+      right = after[np.argmin(starts[after, axis])]
+      narrow, wide = sorted((widths[left], widths[right]))
+      gap = starts[right, axis] - ends[left, axis]
+      if gap < -.08 * narrow:
+        continue
+      # Adjacent columns can be uneven. Require a change in both scale and span.
+      if axis == 0:
+        short, tall = sorted((heights[left], heights[right]))
+        split = narrow <= .9 * wide and short <= .7 * tall and short >= 2 * narrow
+      else:
+        split = narrow <= .65 * wide
+      if split:
+        return (split_vertical_text([lines[i] for i in sorted(before)])
+          + split_vertical_text([lines[i] for i in sorted(after)]))
+  return [lines]
+
+
 def line_distance(a, b):
   font = max(a['size'],b['size'])
   def area(points):
@@ -318,27 +361,41 @@ async def detect(owner, image, config, existing):
     polygons = await detector.detect_comic_polygons(pixels(image)) if model.startswith('pp-ocrv5-') and hasattr(detector,'detect_comic_polygons') else []
     bubbles = deepcopy(getattr(detector,'bubble_quads',None))
   block_detector = model in ('comic-rtdetr-onnx', 'comic-rfdetr-seg-onnx')
-  lines = []
-  if model in ('comic-rtdetr-onnx', 'comic-rfdetr-seg-onnx'):
+  grouped_lines = []
+  if block_detector:
     try:
       verifier = ppocr_model(owner, config['sourceLanguage'], detector=True)
     except ValueError:
       verifier = None
     if verifier:
       async with resource(owner, verifier) as text_detector:
-        lines = await text_detector.detect_comic(pixels(image))
+        lines = [np.asarray(line, dtype=float) for line in await text_detector.detect_comic(pixels(image))]
         if hasattr(text_detector,'detect_comic_polygons'):
           polygons = await text_detector.detect_comic_polygons(pixels(image))
+      centers = [line.mean(axis=0) for line in lines]
       verified = []
+      bubble_polygons = [np.asarray(bubble, np.float32) for bubble in bubbles or []]
       for raw in quads:
         points = np.asarray(raw)
         left, top = points.min(axis=0)
         right, bottom = points.max(axis=0)
-        if any(left <= np.asarray(line)[:,0].mean() <= right and top <= np.asarray(line)[:,1].mean() <= bottom for line in lines):
+        supported = [line for line, (x, y) in zip(lines, centers)
+          if left <= x <= right and top <= y <= bottom]
+        if not supported:
+          continue
+        groups = block_text_groups(supported, bubble_polygons)
+        if len(groups) == 1:
           verified.append(raw)
+          grouped_lines.append(supported)
+          continue
+        for group in groups:
+          points = np.concatenate(group)
+          left, top = points.min(axis=0)
+          right, bottom = points.max(axis=0)
+          verified.append([[left,top],[right,top],[right,bottom],[left,bottom]])
+          grouped_lines.append(group)
       quads = verified
-  grouped_lines = []
-  if not block_detector:
+  else:
     grouped_lines = [[quads[index] for index in group] for group in paragraph_groups(quads)]
     quads = []
     for group in grouped_lines:
@@ -373,12 +430,12 @@ async def detect(owner, image, config, existing):
       autoAlign=settings['autoAlign'], autoBlockAlign=settings['autoBlockAlign'],
       direction=direction, color=settings['color'], strokeColor=settings['strokeColor'], strokeWidth=settings['strokeWidth'],
       lineSpacing=settings['lineSpacing'], align=settings['align'], blockAlign=settings['blockAlign']).model_dump()
-    supported = [np.asarray(line, dtype=float) for line in lines if x <= np.asarray(line)[:,0].mean() <= right and y <= np.asarray(line)[:,1].mean() <= bottom]
-    if model.startswith('pp-ocrv5-'):
-      supported = [np.asarray(line,dtype=float) for line in grouped_lines[index]]
+    supported = [np.asarray(line,dtype=float) for line in grouped_lines[index]] if grouped_lines else []
     if supported and settings['direction'] == 'auto':
-      ratios = [np.linalg.norm(line[3]-line[0])/max(1,np.linalg.norm(line[1]-line[0])) for line in supported]
-      style['direction'] = 'vertical-rl' if np.median(ratios) > 1.4 else 'horizontal'
+      widths = np.linalg.norm([line[1]-line[0] for line in supported], axis=1)
+      heights = np.linalg.norm([line[3]-line[0] for line in supported], axis=1)
+      areas = widths * heights
+      style['direction'] = 'vertical-rl' if areas[heights > 1.4 * widths].sum() > areas.sum() / 2 else 'horizontal'
     projected = False
     if len(supported) == 1:
       line = supported[0]
@@ -406,7 +463,6 @@ async def detect(owner, image, config, existing):
       matching = max(polygons,key=overlap) if len(polygons) else None
       regions[-1]['textQuad'] = np.asarray(matching).tolist() if matching is not None and overlap(matching)>0 else points.tolist()
   if block_detector:
-    # RT-DETR already predicts text blocks; line heuristics must not split them again.
     if bubbles:
       inside = []
       for region in regions:

@@ -1,8 +1,12 @@
+---
+description: "Nola Translator 데스크톱 앱과 브라우저 확장이 음성을 인식하고 번역하는 방식을 알아보고, 데모와 설치 방법 및 지원 기능을 확인하세요."
+---
+
 # 제품 소개
 
 <div align="center">
   <img src="/docs-image/ko/getting-started/introduction/nola-translator-logo.svg" alt="Nola Translator Logo" width="112" height="112">
-  <h1>Nola Translator</h1>
+  <p class="intro-product-name"><strong>Nola Translator</strong></p>
   <p>브라우저 확장 프로그램을 제공하는 오픈소스 실시간 번역 소프트웨어</p>
   <p><a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.md">English</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-CN.md">简体中文</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-TW.md">繁體中文（台灣）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-HK.md">繁體中文（香港）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ja.md">日本語</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ko.md">한국어</a></p>
 </div>

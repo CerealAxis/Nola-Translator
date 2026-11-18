@@ -1,3 +1,7 @@
+---
+description: "Compare supported languages for built-in speech recognition, translation, and speech synthesis models and the supported cloud services."
+---
+
 # Languages Supported by Models
 
 The available speech recognition, translation, and speech synthesis languages depend on the selected model. The tables below list the language capabilities currently shown for the built-in models and services; consult the model and service provider documentation for actual results.

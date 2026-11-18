@@ -2,6 +2,7 @@
 title: Attachments（附件列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在助手输入框中管理要随消息发送的文件，查看上传进度、完成状态与失败反馈，并移除不需要的附件。"
 ---
 
 # Attachments（附件列表）

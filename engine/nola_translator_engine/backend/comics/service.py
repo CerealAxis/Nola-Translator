@@ -101,7 +101,10 @@ class ComicService:
   def public_job(self, job):
     fields = ('id', 'bookId', 'kind', 'pages', 'status', 'progress', 'createdAt',
       'changes', 'failedPageIds', 'error', 'stage')
-    return {key: value for key, value in job.items() if key in fields}
+    result = {key: value for key, value in job.items() if key in fields}
+    if job.get('active'):
+      result['activePageId'] = job['active']['pageId']
+    return result
 
   def public_book(self, book):
     result = deepcopy(book)

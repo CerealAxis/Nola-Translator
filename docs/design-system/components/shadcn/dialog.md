@@ -2,6 +2,7 @@
 title: Dialog（对话框）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "覆盖主窗口或另一个对话框的窗口，使下方内容无法交互。"
 ---
 
 # Dialog（对话框）

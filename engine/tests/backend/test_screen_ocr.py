@@ -464,32 +464,27 @@ def test_arabic_decoder_retains_number_and_latin_order():
     assert screen_ocr.arabic_logical_order("اب123CDج") == "ج123CDبا"
 
 
-@pytest.mark.parametrize("dark,gradient", [(False, False), (True, False), (False, True)])
-def test_text_repair_erases_glyphs_and_preserves_the_surrounding_image(dark, gradient):
+def test_overlay_blurs_only_the_source_text_quad_and_preserves_foreground_color():
     import cv2
 
-    level = 28 if dark else 235
-    original = np.full((100, 320, 3), level, np.uint8)
-    if gradient:
-        original[:] = np.linspace(180, 245, 320, dtype=np.uint8)[None, :, None]
-    captured = original.copy()
-    ink = (245, 245, 245) if dark else (20, 20, 20)
-    cv2.putText(captured, "Hello 123", (30, 57), cv2.FONT_HERSHEY_SIMPLEX, 1, ink, 2, cv2.LINE_AA)
-    quad = [[27, 31], [195, 31], [195, 62], [27, 62]]
-    result = screen_ocr.screen_text_appearance(captured, quad)
-    patch = result["patches"][0]
-    decoded = cv2.imdecode(np.frombuffer(base64.b64decode(patch["image"].split(",", 1)[1]), np.uint8), cv2.IMREAD_UNCHANGED)
-    left, top = round(patch["x"] * 320), round(patch["y"] * 100)
-    h, w = decoded.shape[:2]
-    alpha = decoded[:, :, 3:4] / 255
-    rendered = captured.copy()
-    rendered[top:top+h, left:left+w] = decoded[:, :, :3] * alpha + captured[top:top+h, left:left+w] * (1-alpha)
-    mask = np.any(captured != original, axis=2)
-    before = np.abs(captured.astype(float) - original).mean(axis=2)[mask].mean()
-    after = np.abs(rendered.astype(float) - original).mean(axis=2)[mask].mean()
-    assert after < before * .2
-    assert np.array_equal(rendered[:15], original[:15])
-    assert len(result["color"]) == 7 and len(result["background"]) == 7
+    image = np.full((128, 320, 3), (42, 32, 16), dtype=np.uint8)
+    cv2.putText(image, "North Entrance", (20, 66), cv2.FONT_HERSHEY_SIMPLEX,
+                0.9, (195, 230, 255), 2, cv2.LINE_AA)
+    transform = cv2.getRotationMatrix2D((140, 54), 11, 1)
+    source_quad = np.array([[17, 43], [245, 43], [245, 71], [17, 71]], dtype=np.float32)
+    tilted = cv2.warpAffine(image, transform, (320, 128), borderMode=cv2.BORDER_REPLICATE)
+    block = {"quad": cv2.transform(source_quad[None], transform)[0].tolist()}
+    screen_ocr._add_overlay_patches(tilted, [block])
+    patch = block["patches"][0]
+    pixels = cv2.imdecode(np.frombuffer(base64.b64decode(patch["image"].split(",", 1)[1]), np.uint8),
+                         cv2.IMREAD_UNCHANGED)
+    x, y = round(patch["x"] * 320), round(patch["y"] * 128)
+    h, w = pixels.shape[:2]
+    opaque = pixels[:, :, 3] == 255
+    assert block["ink"] == "#ffe6c3"
+    assert np.count_nonzero(opaque) > 0 and pixels[0, 0, 3] == 0
+    assert pixels[:, :, :3][opaque].std() < tilted[y:y + h, x:x + w][opaque].std()
+    assert w < 320 and h < 128
 
 
 @pytest.mark.parametrize("fixed_batch,expected_calls", [(1, 2), (None, 1)])

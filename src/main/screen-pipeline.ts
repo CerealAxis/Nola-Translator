@@ -1,18 +1,26 @@
-import type { ScreenAppearance, ScreenConfig, ScreenTextBlock } from '../shared/screen-translation'
+import type { ScreenBlurPatch, ScreenConfig, ScreenRegion, ScreenTextBlock } from '../shared/screen-translation'
 
-export interface OcrBlock { id: string; text: string; confidence: number; quad: number[][]; appearance?: ScreenAppearance; visualId?: string }
-type Candidate = { block: ScreenTextBlock; first: number; lastText: string; seen: number; failures: number; signature: string; abort: AbortController }
+export interface OcrBlock {
+  text: string;
+  quad: number[][];
+  lineHeight?: number;
+  ink?: string;
+  patches?: ScreenBlurPatch[];
+}
+interface RegionRevision {
+  lastText: string;
+  abort: AbortController;
+  blocks: ScreenTextBlock[];
+  keys: string[];
+}
 
-/** Keep text revisions independent of video frames so animation cannot starve translations. */
 export class ScreenPipeline {
-  private readonly regions = new Map<string, Map<string, Candidate>>()
+  private readonly regions = new Map<string, RegionRevision>()
   private readonly cache = new Map<string, string>()
-  private readonly pending = new Map<string, Candidate>()
-  private readonly active = new Set<Candidate>()
-  private readonly abort = new AbortController()
+  private readonly pending: Array<{ region: RegionRevision; index: number }> = []
   private revision = 0
+  private translating = false
   private stopped = false
-  private lastRegion?: string
 
   constructor(private readonly config: ScreenConfig,
     private readonly translate: (text: string, signal: AbortSignal) => Promise<string>,
@@ -20,154 +28,212 @@ export class ScreenPipeline {
     private readonly failed: () => void,
     private readonly signature: (text: string) => string = () => '') {}
 
-  blocks(): ScreenTextBlock[] { return [...this.regions.values()].flatMap(region => [...region.values()].map(item => ({ ...item.block }))) }
-
-  hideRegion(regionId: string): void {
-    for (const item of this.regions.get(regionId)?.values() ?? []) {
-      item.block.hidden = true
-      item.block.appearancePending = true
-      if (this.pending.delete(item.block.id)) item.block.status = 'stabilizing'
-    }
-    this.changed()
+  blocks(): ScreenTextBlock[] {
+    return [...this.regions.values()].flatMap(region => region.blocks.map(block => ({ ...block })))
   }
 
-  observeRegion(regionId: string, probes: ReadonlySet<string>): void {
-    let changed = false
-    for (const item of this.regions.get(regionId)?.values() ?? []) {
-      if (!item.block.appearancePending) { item.block.appearancePending = true; changed = true }
-      if (!item.block.visualId || !probes.has(item.block.visualId)) {
-        if (!item.block.hidden) { item.block.hidden = true; changed = true }
-        if (this.pending.delete(item.block.id)) item.block.status = 'stabilizing'
-      }
-    }
-    if (changed) this.changed()
-  }
-
-  verifyVisual(id: string, matches: boolean, appearanceCurrent: boolean, now = Date.now()): void {
-    for (const region of this.regions.values()) for (const item of region.values()) {
-      if (item.block.visualId !== id) continue
-      const previous = `${item.block.hidden}:${item.block.appearancePending}:${item.block.status}`
-      item.block.hidden = !matches
-      item.block.appearancePending = !matches || !appearanceCurrent
-      if (matches) { item.seen++; this.schedule(item, now) }
-      else if (this.pending.delete(item.block.id)) item.block.status = 'stabilizing'
-      if (previous !== `${item.block.hidden}:${item.block.appearancePending}:${item.block.status}`) this.changed()
-    }
-    this.drain()
-  }
-
-  update(regionId: string, input: OcrBlock[], width: number, height: number, now = Date.now(), verified = true): void {
+  update(region: ScreenRegion, input: OcrBlock[], width: number, height: number, force = false): void {
     if (this.stopped) return
-    const region = this.config.regions.find(item => item.id === regionId)
-    if (!region) return
-    const previous = this.regions.get(regionId) ?? new Map<string, Candidate>()
-    const next = new Map<string, Candidate>()
-    const used = new Set<Candidate>()
-    for (const item of input.filter(item => item.text.trim() && item.confidence >= 0.45)) {
-      const xs = item.quad.map(point => point[0]), ys = item.quad.map(point => point[1])
-      const x = Math.max(0, Math.min(...xs) / width), y = Math.max(0, Math.min(...ys) / height)
-      const w = Math.min(1 - x, (Math.max(...xs) - Math.min(...xs)) / width)
-      const h = Math.min(1 - y, (Math.max(...ys) - Math.min(...ys)) / height)
-      if (!(w > 0 && h > 0)) continue
-      const text = item.text.trim()
-      const signature = this.signature(text)
-      const old = [...previous.values()].find(value => !used.has(value)
-        && Math.abs(value.block.x - (region.x + x * region.width)) < region.width * 0.035
-        && Math.abs(value.block.y - (region.y + y * region.height)) < region.height * 0.035)
-      if (old) used.add(old)
-      const angle = Math.atan2(item.quad[1][1] - item.quad[0][1], item.quad[1][0] - item.quad[0][0]) * 180 / Math.PI
-      const block: ScreenTextBlock = {
-        id: old?.block.id ?? `${regionId}:${++this.revision}`, regionId, text,
-        revision: old?.block.text === text ? old.block.revision : ++this.revision,
-        x: region.x + x * region.width, y: region.y + y * region.height,
-        width: w * region.width, height: h * region.height, angle,
-        quad: item.quad.map(point => [region.x + point[0] / width * region.width, region.y + point[1] / height * region.height]),
-        appearance: item.appearance ? { ...item.appearance, patches: item.appearance.patches.map(patch => ({ ...patch,
-          x: region.x + patch.x * region.width, y: region.y + patch.y * region.height,
-          width: patch.width * region.width, height: patch.height * region.height })) } : undefined,
-        status: 'stabilizing', visualId: item.visualId, hidden: !verified, appearancePending: !verified,
+    const entries = input.filter(item => item.text.trim() && item.quad.length === 4)
+    const boxes = entries.map(bounds)
+    const vertical = boxes.reduce((ratio, box) => box.min > 0 ? ratio + Math.log(box.width / box.height) : ratio, 0) < 0
+    const space = /^(?:zh|ja)(?:-|$)/i.test(this.config.sourceLanguage) ? '' : ' '
+    const merged = mergeScreenLines(entries, vertical, space)
+    const text = sortLines(merged.map(bounds), vertical, space).map(line => line.text).join('\n')
+    const previous = this.regions.get(region.id)
+    const unchanged = previous && !force && text && editDistanceBelow(previous.lastText, text, 3)
+    if (!text && !previous?.blocks.length) return
+    const blocks = merged.map((block, index): ScreenTextBlock => {
+      const quad = block.quad.map(([x, y]) => [region.x + x / width * region.width, region.y + y / height * region.height])
+      const [left, top, right, bottom] = bounds({ ...block, quad }).edges
+      const angle = Math.atan2((block.quad[1][1] - block.quad[0][1]) / height * region.height,
+        (block.quad[1][0] - block.quad[0][0]) / width * region.width) * 180 / Math.PI
+      const patches = block.patches?.map(patch => ({ ...patch,
+        x: region.x + patch.x * region.width, y: region.y + patch.y * region.height,
+        width: patch.width * region.width, height: patch.height * region.height,
+      }))
+      return { id: `${region.id}:${index}`, regionId: region.id, revision: this.revision + 1, text: block.text,
+        x: left, y: top, width: right - left, height: bottom - top, angle, quad, status: 'translating',
+        lineHeight: (block.lineHeight ?? sourceLineHeight(block)) / height * region.height,
+        ink: block.ink, patches }
+    })
+    if (unchanged && previous) {
+      previous.lastText = text
+      if (blocks.length === previous.blocks.length && blocks.every((block, i) => block.text === previous.blocks[i].text)) {
+        previous.blocks.forEach((block, i) => {
+          const { x, y, width, height, angle, quad, lineHeight, patches, ink } = blocks[i]
+          Object.assign(block, { x, y, width, height, angle, quad, lineHeight, patches, ink })
+        })
+        this.changed()
       }
-      let candidate: Candidate
-      if (old?.block.text === text && old.signature === signature) {
-        candidate = old
-        candidate.seen++
-        const sameProbe = !!block.visualId && block.visualId === candidate.block.visualId
-        candidate.block = { ...candidate.block, x: block.x, y: block.y, width: block.width, height: block.height, angle, quad: block.quad, appearance: block.appearance,
-          visualId: block.visualId, hidden: verified ? false : sameProbe ? candidate.block.hidden : true, appearancePending: !verified }
-      } else {
-        if (old) { this.pending.delete(old.block.id); old.abort.abort() }
-        candidate = { block, first: old && (old.block.status === 'stabilizing' || old.block.status === 'translating') ? old.first : now, lastText: text, seen: old?.block.text === text ? 2 : 1, failures: 0, signature, abort: new AbortController() }
+      return
+    }
+    this.revision++
+    this.replace(region.id, text, blocks)
+  }
+
+  refreshRules(): void {
+    for (const [id, region] of this.regions) {
+      if (region.blocks.some((block, index) => this.key(block.text) !== region.keys[index])) {
+        this.replace(id, region.lastText, region.blocks.map(block => ({ ...block, revision: ++this.revision })))
       }
-      next.set(candidate.block.id, candidate)
-      this.schedule(candidate, now)
     }
-    for (const [id, item] of previous) if (next.get(id) !== item) {
-      item.abort.abort()
-      if (this.pending.get(id) === item) this.pending.delete(id)
-    }
-    this.regions.set(regionId, next)
-    this.changed()
-    this.drain()
   }
 
   stop(): void {
     this.stopped = true
-    this.abort.abort()
-    this.pending.clear()
+    for (const region of this.regions.values()) region.abort.abort()
+    this.pending.length = 0
     this.regions.clear()
   }
 
-  private schedule(candidate: Candidate, now: number): void {
-    if (candidate.block.hidden || candidate.block.status !== 'stabilizing' || candidate.seen < 2 && now - candidate.first < 1200) return
-    const key = `${this.config.model}\0${this.config.sourceLanguage}\0${this.config.targetLanguage}\0${candidate.signature}\0${candidate.block.text}`
-    const cached = this.cache.get(key)
-    if (cached !== undefined) { candidate.block.translation = cached; candidate.block.status = 'ready' }
-    else { candidate.block.status = 'translating'; this.pending.set(candidate.block.id, candidate) }
+  private key(text: string): string {
+    return JSON.stringify([this.signature(text), text])
   }
 
-  private drain(): void {
-    while (!this.stopped && this.active.size < 2 && this.pending.size) {
-      const [id, candidate] = [...this.pending].find(([, item]) => item.block.regionId !== this.lastRegion) ?? this.pending.entries().next().value!
-      this.lastRegion = candidate.block.regionId
-      this.pending.delete(id)
-      if (this.regions.get(candidate.block.regionId)?.get(id) !== candidate) continue
-      this.active.add(candidate)
-      const revision = candidate.block.revision
-      void this.translate(candidate.block.text, AbortSignal.any([this.abort.signal, candidate.abort.signal])).then(translation => {
-        if (!translation.trim()) throw new Error('Empty screen translation')
-        if (this.stopped || this.regions.get(candidate.block.regionId)?.get(id) !== candidate || candidate.block.revision !== revision || candidate.signature !== this.signature(candidate.block.text)) return
-        const key = `${this.config.model}\0${this.config.sourceLanguage}\0${this.config.targetLanguage}\0${candidate.signature}\0${candidate.block.text}`
-        this.cache.set(key, translation)
-        if (this.cache.size > 256) this.cache.delete(this.cache.keys().next().value!)
-        candidate.block.translation = translation
-        candidate.block.status = 'ready'
-      }).catch(() => {
-        if (this.stopped || this.regions.get(candidate.block.regionId)?.get(id) !== candidate) return
-        if (++candidate.failures < 2) this.pending.set(id, candidate)
-        else { candidate.block.status = 'error'; this.failed() }
-      }).finally(() => { this.active.delete(candidate); if (!this.stopped) { this.changed(); this.drain() } })
+  private replace(id: string, text: string, blocks: ScreenTextBlock[]): void {
+    const previous = this.regions.get(id)
+    previous?.abort.abort()
+    if (previous) {
+      for (let i = this.pending.length - 1; i >= 0; i--) {
+        if (this.pending[i].region === previous) this.pending.splice(i, 1)
+      }
+    }
+    const region = { lastText: text, abort: new AbortController(), blocks, keys: blocks.map(block => this.key(block.text)) }
+    this.regions.set(id, region)
+    blocks.forEach((block, index) => {
+      block.translation = this.cache.get(region.keys[index])
+      block.status = block.translation === undefined ? 'translating' : 'ready'
+      if (block.status === 'translating') this.pending.push({ region, index })
+    })
+    this.changed()
+    if (!this.translating) void this.drain()
+  }
+
+  private async drain(): Promise<void> {
+    this.translating = true
+    try {
+      let task = this.pending.shift()
+      while (task) {
+        const { region, index } = task
+        const { signal } = region.abort
+        const block = region.blocks[index], key = region.keys[index]
+        if (!signal.aborted) {
+          try {
+            const cached = this.cache.get(key)
+            const result = cached ?? await this.translate(block.text, signal)
+            if (!signal.aborted) {
+              this.cache.set(key, result)
+              if (this.cache.size > 256) {
+                const earliest = this.cache.keys().next()
+                if (!earliest.done) this.cache.delete(earliest.value)
+              }
+              block.translation = result
+              block.status = 'ready'
+            }
+          } catch {
+            if (!signal.aborted) { block.status = 'error'; this.failed() }
+          }
+          if (!signal.aborted) this.changed()
+        }
+        task = this.pending.shift()
+      }
+    } finally {
+      this.translating = false
     }
   }
 }
 
-/** Join aligned dialogue lines while keeping separated menu columns and controls independent. */
-export function mergeScreenLines(input: OcrBlock[], imageWidth: number): OcrBlock[] {
-  const box = (block: OcrBlock) => ({ left: Math.min(...block.quad.map(point => point[0])), right: Math.max(...block.quad.map(point => point[0])), top: Math.min(...block.quad.map(point => point[1])), bottom: Math.max(...block.quad.map(point => point[1])) })
-  const result: OcrBlock[] = []
-  for (const block of [...input].sort((a, b) => box(a).top - box(b).top || box(a).left - box(b).left)) {
-    const b = box(block)
-    const previous = [...result].reverse().find(item => {
-      const a = box(item), lineHeight = b.bottom - b.top
-      return Math.abs(a.left - b.left) <= imageWidth * 0.015 && b.top >= a.bottom - lineHeight * 0.15
-        && b.top - a.bottom < lineHeight * 0.65 && Math.min(a.right - a.left, b.right - b.left) >= Math.max(a.right - a.left, b.right - b.left) * 0.5
-        && Math.abs(item.quad[0][1] - item.quad[1][1]) < lineHeight * 0.2 && Math.abs(block.quad[0][1] - block.quad[1][1]) < lineHeight * 0.2
-    })
-    if (!previous) { result.push({ ...block, quad: block.quad.map(point => [...point]) }); continue }
-    const a = box(previous), left = Math.min(a.left, b.left), right = Math.max(a.right, b.right)
-    previous.text += `\n${block.text}`
-    previous.confidence = Math.min(previous.confidence, block.confidence)
-    if (previous.appearance && block.appearance) previous.appearance = { ...previous.appearance, patches: [...previous.appearance.patches, ...block.appearance.patches] }
-    previous.quad = [[left, a.top], [right, a.top], [right, b.bottom], [left, b.bottom]]
+// Luna compares each recognized region against its immediately preceding OCR text.
+export function editDistanceBelow(left: string, right: string, limit: number): boolean {
+  if (left === right) return true
+  if (Math.abs(left.length - right.length) >= limit) return false
+  let previous = Array.from({ length: right.length + 1 }, (_, i) => Math.min(i, limit))
+  let current = previous.slice()
+  for (let i = 1; i <= left.length; i++) {
+    const start = Math.max(1, i - limit + 1), end = Math.min(right.length, i + limit - 1)
+    current[start - 1] = Math.min(i, limit)
+    for (let j = start; j <= end; j++) {
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + Number(left[i - 1] !== right[j - 1]))
+    }
+    if (end < right.length) current[end + 1] = limit
+    ;[previous, current] = [current, previous]
   }
-  return result
+  return previous[right.length] < limit
+}
+
+function bounds(block: OcrBlock) {
+  const xs = block.quad.map(point => point[0]), ys = block.quad.map(point => point[1])
+  const left = Math.min(...xs), top = Math.min(...ys), right = Math.max(...xs), bottom = Math.max(...ys)
+  const width = right - left, height = bottom - top
+  return { ...block, edges: [left, top, right, bottom], width, height, min: Math.min(width, height) }
+}
+
+function sourceLineHeight({ quad: [a, b, c, d] }: OcrBlock): number {
+  return (Math.hypot(d[0] - a[0], d[1] - a[1]) + Math.hypot(c[0] - b[0], c[1] - b[1])) / 2
+}
+
+function sortLines(boxes: ReturnType<typeof bounds>[], vertical: boolean, space: string) {
+  const axis = vertical ? 0 : 1
+  const center = (box: ReturnType<typeof bounds>, dim: number) => (box.edges[dim] + box.edges[dim + 2]) / 2
+  const remaining = new Set(boxes)
+  const lines = []
+  for (const box of remaining) {
+    remaining.delete(box)
+    const row = [box]
+    const mid = center(box, axis)
+    for (const other of remaining) {
+      const otherMid = center(other, axis)
+      if (mid > other.edges[axis] && mid < other.edges[axis + 2]
+          && otherMid > box.edges[axis] && otherMid < box.edges[axis + 2]) {
+        row.push(other)
+        remaining.delete(other)
+      }
+    }
+    row.sort((a, b) => center(a, 1 - axis) - center(b, 1 - axis))
+    lines.push({ mid: center(row[0], axis), ...bounds({ text: row.map(item => item.text).join(space),
+      quad: row.flatMap(item => item.quad) }) })
+  }
+  return lines.sort((a, b) => vertical ? b.mid - a.mid : a.mid - b.mid)
+}
+
+// Group neighboring OCR boxes by Luna's relative distance and preserve the first box's angle.
+export function mergeScreenLines(input: OcrBlock[], vertical: boolean, space: string): OcrBlock[] {
+  const groups = input.map(item => [bounds(item)])
+  const distance = (a: number[], b: number[]) =>
+    Math.hypot(Math.max(a[0] - b[2], b[0] - a[2], 0), Math.max(a[1] - b[3], b[1] - a[3], 0))
+  const size = (group: ReturnType<typeof bounds>[]) => group.reduce((sum, box) => sum + box.min, 0) / group.length
+  for (let i = 0; i < groups.length; i++) {
+    for (let j = 0; j < groups.length; j++) {
+      if (i === j) continue
+      const threshold = 0.4 * Math.min(size(groups[i]), size(groups[j]))
+      if (!groups[i].some(a => groups[j].some(b => distance(a.edges, b.edges) <= threshold))) continue
+      groups[i].push(...groups[j])
+      groups.splice(j, 1)
+      if (j < i) i--
+      j = -1
+    }
+  }
+  return groups.map(group => {
+    if (group.length === 1) {
+      const { text, quad, ink, patches } = group[0]
+      return { text, quad, ink, patches }
+    }
+    const lines = sortLines(group, vertical, space)
+    const text = lines.map((line, index) => {
+      if (!index) return line.text
+      const previous = lines[index - 1], edge = vertical ? 3 : 2
+      const tolerance = vertical ? Math.min(previous.width, line.width) : Math.min(previous.height, line.height)
+      return (previous.edges[edge] < line.edges[edge] - tolerance ? '\n' : space) + line.text
+    }).join('')
+    const [a, b] = group[0].quad
+    const angle = Math.atan2(b[1] - a[1], b[0] - a[0])
+    const cos = Math.cos(angle), sin = Math.sin(angle)
+    const points = group.flatMap(item => item.quad.map(([x, y]) => [x * cos + y * sin, -x * sin + y * cos]))
+    const [left, top, right, bottom] = bounds({ text, quad: points }).edges
+    const quad = [[left, top], [right, top], [right, bottom], [left, bottom]]
+      .map(([x, y]) => [x * cos - y * sin, x * sin + y * cos])
+    return { text, quad, lineHeight: group.reduce((sum, block) => sum + sourceLineHeight(block), 0) / group.length,
+      ink: group[0].ink, patches: group.flatMap(block => block.patches ?? []) }
+  })
 }

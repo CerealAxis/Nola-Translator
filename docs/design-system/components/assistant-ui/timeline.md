@@ -2,6 +2,7 @@
 title: Timeline（时间线）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "按先后顺序展示事件，区分已经完成、当前进行和未来阶段。"
 ---
 
 # Timeline（时间线）

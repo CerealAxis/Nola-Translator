@@ -2,6 +2,7 @@
 title: Support tickets（支持工单）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用带坐标轴和图例的三序列堆叠柱状图，对比邮件、聊天和电话工单。"
 ---
 
 # Support tickets（支持工单）

@@ -1,3 +1,7 @@
+---
+description: "Nola Translator 후원 방법과 후원자 혜택을 확인하고 중국 본토와 그 밖의 지역에 맞는 후원 경로를 찾아보세요."
+---
+
 # 후원
 
 > [!WARNING]

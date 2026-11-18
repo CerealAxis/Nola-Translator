@@ -2,6 +2,7 @@
 title: 足不出户
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "能在当前页面完成的事，就尽量留在当前页面。少一次跳转，用户便少一次重新寻找原内容。"
 ---
 
 # 足不出户

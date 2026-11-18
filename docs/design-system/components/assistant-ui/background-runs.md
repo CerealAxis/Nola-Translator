@@ -2,6 +2,7 @@
 title: Background runs（后台运行）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在收件箱汇总后台运行，查看状态并进入对应会话领取结果。"
 ---
 
 # Background runs（后台运行）

@@ -2,6 +2,7 @@
 title: Thread（对话流）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "完整的聊天界面，包含消息列表、输入区、滚动定位以及新会话、历史加载和生成中的状态。预览可以发送消息、接收模拟流式回复和停止生成。"
 ---
 
 # Thread（对话流）

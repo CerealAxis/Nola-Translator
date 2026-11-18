@@ -2,6 +2,7 @@
 title: Sheet（侧边面板）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "扩展 Dialog 组件，用于显示补充屏幕主要内容的信息。"
 ---
 
 # Sheet（侧边面板）

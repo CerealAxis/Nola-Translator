@@ -2,6 +2,7 @@
 title: Canvas（画布）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "将聊天和可查看的文档并列展示，支持复制和关闭。"
 ---
 
 # Canvas（画布）

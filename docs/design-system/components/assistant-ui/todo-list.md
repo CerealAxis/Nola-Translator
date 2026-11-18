@@ -2,6 +2,7 @@
 title: Todo list（待办列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "以清单形式显示待办任务、当前步骤及其完成情况。"
 ---
 
 # Todo list（待办列表）

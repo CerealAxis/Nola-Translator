@@ -1,8 +1,12 @@
+---
+description: "認識 Nola Translator 桌面應用程式與瀏覽器擴充的音訊辨識和翻譯流程，試用線上示範，並查看安裝方式與模型功能。"
+---
+
 # 產品介紹
 
 <div align="center">
   <img src="/docs-image/zh-TW/getting-started/introduction/nola-translator-logo.svg" alt="Nola Translator Logo" width="112" height="112">
-  <h1>Nola Translator</h1>
+  <p class="intro-product-name"><strong>Nola Translator</strong></p>
   <p>一款開源的即時翻譯軟體，提供瀏覽器插件版本</p>
   <p><a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.md">English</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-CN.md">简体中文</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-TW.md">繁體中文（台灣）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-HK.md">繁體中文（香港）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ja.md">日本語</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ko.md">한국어</a></p>
 </div>

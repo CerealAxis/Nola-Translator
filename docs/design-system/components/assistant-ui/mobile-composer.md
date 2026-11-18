@@ -2,6 +2,7 @@
 title: Mobile composer（移动端消息编辑器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在移动端展示紧凑的编辑栏，提供附件、发送和运行控制。"
 ---
 
 # Mobile composer（移动端消息编辑器）

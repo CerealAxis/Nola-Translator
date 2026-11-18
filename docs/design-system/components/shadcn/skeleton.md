@@ -2,6 +2,7 @@
 title: Skeleton（骨架屏）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在列表或卡片加载期间显示与即将出现的内容相对应的骨架占位。"
 ---
 
 # Skeleton（骨架屏）

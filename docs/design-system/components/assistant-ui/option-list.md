@@ -2,6 +2,7 @@
 title: Option list（选项列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "让用户从工具提出的选项中单选或多选，确认后显示答案。"
 ---
 
 # Option list（选项列表）

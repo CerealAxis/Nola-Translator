@@ -2,6 +2,7 @@
 title: View event（查看日程）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用紧凑的日程卡片展示单个事件的日期、时间和地点，让读者快速确认安排。"
 ---
 
 # View event（查看日程）

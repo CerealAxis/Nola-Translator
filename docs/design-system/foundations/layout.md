@@ -2,6 +2,7 @@
 title: 布局
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "布局组织内容和操作，帮助人们理解界面、找到目标，并适应窗口与文字大小的变化。"
 ---
 
 # 布局

@@ -2,6 +2,7 @@
 title: Card（卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用卡片的页头、内容区和页脚组织一组信息，并在相应位置放置操作。"
 ---
 
 # Card（卡片）

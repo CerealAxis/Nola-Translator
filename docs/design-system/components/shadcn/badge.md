@@ -2,6 +2,7 @@
 title: Badge（徽标）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用徽标简短标记状态、分类或数量，查看常用样式和与图标组合的示例。"
 ---
 
 # Badge（徽标）

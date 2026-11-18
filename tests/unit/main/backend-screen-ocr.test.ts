@@ -51,6 +51,22 @@ it('does not restart the backend when releasing a model after backend exit', asy
   expect(ensureBackend).not.toHaveBeenCalled()
 })
 
+it('posts native capture requests through the authenticated backend and releases the same session', async () => {
+  const fetch = vi.fn(async (_url: URL, options: RequestInit) => options.method === 'DELETE'
+    ? new Response(null, { status: 204 }) : new Response(JSON.stringify({ frames: [], hide_overlay: true })))
+  vi.stubGlobal('fetch', fetch)
+  const { client } = create()
+  const request = { session_id: crypto.randomUUID(), epoch: 2, mode: 'analysis' as const,
+    manual: false, target: '12345', overlay: '', owner_pid: 123, composition_changed: false, regions: [] }
+  await expect(client.capture(request, new AbortController().signal)).resolves.toEqual({ frames: [], hide_overlay: true })
+  await client.releaseCapture(request.session_id)
+  expect(fetch.mock.calls.map(([url, options]) => [url.pathname, options.method])).toEqual([
+    ['/api/v2/screen/capture', 'POST'], [`/api/v2/screen/capture/${request.session_id}`, 'DELETE'],
+  ])
+  expect(fetch.mock.calls[0][1].headers).toMatchObject({ Authorization: 'Bearer fixture' })
+  expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toEqual(request)
+})
+
 it('loads, infers and releases the selected language pack while management can address a different pack', async () => {
   const fetch = vi.fn(async (url: URL, options?: RequestInit) => new Response(JSON.stringify(options?.method === 'POST' && url.pathname === '/api/v2/screen/ocr'
     ? { width: 100, height: 50, blocks: [] } : { installed: true, state: 'idle' })))

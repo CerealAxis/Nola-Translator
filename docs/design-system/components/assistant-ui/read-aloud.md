@@ -2,6 +2,7 @@
 title: Read aloud（朗读）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "朗读一条消息，同步显示播放进度、当前词和倍速。"
 ---
 
 # Read aloud（朗读）

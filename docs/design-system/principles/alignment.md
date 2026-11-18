@@ -2,6 +2,7 @@
 title: 对齐
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "对齐让页面有稳定的阅读线。用户沿同一起点向下看，就能较快找到相关内容。"
 ---
 
 # 对齐

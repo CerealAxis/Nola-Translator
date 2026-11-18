@@ -1,3 +1,7 @@
+---
+description: "从确认问题、准备环境和 Fork 仓库开始，学习如何修改 Nola Translator 文档、校验差异并提交 Pull Request。"
+---
+
 # 如何贡献
 
 > [!WARNING]  

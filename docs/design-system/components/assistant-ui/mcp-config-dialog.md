@@ -2,6 +2,7 @@
 title: MCP config dialog（MCP 配置对话框）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "让用户查看应用内置的 MCP 连接器，添加自己的服务器，并管理连接和身份验证。"
 ---
 
 # MCP config dialog（MCP 配置对话框）

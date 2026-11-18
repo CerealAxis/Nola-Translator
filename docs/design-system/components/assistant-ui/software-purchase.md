@@ -2,6 +2,7 @@
 title: Software purchase（软件购买）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "购买表单收集用途、日期、席位数和结算频率，并展示金额和确认操作。"
 ---
 
 # Software purchase（软件购买）

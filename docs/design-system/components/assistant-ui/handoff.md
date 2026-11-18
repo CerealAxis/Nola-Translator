@@ -2,6 +2,7 @@
 title: Handoff（交接）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "呈现从一个代理转交给另一个代理的过程及携带的上下文。"
 ---
 
 # Handoff（交接）

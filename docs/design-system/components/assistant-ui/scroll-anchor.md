@@ -2,6 +2,7 @@
 title: Scroll anchor（滚动锚点）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在新消息增长时保留阅读位置，并让用户一键回到最新内容。"
 ---
 
 # Scroll anchor（滚动锚点）

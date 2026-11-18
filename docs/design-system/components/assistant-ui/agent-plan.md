@@ -2,6 +2,7 @@
 title: Agent plan（代理计划）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "显示代理的执行计划，区分已完成、进行中和等待执行的步骤。"
 ---
 
 # Agent plan（代理计划）

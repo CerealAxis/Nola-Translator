@@ -2,6 +2,7 @@
 title: Reasoning（推理）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "将模型推理放入可展开区域，流式传输时可继续显示进度。"
 ---
 
 # Reasoning（推理）

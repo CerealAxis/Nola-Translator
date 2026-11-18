@@ -2,6 +2,7 @@
 title: Composer（消息编辑器）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "将输入框、工具区、附件和发送操作组合成消息编辑器。"
 ---
 
 # Composer（消息编辑器）

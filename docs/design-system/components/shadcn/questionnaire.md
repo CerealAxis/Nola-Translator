@@ -2,6 +2,7 @@
 title: Questionnaire（问卷）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "支持单选、多选、自由作答和可跳过问题的多步问卷。"
 ---
 
 # Questionnaire（问卷）

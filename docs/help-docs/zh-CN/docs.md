@@ -1,3 +1,7 @@
+---
+description: "按任务查找 Nola Translator 帮助文档，查看安装与模型配置、字幕功能、问题排查、参与贡献和软件协议。"
+---
+
 # 帮助文档
 
 这里存放 Nola Translator 的帮助文档。

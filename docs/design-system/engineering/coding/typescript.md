@@ -1,6 +1,7 @@
 ---
 group: 代码风格
 order: 4
+description: "查看 TypeScript 中类型声明、函数、类、断言、导入及注释等编码约定。"
 ---
 
 # TypeScript 编码规约

@@ -2,6 +2,7 @@
 title: 设计原则
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "设计原则用于判断信息怎么排、操作放在哪里，以及页面变化后用户能否看清结果。本章沿着这三个问题阅读。"
 ---
 
 # 设计原则

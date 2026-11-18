@@ -2,6 +2,7 @@
 title: Separator（分隔线）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在相关内容之间放置水平或垂直分隔线，明确不同分组的边界。"
 ---
 
 # Separator（分隔线）

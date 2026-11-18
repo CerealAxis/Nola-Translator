@@ -2,6 +2,7 @@
 title: Follow-up suggestions（后续建议）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在一次回复结束后，用可横向滚动的按钮提供下一步建议。"
 ---
 
 # Follow-up suggestions（后续建议）

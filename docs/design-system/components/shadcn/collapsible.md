@@ -2,6 +2,7 @@
 title: Collapsible（局部展开）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用局部折叠组件控制一段内容的展开与收起，将触发按钮放在对应内容附近。"
 ---
 
 # Collapsible（局部展开）

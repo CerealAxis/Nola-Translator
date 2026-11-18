@@ -344,7 +344,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
     <>
       {locked ? null : (
         <div data-slot="overlay-controls" className="nola-caption-controls">
-          <div ref={controlsRow} className="nola-caption-controls-row nola-no-drag" data-material="glass">
+          <div ref={controlsRow} className="nola-caption-controls-row nola-no-drag">
             {/*
              * A spinner marks `starting` rather than greying the button out: greyed
              * and unresponsive reads as broken, a spinner reads as waiting on the

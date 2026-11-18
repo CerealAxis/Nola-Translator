@@ -2,7 +2,7 @@ import { emptyWordRules, protectTranslation, resolveWordRules, type WordRulesDoc
 import { randomUUID } from 'node:crypto'
 import { readFile, mkdir, writeFile, rename } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { BrowserWindow, desktopCapturer, globalShortcut, ipcMain, nativeImage, screen, session } from 'electron'
+import { BrowserWindow, desktopCapturer, globalShortcut, ipcMain, screen } from 'electron'
 import type { IpcMainInvokeEvent, Rectangle, WebContents } from 'electron'
 import { electronShortcut } from '../shared/keyboard-shortcuts'
 import type { AppSettings } from '../shared/settings'
@@ -10,19 +10,20 @@ import { defaultRealtimeS2s } from '../shared/settings'
 import type { ModelGatewaySnapshot } from '../shared/model-gateway'
 import { screenProcessingMode, screenTranslationModel } from '../shared/screen-translation'
 import type { DirectModelRequest, DirectModelResult } from '../shared/agent-workspace'
-import { screenCommandSchema, screenConfigSchema, screenFrameSchema, screenShortcutsSchema, screenPresetSchema, screenRegionSetSchema, type ScreenRegionSet, type ScreenRegionPreset, type ScreenShortcuts, type ScreenConfig, type ScreenFrame, type ScreenSnapshot, type ScreenSource, type ScreenOcrRequest, type ScreenOcrResult } from '../shared/screen-translation'
+import { screenCommandSchema, screenConfigSchema, screenShortcutsSchema, screenPresetSchema, screenRegionSetSchema, type ScreenRegionSet, type ScreenRegionPreset, type ScreenShortcuts, type ScreenConfig, type ScreenCaptureRequest, type ScreenCaptureResult, type ScreenSnapshot, type ScreenSource, type ScreenOcrRequest, type ScreenOcrResult } from '../shared/screen-translation'
 import type { FeatureActivity, FeatureLease } from './feature-activity'
 import { isTrustedRendererUrl, resolvePreloadPath } from './window-options'
-import { ScreenPipeline, mergeScreenLines, type OcrBlock } from './screen-pipeline'
+import { ScreenPipeline } from './screen-pipeline'
 import { observeScreenWindow } from './screen-target'
 import type { ScreenRegion } from '../shared/screen-translation'
 import { emptyGlossary, type GlossaryDocument } from '../shared/glossary'
 import { resolveGlossaryTerms } from '../shared/glossary-match'
-import { createScreenTextProbe, matchesScreenTextProbe, type ScreenTextProbe } from '../shared/screen-visual-probe'
 
 interface ScreenTranslationOptions {
   mainDir: string; configPath: string; prepareOcr(): Promise<() => void>
   gatewaySnapshot(): Pick<ModelGatewaySnapshot, 'state' | 'availableModels'>
+  captureScreen(request: ScreenCaptureRequest, signal: AbortSignal): Promise<ScreenCaptureResult>
+  releaseScreenCapture?(sessionId: string): Promise<void>
   getMainWindow?(): BrowserWindow | null
   inferOcr(request: ScreenOcrRequest, signal: AbortSignal): Promise<ScreenOcrResult>
   settings(): AppSettings; inferModel(request: DirectModelRequest, signal: AbortSignal): Promise<DirectModelResult>
@@ -33,7 +34,6 @@ interface ScreenTranslationOptions {
 export class ScreenTranslation {
   private state: ScreenSnapshot = { status: 'ready', config: screenConfigSchema.parse({}), sessionId: randomUUID(), epoch: 0, blocks: [], shortcutError: false, frames: 0, ocrMs: 0, translationMs: 0 }
   private readonly ready: Promise<void>
-  private capture?: BrowserWindow
   private overlay?: BrowserWindow
   private toolbar?: BrowserWindow
   private editor?: BrowserWindow
@@ -45,10 +45,10 @@ export class ScreenTranslation {
   private presets: ScreenRegionPreset[] = []
   private draft?: ScreenRegionSet
   private pipeline?: ScreenPipeline
-  private processing = false
-  private pendingFrame?: ScreenFrame
-  private readonly observedHashes = new Map<string, string>()
-  private readonly visualProbes = new Map<string, ScreenTextProbe>()
+  private sampling = false
+  private captureTimer?: ReturnType<typeof setTimeout>
+  private hiddenForCapture?: BrowserWindow
+  private readonly lastOcr = new Map<string, number>()
   private captureRegions: ScreenRegion[] = []
   private cursorTimer?: ReturnType<typeof setInterval>
   private switchingDisplay = false
@@ -57,6 +57,7 @@ export class ScreenTranslation {
   private glossaryDocument = emptyGlossary()
   private wordRulesDocument = emptyWordRules()
   private singleRead = false
+  private readRevision = 0
   private readonly requestedRegions = new Set<string>()
   private savedScreenConfig?: ScreenConfig
   private readonly listeners = new Set<(snapshot: ScreenSnapshot) => void>()
@@ -64,10 +65,8 @@ export class ScreenTranslation {
   private sourceAvailable = true
   private targetForeground = true
   private bounds?: Rectangle
+  private targetPixels?: Rectangle
   private stopObserver?: () => void
-  private captureDimensions?: { width: number; height: number }
-  private readonly hashes = new Map<string, string>()
-  private readonly ocrResults = new Map<string, { blocks: OcrBlock[]; width: number; height: number }>()
   private workAbort = new AbortController()
   private lease?: FeatureLease
   private releaseOcr?: () => void
@@ -105,7 +104,7 @@ export class ScreenTranslation {
       const command = screenCommandSchema.parse(raw)
       if (command.action === 'regions' || command.action === 'cancelEdit') {
         if (event.sender !== this.editor?.webContents) throw new Error('Access denied')
-      } else if (event.sender === this.capture?.webContents || event.sender === this.overlay?.webContents || event.sender === this.highlights?.webContents) throw new Error('Access denied')
+      } else if (event.sender === this.overlay?.webContents || event.sender === this.highlights?.webContents) throw new Error('Access denied')
       if (command.action === 'configure') await this.configure(command.config)
       else if (command.action === 'toolbarSize') {
         if (event.sender !== this.toolbar?.webContents) throw new Error('Access denied')
@@ -145,21 +144,13 @@ export class ScreenTranslation {
       return this.snapshot()
     })
     handle('screen:bootstrap', event => {
-      const role = event.sender === this.capture?.webContents ? 'capture' : event.sender === this.editor?.webContents ? 'editor' : event.sender === this.overlay?.webContents ? 'overlay' : event.sender === this.highlights?.webContents ? 'regions' : event.sender === this.toolbar?.webContents ? 'toolbar' : undefined
+      const role = event.sender === this.editor?.webContents ? 'editor' : event.sender === this.overlay?.webContents ? 'overlay' : event.sender === this.highlights?.webContents ? 'regions' : event.sender === this.toolbar?.webContents ? 'toolbar' : undefined
       if (!role) throw new Error('Access denied')
       return { role, snapshot: this.snapshot() }
     })
-    handle('screen:frame', (event, raw) => {
-      if (event.sender !== this.capture?.webContents) throw new Error('Access denied')
-      return this.frame(screenFrameSchema.parse(raw))
-    })
-    handle('screen:capture-error', event => {
-      if (event.sender !== this.capture?.webContents) throw new Error('Access denied')
-      this.fail('captureFailed')
-    })
   }
 
-  snapshot(): ScreenSnapshot { return { ...this.state, config: { ...this.state.config, regions: [...this.state.config.regions] }, blocks: [...this.state.blocks], presets: structuredClone(this.presets), regionsVisible: !!this.highlights, captureRegions: this.captureRegions, overlayVisible: this.overlayVisible, visualProbes: [...this.visualProbes.values()] } }
+  snapshot(): ScreenSnapshot { return { ...this.state, config: { ...this.state.config, regions: [...this.state.config.regions] }, blocks: [...this.state.blocks], presets: structuredClone(this.presets), regionsVisible: !!this.highlights, captureRegions: this.captureRegions, overlayVisible: this.overlayVisible } }
 
   subscribe(listener: (snapshot: ScreenSnapshot) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener) }
 
@@ -198,7 +189,8 @@ export class ScreenTranslation {
     this.singleRead = !continuous
     this.requestedRegions.clear()
     for (const region of this.captureRegions) this.requestedRegions.add(region.id)
-    this.hashes.clear()
+    this.readRevision++
+    this.scheduleCapture()
   }
 
   async refreshWordRules(): Promise<void> {
@@ -206,7 +198,7 @@ export class ScreenTranslation {
     const document = await this.options.wordRules()
     if (document.matchingRevision === this.wordRulesDocument.matchingRevision) return
     this.wordRulesDocument = document
-    for (const [regionId, result] of this.ocrResults) this.pipeline?.update(regionId, result.blocks, result.width, result.height, Date.now(), this.hashes.get(regionId) === this.observedHashes.get(regionId))
+    this.pipeline?.refreshRules()
   }
 
   async refreshGlossary(): Promise<void> {
@@ -217,9 +209,7 @@ export class ScreenTranslation {
     const changed = document.matchingRevision !== this.glossaryDocument.matchingRevision
     this.glossaryDocument = document
     if (!changed) return
-    for (const [regionId, result] of this.ocrResults) {
-      this.pipeline?.update(regionId, result.blocks, result.width, result.height, Date.now(), this.hashes.get(regionId) === this.observedHashes.get(regionId))
-    }
+    this.pipeline?.refreshRules()
   }
 
   private glossaryMatch(text: string) {
@@ -231,8 +221,8 @@ export class ScreenTranslation {
     if (!this.bounds || this.state.config.captureMode !== 'cursor' || this.userPaused || this.switchingDisplay) return
     const point = screen.getCursorScreenPoint(), bounds = this.bounds
     const contains = (rect: Rectangle) => point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height
-    const ownSurface = BrowserWindow.getAllWindows().some(window => window !== this.capture && window !== this.overlay && window !== this.highlights && window.isVisible() && contains(window.getBounds()))
-    if (!contains(bounds) && !ownSurface && this.capture && String(screen.getDisplayNearestPoint(point).id) !== this.state.config.display?.id) {
+    const ownSurface = BrowserWindow.getAllWindows().some(window => window !== this.overlay && window !== this.highlights && window.isVisible() && contains(window.getBounds()))
+    if (!contains(bounds) && !ownSurface && this.overlay && String(screen.getDisplayNearestPoint(point).id) !== this.state.config.display?.id) {
       void this.switchCursorDisplay()
       return
     }
@@ -373,27 +363,28 @@ export class ScreenTranslation {
         this.observedSourceId = selected.id
         this.stopObserver = observeScreenWindow(selected.id, target => {
           if (this.observedSourceId !== selected.id) return
+          const bounds = target.clientBounds ?? target.bounds
           if (!initialized) {
             initialized = true; clearTimeout(timeout)
             if (!target.available) { reject(new Error('targetUnavailable')); return }
             this.state.config.windowIdentity = target.identity
-            this.bounds = target.bounds
+            this.bounds = bounds
+            this.targetPixels = target.clientPixels
             this.sourceAvailable = target.available; this.targetForeground = target.foreground
             resolve()
             return
           }
           if (target.identity !== this.state.config.windowIdentity) { this.fail('targetChanged'); return }
-          const wasAvailable = this.sourceAvailable && this.targetForeground
+          const wasAvailable = this.sourceAvailable
           this.sourceAvailable = target.available; this.targetForeground = target.foreground
-          const dimensions = this.captureDimensions
-          const candidate = dimensions && target.candidates.find(item => Math.abs(item.width / item.height - dimensions.width / dimensions.height) < 0.03)
-          const bounds = candidate ? candidate.bounds : target.bounds
           const resized = this.bounds && (bounds.width !== this.bounds.width || bounds.height !== this.bounds.height)
           this.bounds = bounds
-          if (resized) { this.captureDimensions = undefined; if (this.pipeline) this.resetPipeline(); this.publish() }
+          this.targetPixels = target.clientPixels
+          if (resized) { if (this.pipeline) this.resetPipeline(); this.publish() }
           this.updateBounds()
           if (!this.canRun() && this.state.status === 'running') { this.invalidate(); this.state.status = 'waiting'; this.publish() }
           else if (!wasAvailable && this.canRun() && this.state.status === 'waiting') { this.resetPipeline(); this.state.status = 'running'; this.publish() }
+          else this.updateOverlayVisibility()
         }, () => { clearTimeout(timeout); if (!initialized) reject(new Error('targetUnavailable')); else this.fail('targetUnavailable') })
       })
       return false
@@ -455,7 +446,7 @@ export class ScreenTranslation {
     await this.stopping
     await this.showToolbar()
     if (this.state.status === 'starting' || this.state.status === 'running' || this.editor) return
-    if (this.capture && this.lease) { await this.resume(); return }
+    if (this.overlay && this.releaseOcr) { await this.resume(); return }
     if (this.disposed) return
     if (this.options.gatewaySnapshot().state !== 'running') { this.fail('gatewayNotReady'); return }
     if (screenProcessingMode(this.state.config) === 'default' && defaultRealtimeS2s(this.options.settings())) {
@@ -485,7 +476,8 @@ export class ScreenTranslation {
       this.state.frames = 0
       this.userPaused = false
       this.singleRead = false
-      this.captureRegions = config.captureMode === 'regions' ? config.regions : [{ id: randomUUID(), x: 0, y: 0, width: 1, height: 1 }]
+      this.captureRegions = config.captureMode !== 'cursor' && config.regions.length
+        ? config.regions : [{ id: randomUUID(), x: 0, y: 0, width: 1, height: 1 }]
       if (config.captureMode === 'cursor') this.updateCursorRegion()
       await this.openCapture(lifecycle)
       if (lifecycle !== this.lifecycle || this.disposed) return
@@ -517,10 +509,14 @@ export class ScreenTranslation {
     if (screenProcessingMode(this.state.config) === 'default' && defaultRealtimeS2s(this.options.settings())) {
       this.fail('s2sUnsupported'); return
     }
-    if (!this.capture || !this.lease && this.options.activity) { await this.stop(); await this.start(); return }
+    if (!this.overlay || !this.lease && this.options.activity) { await this.stop(); await this.start(); return }
     if (this.editor) return
     this.userPaused = false
     this.singleRead = false
+    this.requestedRegions.clear()
+    if (this.state.config.captureMode !== 'cursor' && this.state.config.regions.length) {
+      this.captureRegions = this.state.config.regions
+    }
     this.state.error = undefined
     this.resetPipeline()
     this.state.status = this.canRun() ? 'running' : 'waiting'
@@ -581,114 +577,106 @@ export class ScreenTranslation {
     await this.writeQueue.catch(() => {})
     this.stopShortcutRecording()
     for (const accelerator of this.registeredShortcuts) globalShortcut.unregister(accelerator)
-    for (const channel of ['snapshot', 'sources', 'command', 'bootstrap', 'frame', 'capture-error']) ipcMain.removeHandler(`screen:${channel}`)
+    for (const channel of ['snapshot', 'sources', 'command', 'bootstrap']) ipcMain.removeHandler(`screen:${channel}`)
     await this.writeQueue.catch(() => {})
   }
 
-  private async frame(frame: ScreenFrame): Promise<void> {
-    if (frame.sessionId !== this.state.sessionId || frame.epoch !== this.state.epoch) return
-    if (this.state.status !== 'running' && this.state.status !== 'editing') return
-    const dimensions = this.captureDimensions
-    if (dimensions && Math.abs(dimensions.width / dimensions.height - frame.width / frame.height) > 0.03) {
-      if (this.state.config.captureMode === 'window') {
-        this.captureDimensions = { width: frame.width, height: frame.height }; this.resetPipeline(); this.publish()
-      } else this.fail('targetChanged')
-      return
+  private scheduleCapture(delay = 0): void {
+    if (this.captureTimer || this.sampling || !this.overlay || this.state.status !== 'running'
+        || this.singleRead && !this.requestedRegions.size) return
+    this.captureTimer = setTimeout(() => {
+      this.captureTimer = undefined
+      void this.sample()
+    }, delay)
+    this.captureTimer.unref?.()
+  }
+
+  private async sample(): Promise<void> {
+    const pipeline = this.pipeline, bounds = this.bounds
+    if (!pipeline || !bounds || this.state.status !== 'running') return
+    const { epoch, sessionId, config } = this.state
+    const { signal } = this.workAbort
+    const readRevision = this.readRevision
+    const manual = this.requestedRegions.size > 0
+    const now = Date.now()
+    const regions = this.captureRegions.filter(region => manual ? this.requestedRegions.has(region.id)
+      : config.ocrMode !== 'period' || now - (this.lastOcr.get(region.id) ?? -Infinity) > config.intervalMs)
+    const delay = config.ocrMode === 'trigger' && !manual ? 15 : 100
+    if (!regions.length) { this.scheduleCapture(delay); return }
+    const physical = this.targetPixels ?? screen.dipToScreenRect(null, bounds)
+    const request: ScreenCaptureRequest = {
+      session_id: sessionId, epoch, mode: config.ocrMode, manual,
+      target: config.captureMode === 'window' ? /^window:(\d+):\d+$/.exec(config.sourceId)?.[1] ?? '' : '',
+      overlay: '', composition_changed: false, owner_pid: process.pid,
+      regions: regions.map(region => {
+        const left = Math.round(region.x * physical.width), top = Math.round(region.y * physical.height)
+        const right = Math.min(physical.width, Math.round((region.x + region.width) * physical.width))
+        const bottom = Math.min(physical.height, Math.round((region.y + region.height) * physical.height))
+        return { id: region.id, x: physical.x + left, y: physical.y + top,
+          width: Math.max(1, right - left), height: Math.max(1, bottom - top) }
+      }),
     }
-    this.captureDimensions = { width: frame.width, height: frame.height }
-    if (this.state.status !== 'running' || !this.pipeline) return
-    const knownProbes = new Set(this.visualProbes.keys())
-    for (const region of frame.observed ?? frame.regions) {
-      if (!this.captureRegions.some(item => item.id === region.regionId)) continue
-      if (this.observedHashes.get(region.regionId) !== region.hash) this.pipeline.observeRegion(region.regionId, knownProbes)
-      this.observedHashes.set(region.regionId, region.hash)
-    }
-    for (const check of frame.checked ?? []) {
-      const probe = this.visualProbes.get(check.id)
-      if (probe) this.pipeline.verifyVisual(check.id, check.matches, probe.sourceHash === this.observedHashes.get(probe.regionId))
-    }
-    if (!frame.regions.length) return
-    if (this.processing) {
-      const pending = new Map((this.pendingFrame?.regions ?? []).map(region => [region.regionId, region]))
-      for (const region of frame.regions) pending.set(region.regionId, region)
-      let bytes = [...pending.values()].reduce((total, region) => total + region.image.length, 0)
-      while (bytes > 48 * 1024 * 1024 && pending.size) {
-        const [id, oldest] = pending.entries().next().value!
-        pending.delete(id); bytes -= oldest.image.length
-      }
-      // Pixel checks describe their own observation, never replay them after a newer frame.
-      this.pendingFrame = { ...frame, observed: [], checked: [], regions: [...pending.values()] }
-      return
-    }
-    this.processing = true
-    const epoch = this.state.epoch, abort = this.workAbort, pipeline = this.pipeline
-    this.state.frames++
+    this.sampling = true
+    let errorStage: ScreenSnapshot['error'] = 'captureFailed'
     try {
+      const captured = await this.captureExcludingOverlay(request, signal)
+      if (signal.aborted || readRevision !== this.readRevision
+          || this.bounds?.x !== bounds.x || this.bounds?.y !== bounds.y) return
+      if (captured.unavailable) {
+        if (config.captureMode !== 'window') this.fail('captureFailed')
+        return
+      }
+      if (!captured.frames.length) return
+      this.state.frames++
+      errorStage = 'ocrFailed'
       await this.refreshGlossary()
-      if (epoch !== this.state.epoch || abort.signal.aborted) return
-      // Every capture is bounded to one frame; regions rotate to avoid a permanently preferred first region.
-      const offset = this.state.frames % Math.max(1, frame.regions.length)
-      const regions = [...frame.regions.slice(offset), ...frame.regions.slice(0, offset)]
-      for (const region of regions) {
-        if (epoch !== this.state.epoch || abort.signal.aborted) break
-        if (!this.captureRegions.some(item => item.id === region.regionId)) continue
-        if (this.singleRead && !this.requestedRegions.has(region.regionId)) continue
-        if (this.observedHashes.get(region.regionId) !== region.hash) continue
-        let result = this.ocrResults.get(region.regionId)
-        if (this.hashes.get(region.regionId) !== region.hash || !result) {
-          const started = Date.now()
-          result = await this.options.inferOcr({ image: region.image, appearance: this.state.config.strategy !== 'speed', language: this.state.config.sourceLanguage === 'zh-Hant' ? 'zh' : this.state.config.sourceLanguage }, abort.signal)
-          if (epoch !== this.state.epoch || abort.signal.aborted) break
-          const blocks = this.probeBlocks(region.regionId, region.hash, region.image, result)
-          if (this.observedHashes.get(region.regionId) !== region.hash && !blocks.some(block => block.visualId)) continue
-          result = { ...result, blocks }
-          this.state.ocrMs = Date.now() - started
-          this.hashes.set(region.regionId, region.hash)
-          this.ocrResults.set(region.regionId, result)
-        }
-        const verified = this.observedHashes.get(region.regionId) === region.hash
-        pipeline.update(region.regionId, result.blocks, result.width, result.height, Date.now(), verified)
-        if (this.singleRead) {
-          pipeline.update(region.regionId, result.blocks, result.width, result.height, Date.now(), verified)
-          this.requestedRegions.delete(region.regionId)
-        }
+      for (const frame of captured.frames) {
+        if (signal.aborted || readRevision !== this.readRevision) break
+        const region = regions.find(region => region.id === frame.id)
+        if (!region) continue
+        const started = Date.now()
+        const result = await this.options.inferOcr({ image: frame.image, overlay: true,
+          language: config.sourceLanguage === 'zh-Hant' ? 'zh' : config.sourceLanguage }, signal)
+        if (signal.aborted || readRevision !== this.readRevision) break
+        this.lastOcr.set(region.id, Date.now())
+        this.state.ocrMs = Date.now() - started
+        pipeline.update(region, result.blocks, result.width, result.height, manual || config.ocrMode === 'trigger')
+        if (manual) this.requestedRegions.delete(region.id)
       }
     } catch (error) {
-      if (epoch === this.state.epoch && !abort.signal.aborted && !(error instanceof Error && error.message === 'resourceBusy')) {
+      if (signal.aborted || readRevision !== this.readRevision) return
+      const reason = error instanceof Error ? error.message : ''
+      if (reason !== 'resourceBusy') {
         const known = ['ocrMissing', 'ocrNotReady', 'ocrCorrupt', 'ocrRuntimeUnavailable', 'backendUnavailable'] as const
-        this.fail(known.find(code => error instanceof Error && error.message === code) ?? 'ocrFailed')
+        this.fail(known.find(code => code === reason) ?? errorStage)
       }
     } finally {
-      this.processing = false
-      const pending = this.pendingFrame; this.pendingFrame = undefined
-      if (pending) void this.frame(pending)
+      this.sampling = false
+      this.scheduleCapture(delay)
     }
   }
 
-  private probeBlocks(regionId: string, hash: string, image: string, result: { blocks: OcrBlock[]; width: number; height: number }): OcrBlock[] {
-    const blocks = mergeScreenLines(result.blocks, result.width)
-    const source = nativeImage.createFromDataURL(image)
-    if (source.isEmpty()) return blocks
-    const { width, height } = source.getSize()
-    if (width !== result.width || height !== result.height) return blocks
-    const pixels = source.toBitmap()
-    for (let index = 0; index < pixels.length; index += 4) { const blue = pixels[index]; pixels[index] = pixels[index + 2]; pixels[index + 2] = blue }
-    const previous = [...this.visualProbes.values()].filter(probe => probe.regionId === regionId)
-    const next: ScreenTextProbe[] = []
-    for (const block of blocks) {
-      const visual = createScreenTextProbe({ data: pixels, width, height }, block.quad)
-      if (!visual) continue
-      const same = previous.find(probe => probe.x === visual.x && probe.y === visual.y && probe.width === visual.width && probe.height === visual.height
-        && matchesScreenTextProbe({ data: pixels, width, height }, probe))
-      const id = same?.id ?? randomUUID()
-      next.push({ ...(same ?? visual), id, regionId, sourceHash: hash })
-      block.visualId = id
+  private async captureExcludingOverlay(request: ScreenCaptureRequest, signal: AbortSignal): Promise<ScreenCaptureResult> {
+    const overlay = this.overlay
+    if (!overlay?.isVisible()) return this.options.captureScreen(request, signal)
+    const native = overlay.getNativeWindowHandle()
+    const handle = (native.length === 8 ? native.readBigUInt64LE() : native.readUInt32LE()).toString()
+    const probe = await this.options.captureScreen({ ...request, overlay: handle }, signal)
+    if (!probe.hide_overlay || signal.aborted || overlay.isDestroyed()) return probe
+    overlay.setContentProtection(true)
+    try {
+      const result = await this.options.captureScreen({ ...request, overlay: handle }, signal)
+      if (!result.hide_overlay || signal.aborted || overlay.isDestroyed()) return result
+      this.hiddenForCapture = overlay
+      overlay.hide()
+      return await this.options.captureScreen({ ...request, composition_changed: true }, signal)
+    } finally {
+      if (!overlay.isDestroyed()) overlay.setContentProtection(false)
+      if (this.hiddenForCapture === overlay) {
+        this.hiddenForCapture = undefined
+        this.updateOverlayVisibility()
+      }
     }
-    if (next.length || this.observedHashes.get(regionId) === hash) {
-      for (const probe of previous) this.visualProbes.delete(probe.id)
-      for (const probe of next) this.visualProbes.set(probe.id, probe)
-    }
-    return blocks
   }
 
   private resetPipeline(): void {
@@ -710,15 +698,15 @@ export class ScreenTranslation {
   private invalidate(): void {
     this.state.epoch++
     this.workAbort.abort(); this.workAbort = new AbortController()
+    if (this.captureTimer) clearTimeout(this.captureTimer)
+    this.captureTimer = undefined
     this.pipeline?.stop(); this.pipeline = undefined
-    this.hashes.clear(); this.ocrResults.clear()
-    this.observedHashes.clear(); this.pendingFrame = undefined
-    this.visualProbes.clear()
+    this.lastOcr.clear()
     this.state.blocks = []
     this.overlay?.hide()
   }
 
-  private canRun(): boolean { return this.sourceAvailable && this.targetForeground && !this.userPaused }
+  private canRun(): boolean { return this.sourceAvailable && !this.userPaused }
   private fail(error: ScreenSnapshot['error']): void {
     const toolbar = this.toolbar; this.toolbar = undefined
     const cleanup = this.stop()
@@ -732,55 +720,52 @@ export class ScreenTranslation {
   }
 
   private async openCapture(lifecycle: number): Promise<void> {
-    if (this.capture && !this.capture.isDestroyed()) return
+    if (this.overlay && !this.overlay.isDestroyed()) return
     if (await this.desktopSource()) throw new Error('targetChanged')
     if (lifecycle !== this.lifecycle || this.disposed) return
-    const selected = (await desktopCapturer.getSources({ types: [this.state.config.captureMode === 'window' ? 'window' : 'screen'], thumbnailSize: { width: 0, height: 0 } })).find(source => source.id === this.state.config.sourceId)
-    if (lifecycle !== this.lifecycle || this.disposed) return
-    if (!selected) throw new Error('targetUnavailable')
-    if (this.state.config.captureMode === 'regions') this.sourceAvailable = true
-    if (this.state.config.captureMode !== 'window') this.targetForeground = true
-    this.captureDimensions = undefined
+    if (!this.bounds) throw new Error('targetUnavailable')
     if (this.state.config.captureMode !== 'window') {
-    const original = this.state.config.display!
-    const update = () => {
-      const display = screen.getAllDisplays().find(item => String(item.id) === original.id)
-      if (!display || display.bounds.width !== original.width || display.bounds.height !== original.height || display.scaleFactor !== original.scale) this.fail('targetChanged')
-      else { this.bounds = display.bounds; this.updateBounds() }
+      this.sourceAvailable = true
+      this.targetForeground = true
+      const original = this.state.config.display!
+      const update = () => {
+        const display = screen.getAllDisplays().find(item => String(item.id) === original.id)
+        if (!display || display.bounds.width !== original.width || display.bounds.height !== original.height
+            || display.scaleFactor !== original.scale) this.fail('targetChanged')
+        else { this.bounds = display.bounds; this.updateBounds() }
+      }
+      screen.on('display-removed', update)
+      screen.on('display-metrics-changed', update)
+      this.stopObserver = () => {
+        screen.removeListener('display-removed', update)
+        screen.removeListener('display-metrics-changed', update)
+      }
     }
-    screen.on('display-removed', update); screen.on('display-metrics-changed', update)
-    this.stopObserver = () => { screen.removeListener('display-removed', update); screen.removeListener('display-metrics-changed', update) }
-    }
-    const captureSession = session.fromPartition('screen-translation-capture')
-    captureSession.setPermissionRequestHandler((contents, permission, callback) => callback(contents === this.capture?.webContents && permission === 'media'))
-    captureSession.setPermissionCheckHandler((contents, permission) => contents === this.capture?.webContents && permission === 'media')
-    captureSession.setDisplayMediaRequestHandler((request, callback) => {
-      if (request.frame !== this.capture?.webContents.mainFrame) { callback({}); return }
-      callback({ video: selected })
-    })
-    this.capture = this.openWindow('capture', { x: 0, y: 0, width: 320, height: 240 })
-    const capture = this.capture
-    capture.webContents.once('render-process-gone', () => { if (!this.disposed && this.capture === capture) this.fail('captureFailed') })
-    if (this.bounds) this.overlay = this.openWindow('overlay', this.bounds)
+    this.overlay = this.openWindow('overlay', this.bounds)
   }
 
   private async closeCapture(): Promise<void> {
-    this.stopObserver?.(); this.stopObserver = undefined
+    const active = !!this.overlay
+    const sessionId = this.state.sessionId
+    this.stopObserver?.()
+    this.stopObserver = undefined
     this.observedSourceId = undefined
-    this.capture?.destroy(); this.capture = undefined
-    this.overlay?.destroy(); this.overlay = undefined
+    this.overlay?.destroy()
+    this.overlay = undefined
+    this.targetPixels = undefined
     this.bounds = undefined
+    if (active) await this.options.releaseScreenCapture?.(sessionId).catch(() => {})
   }
 
-  private openWindow(role: 'capture' | 'editor' | 'overlay' | 'regions' | 'toolbar', bounds: Rectangle): BrowserWindow {
-    const window = new BrowserWindow({ ...bounds, show: false, frame: false, transparent: role !== 'capture', backgroundColor: '#00000000',
+  private openWindow(role: 'editor' | 'overlay' | 'regions' | 'toolbar', bounds: Rectangle): BrowserWindow {
+    const window = new BrowserWindow({ ...bounds, show: false, frame: false, transparent: true, backgroundColor: '#00000000',
       focusable: role === 'editor' || role === 'toolbar', skipTaskbar: true, resizable: false, movable: role === 'toolbar', hasShadow: false,
       webPreferences: { preload: resolvePreloadPath(this.options.mainDir), contextIsolation: true, sandbox: true, nodeIntegration: false,
-        backgroundThrottling: false, ...(role === 'capture' ? { partition: 'screen-translation-capture' } : {}) },
+        backgroundThrottling: false },
     })
-    window.setContentProtection(true)
+    if (role !== 'overlay') window.setContentProtection(true)
     // Windows constrains initial bounds to the work area; OCR coordinates cover the entire display.
-    if (role !== 'capture' && role !== 'toolbar') {
+    if (role !== 'toolbar') {
       window.setBounds(bounds)
       window.on('show', () => { if (!window.isDestroyed()) window.setBounds(this.bounds ?? bounds) })
     }
@@ -822,11 +807,17 @@ export class ScreenTranslation {
     const value = this.snapshot()
     this.options.publish(value)
     for (const listener of this.listeners) listener(value)
-    for (const window of [this.capture, this.overlay, this.editor, this.highlights, this.toolbar]) {
+    for (const window of [this.overlay, this.editor, this.highlights, this.toolbar]) {
       if (window && !window.isDestroyed() && !window.webContents.isDestroyed() && !window.webContents.isLoadingMainFrame()) window.webContents.send('screen:changed', value)
     }
-    if (this.overlay && !this.overlay.isDestroyed()) {
-      if (this.overlayVisible && this.state.status === 'running' && this.canRun() && this.state.blocks.some(block => block.status === 'ready' && !block.hidden)) this.overlay.showInactive()
+    this.updateOverlayVisibility()
+    this.scheduleCapture()
+  }
+
+  private updateOverlayVisibility(): void {
+    if (this.overlay && !this.overlay.isDestroyed() && this.overlay !== this.hiddenForCapture) {
+      if (this.overlayVisible && this.targetForeground && this.state.status === 'running' && this.canRun()
+          && this.state.blocks.some(block => block.status === 'ready' && block.translation)) this.overlay.showInactive()
       else this.overlay.hide()
     }
   }

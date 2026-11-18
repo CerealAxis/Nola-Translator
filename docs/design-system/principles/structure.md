@@ -2,6 +2,7 @@
 title: 亲密性
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "相关内容放得近，读起来像一个整体。无关内容拉开距离，页面分组就清楚。"
 ---
 
 # 亲密性

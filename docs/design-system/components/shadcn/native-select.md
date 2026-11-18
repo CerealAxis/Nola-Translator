@@ -2,6 +2,7 @@
 title: Native Select（原生选择框）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "应用样式并与设计系统保持一致的原生 HTML 选择元素。"
 ---
 
 # Native Select（原生选择框）

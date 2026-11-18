@@ -2,6 +2,7 @@
 title: Approval card（审批卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在命令或高风险操作执行前请求批准，并显示后续状态。"
 ---
 
 # Approval card（审批卡片）

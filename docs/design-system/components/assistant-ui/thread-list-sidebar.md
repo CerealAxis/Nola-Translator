@@ -2,6 +2,7 @@
 title: Thread list sidebar（会话列表侧栏）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "带页眉、页脚和可选折叠轨道的侧栏框架，将运行时的 Thread list（对话列表） 放在当前对话旁边。"
 ---
 
 # Thread list sidebar（会话列表侧栏）

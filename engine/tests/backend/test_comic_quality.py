@@ -377,6 +377,47 @@ async def test_block_detector_keeps_its_paragraph_as_one_translation_unit(monkey
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('detector', ['rtdetr', 'rfdetr-seg'])
+async def test_block_detector_splits_vertical_title_edition_and_credits(monkeypatch, detector):
+  def box(left, top, right, bottom):
+    return [[left, top], [right, top], [right, bottom], [left, bottom]]
+
+  title = [box(132, 304, 193, 500), box(185, 302, 255, 535), box(253, 386, 297, 492),
+    box(265, 321, 288, 354), box(264, 346, 284, 365), box(262, 360, 285, 388),
+    box(270, 382, 283, 394), box(301, 363, 318, 381)]
+  edition = [box(83, 308, 134, 431)]
+  credits = [box(90, 432, 115, 523), box(114, 432, 129, 513)]
+  number = box(309, 130, 350, 208)
+  lines = [*title, *edition, *credits, number]
+
+  class Detector:
+    def __init__(self, kind):
+      self.kind = kind
+
+    async def detect_comic(self, image):
+      return lines if self.kind == 'pp-ocrv5-ch' else [box(81, 302, 315, 536), number]
+
+  @asynccontextmanager
+  async def resource(owner, kind):
+    yield Detector(kind)
+
+  monkeypatch.setattr(vision, 'resource', resource)
+  monkeypatch.setattr(vision, 'ppocr_model', lambda *args, **kwargs: 'pp-ocrv5-ch')
+  result = await vision.detect(None, Image.new('RGB', (393, 556)), Config(detector=detector).model_dump(), [])
+  assert [item['sourceLines'] for item in result] == [[number], title, edition, credits]
+  assert all(item['style']['direction'] == 'vertical-rl' for item in result)
+
+
+def test_detected_balloon_boundaries_split_a_shared_text_block():
+  left = np.asarray([[20,30],[75,30],[75,55],[20,55]], dtype=np.float32)
+  right = left + np.float32([70, 0])
+  bubbles = [left + [[-5,-5],[5,-5],[5,5],[-5,5]], right + [[-5,-5],[5,-5],[5,5],[-5,5]]]
+  groups = vision.block_text_groups([left, right], [bubble.astype(np.float32) for bubble in bubbles])
+  assert [group[0].tolist() for group in groups] == [left.tolist(), right.tolist()]
+  assert [len(group) for group in groups] == [1, 1]
+
+
+@pytest.mark.asyncio
 async def test_line_detector_groups_lines_before_creating_translation_units(monkeypatch):
   lines=[[[20,20],[45,20],[45,170],[20,170]],[[50,20],[75,20],[75,170],[50,170]]]
   class Detector:

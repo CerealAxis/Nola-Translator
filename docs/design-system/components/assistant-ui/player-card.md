@@ -2,6 +2,7 @@
 title: Player card（选手卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "球员资料卡突出球员姓名和位置，下面排列四项比赛数据。"
 ---
 
 # Player card（选手卡片）

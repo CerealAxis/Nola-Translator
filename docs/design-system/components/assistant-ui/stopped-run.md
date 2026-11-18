@@ -2,6 +2,7 @@
 title: Stopped run（已停止的运行）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "停止后保留已经生成的回复，并提供继续生成入口。"
 ---
 
 # Stopped run（已停止的运行）

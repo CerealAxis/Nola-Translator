@@ -2,6 +2,7 @@
 title: Computer use（电脑操作）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在会话中展示自动化助手正在操作的屏幕、当前动作及光标轨迹，支持独立渲染和运行时工具结果。"
 ---
 
 # Computer use（电脑操作）

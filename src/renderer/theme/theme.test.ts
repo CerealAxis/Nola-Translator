@@ -14,12 +14,8 @@ describe('product design contracts', () => {
     expect(product).not.toMatch(/font-weight:\s*(550|650|700)\b/)
   })
 
-  it('requires explicit scene opt-in for glass', () => {
-    const glass = product.slice(product.indexOf('@supports (backdrop-filter:'))
-      .split('/* ===== 公共控件补充样式 ===== */')[0]
-    expect(glass).toContain('[data-material="glass"]')
-    expect(glass).not.toMatch(/\[data-slot=|\.card\b|\.sidebar\b/)
-    expect(glass).toContain('prefers-reduced-transparency: reduce')
+  it('does not apply backdrop filters in the shared product theme', () => {
+    expect(product).not.toContain('backdrop-filter')
   })
 
   it('keeps density overrides independent of typography', () => {

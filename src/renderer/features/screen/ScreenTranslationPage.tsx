@@ -183,7 +183,21 @@ export function ScreenTranslationPage() {
         <FieldGroup>
           {select('screen-capture-mode', t('suite.captureMode'), config.captureMode, ['cursor', 'regions', 'window'].map(value => ({ value, label: t(`suite.${value as 'cursor' | 'regions' | 'window'}`) })), value => patch('captureMode', value as ScreenConfig['captureMode']))}
           {config.captureMode === 'window' && select('screen-target-window', t('suite.selectWindow'), config.sourceId, sources.map(source => ({ value: source.id, label: source.name })), value => setConfig(previous => ({ ...previous, sourceId: value, sourceName: sources.find(source => source.id === value)?.name ?? '' })))}
-          {select('screen-strategy', t('suite.strategy'), config.strategy, ['auto', 'speed', 'quality'].map(value => ({ value, label: t(`suite.${value as 'auto' | 'speed' | 'quality'}`) })), value => patch('strategy', value as ScreenConfig['strategy']))}
+          {select('screen-ocr-mode', t('screen.ocrMode'), config.ocrMode, [
+            { value: 'period', label: t('screen.ocrPeriod') },
+            { value: 'analysis', label: t('screen.ocrAnalysis') },
+            { value: 'trigger', label: t('screen.ocrTrigger') },
+          ], value => patch('ocrMode', value as ScreenConfig['ocrMode']))}
+          {config.ocrMode === 'period' && <Field className="nola-settings-field">
+            <FieldLabel htmlFor="screen-intervalMs">{t('screen.ocrInterval')}</FieldLabel>
+            <Input id="screen-intervalMs" type="number" min={100} max={100000} step={100}
+              value={config.intervalMs} disabled={active || busy} onChange={event => patch('intervalMs', Number(event.target.value))} />
+          </Field>}
+          {config.captureMode === 'window' && config.sourceId && <Field className="nola-settings-field">
+            <FieldLabel htmlFor="screen-window-areas">{t('screen.regions')}</FieldLabel>
+            <Button id="screen-window-areas" variant="outline" size="sm" disabled={busy || !api || snapshot?.status === 'editing'}
+              onClick={() => void run({ action: 'edit' }, !canStop)}><Crop data-icon="inline-start" />{t('screen.edit')}</Button>
+          </Field>}
           <GlossarySelectionField className="nola-settings-field" value={config.glossarySelection} disabled={active || busy} onChange={value => patch('glossarySelection', value)} />
           <WordRuleSelectionField value={config.excludedSelection ?? { mode: 'auto' }} disabled={active || busy} onChange={value => patch('excludedSelection', value)} />
           {config.captureMode === 'regions' && <Field className="nola-settings-field screen-regions-field"><FieldLabel htmlFor="screen-preset">{t('screen.regions')}</FieldLabel>
@@ -222,9 +236,10 @@ export function ScreenTranslationPage() {
         <div className="nola-settings-heading"><h2 id="screen-style-heading">{t('screen.style')}</h2></div>
         <FieldGroup className="nola-settings-fields">
         {select('screen-fontSize', t('screen.fontSize'), String(config.fontSize), [{ value: '0', label: t('screen.fontAuto') }, ...[12, 14, 16, 18, 20, 24, 28, 32, 36].map(value => ({ value: String(value), label: String(value) }))], value => patch('fontSize', Number(value)))}
-        {(['opacity', 'intervalMs'] as const).map(key => <Field key={key} className="nola-settings-field"><FieldLabel htmlFor={`screen-${key}`}>{t(key === 'intervalMs' ? 'screen.interval' : `screen.${key}`)}</FieldLabel>
-          <Input id={`screen-${key}`} type="number" min={key === 'opacity' ? 0.35 : 250} max={key === 'opacity' ? 1 : 3000} step={key === 'opacity' ? 0.05 : 1} value={config[key]} disabled={active || busy} onChange={event => patch(key, Number(event.target.value))} />
-        </Field>)}
+        <Field className="nola-settings-field"><FieldLabel htmlFor="screen-opacity">{t('screen.opacity')}</FieldLabel>
+          <Input id="screen-opacity" type="number" min={0.35} max={1} step={0.05} value={config.opacity}
+            disabled={active || busy} onChange={event => patch('opacity', Number(event.target.value))} />
+        </Field>
         <Field className="nola-settings-field"><FieldLabel htmlFor="screen-show-source">{t('screen.showSource')}</FieldLabel><Switch id="screen-show-source" checked={config.showSource} disabled={active || busy} onCheckedChange={value => patch('showSource', value)}><SwitchThumb /></Switch></Field>
         </FieldGroup>
       </section>

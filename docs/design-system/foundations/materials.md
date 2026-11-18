@@ -2,6 +2,7 @@
 title: 材质
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "材质帮助区分内容与控件，并传达界面的层次。选择表面时，应同时考虑它承载的信息、下方内容和文字的可读性。"
 ---
 
 # 材质

@@ -2,6 +2,7 @@
 title: Tabs（标签页）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "一组分层的内容区，称为选项卡面板，每次显示其中一个。"
 ---
 
 # Tabs（标签页）

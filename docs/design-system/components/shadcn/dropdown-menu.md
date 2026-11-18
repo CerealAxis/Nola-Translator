@@ -2,6 +2,7 @@
 title: Dropdown Menu（下拉菜单）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "由按钮触发，向用户展示一组操作或功能等菜单选项。"
 ---
 
 # Dropdown Menu（下拉菜单）

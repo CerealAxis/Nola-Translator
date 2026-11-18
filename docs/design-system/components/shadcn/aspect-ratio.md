@@ -2,6 +2,7 @@
 title: Aspect Ratio（宽高比）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用固定宽高比约束图像或其他媒体的显示区域，让预览在不同可用宽度下保持比例。"
 ---
 
 # Aspect Ratio（宽高比）

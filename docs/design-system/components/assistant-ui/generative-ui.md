@@ -2,6 +2,7 @@
 title: Generative UI（生成式界面）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "将结构化的生成结果渲染成由样式化组件组成的界面。"
 ---
 
 # Generative UI（生成式界面）

@@ -2,6 +2,7 @@
 title: Tool failure（工具故障）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "显示工具错误和尝试次数，并允许单独重试该调用。"
 ---
 
 # Tool failure（工具故障）

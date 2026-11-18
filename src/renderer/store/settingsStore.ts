@@ -277,9 +277,6 @@ export async function openRuntimeSettings(component: 'engine' | 'llama' | 'crisp
 /** Fields a drag emits. Changes within 180ms collapse into one write. */
 const DEBOUNCE_MS = 180
 const DEBOUNCED_PATHS: ReadonlySet<string> = new Set([
-  'appearance.glassBlur',
-  'appearance.glassOpacity',
-  'appearance.glassSaturation',
   'overlay.fontSize',
   'overlay.fontWeight',
   'overlay.translationFontSize',

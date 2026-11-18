@@ -2,6 +2,7 @@
 title: Pagination（分页）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "将长列表拆为可浏览的多个页面，通过页码和上一页、下一页链接移动。"
 ---
 
 # Pagination（分页）

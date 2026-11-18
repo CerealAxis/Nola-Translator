@@ -2,6 +2,7 @@
 title: Directive text（指令文本）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在消息正文中把人员提及和命令指令显示为行内标签，让读者区分指令与普通文本。"
 ---
 
 # Directive text（指令文本）

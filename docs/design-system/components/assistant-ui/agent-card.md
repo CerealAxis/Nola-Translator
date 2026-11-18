@@ -2,6 +2,7 @@
 title: Agent card（代理卡片）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在代理卡片中展示代理信息与可用技能，并提供连接入口。页面包含独立使用和运行时接入的组件示例。"
 ---
 
 # Agent card（代理卡片）

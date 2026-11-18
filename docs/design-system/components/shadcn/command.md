@@ -2,6 +2,7 @@
 title: Command（命令面板）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用命令菜单搜索可用操作，按组浏览命令并使用快捷键执行。"
 ---
 
 # Command（命令面板）

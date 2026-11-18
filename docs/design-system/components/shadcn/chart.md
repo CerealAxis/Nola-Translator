@@ -2,6 +2,7 @@
 title: Chart（图表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "通过 Recharts 图表示例呈现类别比较和数值趋势，了解坐标、图例、提示内容和主题样式的配置。"
 ---
 
 # Chart（图表）

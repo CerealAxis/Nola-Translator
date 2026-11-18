@@ -2,6 +2,7 @@
 title: Weekly active users（周活跃用户）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用带坐标轴和图例的双序列堆叠面积图，对比新用户和回访用户。"
 ---
 
 # Weekly active users（周活跃用户）

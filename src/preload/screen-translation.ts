@@ -7,8 +7,6 @@ export function createScreenPreload(ipc: IpcRenderer): ScreenTranslationBridge {
     sources: () => ipc.invoke('screen:sources'),
     command: command => ipc.invoke('screen:command', command),
     windowBootstrap: () => ipc.invoke('screen:bootstrap'),
-    frame: frame => ipc.invoke('screen:frame', frame),
-    captureError: () => ipc.invoke('screen:capture-error'),
     onChanged: callback => {
       const listener = (_event: Electron.IpcRendererEvent, snapshot: ScreenSnapshot) => callback(snapshot)
       ipc.on('screen:changed', listener)

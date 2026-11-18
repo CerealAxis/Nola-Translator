@@ -2,6 +2,7 @@
 title: Message pair（消息对）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "把用户消息和助手的流式回复放在一起，悬停时显示消息操作。"
 ---
 
 # Message pair（消息对）

@@ -29,5 +29,6 @@ try {
     })
   }
 } finally {
+  server.httpServer.closeAllConnections()
   await server.close()
 }

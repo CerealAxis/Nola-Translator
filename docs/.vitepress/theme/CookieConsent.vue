@@ -5,12 +5,18 @@ import { cookieConsentTranslations } from './cookieConsent'
 import { localeOfPath } from './siteLocale'
 import 'vanilla-cookieconsent/dist/cookieconsent.css'
 
-const emit = defineEmits<{ analyticsChange: [enabled: boolean] }>()
+const emit = defineEmits<{ analyticsChange: [enabled: boolean]; languageNoticeReady: [ready: boolean] }>()
 const { page } = useData()
 const locale = computed(() => localeOfPath(`/${page.value.relativePath}`, '/'))
 let initialized = false
 let consent: typeof import('vanilla-cookieconsent') | undefined
 let disposed = false
+const openModals = new Set<string>()
+let modalChange = 0
+
+const syncLanguageNotice = () => {
+  if (!disposed) emit('languageNoticeReady', Boolean(consent?.validConsent() && !openModals.size))
+}
 
 onMounted(async () => {
   consent = await import('vanilla-cookieconsent')
@@ -27,10 +33,25 @@ onMounted(async () => {
     language: { default: locale.value, translations: cookieConsentTranslations(withBase('/')) },
     onConsent: syncAnalytics,
     onChange: syncAnalytics,
+    onModalShow: ({ modalName }) => {
+      modalChange++
+      openModals.add(modalName)
+      syncLanguageNotice()
+    },
+    onModalHide: ({ modalName }) => {
+      openModals.delete(modalName)
+      const change = ++modalChange
+      requestAnimationFrame(async () => {
+        const animations = document.querySelector('#cc-main')?.getAnimations({ subtree: true }) ?? []
+        await Promise.allSettled(animations.map(animation => animation.finished))
+        if (change === modalChange) syncLanguageNotice()
+      })
+    },
   })
   if (disposed) return
   await consent.setLanguage(locale.value)
   syncAnalytics()
+  syncLanguageNotice()
   initialized = true
 })
 

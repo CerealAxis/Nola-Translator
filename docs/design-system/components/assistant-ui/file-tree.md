@@ -2,6 +2,7 @@
 title: File tree（文件树）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用可展开的树形结构列出任务涉及的目录和文件，并标明单个文件的改动量。"
 ---
 
 # File tree（文件树）

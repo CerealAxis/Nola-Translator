@@ -45,7 +45,7 @@ const sectionIcons = { general: Settings2, apiProviders: Plug, shortcuts: Keyboa
 const descriptions = { general: 'generalDescription', apiProviders: 'providersDescription', shortcuts: 'shortcutsDescription', web: 'webDescription', video: 'videoDescription', selection: 'selectionDescription', inputTranslation: 'inputDescription', tts: 'ttsDescription', translationHub: 'hubDescription', floatingButton: 'floatingDescription', contextMenu: 'contextDescription', glossary: 'glossaryDescription', backup: 'backupDescription' } as const
 const previewSections: readonly string[] = ['web', 'video', 'selection', 'inputTranslation', 'floatingButton', 'contextMenu']
 const searchKeys: Record<typeof sections[number], BrowserKey[]> = {
-  general: ['interfaceLanguage', 'theme', 'liquidGlass', 'source', 'target', 'siteBlacklist'],
+  general: ['interfaceLanguage', 'theme', 'source', 'target', 'siteBlacklist'],
   apiProviders: ['apiKey', 'baseUrl', 'model', 'webConcurrency', 'featureBindings', 'asr', 'tts', 's2s', 'llm', 'connection'],
   shortcuts: ['translatePage', 'translateSelection', 'hoverTranslation', 'video'],
   web: ['provider', 'display', 'pageScope', 'translateTitle', 'hoverTranslation', 'contextAware', 'minTextLength', 'skipLanguages', 'autoSites', 'neverAutoSites', 'pageStyle', 'customCss', 'prompt', 'requestRate', 'llmBatchSize', 'siteRules'],
@@ -310,7 +310,7 @@ function TranslationCenter({ settings, providers, locale, t }: { settings: Prefe
   return <div className="nola-translation-center">
     <div className="nola-hub-source">
       <div className="nola-hub-languages"><PopupLanguage size="sm" label={t('source')} value={source} options={[{ value: 'auto', label: t('autoDetect') }, ...languageOptions(locale)]} onChange={setSource} t={t} /><Button variant="bare" size="icon-sm" aria-label={t('swapLanguages')} title={t('swapLanguages')} disabled={source === 'auto'} onClick={() => { setSource(target); setTarget(source) }}><ArrowLeftRight /></Button><PopupLanguage size="sm" label={t('target')} value={target} options={languageOptions(locale)} onChange={setTarget} t={t} /></div>
-      <div className="nola-hub-input nola-card nola-glass" onPaste={event => void paste(event)}>
+      <div className="nola-hub-input nola-card" onPaste={event => void paste(event)}>
         {image && <div className="nola-hub-attachment">
           <img src={image} alt={t('imageTranslate')} />
           <Button variant="bare" size="icon-sm" aria-label={t('remove')} title={t('remove')} onClick={() => { pasteRevision.current++; setPreparingImage(false); changeImage('') }}><X /></Button>
@@ -421,7 +421,6 @@ function Backup({ settings, t }: { settings: Preferences; t: T }) {
 
 export function Options() {
   const [settings, locale, t] = usePreferences()
-  const supportsGlass = Boolean(globalThis.CSS?.supports?.('backdrop-filter', 'blur(1px)') || globalThis.CSS?.supports?.('-webkit-backdrop-filter', 'blur(1px)'))
   const [section, setSection] = useState<typeof sections[number]>(() => sections.find(section => section === parseOptionsRoute(window.location.hash).section) ?? 'general')
   const [libraryId, setLibraryId] = useState(() => parseOptionsRoute(window.location.hash).libraryId)
   const [query, setQuery] = useState('')
@@ -473,7 +472,6 @@ export function Options() {
       {active.includes('general') && <><Group title={t('appearance')}>
         <ChoiceField label={t('interfaceLanguage')} value={settings.uiLanguage} options={UI_LANGUAGES.map((value, index) => ({ value, label: index ? languageLabels[index - 1] : t('browserDefault') }))} onChange={value => save('uiLanguage', value as Preferences['uiLanguage'])} />
         <ChoiceField label={t('theme')} value={settings.theme} options={[{ value: 'auto', label: t('browserDefault') }, { value: 'light', label: t('light') }, { value: 'dark', label: t('dark') }]} onChange={value => save('theme', value as Preferences['theme'])} />
-        <Toggle label={t('liquidGlass')} checked={supportsGlass && settings.liquidGlass} disabled={!supportsGlass} hint={t(supportsGlass ? 'liquidGlassHint' : 'liquidGlassUnavailable')} onChange={value => save('liquidGlass', value)} />
       </Group><Group title={t('translationLanguages')}><ChoiceField label={t('source')} value={settings.sourceLanguage} options={[{ value: 'auto', label: t('autoDetect') }, ...languageOptions(locale)]} onChange={value => save('sourceLanguage', value)} />
         <TargetLanguageField value={settings.pageLanguage} locale={locale} t={t} onChange={value => save('pageLanguage', value)} />
       </Group><Group title={t('siteScope')}>{list('siteBlacklist', 'siteBlacklist')}</Group></>}

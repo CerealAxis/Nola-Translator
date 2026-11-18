@@ -2,6 +2,7 @@
 title: Toast（轻提示）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用短暂通知反馈操作结果，帮助用户在保持当前任务上下文的同时看到状态。"
 ---
 
 # Toast（轻提示）

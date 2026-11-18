@@ -2,6 +2,7 @@
 title: Resizable（可调整大小）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "支持键盘操作且具备无障碍性的可调整尺寸面板组及布局。"
 ---
 
 # Resizable（可调整大小）

@@ -2,6 +2,7 @@
 title: 图像
 pageClass: nola-vis-doc nola-vis-foundations
 editLink: false
+description: "图像在不同显示密度、尺寸与外观中都应保持清晰。制作资源时，同时考虑显示尺寸、像素数量、格式和颜色，让用户在实际使用环境中看到完整且准确的内容。"
 ---
 
 # 图像

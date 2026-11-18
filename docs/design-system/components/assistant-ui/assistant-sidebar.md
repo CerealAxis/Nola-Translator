@@ -2,6 +2,7 @@
 title: Assistant sidebar（助手侧栏）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "助手侧栏通过拖动手柄在应用内容与实时对话之间分配屏幕空间。它只管理两栏的大小，右侧始终使用实时 Thread。"
 ---
 
 # Assistant sidebar（助手侧栏）

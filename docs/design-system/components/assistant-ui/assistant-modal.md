@@ -2,6 +2,7 @@
 title: Assistant modal（助手弹窗）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "从角落的按钮打开一个可调整大小的对话浮层。浮层包含完整的对话和会话列表，适用于内嵌助手与帮助入口。"
 ---
 
 # Assistant modal（助手弹窗）

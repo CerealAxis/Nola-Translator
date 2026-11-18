@@ -2,6 +2,7 @@
 title: Playlist（播放列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "播放列表卡片包含封面和带编号的曲目列表，每首曲目都有播放按钮。"
 ---
 
 # Playlist（播放列表）

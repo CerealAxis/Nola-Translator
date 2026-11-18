@@ -2,6 +2,7 @@
 title: Confidence（置信度）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在回答中标记结论的依据和确定程度，通过悬停或键盘焦点查看对应的解释。"
 ---
 
 # Confidence（置信度）

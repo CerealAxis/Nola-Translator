@@ -2,6 +2,7 @@
 title: Error state（错误状态）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在失败的助手消息旁说明当前状态，提供重试操作并在重试期间显示进度反馈。"
 ---
 
 # Error state（错误状态）

@@ -2,6 +2,7 @@
 title: Response time（响应时间）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "用带坐标轴的单序列折线图展示全天的 p50 响应时间。"
 ---
 
 # Response time（响应时间）

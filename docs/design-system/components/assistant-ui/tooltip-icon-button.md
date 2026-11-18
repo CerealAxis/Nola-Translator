@@ -2,6 +2,7 @@
 title: Tooltip icon button（带提示的图标按钮）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "图标按钮搭配文字提示，适用于消息操作栏等紧凑界面。"
 ---
 
 # Tooltip icon button（带提示的图标按钮）

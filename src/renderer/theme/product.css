@@ -2890,7 +2890,7 @@ svg[class~="text-danger-soft-foreground"],
   background-color: var(--popover);
 }
 
-.nola-glass-popup {
+.nola-popup-surface {
   color: var(--popover-foreground);
   background: var(--popover);
   border: 1px solid var(--border);
@@ -2901,50 +2901,6 @@ svg[class~="text-danger-soft-foreground"],
 ::selection {
   color: var(--accent-foreground);
   background: var(--accent);
-}
-
-/* ===== 毛玻璃 ===== */
-
-:root,
-:host {
-  --nola-glass-blur: 18px;
-  --nola-glass-opacity: 58%;
-  --nola-glass-saturation: 165%;
-  --nola-glass-dark-opacity: 0%;
-  --nola-glass-base-opacity: min(100%, calc(var(--nola-glass-opacity) + var(--nola-glass-dark-opacity)));
-  --nola-glass-filter: blur(var(--nola-glass-blur)) saturate(var(--nola-glass-saturation));
-  --nola-glass-stroke: rgb(255 255 255 / 70%);
-  --nola-glass-depth: 0 14px 38px rgb(31 49 84 / 14%);
-  --nola-glass-inner: inset 0 1px 0 rgb(255 255 255 / 66%);
-  --nola-glass-surface-strong: color-mix(in srgb, var(--popover) max(80%, var(--nola-glass-base-opacity)), transparent);
-}
-
-:root:is(.dark, [data-theme="dark"]),
-:host([data-theme="dark"]) {
-  --nola-glass-dark-opacity: 4%;
-  --nola-glass-stroke: rgb(255 255 255 / 22%);
-  --nola-glass-depth: 0 16px 46px rgb(0 0 0 / 37%);
-  --nola-glass-inner: inset 0 1px 0 rgb(255 255 255 / 19%);
-}
-
-.nola-caption-controls-row[data-material="glass"] {
-  --nola-glass-surface-strong: rgb(16 16 16 / max(80%, var(--nola-glass-base-opacity)));
-}
-
-.nola-caption-card[data-color-scheme="light"] .nola-caption-controls-row[data-material="glass"] {
-  --nola-glass-surface-strong: rgb(255 255 255 / max(80%, var(--nola-glass-base-opacity)));
-}
-
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  @media not ((prefers-contrast: more) or (forced-colors: active) or (prefers-reduced-transparency: reduce)) {
-    :root:not([data-nola-glass="off"]) [data-material="glass"] {
-      background: var(--nola-glass-surface-strong);
-      border: 1px solid var(--nola-glass-stroke);
-      box-shadow: var(--nola-glass-inner), var(--nola-glass-depth);
-      -webkit-backdrop-filter: var(--nola-glass-filter);
-      backdrop-filter: var(--nola-glass-filter);
-    }
-  }
 }
 
 /* ===== 公共控件补充样式 ===== */

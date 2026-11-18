@@ -2,6 +2,7 @@
 title: Models（模型列表）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在编辑器中查看当前模型，并选择接下来要使用的模型。"
 ---
 
 # Models（模型列表）

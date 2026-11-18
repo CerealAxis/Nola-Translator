@@ -2,6 +2,7 @@
 title: Document reference（文档引用）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "展示文档引用的原文片段，并提供跳转到对应页码的入口。"
 ---
 
 # Document reference（文档引用）

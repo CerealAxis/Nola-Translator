@@ -1,6 +1,7 @@
 ---
 group: 代码风格
 order: 2
+description: "查看 CSS、Sass 和 Less 的编码风格与实践，包括选择器、声明及 Stylelint 工具。"
 ---
 
 # CSS 编码规约

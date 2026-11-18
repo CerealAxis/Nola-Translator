@@ -1,6 +1,6 @@
-import type { ScreenRegion, ScreenTextBlock } from '../../../shared/screen-translation'
+import type { ScreenBlurPatch, ScreenRegion, ScreenTextBlock } from '../../../shared/screen-translation'
 
-export interface OverlayLayout { id: string; x: number; y: number; width: number; height: number; textWidth: number; textHeight: number; angle: number; fontSize: number; text: string; overflow: boolean; padding: number }
+export interface OverlayLayout { id: string; x: number; y: number; width: number; height: number; textWidth: number; textHeight: number; angle: number; fontSize: number; text: string; overflow: boolean; padding: number; ink?: string; patches?: ScreenBlurPatch[] }
 export type MeasureScreenText = (text: string, fontSize: number) => number
 
 export function visibleScreenBlocks(blocks: ScreenTextBlock[]): ScreenTextBlock[] {
@@ -31,7 +31,6 @@ export function screenTextLines(text: string, width: number, fontSize: number, m
   return lines
 }
 
-/** Keep every translation anchored to its OCR box; adjacent text must never move it. */
 export function layoutScreenOverlay(blocks: ScreenTextBlock[], viewport: { width: number; height: number }, preferredSize: number,
   showSource: boolean, measure: MeasureScreenText, padding: number, regions: ScreenRegion[] = []): OverlayLayout[] {
   const viewportWidth = Math.max(1, viewport.width), viewportHeight = Math.max(1, viewport.height)
@@ -39,37 +38,52 @@ export function layoutScreenOverlay(blocks: ScreenTextBlock[], viewport: { width
     const text = showSource ? `${block.text}\n${block.translation}` : block.translation!
     const quad = block.quad?.map(([x, y]) => [x * viewportWidth, y * viewportHeight])
     const angle = quad ? Math.atan2(quad[1][1] - quad[0][1], quad[1][0] - quad[0][0]) * 180 / Math.PI : block.angle
-    const radians = angle * Math.PI / 180
-    const sourceWidth = quad ? Math.hypot(quad[1][0] - quad[0][0], quad[1][1] - quad[0][1]) : block.width * viewportWidth
-    const sourceHeight = quad ? Math.hypot(quad[3][0] - quad[0][0], quad[3][1] - quad[0][1]) : block.height * viewportHeight
-    const originX = quad ? quad[0][0] : block.x * viewportWidth
-    const originY = quad ? quad[0][1] : block.y * viewportHeight
-    const textWidth = Math.max(1, sourceWidth)
-    let textHeight = Math.max(1, sourceHeight)
-    const inset = Math.min(padding, textHeight * 0.1, textWidth * 0.1)
-    const neededHeight = (size: number) => screenTextLines(text, Math.max(1, textWidth - inset * 2), size, measure) * size * 1.45 + inset * 2
-    const sourceLines = Math.max(1, block.text.split('\n').length)
-    const minimumSize = preferredSize ? 12 : 10
-    let fontSize = Math.max(minimumSize, Math.floor(Math.min(preferredSize || Infinity, (textHeight - inset * 2) / (sourceLines * 1.45))))
-    while (fontSize > minimumSize && neededHeight(fontSize) > textHeight) fontSize--
+    const rotate = Math.abs(angle) >= 0.3
+    const radians = rotate ? angle * Math.PI / 180 : 0
     const c = Math.cos(radians), s = Math.sin(radians)
-    const endX = originX + textWidth * c, endY = originY + textWidth * s
-    // Extra lines grow from the same text origin, bounded by the screen edges.
-    const region = regions.find(item => item.id === block.regionId)
-    const left = (region?.x ?? 0) * viewportWidth, top = (region?.y ?? 0) * viewportHeight
-    const right = region ? (region.x + region.width) * viewportWidth : viewportWidth
-    const bottom = region ? (region.y + region.height) * viewportHeight : viewportHeight
-    let availableHeight = Infinity
-    for (const [x, y] of [[originX, originY], [endX, endY]]) {
-      if (Math.abs(s) > 1e-6) availableHeight = Math.min(availableHeight, s > 0 ? (x - left) / s : (right - x) / -s)
-      if (Math.abs(c) > 1e-6) availableHeight = Math.min(availableHeight, c > 0 ? (bottom - y) / c : (y - top) / -c)
+    const edge = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1])
+    const originX = rotate && quad ? quad[0][0] : block.x * viewportWidth
+    const originY = rotate && quad ? quad[0][1] : block.y * viewportHeight
+    let textWidth = Math.max(1, rotate && quad ? (edge(quad[0], quad[1]) + edge(quad[2], quad[3])) / 2 : block.width * viewportWidth)
+    let textHeight = Math.max(1, rotate && quad ? (edge(quad[0], quad[3]) + edge(quad[1], quad[2])) / 2 : block.height * viewportHeight)
+    const inset = Math.min(padding, textWidth / 12, textHeight / 12)
+    const neededHeight = (size: number, width: number) =>
+      screenTextLines(text, Math.max(1, width - inset * 2), size, measure) * size * 1.45 + inset * 2
+    const tokens = text.match(/[^\s]+/gu) ?? []
+    const longest = (size: number) => tokens.reduce((width, token) => Math.max(width, measure(token, size)), 0) + inset * 2
+    const sourceSize = Math.round((block.lineHeight ?? block.height) * viewportHeight * 0.85)
+    let high = preferredSize || Math.max(10, Math.min(100, sourceSize))
+    let fontSize = Math.min(12, high)
+    while (fontSize < high) {
+      const trial = Math.ceil((fontSize + high) / 2)
+      if (longest(trial) <= textWidth && neededHeight(trial, textWidth) <= textHeight) fontSize = trial
+      else high = trial - 1
     }
-    textHeight = Math.max(1, Math.min(Math.max(textHeight, neededHeight(fontSize)), Math.max(1, availableHeight)))
-    const centerX = originX + textWidth * c / 2 - textHeight * s / 2
-    const centerY = originY + textWidth * s / 2 + textHeight * c / 2
+
+    let x = 0, y = 0
+    if (neededHeight(fontSize, textWidth) > textHeight || longest(fontSize) > textWidth) {
+      const region = regions.find(item => item.id === block.regionId)
+      const left = (region?.x ?? 0) * viewportWidth, top = (region?.y ?? 0) * viewportHeight
+      const right = region ? (region.x + region.width) * viewportWidth : viewportWidth
+      const bottom = region ? (region.y + region.height) * viewportHeight : viewportHeight
+      const local = [[left, top], [right, top], [right, bottom], [left, bottom]].map(([px, py]) => {
+        const dx = px - originX, dy = py - originY
+        return [dx * c + dy * s, -dx * s + dy * c]
+      })
+      const xMin = Math.min(...local.map(point => point[0])), xMax = Math.max(...local.map(point => point[0]))
+      const yMin = Math.min(...local.map(point => point[1])), yMax = Math.max(...local.map(point => point[1]))
+      textWidth = Math.max(1, Math.min(xMax - xMin, Math.max(textWidth, longest(fontSize))))
+      textHeight = Math.max(1, Math.min(yMax - yMin, Math.max(textHeight, neededHeight(fontSize, textWidth))))
+      x = Math.max(xMin, Math.min(0, xMax - textWidth))
+      y = Math.max(yMin, Math.min(0, yMax - textHeight))
+    }
+    const centerX = originX + (x + textWidth / 2) * c - (y + textHeight / 2) * s
+    const centerY = originY + (x + textWidth / 2) * s + (y + textHeight / 2) * c
     const width = Math.abs(textWidth * c) + Math.abs(textHeight * s)
     const height = Math.abs(textWidth * s) + Math.abs(textHeight * c)
     return { id: block.id, x: centerX - width / 2, y: centerY - height / 2, width, height,
-      textWidth, textHeight, angle, fontSize, text, overflow: neededHeight(fontSize) > textHeight + 0.01, padding: inset }
+      textWidth, textHeight, angle: rotate ? angle : 0, fontSize, text,
+      overflow: neededHeight(fontSize, textWidth) > textHeight + 0.01, padding: inset,
+      ink: block.ink, patches: block.patches }
   })
 }

@@ -66,7 +66,6 @@ export interface Preferences {
 
   uiLanguage: UiLanguagePreference
   theme: 'auto' | 'light' | 'dark'
-  liquidGlass: boolean
   pageLanguage: string
   pageDisplay: DisplayMode
   autoSites: string[]
@@ -104,7 +103,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   requestRate: 5, webConcurrency: 8, batchSize: 8, shortcutPage: 'Alt+T', shortcutSelection: 'Alt+S', shortcutHover: 'Alt', shortcutSubtitles: 'Alt+V',
   ttsVoice: '', ttsRate: 1, ttsPitch: 1, ttsVolume: 1, glossary: [], siteRules: [],
 
-  uiLanguage: 'auto', theme: 'auto', liquidGlass: false, pageLanguage: 'zh', pageDisplay: 'bilingual', autoSites: [],
+  uiLanguage: 'auto', theme: 'auto', pageLanguage: 'zh', pageDisplay: 'bilingual', autoSites: [],
   subtitleSourceSize: 16, subtitleSourceColor: '#ffffff', subtitleSourceFont: 'system-ui', subtitleTranslationSize: 16, subtitleTranslationColor: '#ffffff', subtitleTranslationFont: 'system-ui', subtitleTranslationFirst: false, subtitleBold: false, subtitlePauseOnHover: false,
   autoSubtitleSites: [], subtitleFont: 'system-ui', subtitleColor: '#ffffff', subtitleBackground: '#000000', subtitleBackgroundOpacity: 0.72, subtitleFollow: true, subtitlePositionX: 50, subtitlePositionY: 95,
   videoLanguage: 'zh', videoDisplay: 'bilingual', pipeline: 'cascade', subtitleSize: 16, subtitleOffset: 5,

@@ -103,6 +103,11 @@ const inPlaceHints = {
 }
 const ocrLifecycleHints = {"zh-CN": "模型管理负责下载、删除；模型网关负责加载。启动后可在屏幕原文位置覆盖译文。", "zh-TW": "模型管理負責下載與刪除，模型閘道負責載入。啟動後可在螢幕原文位置覆蓋譯文。", "zh-HK": "模型管理負責下載與刪除，模型閘道負責載入。啟動後可在螢幕原文位置覆蓋譯文。", "en": "Download and remove models here; load them in Model Gateway to translate screen text in place.", "ja": "ここでモデルのダウンロードと削除を行い、モデルゲートウェイで読み込むと画面の原文位置に訳文を表示できます。", "ko": "여기에서 모델을 다운로드하거나 삭제하고 모델 게이트웨이에서 불러와 화면 원문 위치에 번역을 표시하세요."}
 const regionUi = {
+  ocrMode: ['OCR 触发方式', 'OCR 觸發方式', 'OCR 觸發方式', 'OCR trigger', 'OCR の実行方法', 'OCR 실행 방식'],
+  ocrPeriod: ['定时识别', '定時辨識', '定時辨識', 'Timed', '一定間隔', '주기적 인식'],
+  ocrAnalysis: ['画面稳定后识别', '畫面穩定後辨識', '畫面穩定後辨識', 'After image settles', '画面が安定したら実行', '화면이 안정되면 인식'],
+  ocrTrigger: ['鼠标或键盘触发', '滑鼠或鍵盤觸發', '滑鼠或鍵盤觸發', 'Mouse or keyboard input', 'マウスやキー入力で実行', '마우스 또는 키 입력'],
+  ocrInterval: ['识别间隔（毫秒）', '辨識間隔（毫秒）', '辨識間隔（毫秒）', 'OCR interval (ms)', 'OCR 実行間隔 (ms)', 'OCR 간격(ms)'],
   sceneTitle: ['屏幕场景', '螢幕場景', '螢幕場景', 'Screen scene', '画面翻訳シーン', '화면 번역 장면'],
   sceneDescription: ['屏幕翻译示意：框选显示器中的文字，在原位置显示译文。', '螢幕翻譯示意：框選顯示器中的文字，在原位置顯示譯文。', '螢幕翻譯示意：框選顯示器中的文字，在原位置顯示譯文。', 'Illustration: select text on a display and show its translation in place.', '画面翻訳のイメージ：文字を範囲選択し、元の位置に訳文を表示します。', '화면 번역 예시: 디스플레이의 텍스트를 선택하고 원래 위치에 번역을 표시합니다.'],
   sceneSource: ['Hello, world!', 'Hello, world!', 'Hello, world!', 'Bonjour le monde !', 'Hello, world!', 'Hello, world!'],

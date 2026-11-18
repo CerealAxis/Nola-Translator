@@ -2,6 +2,7 @@
 title: 提供邀请
 pageClass: nola-vis-doc nola-vis-principles
 editLink: false
+description: "用户应看得出哪里能点击、编辑或继续。文字、形状和状态变化都可以提示下一步操作。"
 ---
 
 # 提供邀请

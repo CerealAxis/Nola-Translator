@@ -2,6 +2,7 @@
 title: Create event（创建日程）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "日程卡片汇总当天三项活动，供用户确认加入日历或舍弃。"
 ---
 
 # Create event（创建日程）

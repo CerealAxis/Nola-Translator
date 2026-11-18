@@ -2,6 +2,7 @@
 title: Code Block（代码块）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "显示代码、终端输出和差异，可选择显示页头、行号及复制按钮。"
 ---
 
 # Code Block（代码块）

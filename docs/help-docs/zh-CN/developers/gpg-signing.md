@@ -1,3 +1,7 @@
+---
+description: "为 Nola Translator 仓库配置 GPG 提交签名，查看密钥生成、公钥登记以及创建和验证签名提交的步骤。"
+---
+
 # GPG 签名配置
 
 > [!WARNING]  

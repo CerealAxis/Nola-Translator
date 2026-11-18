@@ -2,6 +2,7 @@
 title: Toggle Group（切换按钮组）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "组合多个有按下状态的按钮，并按用途设置单选或多选行为。"
 ---
 
 # Toggle Group（切换按钮组）

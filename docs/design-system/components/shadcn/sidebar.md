@@ -2,6 +2,7 @@
 title: Sidebar（侧栏）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "组合侧栏头部、分组菜单与其他区域，按场景切换完整或折叠导航。"
 ---
 
 # Sidebar（侧栏）

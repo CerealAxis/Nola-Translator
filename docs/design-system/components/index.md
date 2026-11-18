@@ -2,6 +2,7 @@
 title: 组件目录
 pageClass: nola-vis-doc
 editLink: false
+description: "浏览 Nola Translator 设计系统的组件目录，比较组件预览，打开 shadcn、Assistant UI 与产品自定义组件的完整文档。"
 ---
 
 <script setup>

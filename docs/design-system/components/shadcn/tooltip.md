@@ -2,6 +2,7 @@
 title: Tooltip（文字提示）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "当元素获得键盘焦点或鼠标悬停在其上时，弹出与该元素相关的信息。"
 ---
 
 # Tooltip（文字提示）

@@ -2,6 +2,7 @@
 title: Textarea（多行输入）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "显示表单中的多行文本框，或外观类似多行文本框的组件。"
 ---
 
 # Textarea（多行输入）

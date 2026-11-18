@@ -2,6 +2,7 @@
 title: Alert（提示）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "使用提示组件呈现需要注意的信息，可以组合标题、说明、图标和与消息相关的操作。"
 ---
 
 # Alert（提示）

@@ -2,6 +2,7 @@
 title: Field（表单字段）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "将标签、控件和帮助文本组合为无障碍表单字段和输入组。"
 ---
 
 # Field（表单字段）

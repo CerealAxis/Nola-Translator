@@ -2,6 +2,7 @@
 title: Radio Group（单选组）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "一组可选中的按钮，称为单选按钮，同一时间最多只能选中一个。"
 ---
 
 # Radio Group（单选组）

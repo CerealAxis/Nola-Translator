@@ -2,6 +2,7 @@
 title: Message timing（消息耗时）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "展示当前消息的流式统计，包括首个 token 的等待时间、总耗时和生成速度。"
 ---
 
 # Message timing（消息耗时）

@@ -2,6 +2,7 @@
 title: Prompt library（提示词库）
 pageClass: nola-vis-doc shadcn-base-doc
 editLink: false
+description: "在提示词库浏览和搜索已保存的提示词，找到合适的条目后插入当前草稿。"
 ---
 
 # Prompt library（提示词库）

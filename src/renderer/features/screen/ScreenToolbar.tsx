@@ -86,7 +86,7 @@ export function ScreenToolbar({ api, snapshot }: { api: ScreenTranslationBridge;
           <SelectContent><SelectGroup>{sources.map(source => <SelectItem value={source.id} key={source.id}>{source.name}</SelectItem>)}</SelectGroup></SelectContent>
         </Select>{!sources.length && <span>{t('suite.noWindows')}</span>}
       </Field>}
-      {config.captureMode === 'regions' && <Button variant="outline" size="sm" disabled={busy} onClick={() => void run({ action: 'edit' })}>{t('screen.edit')}</Button>}
+      {config.captureMode !== 'cursor' && <Button variant="outline" size="sm" disabled={busy || config.captureMode === 'window' && !config.sourceId} onClick={() => void run({ action: 'edit' })}>{t('screen.edit')}</Button>}
       <Field className="screen-toolbar__switch"><FieldLabel htmlFor="toolbar-overlay">{t('suite.overlayVisible')}</FieldLabel><Switch id="toolbar-overlay" checked={snapshot.overlayVisible !== false} disabled={busy} onCheckedChange={() => void run({ action: 'toggleOverlay' })}><SwitchThumb /></Switch></Field>
     </div>}
   </section>
