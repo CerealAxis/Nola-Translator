@@ -16,8 +16,8 @@ export interface SettingRowProps {
    */
   descriptionTooltip?: boolean
 }
-const LABEL_CLASS = 'text-sm font-medium text-foreground'
-const TOOLTIP_CLASS = 'z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
+const LABEL_CLASS = 'type-body font-medium text-foreground'
+const TOOLTIP_CLASS = 'z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 type-body text-overlay-foreground shadow-overlay'
 export function SettingRow({ label, desc, children, className = '', descriptionTooltip = false }: SettingRowProps) {
   const labelId = useId()
   return (
@@ -27,7 +27,7 @@ export function SettingRow({ label, desc, children, className = '', descriptionT
           <TooltipTrigger delay={300} render={<span id={labelId} className={LABEL_CLASS} tabIndex={0}>{label}</span>} />
           <TooltipContent sideOffset={3} className={TOOLTIP_CLASS}>{desc}</TooltipContent>
         </Tooltip> : <span id={labelId} className={LABEL_CLASS}>{label}</span>}
-        {desc && !descriptionTooltip ? <p className="mt-1 text-xs text-muted">{desc}</p> : null}
+        {desc && !descriptionTooltip ? <p className="mt-1 type-muted text-muted">{desc}</p> : null}
       </div>
       <div className="nola-setting-control">{children}</div>
     </div>

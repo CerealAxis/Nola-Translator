@@ -19,7 +19,7 @@ function bytes(value: number): string { return `${(value / 1024 ** 3).toFixed(2)
 
 /** Loader tag for a model. The soft variant of the old chip was a muted fill with inherited text. */
 function LoaderChip({ loaders, className }: { loaders: string; className?: string }) {
-  return <span className={['inline-flex w-fit shrink-0 items-center rounded-2xl bg-default px-1 py-0 text-xs font-medium leading-5 text-foreground', className ?? ''].filter(Boolean).join(' ')}>{loaders}</span>
+  return <span className={['inline-flex w-fit shrink-0 items-center rounded-2xl bg-default px-1 py-0 type-small text-foreground', className ?? ''].filter(Boolean).join(' ')}>{loaders}</span>
 }
 
 /** Busy marker for a button that starts an operation; the button itself carries the disabled state. */
@@ -97,10 +97,10 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
     const options = resources.filter(item => item.kind === kind && !item.resourceId.startsWith('hub:'))
     const current = options.find(item => item.resourceId === value && supportsModel(item))
     const loaders = (item: ResourceRecord) => modelEngines(item).map(loaderName).join(' / ')
-    const itemClass = 'flex cursor-default items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-overlay-foreground data-[highlighted]:bg-surface-tertiary data-[selected]:bg-accent-soft aria-disabled:opacity-50'
+    const itemClass = 'flex cursor-default items-center justify-between gap-2 rounded-md px-2 py-1.5 type-body text-overlay-foreground data-[highlighted]:bg-surface-tertiary data-[selected]:bg-accent-soft aria-disabled:opacity-50'
     return <Select value={current?.resourceId ?? 'none'} onValueChange={key => { if (typeof key === 'string') onChange(key === 'none' ? '' : key) }}>
       <div className="flex w-full flex-col gap-1">
-        <SelectFieldLabel className="w-fit text-sm font-medium text-foreground">{label}</SelectFieldLabel>
+        <SelectFieldLabel className="w-fit type-body font-medium text-foreground">{label}</SelectFieldLabel>
         <SelectTrigger className="select__trigger w-full">
           <SelectValue className="select__value">{selected => {
             const item = options.find(option => option.resourceId === selected)
@@ -112,7 +112,7 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
         <SelectGroup className="flex flex-col">
           <SelectItem value="none" className={itemClass}>{t('offline.none')}</SelectItem>
           {options.map(item => <SelectItem key={item.resourceId} value={item.resourceId} disabled={!supportsModel(item)} className={itemClass}>
-            <span className="offline-model-option"><Label className="text-sm">{item.name}</Label><LoaderChip loaders={loaders(item)} className="ms-auto" /></span>
+            <span className="offline-model-option"><Label className="type-body">{item.name}</Label><LoaderChip loaders={loaders(item)} className="ms-auto" /></span>
           </SelectItem>)}
         </SelectGroup>
       </SelectContent>
@@ -146,7 +146,7 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
           <SettingsRow label="llama.cpp"><SettingSelect value={llama} onChange={value => updateLoader(setLlama, value)} ariaLabel="llama.cpp" options={[{ value: '', label: t('offline.none') }, ...llamaOptions.map(item => ({ value: item.id, label: item.name }))]} /></SettingsRow>
           <SettingsRow label="CrispASR"><SettingSelect value={crisp} onChange={value => updateLoader(setCrisp, value)} ariaLabel="CrispASR" options={[{ value: '', label: t('offline.none') }, { value: CRISP_RUNTIME_ID, label: '0.8.43 · Vulkan' }]} /></SettingsRow>
         </div> : null}
-        {step === 1 ? <div className="offline-model-fields"><div className="model-import-section-heading"><Label className="text-sm">{t('offline.modelChoice')}</Label><ImportHelp label={t('offline.modelChoice')}>{t('offline.loaderRequired')}</ImportHelp></div>
+        {step === 1 ? <div className="offline-model-fields"><div className="model-import-section-heading"><Label className="type-body">{t('offline.modelChoice')}</Label><ImportHelp label={t('offline.modelChoice')}>{t('offline.loaderRequired')}</ImportHelp></div>
           {modelPicker('recognitionModel', recognition, setRecognition, t('offline.recognition'))}
           {modelPicker('translationModel', translation, setTranslation, t('offline.translation'))}
         </div> : null}
@@ -156,7 +156,7 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
         </> : null}
       </> : <>
         {state.mode === 'model' ? <ModelImportPanel>{modelPreview}</ModelImportPanel> : <><div className="offline-actions"><Button variant="secondary" disabled={state.busy} onClick={() => void offlineActions.pickBundle()}><BusyIcon busy={state.busy} />{t('offline.selectBundle')}</Button></div></>}
-        {state.mode !== 'model' ? state.preview ? <><ul className="offline-items">{state.preview.items.map(item => <li key={item.id}><div><strong>{resources.find(resource => resource.resourceId === item.id)?.name ?? item.name}</strong><p className="nola-caption text-muted">{t(`offline.${item.status}`)} · {bytes(item.bytes)}</p>{item.reason || item.files?.length ? <ImportHelp label={t('offline.importInfo')}>{item.reason}{item.files?.length ? <ul>{item.files.map(file => <li key={file}>{file}</li>)}</ul> : null}</ImportHelp> : null}</div></li>)}</ul><SettingsRow label={t('offline.requiredSpace')}><span>{bytes(state.preview.totalBytes)}</span></SettingsRow>{state.preview.availableBytes !== undefined ? <SettingsRow label={t('offline.availableSpace')}><span>{bytes(state.preview.availableBytes)}</span></SettingsRow> : null}</> : null : null}
+        {state.mode !== 'model' ? state.preview ? <><ul className="offline-items">{state.preview.items.map(item => <li key={item.id}><div><strong>{resources.find(resource => resource.resourceId === item.id)?.name ?? item.name}</strong><p className="type-muted text-muted">{t(`offline.${item.status}`)} · {bytes(item.bytes)}</p>{item.reason || item.files?.length ? <ImportHelp label={t('offline.importInfo')}>{item.reason}{item.files?.length ? <ul>{item.files.map(file => <li key={file}>{file}</li>)}</ul> : null}</ImportHelp> : null}</div></li>)}</ul><SettingsRow label={t('offline.requiredSpace')}><span>{bytes(state.preview.totalBytes)}</span></SettingsRow>{state.preview.availableBytes !== undefined ? <SettingsRow label={t('offline.availableSpace')}><span>{bytes(state.preview.availableBytes)}</span></SettingsRow> : null}</> : null : null}
       </>}
       </div>
       {!completedModelImport && (state.mode !== 'model' || task || state.preview) ? <DialogFooter>

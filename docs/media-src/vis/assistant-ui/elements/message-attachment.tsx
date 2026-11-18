@@ -46,7 +46,7 @@ export function MessageAttachments({
                 }}
               />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5 pe-2">
-                <span className="text-foreground/90 truncate text-[13.5px]">
+                <span className="text-foreground/90 truncate type-body">
                   {item.name}
                 </span>
                 <span className={cn(mono, "text-muted-foreground")}>
@@ -65,7 +65,7 @@ export function MessageAttachments({
                 )}
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-foreground/90 truncate text-[13.5px]">
+                <span className="text-foreground/90 truncate type-body">
                   {item.name}
                 </span>
                 <span className={cn(mono, "text-muted-foreground")}>

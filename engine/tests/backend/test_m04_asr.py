@@ -25,6 +25,28 @@ from test_m02_gateway import _model_root
 from test_m05_translation import FakeGateway
 
 
+async def test_stop_fences_vad_work_that_is_still_finishing_in_a_thread():
+    import threading
+    entered, release = threading.Event(), threading.Event()
+    def accept(frame):
+        entered.set()
+        assert release.wait(2)
+        return [VolumeGateSegment(0, 20, frame.samples)]
+    session = SimpleNamespace(session_id=UUID(int=1), pipeline_id="stopping", epoch=0,
+                              config=SessionConfig.model_validate(cascade_config()))
+    events = []
+    pipeline = AsrPipeline(session, None, lambda *event: events.append(event),
+                           segmenter=SimpleNamespace(accept=accept))
+    pending = asyncio.create_task(pipeline.accept(AudioFrame(np.ones(320, dtype=np.float32), 0), 0))
+    try:
+        assert await asyncio.to_thread(entered.wait, 1)
+        await pipeline.close()
+    finally:
+        release.set()
+    await pending
+    assert not pipeline._final_jobs and not events
+
+
 @pytest.mark.parametrize("text,reason,silence_ms", [
     ("Ready?", "soft_silence_boundary", 500),
     ("Ready", "hard_silence", 900),

@@ -49,7 +49,7 @@ export function DocumentReference({
           <FileTextIcon className="size-3.5" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13.5px] font-medium">{title}</span>
+          <span className="truncate type-body font-medium">{title}</span>
           <span className={cn(mono, "text-muted-foreground")}>
             {pages} 页· {anchors.length} 引
           </span>
@@ -71,7 +71,7 @@ export function DocumentReference({
               <span className={cn(mono, "text-muted-foreground")}>
                 p. {anchor.page}
               </span>
-              <span className="text-foreground/65 border-foreground/15 border-s-2 ps-2 text-xs leading-relaxed break-words">
+              <span className="text-foreground/65 border-foreground/15 border-s-2 ps-2 type-small break-words">
                 {anchor.quote}
               </span>
             </>

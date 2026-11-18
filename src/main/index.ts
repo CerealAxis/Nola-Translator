@@ -134,6 +134,11 @@ function createMainWindow(theme: AppSettings['theme']): void {
   const preload = resolvePreloadPath(__dirname)
   const window = new BrowserWindow(createMainWindowOptions(preload, theme, __dirname))
   mainWindow = window
+  window.webContents.on('did-start-navigation', (_event, _url, inPlace, mainFrame) => {
+    if (mainFrame && !inPlace) comicTranslation?.rendererUnavailable()
+  })
+  window.webContents.on('render-process-gone', () => comicTranslation?.rendererUnavailable())
+  window.webContents.on('destroyed', () => comicTranslation?.rendererUnavailable())
 
   window.once('ready-to-show', () => {
     window.maximize()

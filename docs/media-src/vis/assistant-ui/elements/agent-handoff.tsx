@@ -34,7 +34,7 @@ export function AgentHandoff({
         <span
           className={cn(
             field,
-            "text-muted-foreground flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-opacity duration-500",
+            "text-muted-foreground flex items-center gap-1.5 rounded-full px-2.5 py-1 type-muted transition-opacity duration-500",
             settled && "opacity-45",
           )}
         >
@@ -53,7 +53,7 @@ export function AgentHandoff({
 
         <span
           className={cn(
-            "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-colors duration-500",
+            "flex items-center gap-1.5 rounded-full px-2.5 py-1 type-body transition-colors duration-500",
             settled
               ? cn(field, "text-foreground/80")
               : "bg-primary/12 text-accent-foreground dark:bg-primary/15 dark:text-primary",
@@ -64,7 +64,7 @@ export function AgentHandoff({
         </span>
       </div>
 
-      <p className="text-muted-foreground text-xs leading-relaxed">{reason}</p>
+      <p className="text-muted-foreground type-muted">{reason}</p>
 
       {carried.length > 0 && (
         <div className="flex flex-col gap-1">
@@ -74,7 +74,7 @@ export function AgentHandoff({
           {carried.map((item) => (
             <span
               key={item}
-              className="text-foreground/60 border-foreground/12 border-s ps-2.5 text-xs leading-relaxed"
+              className="text-foreground/60 border-foreground/12 border-s ps-2.5 type-small"
             >
               {item}
             </span>

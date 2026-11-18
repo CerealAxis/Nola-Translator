@@ -1,4 +1,4 @@
-export { DualColumnView, lineOpacity } from './DualColumnView'
+export { DualColumnView } from './DualColumnView'
 export type { DualColumnViewProps, DualColumnSegment } from './DualColumnView'
 
 export { AudioPlayerBar, formatClock } from './AudioPlayerBar'

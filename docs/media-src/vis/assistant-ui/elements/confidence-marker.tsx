@@ -50,7 +50,7 @@ export function ConfidenceMarker({
 
       {...props}
     >
-      <p className="text-[13.5px] leading-relaxed">
+      <p className="type-body">
         {claims.map((claim) => (
           <button
             key={claim.id}

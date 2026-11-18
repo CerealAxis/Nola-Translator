@@ -25,6 +25,7 @@ import { OverlayMenuRoot } from './features/overlay/OverlayMenuRoot'
 import { RuntimeOperationNotice } from './features/settings/RuntimeOperationNotice'
 import { isSettingsErrorClaimed } from './features/settings/settingsErrorChannel'
 import { SETTINGS_WRITE_FAILURE_KEYS, settingsWriteFailure } from './features/settings/settingsWriteError'
+import { flushPendingSettings } from './store/settingsStore'
 import { StartupFailureDialog } from './features/settings/StartupFailureDialog'
 import { AppUpdateNotice } from './features/settings/AppUpdateNotice'
 import { OnboardingTour } from './features/onboarding'
@@ -299,6 +300,10 @@ function Root() {
     return () => window.clearTimeout(timer)
   }, [engineSettled])
   useSplashUntilEngineSettles(!isIpcBridgeAvailable() || engineSettled || startupTimedOut)
+  useEffect(() => {
+    if (isOverlayDocument || isWorkspaceDocument || isMigrationDocument || isOverlayToastDocument || !isIpcBridgeAvailable()) return
+    return bridge.comic?.onFlushRequested?.(flushPendingSettings)
+  }, [])
   useEffect(() => {
     const teardown = () => {
       void disposeStores()

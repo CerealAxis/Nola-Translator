@@ -50,7 +50,7 @@ export function TraceWaterfall({
       {...props}
     >
       <div className="flex items-baseline justify-between">
-        <span className="text-[13.5px] font-medium">跟踪</span>
+        <span className="type-body font-medium">跟踪</span>
         <span className={cn(mono, "text-muted-foreground tabular-nums")}>
           {totalMs} 毫秒
         </span>
@@ -66,7 +66,7 @@ export function TraceWaterfall({
               className="fade-in slide-in-from-left-1 animate-in fill-mode-both grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-2 duration-300"
             >
               <span
-                className="text-foreground/70 min-w-0 truncate text-xs"
+                className="text-foreground/70 min-w-0 truncate type-small"
                 style={{ paddingInlineStart: `${item.depth * 0.75}rem` }}
               >
                 {item.name}

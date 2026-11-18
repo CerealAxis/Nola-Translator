@@ -135,7 +135,7 @@ export function MapAnswer({
           );
           const content = (
             <>
-              <span className="text-foreground/85 min-w-0 flex-1 truncate text-[13px]">
+              <span className="text-foreground/85 min-w-0 flex-1 truncate type-body">
                 {pin.label}
               </span>
               <span className={cn(mono, "text-muted-foreground shrink-0")}>

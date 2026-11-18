@@ -62,18 +62,18 @@ export function AgentCard({
         </span>
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-baseline gap-2">
-            <span className="truncate [font:var(--font-label)] font-medium">{name}</span>
+            <span className="truncate type-body font-medium">{name}</span>
             <span className={cn(mono, "text-muted-foreground shrink-0")}>
               v{version}
             </span>
           </span>
-          <span className="text-muted-foreground truncate [font:var(--font-caption)]">
+          <span className="text-muted-foreground truncate type-muted">
             {provider}
           </span>
         </div>
       </div>
 
-      <p className="text-foreground/60 [font:var(--font-caption)] leading-relaxed">
+      <p className="text-foreground/60 type-muted">
         {description}
       </p>
 
@@ -89,7 +89,7 @@ export function AgentCard({
             >
               {skill.name}
             </span>
-            <span className="text-muted-foreground min-w-0 flex-1 truncate [font:var(--font-caption)]">
+            <span className="text-muted-foreground min-w-0 flex-1 truncate type-muted">
               {skill.description}
             </span>
           </div>
@@ -115,12 +115,12 @@ export function AgentCard({
           connected
             ? cn(field, "text-muted-foreground")
             : cn(inkButton, "justify-center"),
-          "flex h-8 items-center justify-center gap-1.5 rounded-full px-3.5 [font:var(--font-caption)] font-medium disabled:pointer-events-none",
+          "flex h-8 items-center justify-center gap-1.5 rounded-full px-3.5 type-body disabled:pointer-events-none",
         )}
       >
         {connected ? (
           <>
-            <CheckIcon className="size-3.5 text-chart-2" />
+            <CheckIcon className="size-3.5 text-success-soft-foreground" />
             Connected
           </>
         ) : (

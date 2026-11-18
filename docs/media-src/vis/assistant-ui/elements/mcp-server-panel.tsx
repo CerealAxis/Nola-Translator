@@ -66,7 +66,7 @@ export function McpServerPanel({
       {...props}
     >
       <div className="flex items-baseline justify-between px-1 pb-1">
-        <span className="text-[13.5px] font-medium">服务器</span>
+        <span className="type-body font-medium">服务器</span>
         <span className={cn(mono, "text-muted-foreground tabular-nums")}>
           {connected} 的 {servers.length} 已连接
         </span>
@@ -87,7 +87,7 @@ export function McpServerPanel({
               )}
             />
             <PlugIcon className="text-muted-foreground size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1 truncate text-[13.5px]">
+            <span className="min-w-0 flex-1 truncate type-body">
               {server.name}
             </span>
             <span className={cn(mono, "text-muted-foreground shrink-0")}>

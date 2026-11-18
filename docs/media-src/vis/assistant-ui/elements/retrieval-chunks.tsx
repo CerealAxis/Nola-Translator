@@ -40,16 +40,16 @@ export function RetrievalChunks({
       <span
         className={cn(
           field,
-          "text-foreground/70 inline-flex w-fit items-center gap-1.5 rounded-full px-3.5 py-2 text-xs",
+          "text-foreground/70 inline-flex w-fit items-center gap-1.5 rounded-full px-3.5 py-2 type-body",
         )}
       >
         <DatabaseIcon className="text-muted-foreground size-3" />
         {query}
       </span>
 
-      <div className="text-muted-foreground text-xs">
+      <div className="text-muted-foreground type-muted">
         {searching ? (
-          <ShimmerLabel className="relative inline-block leading-none">
+          <ShimmerLabel className="relative inline-block">
             取回
           </ShimmerLabel>
         ) : (
@@ -69,7 +69,7 @@ export function RetrievalChunks({
             )}
           >
             <div className="flex items-baseline gap-2">
-              <span className="text-foreground/90 min-w-0 flex-1 truncate text-[13px] font-medium">
+              <span className="text-foreground/90 min-w-0 flex-1 truncate type-body font-medium">
                 {chunk.source}
               </span>
               <span className={cn(mono, "text-muted-foreground shrink-0")}>
@@ -80,14 +80,14 @@ export function RetrievalChunks({
                   mono,
                   "shrink-0 tabular-nums",
                   chunk.score >= 0.8
-                    ? "text-chart-2"
+                    ? "text-success-soft-foreground"
                     : "text-muted-foreground",
                 )}
               >
                 {chunk.score.toFixed(2)}
               </span>
             </div>
-            <p className="text-muted-foreground line-clamp-2 text-xs leading-relaxed">
+            <p className="text-muted-foreground line-clamp-2 type-muted">
               {chunk.text}
             </p>
             <span

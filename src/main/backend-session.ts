@@ -270,7 +270,7 @@ export class BackendSession {
     let input = mapped.config.input
     let inputCable: string | undefined
     if (input.capture_backend === 'windows_process_exclude') {
-      // WASAPI excludes the Electron main process and its renderer and audio utility children.
+      // Windows EXCLUDE_TARGET_PROCESS_TREE includes future renderer and audio utility children.
       const excludedProcessTree = [process.pid]
       const route = z.object({ safe: z.boolean(), issues: z.array(z.object({ code: z.string() })) }).parse(await this.request('/audio/preflight', {
         input_mode: 'process_exclude', excluded_process_tree: excludedProcessTree, probe_target_pid: process.pid,

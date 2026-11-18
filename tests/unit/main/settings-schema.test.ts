@@ -2,6 +2,12 @@ import { expect, it } from 'vitest'
 
 import { settingsPatchSchema } from '../../../src/main/settings-schema'
 
+it('accepts only supported desktop fonts and densities at the IPC boundary', () => {
+  expect(settingsPatchSchema.safeParse({ appearance: { interfaceFont: 'Noto Sans SC', density: 'comfortable' } }).success).toBe(true)
+  expect(settingsPatchSchema.safeParse({ appearance: { interfaceFont: 'arbitrary-family' } }).success).toBe(false)
+  expect(settingsPatchSchema.safeParse({ appearance: { density: 'tiny' } }).success).toBe(false)
+})
+
 it('validates VAD duration bounds and integer values', () => {
   expect(settingsPatchSchema.safeParse({ recognition: { max_segment_ms: 15000, silence_end_ms: 1200 } }).success).toBe(true)
   for (const recognition of [{ max_segment_ms: 2999 }, { max_segment_ms: 30001 }, { silence_end_ms: 299 }, { silence_end_ms: 2001 }, { silence_end_ms: 800.5 }]) {

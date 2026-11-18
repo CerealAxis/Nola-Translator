@@ -41,7 +41,7 @@ export function ReasoningEffort({
       {...props}
     >
       <div className="flex items-baseline justify-between">
-        <span className="text-[13.5px] font-medium">正在思考</span>
+        <span className="type-body font-medium">正在思考</span>
         <span className={cn(mono, "text-muted-foreground tabular-nums")}>
           {fmt(spent)} / {fmt(budget)}
         </span>
@@ -51,7 +51,7 @@ export function ReasoningEffort({
         {levels.map((level) => {
           const active = level.key === selectedKey;
           const className = cn(
-            "flex-1 rounded-full py-1 text-xs font-medium transition-[background-color,color,scale] duration-150",
+            "flex-1 rounded-full py-1 type-body font-medium transition-[background-color,color,scale] duration-150",
             onSelect && "active:scale-[0.97]",
             active
               ? "bg-accent text-accent-foreground"

@@ -94,10 +94,10 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
         <SettingsRow label={t('suite.supportsImages')}><Switch aria-label={t('suite.supportsImages')} checked={draft.images === true} disabled={saving} onCheckedChange={images => patch({ images })}><SwitchThumb /></Switch></SettingsRow>
         <NumberRow label={t('settings.contextWindow')} value={draft.contextWindow} onCommit={contextWindow => patch({ contextWindow })} />
         <NumberRow label={t('settings.maxOutputTokens')} value={draft.maxOutputTokens} onCommit={maxOutputTokens => patch({ maxOutputTokens })} />
-        <details><summary className="cursor-pointer py-2 text-sm">{t('workbench.translationCapabilities')}</summary>
+        <details><summary className="cursor-pointer py-2 type-body">{t('workbench.translationCapabilities')}</summary>
         <ModelLanguageSelect label={t('modelConfig.sourceLanguages')} codes={[...SOURCE_LANGUAGE_OPTIONS]} value={draft.sourceLanguages ?? [...SOURCE_LANGUAGE_OPTIONS]} onChange={sourceLanguages => patch({ sourceLanguages })} />
         <ModelLanguageSelect label={t('modelConfig.targetLanguages')} codes={[...LANGUAGE_CODES]} value={draft.languages} onChange={languages => patch({ languages })} />
-        <div className="models-language-actions"><span className="nola-caption text-muted">{t('modelConfig.selectedLanguageCount', { count: draft.languages.length })}</span>
+        <div className="models-language-actions"><span className="type-muted text-muted">{t('modelConfig.selectedLanguageCount', { count: draft.languages.length })}</span>
           <Button variant="secondary" size="sm" onClick={() => patch({ sourceLanguages: [...SOURCE_LANGUAGE_OPTIONS], languages: [...LANGUAGE_CODES] })}>{t('modelsSettingsUi.selectAllLanguages')}</Button>
           <Button variant="secondary" size="sm" onClick={() => patch({ sourceLanguages: [], languages: [] })}>{t('modelsSettingsUi.clearLanguages')}</Button>
         </div>

@@ -66,7 +66,7 @@ const NestedMessage: FC = () => {
     <MessagePrimitive.Root
       data-slot="aui_task-transcript-message"
       data-role={role}
-      className="flex flex-col gap-1 text-xs leading-relaxed"
+      className="flex flex-col gap-1 type-small"
     >
       <span className={cn(mono, "text-muted-foreground")}>
         {ROLE_LABELS[role]}
@@ -213,7 +213,7 @@ export const TaskGroup: FC<{
     >
       <div
         data-slot="aui_task-group-summary"
-        className="text-muted-foreground px-1 text-xs"
+        className="text-muted-foreground px-1 type-muted"
       >
         {summary.join(" · ")}
       </div>

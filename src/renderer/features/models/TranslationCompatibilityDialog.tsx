@@ -23,7 +23,7 @@ export interface TranslationCompatibilityDialogProps {
 }
 
 /** Row states follow DESIGN §8: highlight while navigating, accent-soft once the row is the current value. */
-const ITEM_CLASS = 'flex cursor-default items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm data-[highlighted]:bg-surface-tertiary data-[selected]:bg-accent-soft data-[selected]:text-primary aria-disabled:opacity-50'
+const ITEM_CLASS = 'flex cursor-default items-center justify-between gap-2 rounded-md px-2 py-1.5 type-body data-[highlighted]:bg-surface-tertiary data-[selected]:bg-accent-soft data-[selected]:text-primary aria-disabled:opacity-50'
 
 export function TranslationCompatibilityDialog(props: TranslationCompatibilityDialogProps) {
   const { t, language } = useI18n()
@@ -40,7 +40,7 @@ export function TranslationCompatibilityDialog(props: TranslationCompatibilityDi
           <p className="text-muted">{t('modelConfig.incompatibleBody', { name: props.translation?.name ?? '', source: label(props.source), target: label(props.target) })}</p>
           {choosingModel ? (
             <Select value={props.translation?.resourceId ?? null} onValueChange={key => { if (typeof key === 'string') { props.onChangeModel(key); props.onClose() } }}>
-              <SelectFieldLabel className="w-fit text-sm font-medium text-foreground">{t('session.translationModel')}</SelectFieldLabel>
+              <SelectFieldLabel className="w-fit type-body font-medium text-foreground">{t('session.translationModel')}</SelectFieldLabel>
               <SelectTrigger className="select__trigger w-full">
                 <SelectValue className="select__value">{value => translationModels.find(model => model.resourceId === value)?.name ?? ''}</SelectValue>
 

@@ -60,6 +60,45 @@ def test_import_empty_library_real_dimensions_and_reopen(service, tmp_path):
   assert reopened.repository.get(book['id'])['pages'] == book['pages']
 
 
+async def test_concurrent_rendered_previews_share_one_render(service, tmp_path, monkeypatch):
+  book = imported(service, tmp_path)
+  page_id = book['pages'][0]['id']
+  original = service._render
+  calls = 0
+  async def render(*args):
+    nonlocal calls
+    calls += 1
+    await asyncio.sleep(.01)
+    return await original(*args)
+  monkeypatch.setattr(service, '_render', render)
+  first, second = await asyncio.gather(
+    service.image_bytes(book['id'], page_id, 'rendered'),
+    service.image_bytes(book['id'], page_id, 'rendered'),
+  )
+  assert first == second and first.startswith(b'\x89PNG')
+  assert calls == 1
+
+
+async def test_async_document_and_image_reads_keep_sqlite_off_the_event_loop(service, tmp_path, monkeypatch):
+  import threading
+  from contextlib import contextmanager
+  book = imported(service, tmp_path)
+  event_thread = threading.get_ident()
+  original = service.repository.connection
+  calls = []
+  @contextmanager
+  def connection():
+    calls.append(threading.get_ident())
+    assert calls[-1] != event_thread
+    with original() as db:
+      yield db
+  monkeypatch.setattr(service.repository, 'connection', connection)
+  await service.document(book['id'], Mutation(operationId=uuid4(), expectedRevision=book['revision'],
+    command=dict(action='configure', config=book['config'])))
+  await service.image_bytes(book['id'], book['pages'][0]['id'], 'source')
+  assert calls
+
+
 @pytest.mark.asyncio
 async def test_editor_save_rerender_and_json_keep_the_automatically_matched_font(service,tmp_path,monkeypatch):
   from contextlib import asynccontextmanager

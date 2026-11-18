@@ -62,7 +62,7 @@ function ModelSelectorRoot({
 }
 
 export const modelSelectorTriggerVariants = cva(
-  "focus-visible:ring-ring/50 flex w-fit items-center justify-between gap-2 overflow-hidden rounded-md text-sm whitespace-nowrap transition-colors outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+  "focus-visible:ring-ring/50 flex w-fit items-center justify-between gap-2 overflow-hidden rounded-md type-body whitespace-nowrap transition-colors outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
   {
     variants: {
       variant: {
@@ -73,7 +73,7 @@ export const modelSelectorTriggerVariants = cva(
       },
       size: {
         default: "h-9 px-3 py-2",
-        sm: "h-8 px-2.5 py-1.5 text-xs",
+        sm: "h-8 px-2.5 py-1.5 type-small",
         lg: "h-10 px-4 py-2.5",
       },
     },
@@ -384,7 +384,7 @@ function ModelSelectorItem({
           <span className="flex min-w-0 flex-col">
             <span className="truncate font-medium">{model.name}</span>
             {model.description && (
-              <span className="text-muted-foreground truncate text-xs">
+              <span className="text-muted-foreground truncate type-muted">
                 {model.description}
               </span>
             )}
@@ -461,7 +461,7 @@ function ModelSelectorEffort({
       }}
       {...props}
     >
-      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className="text-muted-foreground type-muted">{label}</span>
       <RadioGroup
         value={effort ?? ""}
         onValueChange={setEffort}
@@ -473,7 +473,7 @@ function ModelSelectorEffort({
             key={option.id}
             value={option.id}
             className={cn(
-              "focus-visible:ring-ring/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-md px-2 py-1 text-xs transition-colors outline-none focus-visible:ring-1",
+              "focus-visible:ring-ring/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-md px-2 py-1 type-body transition-colors outline-none focus-visible:ring-1",
               "data-checked:bg-accent data-checked:text-accent-foreground data-checked:font-medium",
             )}
           >

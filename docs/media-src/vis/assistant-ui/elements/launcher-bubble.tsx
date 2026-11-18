@@ -83,7 +83,7 @@ export function LauncherBubble({
           )}
         >
           <div className="flex flex-col gap-1">
-            <span className="text-[13.5px] font-medium">{greeting}</span>
+            <span className="type-body font-medium">{greeting}</span>
             <span className={cn(mono, "text-muted-foreground")}>
               通常会在一分钟内回复
             </span>
@@ -98,7 +98,7 @@ export function LauncherBubble({
                   onClick={() => onPick(prompt)}
                   className={cn(
                     field,
-                    "hover:bg-foreground/[0.07] text-foreground/70 rounded-xl px-3 py-2 text-start text-[13px] transition-colors",
+                    "hover:bg-foreground/[0.07] text-foreground/70 rounded-xl px-3 py-2 text-start type-body transition-colors",
                   )}
                 >
                   {prompt}
@@ -108,7 +108,7 @@ export function LauncherBubble({
                   key={prompt}
                   className={cn(
                     field,
-                    "text-foreground/70 rounded-xl px-3 py-2 text-[13px]",
+                    "text-foreground/70 rounded-xl px-3 py-2 type-body",
                   )}
                 >
                   {prompt}

@@ -56,11 +56,11 @@ export function SubagentList({
           >
             <div className="flex items-center gap-2">
               {done ? (
-                <CheckIcon className="fade-in zoom-in-90 animate-in size-3.5 shrink-0 text-chart-2 duration-200" />
+                <CheckIcon className="fade-in zoom-in-90 animate-in size-3.5 shrink-0 text-success-soft-foreground duration-200" />
               ) : (
                 <Loader2Icon className="text-muted-foreground size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
               )}
-              <span className="flex-1 truncate [font:var(--font-label)]">
+              <span className="flex-1 truncate type-body font-medium">
                 {agent.name}
               </span>
               <span className={cn(mono, "text-muted-foreground")}>
@@ -95,7 +95,7 @@ export function SubagentList({
         >
           <div className="flex items-center gap-2">
             <Loader2Icon className="text-muted-foreground size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
-            <span className="flex-1 truncate [font:var(--font-label)]">
+            <span className="flex-1 truncate type-body font-medium">
               {summaryAgent.name}
             </span>
             <span className={cn(mono, "text-muted-foreground")}>

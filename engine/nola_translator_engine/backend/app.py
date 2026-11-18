@@ -124,7 +124,8 @@ def create_app(
         ctx = BackendContext(
             server_instance_id=server_instance_id,
             control_token=token,
-            session_manager=SessionManager(server_instance_id, journal=journal, command_effect=effect),
+            session_manager=SessionManager(server_instance_id, journal=journal, command_effect=effect,
+                                           on_forget=lambda session: ctx.ingestions.pop(session.session_id, None)),
             journal=journal,
             pipeline_registry=registry,
             gateway=active_gateway,

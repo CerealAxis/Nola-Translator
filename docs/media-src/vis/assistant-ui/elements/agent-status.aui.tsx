@@ -130,7 +130,7 @@ const TaskTrayItem: FC<{ task: TaskState }> = ({ task }) => {
     <li
       data-slot="aui_task-tray-item"
       data-state={state}
-      className="flex items-center gap-2.5 rounded-lg py-2 pe-2.5 text-[13px]"
+      className="flex items-center gap-2.5 rounded-lg py-2 pe-2.5 type-body"
       style={{ paddingInlineStart: `${0.625 + task.depth * 0.75}rem` }}
     >
       <TaskStateIcon state={state} />

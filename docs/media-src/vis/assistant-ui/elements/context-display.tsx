@@ -107,12 +107,12 @@ function ContextDisplayContent({
         className,
       )}
     >
-      <div className="text-xs">
+      <div className="type-small">
         <div className="flex items-baseline justify-between gap-6 whitespace-nowrap">
           <span className={getPercentColor(percent)}>
             {Math.round(percent)}% 已满
           </span>
-          <span className="font-mono tabular-nums">
+          <span className="type-muted tabular-nums">
             {formatTokenCount(Math.min(totalTokens, modelContextWindow))} /{" "}
             {formatTokenCount(modelContextWindow)}
           </span>
@@ -138,7 +138,7 @@ function ContextDisplayContent({
                 className="flex items-baseline justify-between gap-6"
               >
                 <span className="text-muted-foreground">{segment.label}</span>
-                <span className="font-mono tabular-nums">
+                <span className="type-muted tabular-nums">
                   {formatTokenCount(segment.tokens)}
                 </span>
               </div>
@@ -196,7 +196,7 @@ function RingVisual() {
 
 function RingPercentLabel() {
   const { percent } = useContextDisplay();
-  return <span className="font-mono tabular-nums">{Math.round(percent)}%</span>;
+  return <span className="type-muted tabular-nums">{Math.round(percent)}%</span>;
 }
 const ContextDisplayRing: FC<PresetProps> = ({
   modelContextWindow,
@@ -212,7 +212,7 @@ const ContextDisplayRing: FC<PresetProps> = ({
   >
     <ContextDisplayTrigger
       className={cn(
-        "text-muted-foreground hover:text-foreground gap-1.5 px-1.5 py-1 text-xs",
+        "text-muted-foreground hover:text-foreground gap-1.5 px-1.5 py-1 type-body",
         className,
       )}
       aria-label={"上下文使用"}
@@ -241,7 +241,7 @@ function BarVisual() {
           style={{ width: `${percent}%` }}
         />
       </div>
-      <span className="text-muted-foreground text-[10px] tabular-nums">
+      <span className="text-muted-foreground type-muted tabular-nums">
         {formatTokenCount(totalTokens)} ({Math.round(percent)}%)
       </span>
     </div>
@@ -295,7 +295,7 @@ const ContextDisplayText: FC<PresetProps> = ({
     <ContextDisplayTrigger
       aria-label={"上下文使用"}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-accent-foreground px-2 py-1 font-mono text-xs tabular-nums",
+        "text-muted-foreground hover:bg-accent hover:text-accent-foreground px-2 py-1 type-muted tabular-nums",
         className,
       )}
     >

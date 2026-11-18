@@ -43,7 +43,7 @@ export function ResearchReport({
       {...props}
     >
       <div className="flex flex-col gap-1">
-        <span className="text-[13.5px] font-medium">{title}</span>
+        <span className="type-body font-medium">{title}</span>
         <span className={cn(mono, "text-muted-foreground tabular-nums")}>
           {done}/{sections.length} 款· {sourcesRead} 源码读取
         </span>
@@ -70,7 +70,7 @@ export function ResearchReport({
               </span>
               <span
                 className={cn(
-                  "min-w-0 flex-1 truncate text-[13px]",
+                  "min-w-0 flex-1 truncate type-body",
                   section.state === "pending"
                     ? "text-muted-foreground"
                     : "text-foreground/85",
@@ -85,7 +85,7 @@ export function ResearchReport({
               )}
             </div>
             {section.preview && (
-              <p className="text-muted-foreground fade-in animate-in ps-5.5 text-xs leading-relaxed duration-300">
+              <p className="text-muted-foreground fade-in animate-in ps-5.5 type-muted duration-300">
                 {section.preview}
               </p>
             )}

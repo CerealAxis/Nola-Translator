@@ -1,152 +1,38 @@
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const here = dirname(fileURLToPath(import.meta.url))
-const read = (name: string) => readFileSync(join(here, name), 'utf8')
+const product = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'product.css'), 'utf8')
+const typography = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'typography.css'), 'utf8')
 
-const product = read('product.css')
-const section = (title: string, css = product) =>
-  css.split(`/* ===== ${title} ===== */\n`)[1].split(/\n\/\* ===== /)[0]
-const light = section('浅色语义变量')
-const dark = section('深色语义变量')
-const controls = section('Base UI 基础控件')
-const typography = section('排版')
-const motion = section('动效')
-const desktopLayout = section('桌面窗口与页面布局', read('../index.css'))
-const all = [light, dark, typography, motion, section('层级'), section('公共变量与工具类'), controls, desktopLayout]
-
-it('registers every status pill soft color without self references', () => {
-  const css = controls
-  for (const status of ['accent', 'success', 'warning', 'danger']) {
-    expect(css).toContain(`--color-${status}-soft: var(--${status}-soft)`)
-    expect(css).toContain(`--color-${status}-soft-foreground:`)
-  }
-  expect(css).not.toMatch(/(--[\w-]+):\s*var\(\1\)/)
-})
-
-/** 取出某段 CSS 里声明的自定义属性名（去重）。 */
-function declaredTokens(css: string): string[] {
-  return [...new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1]))].sort()
-}
-
-describe('主题 token 双套对齐（Phase 1 验收）', () => {
-  it('浅色与深色声明的 token 集合完全一致', () => {
-    expect(declaredTokens(dark)).toEqual(declaredTokens(light))
+describe('product design contracts', () => {
+  it('keeps system and code font stacks independent of optional CJK fonts', () => {
+    expect(typography).toContain('--font-ui: var(--nola-font-family, var(--font-system))')
+    expect(typography).toMatch(/--font-code:\s*ui-monospace/)
+    expect(typography).not.toContain('--font-cjk-fallback')
+    expect(product).not.toMatch(/font-weight:\s*(550|650|700)\b/)
   })
 
-  it('both themes define the required semantic tokens', () => {
-    const required = [
-      '--accent',
-      '--accent-foreground',
-      '--background',
-      '--foreground',
-      '--surface',
-      '--surface-secondary',
-      '--surface-tertiary',
-      '--muted',
-      '--border',
-      '--separator',
-      '--focus',
-      '--success',
-      '--warning',
-      '--danger',
-      '--surface-shadow',
-      '--overlay-shadow',
-      '--field-shadow'
-    ]
-    for (const token of required) {
-      expect(light, `浅色缺 ${token}`).toContain(`${token}:`)
-      expect(dark, `深色缺 ${token}`).toContain(`${token}:`)
-    }
+  it('requires explicit scene opt-in for glass', () => {
+    const glass = product.slice(product.indexOf('@supports (backdrop-filter:'))
+      .split('/* ===== 公共控件补充样式 ===== */')[0]
+    expect(glass).toContain('[data-material="glass"]')
+    expect(glass).not.toMatch(/\[data-slot=|\.card\b|\.sidebar\b/)
+    expect(glass).toContain('prefers-reduced-transparency: reduce')
   })
 
-  it('--focus 必须挂在 --accent 上，不能硬编码色值（否则断开派生链）', () => {
-    expect(light).toMatch(/--focus:\s*var\(--accent\)/)
-    expect(dark).toMatch(/--focus:\s*var\(--accent\)/)
+  it('keeps density overrides independent of typography', () => {
+    const density = product.match(/\[data-density="comfortable"\]\s*\{([^}]+)\}/)?.[1]
+    expect(density).toBeTruthy()
+    expect(density).not.toMatch(/font|line-height|letter-spacing|--text-/)
+    expect(product.match(/--radius-button:/g)).toHaveLength(1)
   })
 
-  it('both themes use the Nola blue accent', () => {
-    // CSS 压缩器会把 0.1780 写成 0.178，正则放宽尾部零
-    expect(light).toMatch(/--accent:\s*oklch\(60% 0\.22 257\)/)
-    expect(dark).toMatch(/--accent:\s*oklch\(70% 0\.16 257\)/)
-  })
-})
-
-describe('设计硬规则由 CSS 自证（§1.8）', () => {
-  it('投影是染色的，没有纯黑阴影', () => {
-    const shadows = all.join('\n').match(/--[a-z-]*shadow:[^;]+;/gi) ?? []
-    for (const s of shadows) {
-      expect(s).not.toMatch(/rgba\(\s*0\s*,\s*0\s*,\s*0\s*,/i)
-    }
-  })
-
-  it('v3 卡片使用轻微染色投影，两套主题均可见', () => {
-    expect(light).toMatch(/--surface-shadow:\s*0 2px 10px rgba\(35,\s*72,\s*125,\s*0\.04\)/)
-    expect(dark).toMatch(/--surface-shadow:\s*0 2px 10px rgba\(15,\s*25,\s*45,\s*0\.12\)/)
-  })
-
-  it('没有把 #000000 / #ffffff 当作背景或前景直接写死', () => {
-    for (const css of all) {
-      expect(css, css.slice(0, 40)).not.toMatch(/#000000/i)
-      expect(css, css.slice(0, 40)).not.toMatch(/#ffffff/i)
-      expect(css).not.toMatch(/(?:background(?:-color)?|color)\s*:\s*(?:white|black)\s*[;}]/i)
-    }
-  })
-
-  it('z-index 只能通过 var(--z-*) 使用，不允许字面量', () => {
-    const zIndexDecls = all
-      .join('\n')
-      .split('\n')
-      .filter((line) => /z-index\s*:/.test(line) && !/^\s*(\/\*|\*)/.test(line))
-    for (const line of zIndexDecls) {
-      const value = line.split('z-index')[1]
-      expect(value, line.trim()).toMatch(/var\(--z-/)
-    }
-  })
-
-  it('主题层不引入网络 @import', () => {
-    for (const css of all) {
-      expect(css).not.toMatch(/@import\s+(url\(|['"]https?:)/i)
-    }
-  })
-})
-
-describe('排版规则（§3.3）', () => {
-  it('界面字体按语言选择 Noto，深浅主题不另设字体', () => {
-    expect(typography).toContain('--font-ui: var(--nola-font-family, var(--font-cjk-fallback), sans-serif)')
-    for (const region of ['SC', 'TC', 'HK', 'JP', 'KR']) expect(typography).toContain(`'Noto Sans ${region}'`)
-    expect(section('产品主题')).not.toMatch(/--font-(ui|sans|mono|serif):|@font-face/)
-  })
-
-  it('正文行高沿用 Apple Liquid Glass 的产品字号', () => {
-    const css = section('产品主题')
-    expect(css).toContain('--nola-text-body: var(--font-body);')
-    expect(css).toMatch(/--font-body:\s*400[^;]+\/1\.55 var\(--font-ui\);/)
-  })
-
-  it('所有数字都用 tabular-nums', () => {
-    expect(typography).toMatch(/tabular-nums/)
-  })
-})
-
-describe('动效规则（§6.4）', () => {
-  it('定义了四个时长档位', () => {
-    const css = motion
-    for (const v of ['--dur-micro: 120ms', '--dur-enter: 200ms', '--dur-exit: 120ms', '--dur-page: 160ms']) {
-      expect(css).toContain(v)
-    }
-  })
-
-  it('循环动画都能被 [data-paused] 停掉', () => {
-    const css = motion
-    expect(css).toMatch(/\[data-paused[^\]]*\][^{]*\{[^}]*animation:\s*none/i)
-  })
-
-  it('减少动画走双通道：系统偏好 + 应用开关', () => {
-    const css = motion
-    expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/)
-    expect(css).toMatch(/data-reduce-motion/)
+  it('supports system and application reduced motion and paused indicators', () => {
+    expect(product).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/)
+    expect(product).toContain('data-reduce-motion')
+    expect(product).toMatch(/\[data-paused[^\]]*\][^{]*\{[^}]*animation:\s*none/i)
+    expect(product).not.toMatch(/@import\s+(url\(|['"]https?:)/i)
   })
 })

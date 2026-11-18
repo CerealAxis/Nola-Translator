@@ -46,7 +46,7 @@ export function EditMessage({
           onClick={onStartEdit}
           className={cn(
             field,
-            "hover:bg-foreground/[0.07] max-w-[85%] rounded-2xl px-3.5 py-2.5 text-start text-[13.5px] transition-colors",
+            "hover:bg-foreground/[0.07] max-w-[85%] rounded-2xl px-3.5 py-2.5 text-start type-body transition-colors",
           )}
         >
           {value}
@@ -73,12 +73,12 @@ export function EditMessage({
         aria-label="Edit your message"
         className={cn(
           field,
-          "text-foreground/90 focus-visible:ring-foreground/20 resize-none rounded-xl px-3 py-2.5 text-[13.5px] leading-relaxed outline-none focus-visible:ring-1",
+          "text-foreground/90 focus-visible:ring-foreground/20 resize-none rounded-xl px-3 py-2.5 type-body outline-none focus-visible:ring-1",
         )}
       />
 
       {discardedReplies > 0 && (
-        <div className="flex items-center gap-2 text-chart-4">
+        <div className="flex items-center gap-2 text-warning-soft-foreground">
           <AlertTriangleIcon className="size-3.5 shrink-0" />
           <span className={cn(mono, "tabular-nums")}>
             sending discards {discardedReplies}{" "}
@@ -91,7 +91,7 @@ export function EditMessage({
         <button
           type="button"
           onClick={onCancel}
-          className="text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground/90 h-8 rounded-full px-3.5 text-xs font-medium transition-[background-color,color,scale] duration-150 active:scale-[0.96]"
+          className="text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground/90 h-8 rounded-full px-3.5 type-body font-medium transition-[background-color,color,scale] duration-150 active:scale-[0.96]"
         >
           Cancel
         </button>
@@ -100,7 +100,7 @@ export function EditMessage({
           onClick={onSave}
           className={cn(
             inkButton,
-            "flex h-8 items-center rounded-full px-3.5 text-xs font-medium",
+            "flex h-8 items-center rounded-full px-3.5 type-body font-medium",
           )}
         >
           Send

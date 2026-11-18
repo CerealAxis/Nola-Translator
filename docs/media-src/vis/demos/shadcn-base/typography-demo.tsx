@@ -4,7 +4,7 @@ export function TypographyDemo() {
       <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight text-balance">
         笑声征税：笑话税编年史
       </h1>
-      <p className="text-xl leading-7 text-muted-foreground [&:not(:first-child)]:mt-6">
+      <p className="text-xl text-muted-foreground [&:not(:first-child)]:mt-6">
         从前，在遥远的国度里有一位懒惰的国王，整天躺在王座上。有一天，大臣们带来一个难题：王国的财库快要空了。
       </p>
       <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0">

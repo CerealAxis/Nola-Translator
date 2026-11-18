@@ -147,7 +147,7 @@ export function AudioPlayerBar({
       <div
         className={['nola-record-audio', className ?? ''].filter(Boolean).join(' ')}
       >
-        <p className="nola-caption text-muted">
+        <p className="type-muted text-muted">
           {unavailableLabel ?? t('records.audioUnavailable')}
         </p>
       </div>
@@ -176,7 +176,7 @@ export function AudioPlayerBar({
             : <Play aria-hidden="true" />}
       </Button>
 
-      <span className="nola-mono shrink-0 text-foreground">{formatClock(positionMs)}</span>
+      <span className="type-small tabular-nums shrink-0 text-foreground">{formatClock(positionMs)}</span>
 
       <SliderRoot
         className="slider min-w-0 flex-1"
@@ -197,7 +197,7 @@ export function AudioPlayerBar({
         </SliderControl>
       </SliderRoot>
 
-      <span className="nola-mono shrink-0 text-muted">{formatClock(totalMs)}</span>
+      <span className="type-small tabular-nums shrink-0 text-muted">{formatClock(totalMs)}</span>
 
       <ToggleGroup className="shrink-0" aria-label={t('homeRecordsUi.playbackRate')} value={[String(rate)]} onValueChange={([value]) => {
         const next = Number(value)

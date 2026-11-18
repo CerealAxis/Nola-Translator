@@ -40,6 +40,7 @@ class ComicService:
     self.ocr = ocr
     self.stage_lock = asyncio.Lock()
     self.stage_tasks = {}
+    self.render_tasks = {}
     self.font_matches = OrderedDict()
 
   async def lettering(self, page, base, config):
@@ -58,7 +59,9 @@ class ComicService:
 
   async def close(self):
     self.interrupt()
-    pending = {task for tasks in self.stage_tasks.values() for task in tasks}
+    for task in self.render_tasks.values():
+      task.cancel()
+    pending = {task for tasks in self.stage_tasks.values() for task in tasks} | set(self.render_tasks.values())
     if pending:
       done, _ = await asyncio.wait(pending, timeout=5)
       for task in done:
@@ -141,10 +144,10 @@ class ComicService:
     return self.repository.append(pages, title, str(request.projectId) if request.projectId else None, request.quick)
 
   async def document(self, book_id, request):
-    if self.repository.is_replay(book_id, request):
-      return self.repository.get(book_id)
-    previous = self.repository.get(book_id)
-    book = self.repository.mutate(book_id, request, preview=True)
+    if await asyncio.to_thread(self.repository.is_replay, book_id, request):
+      return await asyncio.to_thread(self.repository.get, book_id)
+    previous = await asyncio.to_thread(self.repository.get, book_id)
+    book = await asyncio.to_thread(self.repository.mutate, book_id, request, preview=True)
     command = request.command['action']
     prepared = {}
     if command != 'configure':
@@ -173,12 +176,27 @@ class ComicService:
             page.update(renderedAsset=await asyncio.to_thread(lambda: self.repository.asset(png_bytes(rendered))), hasRendered=True, status='rendered')
           page['revision'] = original.get('revision', 0) + 1
           prepared[page['id']] = page
-    self.repository.mutate(book_id, request, prepared_pages=prepared)
-    return self.repository.get(book_id)
+    await asyncio.to_thread(self.repository.mutate, book_id, request, prepared_pages=prepared)
+    return await asyncio.to_thread(self.repository.get, book_id)
 
   async def render(self, book_id, page_id, repair_masks=False):
-    book = self.repository.get(book_id)
+    key = (str(book_id), str(page_id), repair_masks)
+    task = self.render_tasks.get(key)
+    if task is None:
+      task = asyncio.create_task(self._render(book_id, page_id, repair_masks))
+      self.render_tasks[key] = task
+      def finished(done):
+        self.render_tasks.pop(key, None)
+        if not done.cancelled():
+          done.exception()
+      task.add_done_callback(finished)
+    return await asyncio.shield(task)
+
+  async def _render(self, book_id, page_id, repair_masks=False):
+    book = await asyncio.to_thread(self.repository.get, book_id)
     page = self.page(book, page_id)
+    if not repair_masks and page.get('hasRendered'):
+      return page
     expected = fingerprint(page)
     source = await asyncio.to_thread(self.image, page)
     if repair_masks:
@@ -188,22 +206,24 @@ class ComicService:
     if any(r.get('targetText') for r in page['regions']):
       rendered = await self.lettering(page, base, book['config'])
       page.update(renderedAsset=await asyncio.to_thread(lambda: self.repository.asset(png_bytes(rendered))), hasRendered=True, status='rendered')
-    with self.repository.connection() as db:
-      current = self.repository._book(db, book_id)
-      target = self.page(current, page_id)
-      if fingerprint(target) != expected:
-        raise ValueError('revisionConflict')
-      target.update(page)
-      target['revision'] = target.get('revision', 0) + 1
-      self.repository._write(db, current)
+    def commit():
+      with self.repository.connection() as db:
+        current = self.repository._book(db, book_id)
+        target = self.page(current, page_id)
+        if fingerprint(target) != expected:
+          raise ValueError('revisionConflict')
+        target.update(page)
+        target['revision'] = target.get('revision', 0) + 1
+        self.repository._write(db, current)
+    await asyncio.to_thread(commit)
     return page
 
   async def image_bytes(self, book_id, page_id, kind, max_pixels=None):
-    book = self.repository.get(book_id)
+    book = await asyncio.to_thread(self.repository.get, book_id)
     page = self.page(book, page_id)
     if kind == 'rendered' and not page.get('hasRendered'):
       await self.render(book_id, page_id)
-      page = self.page(self.repository.get(book_id), page_id)
+      page = self.page(await asyncio.to_thread(self.repository.get, book_id), page_id)
       if not page.get('hasRendered') and page.get('hasClean'):
         kind = 'clean'
       elif not page.get('hasRendered'):
@@ -318,14 +338,17 @@ class ComicService:
       raise ValueError('staleAttempt')
     return job
 
+  def active_page(self, job_id, request):
+    with self.repository.connection() as db:
+      job = self.active(db, job_id, request.attemptId, request.pageId)
+      book = self.repository._book(db, job['bookId'])
+      return job, deepcopy(self.page(book, request.pageId))
+
   async def prepare(self, job_id, request):
     async with self.stage(job_id):
-      with self.repository.connection() as db:
-        job = self.active(db, job_id, request.attemptId, request.pageId)
-        book = self.repository._book(db, job['bookId'])
-        page = deepcopy(self.page(book, request.pageId))
-        if fingerprint(page) != job['active']['fingerprint']:
-          raise ValueError('revisionConflict')
+      job, page = await asyncio.to_thread(self.active_page, job_id, request)
+      if fingerprint(page) != job['active']['fingerprint']:
+        raise ValueError('revisionConflict')
       kind, config = job['kind'], job['config']
       source = await asyncio.to_thread(self.image, page)
       preserve_language = kind in ('normal', 'visual', 'translate') and vision.same_language(config)
@@ -350,19 +373,21 @@ class ComicService:
       if kind in ('normal', 'visual', 'translate'):
         await vision.filter_translations(self.ocr, source, config,
           [region for region in regions if region not in recognized])
-      with self.repository.connection() as db:
-        current_job = self.active(db, job_id, request.attemptId, request.pageId)
-        current = self.repository._book(db, job['bookId'])
-        target = self.page(current, request.pageId)
-        if fingerprint(target) != job['active']['fingerprint']:
-          raise ValueError('revisionConflict')
-        target.update(page)
-        target['revision'] = target.get('revision', 0) + 1
-        page['revision'] = target['revision']
-        self.repository._write(db, current)
-        current_job['active']['fingerprint'] = fingerprint(page)
-        current_job['stage'] = 'translating' if kind in ('normal', 'visual', 'translate', 'proof') else 'processing'
-        self.repository.write_job(db, current_job)
+      def commit():
+        with self.repository.connection() as db:
+          current_job = self.active(db, job_id, request.attemptId, request.pageId)
+          current = self.repository._book(db, job['bookId'])
+          target = self.page(current, request.pageId)
+          if fingerprint(target) != job['active']['fingerprint']:
+            raise ValueError('revisionConflict')
+          target.update(page)
+          target['revision'] = target.get('revision', 0) + 1
+          page['revision'] = target['revision']
+          self.repository._write(db, current)
+          current_job['active']['fingerprint'] = fingerprint(page)
+          current_job['stage'] = 'translating' if kind in ('normal', 'visual', 'translate', 'proof') else 'processing'
+          self.repository.write_job(db, current_job)
+      await asyncio.to_thread(commit)
       visual = source.copy()
       if visual.width * visual.height > 2_000_000:
         scale = (2_000_000 / (visual.width * visual.height)) ** .5
@@ -392,11 +417,8 @@ class ComicService:
 
   async def complete(self, job_id, request):
     async with self.stage(job_id, fail=bool(request.error)):
-      with self.repository.connection() as db:
-        job = self.active(db, job_id, request.attemptId, request.pageId)
-        book = self.repository._book(db, job['bookId'])
-        page = deepcopy(self.page(book, request.pageId))
-        expected = job['active']['fingerprint']
+      job, page = await asyncio.to_thread(self.active_page, job_id, request)
+      expected = job['active']['fingerprint']
       error = request.error
       if not error:
         try:
@@ -446,34 +468,37 @@ class ComicService:
             page.pop('renderedAsset', None)
         except Exception as cause:
           error = str(cause)[:1000] or type(cause).__name__
-      with self.repository.connection() as db:
-        latest_job = self.active(db, job_id, request.attemptId, request.pageId)
-        current = self.repository._book(db, job['bookId'])
-        target = self.page(current, request.pageId)
-        if not error and fingerprint(target) != expected:
-          error = 'revisionConflict'
-        if error:
-          latest_job['failedPageIds'].append(str(request.pageId))
-          latest_job['error'] = error
-        else:
-          if job['kind'] == 'proof':
-            latest_job['changes'] = job['changes']
+      def commit():
+        nonlocal error
+        with self.repository.connection() as db:
+          latest_job = self.active(db, job_id, request.attemptId, request.pageId)
+          current = self.repository._book(db, job['bookId'])
+          target = self.page(current, request.pageId)
+          if not error and fingerprint(target) != expected:
+            error = 'revisionConflict'
+          if error:
+            latest_job['failedPageIds'].append(str(request.pageId))
+            latest_job['error'] = error
           else:
-            target.update(page)
-            target['revision'] = target.get('revision', 0) + 1
-            self.repository._write(db, current)
-        latest_job['done'].append(str(request.pageId))
-        latest_job['active'] = None
-        latest_job['progress'] = round(100 * len(latest_job['done']) / len(latest_job['pages']))
-        if len(latest_job['done']) == len(latest_job['pages']):
-          latest_job['status'] = 'failed' if latest_job['failedPageIds'] else 'completed'
-        else:
-          latest_job['status'] = 'paused' if latest_job['status'] == 'pausing' else 'queued'
-        self.repository.write_job(db, latest_job)
-        return latest_job
+            if job['kind'] == 'proof':
+              latest_job['changes'] = job['changes']
+            else:
+              target.update(page)
+              target['revision'] = target.get('revision', 0) + 1
+              self.repository._write(db, current)
+          latest_job['done'].append(str(request.pageId))
+          latest_job['active'] = None
+          latest_job['progress'] = round(100 * len(latest_job['done']) / len(latest_job['pages']))
+          if len(latest_job['done']) == len(latest_job['pages']):
+            latest_job['status'] = 'failed' if latest_job['failedPageIds'] else 'completed'
+          else:
+            latest_job['status'] = 'paused' if latest_job['status'] == 'pausing' else 'queued'
+          self.repository.write_job(db, latest_job)
+          return latest_job
+      return await asyncio.to_thread(commit)
 
   async def export(self, book_id, request):
-    book = self.repository.get(book_id)
+    book = await asyncio.to_thread(self.repository.get, book_id)
     ids = [str(p) for p in request.pageIds] if request.pageIds else [p['id'] for p in book['pages']]
     if not ids or len(set(ids)) != len(ids) or any(not any(p['id'] == value for p in book['pages']) for value in ids):
       raise ValueError('invalidPageRange')

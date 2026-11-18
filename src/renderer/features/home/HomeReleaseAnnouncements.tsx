@@ -87,7 +87,7 @@ function HomeReleaseRow({ release }: { release: ReleaseAnnouncement }) {
         <div className="app-update-dialog-body nola-scrollbar flex-1" role="region" aria-label={t('appUpdate.notes')} tabIndex={0}>
           {release.notes.trim()
             ? <ReleaseNotesMarkdown notes={release.notes} releaseUrl={release.url} />
-            : <p className="nola-body">{t('appUpdate.notesUnavailable')}</p>}
+            : <p className="type-body">{t('appUpdate.notesUnavailable')}</p>}
         </div>
         <DialogFooter className="app-update-dialog-footer">
           <DialogClose render={<Button variant="outline" size="sm" onClick={() => actions.settings.startOnboarding('welcome')}>{replay}</Button>} />
@@ -131,10 +131,10 @@ export function HomeReleaseAnnouncements() {
       <h2 id="nola-home-releases-title" className="nola-home-section__heading">{heading}</h2>
       <Card>
         <CardContent>
-          {feed.status === 'loading' && <p className="nola-body" role="status">{t('common.loading')}</p>}
+          {feed.status === 'loading' && <p className="type-body" role="status">{t('common.loading')}</p>}
           {feed.status === 'error' && (
             <div className="flex flex-wrap items-center gap-2">
-              <p className="nola-body" role="status">{t('appUpdate.checkFailed')}</p>
+              <p className="type-body" role="status">{t('appUpdate.checkFailed')}</p>
               <Button variant="outline" size="sm" onClick={retry}>{t('common.retry')}</Button>
             </div>
           )}
@@ -147,7 +147,7 @@ export function HomeReleaseAnnouncements() {
                 </li>
               ))}
             </ul>
-          ) : <p className="nola-body">{empty}</p>)}
+          ) : <p className="type-body">{empty}</p>)}
         </CardContent>
       </Card>
     </section>

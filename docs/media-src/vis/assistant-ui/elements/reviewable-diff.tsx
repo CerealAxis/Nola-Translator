@@ -51,7 +51,7 @@ export function ReviewableDiff({
       {...props}
     >
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <span className="font-mono text-xs">{filename}</span>
+        <span className="type-muted">{filename}</span>
         <span className={cn(mono, "text-muted-foreground tabular-nums")}>
           {kept} 的 {hunks.length} 保留
         </span>
@@ -104,7 +104,7 @@ export function ReviewableDiff({
                       mono,
                       "fade-in animate-in duration-300",
                       hunk.decision === "kept"
-                        ? "text-chart-2"
+                        ? "text-success-soft-foreground"
                         : "text-muted-foreground",
                     )}
                   >
@@ -113,18 +113,18 @@ export function ReviewableDiff({
                 )}
               </span>
             </div>
-            <div className={cn(codeScroll, "pb-1.5 font-mono text-xs")}>
+            <div className={cn(codeScroll, "pb-1.5 type-code")}>
               <div className={codeSurface}>
                 {hunk.lines.map((line, i) => (
                   <div
                     key={`${hunk.id}-${i}`}
                     className={cn(
-                      "flex px-4 py-0.5 leading-relaxed whitespace-pre",
+                      "flex px-4 py-0.5 whitespace-pre",
                       line.kind === "context" && "text-muted-foreground",
                       line.kind === "added" &&
-                        "bg-chart-2/10 text-chart-2",
+                        "bg-chart-2/10 text-success-soft-foreground",
                       line.kind === "removed" &&
-                        "bg-destructive/10 text-destructive",
+                        "bg-destructive/10 text-danger-soft-foreground",
                     )}
                   >
                     <span className="w-4 shrink-0 select-none">

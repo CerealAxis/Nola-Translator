@@ -54,7 +54,7 @@ export function QuoteReply({
 
       {...props}
     >
-      <p className="relative text-[13.5px] leading-relaxed">
+      <p className="relative type-body">
         <span className="text-foreground/70">{before}</span>
         <span className="text-foreground/95 rounded bg-primary/18 px-0.5 dark:bg-primary/25">
           {selection}
@@ -92,7 +92,7 @@ export function QuoteReply({
       {quoted && (
         <div className="fade-in slide-in-from-bottom-1 animate-in flex flex-col gap-1 duration-300">
           <span className={cn(mono, "text-muted-foreground")}>回复</span>
-          <div className="border-foreground/15 text-muted-foreground border-s-2 ps-2.5 text-xs leading-relaxed">
+          <div className="border-foreground/15 text-muted-foreground border-s-2 ps-2.5 type-muted">
             {quoted}
           </div>
         </div>

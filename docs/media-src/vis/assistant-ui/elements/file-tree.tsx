@@ -45,12 +45,12 @@ export function FileTree({
       {...props}
     >
       <div className="flex items-baseline justify-between px-1">
-        <span className="text-[13.5px] font-medium">{files} 文件已更改</span>
+        <span className="type-body font-medium">{files} 文件已更改</span>
         <span className={cn(mono, "tabular-nums")}>
-          <span className="text-chart-2">
+          <span className="text-success-soft-foreground">
             +{totalAdditions}
           </span>{" "}
-          <span className="text-destructive">
+          <span className="text-danger-soft-foreground">
             −{totalDeletions}
           </span>
         </span>
@@ -60,7 +60,7 @@ export function FileTree({
         {take(nodes, visibleCount).map((node) => (
           <div
             key={node.path}
-            className="fade-in slide-in-from-left-1 animate-in fill-mode-both hover:bg-foreground/[0.03] flex items-center gap-2 rounded-lg px-1 py-1 text-[13px] transition-colors duration-300"
+            className="fade-in slide-in-from-left-1 animate-in fill-mode-both hover:bg-foreground/[0.03] flex items-center gap-2 rounded-lg px-1 py-1 type-body transition-colors duration-300"
             style={{ paddingInlineStart: `${0.25 + node.depth * 0.85}rem` }}
           >
             {node.kind === "folder" ? (
@@ -79,12 +79,12 @@ export function FileTree({
                 </span>
                 <span className={cn(mono, "shrink-0 tabular-nums")}>
                   {node.additions ? (
-                    <span className="text-chart-2">
+                    <span className="text-success-soft-foreground">
                       +{node.additions}
                     </span>
                   ) : null}{" "}
                   {node.deletions ? (
-                    <span className="text-destructive">
+                    <span className="text-danger-soft-foreground">
                       −{node.deletions}
                     </span>
                   ) : null}

@@ -145,11 +145,11 @@ export function ConversationMap({
                   "data-[ending-style]:scale-[0.97] data-[ending-style]:opacity-0",
                 )}
               >
-                <p className="line-clamp-2 text-[13px] leading-snug font-medium">
+                <p className="line-clamp-2 type-body font-medium">
                   {payload?.title}
                 </p>
                 {payload?.preview && (
-                  <p className="text-muted-foreground mt-1 line-clamp-3 text-[13px] leading-relaxed">
+                  <p className="text-muted-foreground mt-1 line-clamp-3 type-body">
                     {payload.preview}
                   </p>
                 )}

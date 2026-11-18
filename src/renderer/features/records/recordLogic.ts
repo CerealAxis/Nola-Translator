@@ -68,7 +68,7 @@ export function formatDuration(ms: number): string {
   return `${seconds}s`
 }
 
-/** `HH:MM:SS`. The caller must supply tabular figures, e.g. `.nola-mono`. */
+/** `HH:MM:SS`. Use tabular figures so the clock width stays stable. */
 export function formatClock(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) ms = 0
   const total = Math.floor(ms / 1000)

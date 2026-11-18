@@ -45,7 +45,7 @@ export function ToolGroup({
           open && "rotate-90",
         )}
       />
-      <span className="min-w-0 flex-1 truncate text-[13.5px]">{label}</span>
+      <span className="min-w-0 flex-1 truncate type-body">{label}</span>
       <span className={cn(mono, "text-muted-foreground shrink-0 tabular-nums")}>
         {running > 0
           ? `${tools.length - running}/${tools.length}`
@@ -56,9 +56,9 @@ export function ToolGroup({
       {running > 0 ? (
         <Loader2Icon className="text-muted-foreground size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
       ) : failed > 0 ? (
-        <XIcon className="size-3.5 shrink-0 text-destructive" />
+        <XIcon className="size-3.5 shrink-0 text-danger-soft-foreground" />
       ) : (
-        <CheckIcon className="size-3.5 shrink-0 text-chart-2" />
+        <CheckIcon className="size-3.5 shrink-0 text-success-soft-foreground" />
       )}
     </>
   );
@@ -98,15 +98,15 @@ export function ToolGroup({
                 {tool.state === "running" ? (
                   <Loader2Icon className="text-muted-foreground size-3 animate-spin motion-reduce:animate-none" />
                 ) : tool.state === "failed" ? (
-                  <XIcon className="size-3 text-destructive" />
+                  <XIcon className="size-3 text-danger-soft-foreground" />
                 ) : (
-                  <CheckIcon className="size-3 text-chart-2" />
+                  <CheckIcon className="size-3 text-success-soft-foreground" />
                 )}
               </span>
               <span className={cn(mono, "text-muted-foreground shrink-0")}>
                 {tool.name}
               </span>
-              <span className="text-foreground/80 min-w-0 flex-1 truncate text-[13px]">
+              <span className="text-foreground/80 min-w-0 flex-1 truncate type-body">
                 {tool.target}
               </span>
               {tool.durationMs !== undefined && (

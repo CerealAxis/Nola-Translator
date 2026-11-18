@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { CAPABILITIES, createProvider, getProvider, isBundledProviderCopy, loadProviders, providerSchema, type Capability, type ProviderConnection } from './providers'
-import { DISABLED_PROVIDER, loadPreferences, MAX_WEB_TRANSLATION_CONCURRENCY, type Preferences } from './preferences'
+import { DISABLED_PROVIDER, loadPreferences, MAX_WEB_TRANSLATION_CONCURRENCY, siteEnabled, type Preferences } from './preferences'
 import { generateWith, ProviderError, safeProviderError, synthesizeWith, translateImageWith, translateWith } from './provider-execution'
 import { nativeRequest, nativeTranslationSummary } from './native-provider'
 import { createTranslationCache, translationCacheKey } from './translation-cache'
@@ -152,7 +152,7 @@ export function setupProviderRuntime(): void {
     if (port.name !== 'nola-provider') return
     const trusted = ['options.html', 'popup.html', 'sidepanel.html', 'document.html'].some(path => port.sender?.url?.split('#')[0].split('?')[0] === chrome.runtime.getURL(path))
     const url = port.sender?.url
-    const page = port.sender?.tab?.id !== undefined && Boolean(url && /^https?:\/\//.test(url))
+    const page = port.sender?.tab?.id !== undefined && port.sender.frameId === 0 && Boolean(url && /^https?:\/\//.test(url))
     if (!trusted && !page) { port.disconnect(); return }
     const jobs = new Map<string, AbortController>()
     let closed = false
@@ -172,9 +172,10 @@ export function setupProviderRuntime(): void {
       void (async () => {
         const signal = controller.signal
         if (page && !await chrome.permissions.contains({ origins: [`${new URL(url!).origin}/*`] })) throw new ProviderError('providerPermission')
-        if (request.type === 'translationLimits' && request.desktop) return { desktopConcurrency: await desktopTranslationLimit() }
         if (request.type === 'translate') await recoverExtensionConfiguration()
         const preferences = await loadPreferences()
+        if (page && !siteEnabled(preferences, url!)) throw new ProviderError('providerPermission')
+        if (request.type === 'translationLimits' && request.desktop) return { desktopConcurrency: await desktopTranslationLimit() }
         const contextEnabled = preferences.contextAware && preferences.llmProvider !== DISABLED_PROVIDER
         if (request.type === 'translateImage') {
           const provider = createProvider('index-translate')
@@ -211,18 +212,21 @@ export function setupProviderRuntime(): void {
           return { text: summary }
         }
         if (request.type === 'generate') {
+          if (page && request.providerId && request.providerId !== preferences.llmProvider) throw new ProviderError('providerPermission')
           if (preferences.llmProvider === DISABLED_PROVIDER || request.providerId === DISABLED_PROVIDER) throw new ProviderError('providerDisabled')
           const provider = await getProvider(request.providerId ?? preferences.llmProvider, 'llm')
           await throttle(provider.id, preferences.requestRate, signal)
           return { text: await generateWith(provider, request.text, signal) }
         }
         if (request.type === 'synthesize') {
+          if (page && request.providerId && request.providerId !== preferences.ttsProvider) throw new ProviderError('providerPermission')
           if (preferences.ttsProvider === DISABLED_PROVIDER || request.providerId === DISABLED_PROVIDER) throw new ProviderError('providerDisabled')
           const provider = await getProvider(request.providerId ?? preferences.ttsProvider, 'tts')
           // The page audio player applies speed and volume once, including for native providers.
           return synthesizeWith(provider, request.text, request.language, preferences.ttsVoice, 1, signal, preferences.ttsPitch, 1)
         }
         const binding = { web: preferences.pageProvider, subtitle: preferences.subtitleProvider, selection: preferences.selectionProvider, input: preferences.inputProvider, document: 'index-translate' }
+        if (page && request.providerId && request.providerId !== binding[request.purpose]) throw new ProviderError('providerPermission')
         if (request.providerId === DISABLED_PROVIDER || binding[request.purpose] === DISABLED_PROVIDER && !(trusted && request.providerId)) throw new ProviderError('providerDisabled')
         const provider = await getProvider(request.providerId ?? binding[request.purpose], 'mt')
         const template = request.purpose === 'subtitle' ? preferences.subtitlePrompt : request.purpose === 'web' ? preferences.pagePrompt : ''

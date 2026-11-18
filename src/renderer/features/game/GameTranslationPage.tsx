@@ -56,6 +56,8 @@ export function GameTranslationPage({ gameId }: { gameId?: string }) {
   const [snapshot, setSnapshot] = useState<GameSnapshot>()
   const [draft, setDraft] = useState<GameProfile>()
   const [draftRevision, setDraftRevision] = useState(0)
+  const draftChanged = useRef(false)
+  const draftBase = useRef<GameProfile | undefined>(undefined)
   const [sources, setSources] = useState<ScreenSource[]>([])
   const [sourceId, setSourceId] = useState('')
   const [busy, setBusy] = useState(false)
@@ -85,7 +87,16 @@ export function GameTranslationPage({ gameId }: { gameId?: string }) {
   }
   useEffect(() => { void load(); return api?.onChanged(accept) }, [api])
   const profile = snapshot?.profiles.find(item => item.id === gameId)
-  useEffect(() => { setDraft(profile ? { ...profile } : undefined); setDraftRevision(snapshot?.revision ?? 0) }, [gameId, profile?.id, snapshot?.revision])
+  useEffect(() => {
+    if (draftChanged.current && draftBase.current?.id === profile?.id) {
+      if (JSON.stringify(profile) === JSON.stringify(draftBase.current)) setDraftRevision(snapshot?.revision ?? 0)
+      return
+    }
+    draftChanged.current = false
+    draftBase.current = profile
+    setDraft(profile ? { ...profile } : undefined)
+    setDraftRevision(snapshot?.revision ?? 0)
+  }, [gameId, profile, snapshot?.revision])
   useEffect(() => {
     if (!api || !gameId) return
     let live = true
@@ -97,6 +108,7 @@ export function GameTranslationPage({ gameId }: { gameId?: string }) {
     pending.current = true; setBusy(true)
     try {
       const value = await api.command(command)
+      if (command.action === 'saveProfile') draftChanged.current = false
       accept(value)
       if (command.action === 'saveProfile') setDraftRevision(value.revision)
       return true
@@ -113,7 +125,7 @@ export function GameTranslationPage({ gameId }: { gameId?: string }) {
   if (!profile || !draft) return <Card><CardContent className="flex flex-col items-start gap-3"><p>{t('suite.notFound')}</p><Button nativeButton={false} variant="outline" render={<a href="#/game-translation" />}>{t('suite.gameLibrary')}</Button></CardContent></Card>
   const threadPages = Math.max(1, Math.ceil((snapshot.threads?.length ?? 0) / 12)), visibleThreadPage = Math.min(threadPage, threadPages)
   const recordPages = Math.max(1, Math.ceil(records.length / 10)), visibleRecordPage = Math.min(recordPage, recordPages)
-  const patch = (value: Partial<GameProfile>) => setDraft({ ...draft, ...value })
+  const patch = (value: Partial<GameProfile>) => { draftChanged.current = true; setDraft({ ...draft, ...value }) }
   const embedStyle = draft.embedStyle ?? {}
   const patchStyle = (value: Partial<typeof embedStyle>) => patch({ embedStyle: { ...embedStyle, ...value } })
   const modes = { translation: t('suite.translation'), original: t('suite.source'), bilingual: t('suite.embedBoth') }
@@ -142,7 +154,7 @@ export function GameTranslationPage({ gameId }: { gameId?: string }) {
       </FieldGroup></section><div className="screen-settings__footer flex flex-wrap justify-end gap-2"><Button nativeButton={false} variant="outline" render={<a href="#/settings/glossary" />}>{t('suite.manageGlossary')}</Button><Button variant="outline" disabled={active || busy} onClick={() => setDeleting(true)}><Trash2 data-icon="inline-start" />{t('suite.delete')}</Button><Button disabled={active || busy || !draft.name.trim()} onClick={() => void save()}><Save data-icon="inline-start" />{t('suite.save')}</Button></div></CardContent></Card>
     {snapshot.activeGameId === gameId && snapshot.source === 'hook' && snapshot.sessionId && <Card><CardHeader><CardTitle>{t('suite.hookThreads')}</CardTitle></CardHeader><CardContent className="flex flex-col gap-4">
       {!snapshot.threads?.length && <p role="status">{t('suite.hookWaiting')}</p>}
-      {snapshot.threads?.slice((visibleThreadPage - 1) * 12, visibleThreadPage * 12).map(thread => <section key={thread.id} className="flex min-w-0 flex-col gap-2"><div className="flex items-center justify-between gap-3"><span className="nola-body-strong">{thread.name}</span><Switch aria-label={`${t('suite.active')} ${thread.name}`} checked={thread.selected} disabled={busy || !thread.selected && (snapshot.threads?.filter(item => item.selected).length ?? 0) >= 8} onCheckedChange={selected => { const ids = snapshot.threads!.filter(item => item.id === thread.id ? selected : item.selected).map(item => item.id); void run({ action: 'selectThreads', sessionId: snapshot.sessionId!, ids }) }}><SwitchThumb /></Switch></div>{thread.embedSupported && <label className="flex items-center gap-2"><Switch checked={snapshot.embedThreadId === thread.id} disabled={busy || snapshot.status !== 'running'} onCheckedChange={on => { if (on) setEmbedId(thread.id); else void run({ action: 'embedHook', sessionId: snapshot.sessionId!, id: '' }) }}><SwitchThumb /></Switch>{t('suite.embedText')}</label>}<code className="break-all text-muted">{thread.code}</code><p className="whitespace-pre-wrap break-words">{thread.preview}</p></section>)}
+      {snapshot.threads?.slice((visibleThreadPage - 1) * 12, visibleThreadPage * 12).map(thread => <section key={thread.id} className="flex min-w-0 flex-col gap-2"><div className="flex items-center justify-between gap-3"><span className="type-body font-semibold">{thread.name}</span><Switch aria-label={`${t('suite.active')} ${thread.name}`} checked={thread.selected} disabled={busy || !thread.selected && (snapshot.threads?.filter(item => item.selected).length ?? 0) >= 8} onCheckedChange={selected => { const ids = snapshot.threads!.filter(item => item.id === thread.id ? selected : item.selected).map(item => item.id); void run({ action: 'selectThreads', sessionId: snapshot.sessionId!, ids }) }}><SwitchThumb /></Switch></div>{thread.embedSupported && <label className="flex items-center gap-2"><Switch checked={snapshot.embedThreadId === thread.id} disabled={busy || snapshot.status !== 'running'} onCheckedChange={on => { if (on) setEmbedId(thread.id); else void run({ action: 'embedHook', sessionId: snapshot.sessionId!, id: '' }) }}><SwitchThumb /></Switch>{t('suite.embedText')}</label>}<code className="break-all text-muted">{thread.code}</code><p className="whitespace-pre-wrap break-words">{thread.preview}</p></section>)}
       <GamePages current={visibleThreadPage} total={threadPages} setPage={setThreadPage} label={t('suite.hookThreads')} />
       <form className="flex flex-wrap items-end gap-2" onSubmit={event => { event.preventDefault(); if (snapshot.sessionId) void run({ action: 'insertHook', sessionId: snapshot.sessionId, code: hookCode }).then(ok => { if (ok) setHookCode('') }) }}><Field className="min-w-0 flex-1"><FieldLabel htmlFor="game-hook-code">{t('suite.hookCode')}</FieldLabel><Input id="game-hook-code" maxLength={400} value={hookCode} disabled={busy} onChange={event => setHookCode(event.target.value)} /></Field><Button type="submit" variant="outline" disabled={busy || !hookCode.trim()}>{t('suite.insertHook')}</Button></form>
       <form className="flex flex-wrap items-end gap-2" onSubmit={event => { event.preventDefault(); if (snapshot.sessionId) void run({ action: 'searchHook', sessionId: snapshot.sessionId, text: query, seconds }) }}>

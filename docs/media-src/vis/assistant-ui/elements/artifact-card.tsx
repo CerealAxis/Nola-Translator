@@ -41,7 +41,7 @@ export function ArtifactCard({
         />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] font-medium">{title}</p>
+        <p className="truncate type-body font-medium">{title}</p>
         {generating ? (
           <p
             className={cn(
@@ -49,7 +49,7 @@ export function ArtifactCard({
               "text-muted-foreground flex items-center gap-1",
             )}
           >
-            <ShimmerLabel className="relative inline-block leading-none">
+            <ShimmerLabel className="relative inline-block">
               写作
             </ShimmerLabel>
             <span>·</span>

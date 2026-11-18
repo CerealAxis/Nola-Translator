@@ -31,7 +31,7 @@ export function ErrorState({
         key="retrying"
         role="status"
         className={cn(
-          "fade-in animate-in flex w-full max-w-sm items-center gap-2.5 text-sm duration-300 motion-reduce:animate-none",
+          "fade-in animate-in flex w-full max-w-sm items-center gap-2.5 type-body duration-300 motion-reduce:animate-none",
           className,
         )}
 
@@ -51,7 +51,7 @@ export function ErrorState({
       key="error"
       role="alert"
       className={cn(
-        "fade-in animate-in flex w-full max-w-sm items-start gap-2.5 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive duration-300 motion-reduce:animate-none",
+        "fade-in animate-in flex w-full max-w-sm items-start gap-2.5 rounded-lg border border-border bg-card px-4 py-3 type-body text-danger-soft-foreground duration-300 motion-reduce:animate-none",
         className,
       )}
       {...props}
@@ -59,7 +59,7 @@ export function ErrorState({
       <CircleAlertIcon className="mt-0.5 size-4 shrink-0" />
       <div>
         <p className="font-medium">{title}</p>
-        <p className="mt-0.5 text-sm text-destructive/90">
+        <p className="mt-0.5 type-body text-danger-soft-foreground">
           {detail}
         </p>
       </div>

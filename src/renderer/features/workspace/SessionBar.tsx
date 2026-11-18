@@ -1,7 +1,7 @@
 /**
  * The session bar: timer plus pause / resume and end.
  *
- * The timer needs monospaced digits (`.nola-mono .nola-num`): a per-second digit
+ * The timer uses tabular digits: a per-second digit
  * whose width changes makes the whole bar twitch. `<time dateTime>` keeps the
  * reading a duration in the DOM, where export and screen readers can use it.
  *
@@ -74,7 +74,7 @@ export function SessionBar({ status, pausePending, elapsedMs, onPause, onResume,
         .join(' ')}
     >
       {audioLabel ? <div className="nola-workspace-audio-status"><span className="nola-workspace-mic"><Mic aria-hidden="true" /></span><span>{audioLabel}</span></div> : null}
-      {playbackCopy ? <span className="nola-caption text-muted" aria-live="polite">{t(playbackCopy)}{waitingSpeechCount ? ` · ${t('session.playbackQueueCount', { count: waitingSpeechCount })}` : ''}</span> : null}
+      {playbackCopy ? <span className="type-muted text-muted" aria-live="polite">{t(playbackCopy)}{waitingSpeechCount ? ` · ${t('session.playbackQueueCount', { count: waitingSpeechCount })}` : ''}</span> : null}
       {playbackJob && onResolvePlayback ? <div className="flex shrink-0 items-center gap-1">
         {playbackJob.state === 'failed' ? <Button variant="secondary" size="sm" className="rounded-xl" disabled={busy} onClick={() => onResolvePlayback(playbackJob.jobId, 'retry')}>{t('session.retryPlayback')}</Button> : null}
         <Button variant="outline" size="sm" className="rounded-xl" disabled={busy} onClick={() => onResolvePlayback(playbackJob.jobId, 'skip')}>{t('session.skipPlayback')}</Button>
@@ -88,7 +88,7 @@ export function SessionBar({ status, pausePending, elapsedMs, onPause, onResume,
         // colour says "stopped" without reading the digits.
         data-paused={running ? undefined : 'true'}
         className={[
-          'nola-mono nola-num nola-tick min-w-[10ch] text-[14px] leading-none font-medium',
+          'nola-num nola-tick min-w-[10ch] type-body',
           running ? 'text-foreground' : 'text-muted',
         ]
           .filter(Boolean)

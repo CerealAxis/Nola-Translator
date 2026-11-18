@@ -86,7 +86,7 @@ export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRe
         <DialogHeader>
           <DialogTitle>{t(handle.message)}</DialogTitle>
         </DialogHeader>
-        {handle.detail ? <p className="nola-body mb-4 text-muted">{t(handle.detail)}</p> : null}
+        {handle.detail ? <p className="type-body mb-4 text-muted">{t(handle.detail)}</p> : null}
         <DialogFooter>
           <Button variant="tertiary" size="sm" className="rounded-xl" onClick={() => onCopyDiagnostics({
             supportCode,

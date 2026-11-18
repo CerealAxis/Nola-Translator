@@ -74,7 +74,7 @@ function MonthLabels({ end }: { end: Date }) {
       {({ cell }) =>
         labelsMonth(cell, end) ? (
           <span
-            className="text-muted-foreground w-0 text-xs whitespace-nowrap"
+            className="text-muted-foreground w-0 type-muted whitespace-nowrap"
             style={{ gridColumn: cell.column + 1, gridRow: 1 }}
           >
             {HeatGraphPrimitive.MONTH_SHORT[cell.date.getMonth()]}
@@ -90,7 +90,7 @@ function DayLabels() {
     <div className="flex w-8 shrink-0 flex-col justify-between py-[2px]">
       <HeatGraphPrimitive.DayLabels>
         {({ label }) => (
-          <span className="text-muted-foreground flex h-[13px] items-center text-xs">
+          <span className="text-muted-foreground flex h-[13px] items-center type-muted">
             {label.row % 2 === 0
               ? HeatGraphPrimitive.DAY_SHORT[label.dayOfWeek]
               : ""}
@@ -118,7 +118,7 @@ function CellGrid() {
 
 function CellTooltip() {
   return (
-    <HeatGraphPrimitive.Tooltip className="bg-foreground text-background pointer-events-none rounded-md px-3 py-1.5 text-xs whitespace-nowrap">
+    <HeatGraphPrimitive.Tooltip className="bg-foreground text-background pointer-events-none rounded-md px-3 py-1.5 type-small whitespace-nowrap">
       {({ cell }) => (
         <>
           <strong>{cell.count} 贡献</strong> 上{" "}
@@ -135,7 +135,7 @@ function CellTooltip() {
 
 function GraphLegend() {
   return (
-    <div className="text-muted-foreground ms-auto flex items-center gap-1 text-xs">
+    <div className="text-muted-foreground ms-auto flex items-center gap-1 type-muted">
       <span>减</span>
       <HeatGraphPrimitive.Legend>
         {({ item }) => (

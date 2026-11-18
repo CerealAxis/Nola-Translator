@@ -122,8 +122,8 @@ export function OverlayPage() {
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-heading" title={t('home.quickStart')}
         actions={<div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => navigate('#/settings/appearance')}>{t('shellUi.appearance')}</Button>
-          <Button data-onboarding="open-workspace" variant="secondary" onClick={() => {
+          <Button variant="outline" onClick={() => navigate('#/settings/appearance')}>{t('shellUi.appearance')}</Button>
+          <Button data-onboarding="open-workspace" variant="outline" onClick={() => {
             void actions.settings.showWorkspace().catch(error => notifyOverlayError(t('workspaceUi.windowFailed'), { cause: error }))
           }}><ExternalLink aria-hidden="true" />{t('home.quickStart')}</Button>
           <Button data-onboarding="open-overlay" onClick={() => void open()} disabled={opening || (!overlayVisible && !!s2sModel && !translationDisabled && !s2sReady)} aria-busy={opening}>{opening ? <Spinner /> : <ExternalLink aria-hidden="true" />}{t(overlayVisible ? 'overlay.close' : 'shellUi.openOverlay')}</Button>
@@ -163,7 +163,7 @@ export function OverlayPage() {
               <SettingSelect value={selectedSource} ariaLabel={t('shellUi.audioSource')} isDisabled={sessionActive}
                 options={[{ value: 'defaultOutput', label: t('shellUi.audioSystem') }, ...audioSourceOptions]}
                 onChange={audioSource => patch({ recognition: { audioSource }, realtime: { virtualInputDeviceId: '' } })} />
-              {selectedSource.startsWith('process:') ? <p className="nola-caption">{t('session.applicationAudioHint')}</p> : null}
+              {selectedSource.startsWith('process:') ? <p className="type-muted">{t('session.applicationAudioHint')}</p> : null}
             </div>
             <div className="nola-settings-field nola-language-pair-field" data-onboarding="quick-language">
               <ModelAvailabilityLabel label={t('shellUi.languageDirection')} hint={t('shellUi.languageDirectionHint')} />
@@ -213,7 +213,7 @@ export function OverlayPage() {
                 options={outputOptions} onChange={value => patch({ realtime: { speechOutputDeviceId: value === 'default' ? '' : value } })} />
             </div> : null}
             {s2sModel && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(targetLanguage)
-            ? <p className="col-span-full nola-caption">{t('session.speechLanguageUnavailable')}</p> : null}
+            ? <p className="col-span-full type-muted">{t('session.speechLanguageUnavailable')}</p> : null}
           </FieldGroup>
         </CardContent>
       </Card>

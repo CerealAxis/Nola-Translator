@@ -65,7 +65,7 @@ export function MobileComposer({
               className={cn(
                 "disabled:pointer-events-none",
                 field,
-                "text-foreground/60 shrink-0 rounded-full px-3 py-1.5 text-xs whitespace-nowrap",
+                "text-foreground/60 shrink-0 rounded-full px-3 py-1.5 type-body whitespace-nowrap",
               )}
             >
               {action}
@@ -112,7 +112,7 @@ export function MobileComposer({
             }}
             placeholder={"留言"}
             aria-label={"留言"}
-            className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[16px] outline-none"
+            className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent type-body outline-none"
           />
           {value === "" && (
             <MicIcon className="text-muted-foreground size-4 shrink-0" />

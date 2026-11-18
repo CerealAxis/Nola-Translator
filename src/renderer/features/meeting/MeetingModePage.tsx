@@ -216,8 +216,8 @@ export function MeetingModePage() {
         {passed ? <Check aria-label={t('meeting.detected')} /> : null}
         {headphones && result && !result.error && !heard ? <Button size="sm" variant="secondary" onClick={() => setHeard(true)}>{t('meeting.heard')}</Button> : null}
       </div>
-      {testing === field ? <p className="nola-caption text-muted">{t(microphone ? 'meeting.speakNow' : 'meeting.testing')}</p> : null}
-      {unavailableKey ? <p className="nola-caption text-muted">{t(unavailableKey)}</p> : null}
+      {testing === field ? <p className="type-muted text-muted">{t(microphone ? 'meeting.speakNow' : 'meeting.testing')}</p> : null}
+      {unavailableKey ? <p className="type-muted text-muted">{t(unavailableKey)}</p> : null}
       {resultKey ? <Alert variant={result?.error ? 'danger' : passed ? 'success' : 'warning'}><AlertDescription>{t(resultKey)}</AlertDescription></Alert> : null}
     </div>
   }

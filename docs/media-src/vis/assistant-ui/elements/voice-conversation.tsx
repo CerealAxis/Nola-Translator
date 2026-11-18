@@ -122,7 +122,7 @@ export function VoiceConversation({
       </button>
 
       <div className="flex flex-col items-center gap-1">
-        <span className="text-[13.5px] font-medium">{CAPTION[mode]}</span>
+        <span className="type-body font-medium">{CAPTION[mode]}</span>
         <span className={cn(mono, "text-muted-foreground")}>
           {muted ? "麦克风关闭" : canInterrupt ? "点击中断" : HINT[mode]}
         </span>
@@ -132,7 +132,7 @@ export function VoiceConversation({
         {transcript.map((turn) => (
           <div
             key={turn.id}
-            className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex gap-2 text-xs leading-relaxed duration-300"
+            className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex gap-2 type-small duration-300"
           >
             <span
               className={cn(
@@ -185,7 +185,7 @@ export function VoiceConversation({
           aria-label={"结束通话"}
           onClick={onEnd}
           disabled={!onEnd}
-          className="flex size-10 items-center justify-center rounded-full bg-destructive text-destructive-foreground transition-[opacity,scale] duration-150 hover:opacity-90 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-30 motion-reduce:transition-none"
+          className="flex size-10 items-center justify-center rounded-full bg-destructive text-destructive-foreground transition-[background-color,scale] duration-150 hover:bg-[var(--destructive-hover)] active:scale-[0.96] disabled:pointer-events-none disabled:opacity-30 motion-reduce:transition-none"
         >
           <PhoneOffIcon className="size-4" />
         </button>

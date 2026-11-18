@@ -37,7 +37,8 @@ const OUTPUT = join(ROOT, 'THIRD_PARTY_NOTICES.md')
  * non-zero when it does not, without touching it. The notice travels into the app through a
  * `?raw` import, so a stale file ships stale attribution rather than failing the build.
  */
-const CHECK_ONLY = process.argv.includes('--check')
+const CHECK_RENDERER = process.argv.includes('--check-renderer')
+const CHECK_ONLY = process.argv.includes('--check') || CHECK_RENDERER
 
 const manifest = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 
@@ -1246,6 +1247,7 @@ function collectPlatformRuntime() {
 
   // 浏览器宿主由 `PyInstaller --onefile` 打包，bootloader 随 EXE 进入安装包（extraResources）。
   // 版本从 .venv 的 dist-info 读，跟随 build-browser-host.ps1 实际使用的解释器。
+  if (CHECK_RENDERER) return
   const pyinstallerDist = readDistInfo('pyinstaller', PYINSTALLER_SITE_PACKAGES)
   const pyinstallerMetadata = pyinstallerDist ? readText(join(pyinstallerDist.dir, 'METADATA')) : null
   const pyinstallerVersion = pyinstallerMetadata?.match(/^Version:\s*(.+)$/m)?.[1]?.trim()
@@ -1541,7 +1543,7 @@ if (notoCjkLicense === null) {
   report('embedded', `Noto Sans CJK ${NOTO_CJK_REVISION}`, 'OFL-1.1 text is bundled from src/renderer/assets/fonts/OFL-Noto-CJK.txt; font sources are pinned to https://github.com/notofonts/noto-cjk/tree/f8d157532fbfaeda587e826d4cd5b21a49186f7c')
 }
 collectPlatformRuntime()
-collectPythonTree()
+if (!CHECK_RENDERER) collectPythonTree()
 
 // 字母序；`@` 前缀的包按原样参与排序。同名同版本已按 name+version 去重，
 // 排序键再补上 origin 与首行正文，保证任何输入顺序下输出都稳定。
@@ -1563,7 +1565,8 @@ const blocks = sorted.map((entry) => [
   '---',
 ].join('\n'))
 
-const document = `${HEADER}\n\n${blocks.join('\n\n')}\n`
+const javascriptEntries = sorted.filter(entry => entry.origin !== 'python' && entry.name !== 'PyInstaller').map(entry => `${entry.name}@${entry.version}`)
+const document = `${HEADER}\n\n${blocks.join('\n\n')}\n\n<!-- nola-js-notices: ${JSON.stringify(javascriptEntries)} -->\n`
 
 const counts = { renderer: 0, platform: 0, python: 0 }
 for (const entry of sorted) counts[entry.origin] += 1
@@ -1607,13 +1610,19 @@ if (unresolved.length > 0) {
 
 if (CHECK_ONLY) {
   const current = readText(OUTPUT)
-  if (current === document) {
+  const javascriptMatch = CHECK_RENDERER && current?.match(/<!-- nola-js-notices: (.+) -->/)
+  if (CHECK_RENDERER ? javascriptMatch?.[1] === JSON.stringify(javascriptEntries) && blocks.every(block => current.includes(block + '\n')) : current === document) {
     process.stdout.write([
       `OK ${OUTPUT} matches the current dependencies`,
       `  bytes: ${Buffer.byteLength(document, 'utf8')}, lines: ${lineCount}, entries: ${sorted.length}`,
       ...reportSections,
     ].join('\n'))
     process.exit(0)
+  }
+
+  if (CHECK_RENDERER) {
+    process.stderr.write('STALE JavaScript or platform notices. Run `npm run gen:notices` with the complete release Python environment.\n')
+    process.exit(1)
   }
 
   const currentIdentities = current === null ? [] : readEntryIdentities(current)

@@ -77,7 +77,7 @@ export function ImageGeneration({
         </span>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+        <p className="text-muted-foreground min-w-0 flex-1 truncate type-muted">
           {generating ? (
             <ShimmerLabel className="relative">发电</ShimmerLabel>
           ) : (

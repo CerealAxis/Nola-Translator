@@ -47,7 +47,7 @@ export function EditMessage({
           onClick={onStartEdit}
           className={cn(
             field,
-            "hover:bg-foreground/[0.07] max-w-[85%] rounded-2xl px-3.5 py-2.5 text-start text-[13.5px] transition-colors",
+            "hover:bg-foreground/[0.07] max-w-[85%] rounded-2xl px-3.5 py-2.5 text-start type-body transition-colors",
           )}
         >
           {value}
@@ -75,12 +75,12 @@ export function EditMessage({
         aria-label={"编辑您的留言"}
         className={cn(
           field,
-          "text-foreground/90 focus-visible:ring-foreground/20 resize-none rounded-xl px-3 py-2.5 text-[13.5px] leading-relaxed outline-none focus-visible:ring-1",
+          "text-foreground/90 focus-visible:ring-foreground/20 resize-none rounded-xl px-3 py-2.5 type-body outline-none focus-visible:ring-1",
         )}
       />
 
       {discardedReplies > 0 && (
-        <div className="flex items-center gap-2 text-chart-4">
+        <div className="flex items-center gap-2 text-warning-soft-foreground">
           <AlertTriangleIcon className="size-3.5 shrink-0" />
           <span className={cn(mono, "tabular-nums")}>
             发送丢弃 {discardedReplies}{" "}

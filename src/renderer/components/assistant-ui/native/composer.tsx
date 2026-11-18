@@ -269,7 +269,7 @@ export function ComposerMenuItem({
       data-selected={active || undefined}
       aria-pressed={active || undefined}
       className={cn(
-        "nola-menu-item flex min-h-[var(--field-control-height)] w-full items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 text-start [font:var(--font-control)] outline-none transition-colors disabled:pointer-events-none disabled:opacity-50 aria-disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-ring",
+        "nola-menu-item flex min-h-[var(--field-control-height)] w-full items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 text-start type-body outline-none transition-colors disabled:pointer-events-none disabled:opacity-50 aria-disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-ring",
         className,
       )}
       {...props}
@@ -289,11 +289,11 @@ export function ComposerCommandItem({
     <ComposerMenuItem active={active} {...props}>
       <command.icon className="text-muted-foreground size-3.5 shrink-0" />
       <span className="font-medium">/{command.name}</span>
-      <span className="text-muted-foreground flex-1 truncate text-start [font:var(--font-caption)]">
+      <span className="text-muted-foreground flex-1 truncate text-start type-muted">
         {command.description}
       </span>
       {active && (
-        <kbd className="bg-foreground/[0.06] text-muted-foreground rounded px-1 font-mono [font:var(--font-caption)]">
+        <kbd className="bg-foreground/[0.06] text-muted-foreground rounded px-1 type-muted">
           ↵
         </kbd>
       )}
@@ -311,7 +311,7 @@ export function ComposerPersonItem({
 }) {
   return (
     <ComposerMenuItem active={active} {...props}>
-      <span className="bg-foreground/[0.06] text-muted-foreground flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-medium">
+      <span className="bg-foreground/[0.06] text-muted-foreground flex size-5 shrink-0 items-center justify-center rounded-full type-muted font-medium">
         {person.name[0]}
       </span>
       <span className="flex-1 truncate text-start">{person.name}</span>
@@ -360,14 +360,14 @@ export function ComposerAttachmentChip({
         <Icon className="size-4" />
       </span>
       <span className="flex flex-col">
-        <span className="max-w-36 truncate [font:var(--font-caption)] font-medium">
+        <span className="max-w-36 truncate type-small">
           {attachment.name}
         </span>
         <span
           className={cn(
-            "[font:var(--font-caption)]",
+            "type-muted",
             attachment.state === "error"
-              ? "text-destructive/80"
+              ? "text-danger-soft-foreground"
               : "text-muted-foreground",
           )}
         >
@@ -387,7 +387,7 @@ export function ComposerAttachmentChip({
             <XIcon />
           </button>
         ) : attachment.state === "done" ? (
-          <CheckIcon className="size-3.5 text-chart-2" />
+          <CheckIcon className="size-3.5 text-success-soft-foreground" />
         ) : null}
       </span>
       {attachment.state === "uploading" && (
@@ -422,7 +422,7 @@ export function ComposerInput({
         onSubmit?.();
       }}
       className={cn(
-        "placeholder:text-muted-foreground min-h-[var(--field-control-height)] w-full bg-transparent px-3 [font:var(--font-body)] caret-primary outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[var(--radius-md)]",
+        "placeholder:text-muted-foreground min-h-[var(--field-control-height)] w-full bg-transparent px-3 type-body caret-primary outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[var(--radius-md)]",
         className,
       )}
       {...props}
@@ -469,7 +469,7 @@ export function ComposerVoice({
           0:{String(seconds).padStart(2, "0")}
         </span>
       ) : (
-        <ShimmerLabel className="text-muted-foreground relative [font:var(--font-caption)]">
+        <ShimmerLabel className="text-muted-foreground relative type-muted">
           Transcribing
         </ShimmerLabel>
       )}
@@ -539,7 +539,7 @@ export function ComposerModelTrigger({
       aria-expanded={open}
       data-slot="composer-model-trigger"
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground flex min-h-[var(--field-control-height)] min-w-0 max-w-full items-center gap-2 whitespace-nowrap rounded-[var(--radius-xl)] px-3 [font:var(--font-control)] outline-none transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
+        "text-muted-foreground hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground flex min-h-[var(--field-control-height)] min-w-0 max-w-full items-center gap-2 whitespace-nowrap rounded-[var(--radius-xl)] px-3 type-body outline-none transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
         className,
       )}
       {...props}
@@ -606,12 +606,12 @@ export function ComposerContext({
         )}
       >
         <div className="flex items-baseline justify-between">
-          <p className="[font:var(--font-label)] font-medium">{labels.context}</p>
+          <p className="type-body font-medium">{labels.context}</p>
           <p
             className={cn(
               mono,
               "tabular-nums",
-              warn ? "text-destructive" : "text-muted-foreground",
+              warn ? "text-danger-soft-foreground" : "text-muted-foreground",
             )}
           >
             {Math.round(fraction * 100)}%
@@ -633,7 +633,7 @@ export function ComposerContext({
           {segments.map((segment) => (
             <div
               key={segment.label}
-              className="text-muted-foreground flex items-center gap-2.5 [font:var(--font-caption)]"
+              className="text-muted-foreground flex items-center gap-2.5 type-muted"
             >
               <span
                 aria-hidden
@@ -650,7 +650,7 @@ export function ComposerContext({
           ))}
         </div>
         <div className="bg-foreground/[0.06] h-px" />
-        <div className="text-muted-foreground flex items-center justify-between [font:var(--font-caption)]">
+        <div className="text-muted-foreground flex items-center justify-between type-muted">
           <span>{labels.total}</span>
           <span className={cn(mono, "text-muted-foreground tabular-nums")}>
             {used}k / {usage.total}k
@@ -663,7 +663,7 @@ export function ComposerContext({
         className={cn(
           ghostButton,
           "size-8",
-          warn && "text-destructive",
+          warn && "text-danger-soft-foreground",
         )}
       >
         <svg viewBox="0 0 16 16" className="size-4 -rotate-90" aria-hidden>

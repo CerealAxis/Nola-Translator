@@ -12,6 +12,7 @@ async function main() {
   await app.whenReady()
   await fs.mkdir(output, { recursive: true })
   const win = new BrowserWindow({ show: false, width: 1440, height: 960, webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
+  await win.loadURL('about:blank')
   const errors = []
   const failedRequests = []
   win.webContents.on('console-message', event => {
@@ -78,9 +79,9 @@ async function main() {
     const sidebarTrigger = `${demo}.querySelector('[data-slot=sidebar-trigger]')`
     const sidebarWidth = () => js(`${sidebar}.getBoundingClientRect().width`)
     await until(`${sidebarTrigger}?.getAttribute('aria-expanded') === 'true'`)
-    await until(`${sidebar}.querySelector('img[alt="Nola Translator"]')?.naturalWidth > 0`)
-    assert.match(await js(`${sidebar}.querySelector('[data-slot=sidebar-footer]').textContent`), /Local user\s*local@nola\.invalid/)
-    assert.equal(await js(`${sidebar}.querySelector('[data-slot=avatar-fallback]').textContent`), 'N')
+    await until(`${sidebar}.querySelector('button[aria-label="Nola Translator"] img')?.naturalWidth > 0`)
+    assert.match(await js(`${sidebar}.querySelector('[data-slot=sidebar-footer]').textContent`), /Local account\s*local@xaviermc\.top/)
+    await until(`${sidebar}.querySelector('.nola-sidebar-account img')?.naturalWidth > 0`)
     for (const element of [sidebarTrigger, `${sidebar}.querySelector('.nola-sidebar-account')`]) {
       assert.equal(await js(`getComputedStyle(${element}).backgroundColor`), 'rgba(0, 0, 0, 0)')
     }
@@ -101,7 +102,18 @@ async function main() {
     await js("document.querySelector('.site-demo-window iframe').contentWindow.location.hash = '#/settings/audio'")
     const guide = `${demo}.querySelector('a[href="https://vb-audio.com/Cable/"]')`
     await until(`${guide}?.textContent.trim() === 'Installation guide'`)
-    assert.match(await js(`${guide}.closest('.settings-row').textContent`), /CABLE Input.*CABLE Output.*receiving app/)
+    const helpPoint = await js(`(() => {
+      const frame=document.querySelector('.site-demo-window iframe'), button=${guide}.closest('.settings-row').querySelector('button');
+      button.scrollIntoView({ block:'center' });
+      const f=frame.getBoundingClientRect(), r=button.getBoundingClientRect(), scale=f.width/frame.clientWidth;
+      return {x:Math.round(f.left+(r.left+r.width/2)*scale),y:Math.round(f.top+(r.top+r.height/2)*scale)};
+    })()`)
+    win.webContents.sendInputEvent({type:'mouseMove',...helpPoint})
+    const explanation = `${demo}.querySelector('[data-description="true"]')`
+    await until(`${explanation}?.textContent.includes('CABLE Input')`)
+    assert.match(await js(`${explanation}.textContent`), /CABLE Input.*CABLE Output/)
+    assert.equal(await js(`getComputedStyle(${explanation}).fontSize`), '14px')
+    await js(`${guide}.focus()`)
     // Theme messages must preserve the live iframe, including its current route.
     await js("window.dispatchEvent(new CustomEvent('nola-demo-page', { detail: 'workspace' }))")
     await until("document.querySelector('iframe').contentWindow.location.hash === '#/workspace'")
@@ -137,9 +149,9 @@ async function main() {
     await checkTheme(true)
     console.log('PASS: live demo and hero dark theme')
     await capture('website-dark-1920')
-    await js("window.scrollTo({ top: 1500, behavior: 'instant' })")
+    await js("document.querySelector('#features').scrollIntoView({ block: 'start', behavior: 'instant' })")
     await until("document.querySelector('.site-nav--scrolled')")
-    await until("document.querySelector('.site-scenarios.is-visible')")
+    await until("document.querySelector('#features [data-reveal=section]:not(.is-offscreen)')")
     await finishTransitions()
     await capture('website-dark-scrolled')
     await js("document.querySelector('.site-theme').click()")
@@ -167,6 +179,22 @@ async function main() {
     await loadDocument(`${url}en/getting-started/`)
     await until("document.querySelector('.VPDoc') && document.documentElement.classList.contains('dark')")
     console.log('PASS: document retains dark preference')
+    await loadDocument(`${url}vis/foundations/typography.html`)
+    const specimen = '[data-scene="appearance-typography"]'
+    await until(`document.querySelector('${specimen} .type-code')`)
+    for (const dark of [true, false]) {
+      await js(`document.documentElement.classList.toggle('dark', ${dark})`)
+      await settle()
+      const actual = await js(`['h1','h2','h3','h4','body','small','muted','code'].map(role => {
+        const el = document.querySelector('${specimen} .type-' + role), style = getComputedStyle(el);
+        return [parseFloat(style.fontSize), parseFloat(style.lineHeight), style.fontWeight,
+          style.letterSpacing === 'normal' ? 0 : Number(parseFloat(style.letterSpacing).toFixed(3))];
+      })`)
+      assert.deepEqual(actual, [[36,40,'800',0], [30,36,'600',0], [24,32,'600',0], [20,28,'600',0],
+        [dark ? 15 : 14,22,'400',dark ? 0.225 : 0], [14,20,'500',dark ? 0.28 : 0],
+        [14,20,'400',dark ? 0.28 : 0], [14,20,'600',0]], `product typography preview in ${dark ? 'dark' : 'light'} theme`)
+    }
+    console.log('PASS: eight product typography styles in both preview themes')
     assert.deepEqual(errors, [], 'renderer console errors')
     assert.deepEqual(failedRequests, [], 'failed resource requests')
     console.log('PASS: website sidebar, themes, iframe state, contrast, language fallback and responsive layout')

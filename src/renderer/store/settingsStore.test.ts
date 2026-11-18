@@ -1,11 +1,28 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createIpcBridge } from '@/bridge/ipc/ipcBridge'
 import { disposeStores, initStores } from './index'
-import { attachSettingsStore, checkForAppUpdate, detachSettingsStore, loadSettings, refreshComputeDevices, settingsStore, testAudio, cancelAudioTest } from './settingsStore'
+import { attachSettingsStore, checkForAppUpdate, detachSettingsStore, flushPendingSettings, loadSettings, refreshComputeDevices, settingsStore, testAudio, cancelAudioTest, updateSettings } from './settingsStore'
 import { DEFAULT_SETTINGS } from '../../shared/settings'
 import type { ComputeSnapshot } from '../../shared/compute'
 
 const snapshot: ComputeSnapshot = { devices: [], notes: [], torchVersion: '', activePlan: null }
+
+it('waits for debounced settings persistence before acknowledging the quit flush', async () => {
+  const bridge = createIpcBridge()
+  const saved = deferred<typeof DEFAULT_SETTINGS>()
+  vi.spyOn(bridge.settings, 'get').mockResolvedValue(DEFAULT_SETTINGS)
+  vi.spyOn(bridge.settings, 'update').mockReturnValue(saved.promise)
+  attachSettingsStore(bridge, false)
+  await loadSettings()
+  const write = updateSettings({ appearance: { glassBlur: 23 } })
+  let finished = false
+  const flush = flushPendingSettings().then(() => { finished = true })
+  await Promise.resolve()
+  expect(finished).toBe(false)
+  saved.resolve({ ...DEFAULT_SETTINGS, appearance: { ...DEFAULT_SETTINGS.appearance, glassBlur: 23 } })
+  await Promise.all([write, flush])
+  expect(finished).toBe(true)
+})
 
 it('captures the selected source and plays the returned audio before reporting completion', async () => {
   const bridge = createIpcBridge()

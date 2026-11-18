@@ -43,7 +43,7 @@ export function MessagePair({
     >
       <p
         className={cn(
-          "max-w-[85%] self-end text-sm",
+          "max-w-[85%] self-end type-body",
           variant === "bubble"
             ? cn(paper, "rounded-2xl px-3.5 py-2")
             : "text-foreground/90 text-end",
@@ -52,7 +52,7 @@ export function MessagePair({
         {userMessage}
       </p>
       <div className="group/message flex flex-col items-start">
-        <p className="min-h-[4.25rem] text-sm leading-relaxed">
+        <p className="min-h-[4.25rem] type-body">
           {shown.map((word, index) => {
             const fresh = streaming && shown.length - 1 - index < 2;
 

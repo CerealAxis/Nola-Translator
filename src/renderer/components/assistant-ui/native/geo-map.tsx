@@ -261,7 +261,7 @@ export function GeoMap({
         )}
       >
         {!mapReady ? (
-          <span className="text-muted-foreground absolute inset-0 flex items-center justify-center [font:var(--font-caption)]">
+          <span className="text-muted-foreground absolute inset-0 flex items-center justify-center type-muted">
             Loading map
           </span>
         ) : null}
@@ -282,11 +282,11 @@ export function GeoMap({
                 )}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="text-foreground/90 block [font:var(--font-label)] leading-5 break-words">
+                  <span className="text-foreground/90 block type-body font-medium break-words">
                     {place.label}
                   </span>
                   {place.description ? (
-                    <span className="text-muted-foreground block [font:var(--font-caption)] leading-4 break-words">
+                    <span className="text-muted-foreground block type-muted break-words">
                       {place.description}
                     </span>
                   ) : null}

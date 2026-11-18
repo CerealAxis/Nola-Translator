@@ -24,7 +24,8 @@ import type { UiLanguagePreference } from '@/i18n'
 import { updateSettings } from '@/store'
 import { GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_NODES, GITHUB_PROXY_OFF, findGithubProxyNode } from '../../../../shared/github-proxies'
 import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_NODES, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFF, PYTORCH_WHEEL_MIRRORS } from '../../../../shared/pypi-mirrors'
-import { GLASS_CONTROLS, type GlassControl } from '../../../../shared/settings'
+import { DEFAULT_SETTINGS, GLASS_CONTROLS, UI_FONTS, type GlassControl, type UiFont } from '../../../../shared/settings'
+import { loadInterfaceFont } from '@/theme/interface-font'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
@@ -32,6 +33,28 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
   const { t, uiLanguage, setLanguage } = useI18n()
   const reduceMotion = settings.appearance?.reduceMotion ?? false
   const glassEnabled = settings.appearance?.liquidGlass !== false
+  const [fontBusy, setFontBusy] = useState(false)
+  const [fontFallback, setFontFallback] = useState(document.documentElement.dataset.fontState === 'error')
+  useEffect(() => {
+    const changed = () => setFontFallback(document.documentElement.dataset.fontState === 'error')
+    window.addEventListener('nola-font-state', changed)
+    return () => window.removeEventListener('nola-font-state', changed)
+  }, [])
+  const fontOptions = UI_FONTS.map(value => ({ value, label: value === 'system' ? t('settings.systemFont') : value }))
+  const saveAppearance = (appearance: Partial<typeof settings.appearance>) => updateSettings({ appearance }).catch((error: unknown) => {
+    notifyError(t('settings.appearanceSaveFailed'), { cause: error })
+  })
+  const changeFont = async (font: UiFont) => {
+    setFontBusy(true)
+    try {
+      await loadInterfaceFont(font)
+      await saveAppearance({ interfaceFont: font })
+    } catch (error) {
+      notifyError(t('settings.fontUnavailable'), { cause: error })
+    } finally {
+      setFontBusy(false)
+    }
+  }
 
   useEffect(() => {
     document.documentElement.dataset.reduceMotion = reduceMotion ? 'true' : 'false'
@@ -53,8 +76,23 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
 
   return (
     <div className="settings-panel">
-      <SettingGroup legend={t('settings.groupAppearance')}>
+      <SettingGroup legend={t('settings.groupAppearance')} actions={
+        <Button variant="secondary" disabled={fontBusy} onClick={() => void saveAppearance({ ...DEFAULT_SETTINGS.appearance })}>
+          {t('modelsSettingsUi.resetAppearance')}
+        </Button>
+      }>
         <ThemeRow />
+        <SettingsRow label={t('settings.interfaceFont')}>
+          <SettingSelect value={settings.appearance.interfaceFont} options={fontOptions}
+            isDisabled={fontBusy} ariaLabel={t('settings.interfaceFont')}
+            onChange={value => { if (UI_FONTS.includes(value as UiFont)) void changeFont(value as UiFont) }} />
+        </SettingsRow>
+        {fontFallback && <p role="status" className="type-muted">{t('settings.fontFallback')}</p>}
+        <SettingsRow label={t('settings.density')}>
+          <SettingSelect value={settings.appearance.density} ariaLabel={t('settings.density')}
+            options={[{ value: 'compact', label: t('settings.densityCompact') }, { value: 'comfortable', label: t('settings.densityComfortable') }]}
+            onChange={value => { if (value === 'compact' || value === 'comfortable') void saveAppearance({ density: value }) }} />
+        </SettingsRow>
         <SettingsRow label={t('settings.liquidGlass')}>
           <SettingSwitch
             isSelected={glassEnabled}

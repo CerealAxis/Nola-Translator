@@ -147,14 +147,14 @@ export function AudioTab({ settings }: SettingsPanelProps) {
           </Button>
         </SettingsRow>
         <SettingsRow label={t('session.virtualCableDriverVersion')}>
-          <span className="text-sm text-muted">{checkingCableDriver ? t('gateway.loading') : cableDriverVersion || t('session.virtualCableMissing')}</span>
+          <span className="type-body text-muted">{checkingCableDriver ? t('gateway.loading') : cableDriverVersion || t('session.virtualCableMissing')}</span>
         </SettingsRow>
       </SettingGroup>
 
       <TranslationTab settings={settings} />
 
       {provider !== 'aliyun' ? <SettingGroup legend={t('settings.vadGroup')} actions={
-        <Button variant="secondary" size="sm" className="bg-surface-tertiary" onClick={() => {
+        <Button variant="secondary" size="sm" onClick={() => {
           void updateSettings({ recognition: {
             max_segment_ms: DEFAULT_SETTINGS.recognition.max_segment_ms,
             silence_end_ms: DEFAULT_SETTINGS.recognition.silence_end_ms,
@@ -182,7 +182,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
                   </SliderTrack>
                 </SliderControl>
               </SliderRoot>
-              <output className="nola-caption tabular text-right">{(settings.recognition[field] ?? fallback).toLocaleString(language)}</output>
+              <output className="type-muted tabular text-right">{(settings.recognition[field] ?? fallback).toLocaleString(language)}</output>
               <span className="settings-slider__unit" aria-hidden="true" />
             </div>
           </SettingsRow>
@@ -243,7 +243,7 @@ export function MiniMaxConnection({ recognition, stored, onUpdate = updateSettin
     </SettingsRow>
     <TextRow label={t('settings.endpoint')} value={recognition.minimaxEndpoint ?? ''} onCommit={value => { void onUpdate({ recognition: { minimaxEndpoint: value.trim() } }).catch(() => undefined) }} />
     {credentialField ?? <ApiKeyRow provider="minimax-asr" stored={stored} />}
-    {showNotice ? <p className="nola-caption text-muted">{t('settings.minimaxNotice')}</p> : null}
+    {showNotice ? <p className="type-muted text-muted">{t('settings.minimaxNotice')}</p> : null}
   </>
 }
 

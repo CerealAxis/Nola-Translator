@@ -39,8 +39,8 @@ export function ConnectionState({
     >
       {phase === "dropped" && (
         <>
-          <CloudOffIcon className="size-3.5 shrink-0 text-chart-4" />
-          <span className="min-w-0 flex-1 text-[13px]">
+          <CloudOffIcon className="size-3.5 shrink-0 text-warning-soft-foreground" />
+          <span className="min-w-0 flex-1 type-body">
             连接丢失。运行在服务器上继续进行。
           </span>
           <Button
@@ -55,7 +55,7 @@ export function ConnectionState({
       {phase === "reconnecting" && (
         <>
           <Loader2Icon className="text-muted-foreground size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
-          <span className="min-w-0 flex-1 text-[13px]">重连</span>
+          <span className="min-w-0 flex-1 type-body">重连</span>
           {attempt !== undefined && (
             <span
               className={cn(
@@ -71,8 +71,8 @@ export function ConnectionState({
 
       {phase === "resumed" && (
         <>
-          <CheckIcon className="size-3.5 shrink-0 text-chart-2" />
-          <span className="min-w-0 flex-1 text-[13px]">
+          <CheckIcon className="size-3.5 shrink-0 text-success-soft-foreground" />
+          <span className="min-w-0 flex-1 type-body">
             已重新选择流。
           </span>
           {resumedTokens !== undefined && (

@@ -184,7 +184,7 @@ function ReasoningTrigger({
     <CollapsibleTrigger
       data-slot="reasoning-trigger"
       className={cn(
-        "aui-reasoning-trigger group/trigger text-muted-foreground hover:text-foreground flex max-w-[75%] origin-left items-center gap-2 py-1.5 text-sm transition-[color,scale] active:scale-[0.98]",
+        "aui-reasoning-trigger group/trigger text-muted-foreground hover:text-foreground flex max-w-[75%] origin-left items-center gap-2 py-1.5 type-body transition-[color,scale] active:scale-[0.98]",
         className,
       )}
       {...props}
@@ -196,7 +196,7 @@ function ReasoningTrigger({
       <span
         data-slot="reasoning-trigger-label"
         className={cn(
-          "aui-reasoning-trigger-label-wrapper inline-block leading-none tabular-nums",
+          "aui-reasoning-trigger-label-wrapper inline-block tabular-nums",
           active && "shimmer motion-reduce:animate-none",
         )}
       >
@@ -227,7 +227,7 @@ function ReasoningContent({
     <CollapsibleContent
       data-slot="reasoning-content"
       className={cn(
-        "aui-reasoning-content text-muted-foreground relative overflow-hidden text-sm outline-none",
+        "aui-reasoning-content text-muted-foreground relative overflow-hidden type-body outline-none",
         "group/collapsible-content ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:animate-none",
         "data-closed:animate-collapsible-up",
         "data-open:animate-collapsible-down",
@@ -303,7 +303,7 @@ function ReasoningText({
       ref={scrollRef}
       data-slot="reasoning-text"
       className={cn(
-        "aui-reasoning-text relative z-base max-h-64 overflow-y-auto ps-6 pt-2 pb-2 leading-relaxed text-pretty",
+        "aui-reasoning-text relative z-base max-h-64 overflow-y-auto ps-6 pt-2 pb-2 type-body text-pretty",
         "transform-gpu transition-[transform,opacity] ease-[cubic-bezier(0.32,0.72,0,1)]",
         "motion-reduce:animate-none",
         "group-data-open/collapsible-content:animate-in",

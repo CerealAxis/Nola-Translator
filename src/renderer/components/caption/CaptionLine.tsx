@@ -89,6 +89,7 @@ export function CaptionLine({
   const style: CSSProperties = {
     fontSize: `${fontSize}px`,
     lineHeight,
+    letterSpacing: 'normal',
     opacity: paused ? opacity * PAUSED_DIM : opacity,
     // Interim is the only state that switches text colour; the two final levels ride the ramp.
     color: interim ? 'var(--nola-ui-muted-foreground)' : kind === 'translation' ? TRANSLATION_COLOR : 'var(--foreground)',

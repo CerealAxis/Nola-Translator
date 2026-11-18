@@ -288,8 +288,8 @@ function Value({
           number === 0
             ? "text-muted-foreground"
             : good
-              ? "text-chart-2"
-              : "text-destructive",
+              ? "text-success-soft-foreground"
+              : "text-danger-soft-foreground",
         )}
       >
         {direction} {withUnit(content, format.unit)}
@@ -360,9 +360,9 @@ function Value({
             variant: tone === "danger" ? "destructive" : "secondary",
           }),
           tone === "success" &&
-            "bg-chart-2/12 text-chart-2",
+            "bg-chart-2/12 text-success-soft-foreground",
           tone === "warning" &&
-            "bg-chart-4/12 text-chart-4",
+            "bg-chart-4/12 text-warning-soft-foreground",
         )}
       >
         {textValue(value)}
@@ -380,14 +380,14 @@ function Value({
             key={index}
             className={cn(
               field,
-              "text-foreground/60 rounded-md px-1.5 py-0.5 text-xs",
+              "text-foreground/60 rounded-md px-1.5 py-0.5 type-small",
             )}
           >
             {item}
           </span>
         ))}
         {value.length > shown.length ? (
-          <span className="text-muted-foreground px-1.5 py-0.5 text-xs">
+          <span className="text-muted-foreground px-1.5 py-0.5 type-muted">
             +{value.length - shown.length}
           </span>
         ) : null}
@@ -523,7 +523,7 @@ export function DataTable({
 
   const cellClass = (column: DataTableColumn) =>
     cn(
-      "text-foreground/80 px-4 py-2.5 align-top text-[13px] leading-5",
+      "text-foreground/80 px-4 py-2.5 align-top type-body",
       (column.align ?? (isNumeric(column.format) ? "end" : "start")) ===
         "end" && "text-end tabular-nums",
     );
@@ -595,7 +595,7 @@ export function DataTable({
             <tr>
               <td
                 colSpan={Math.max(columns.length, 1)}
-                className="text-muted-foreground px-4 py-6 text-center text-[13px]"
+                className="text-muted-foreground px-4 py-6 text-center type-body"
               >
                 <span role="status">{emptyMessage}</span>
               </td>
@@ -625,7 +625,7 @@ export function DataTable({
         {sortedRows.length === 0 ? (
           <div
             role="status"
-            className="text-muted-foreground px-2 py-3 text-center text-[13px]"
+            className="text-muted-foreground px-2 py-3 text-center type-body"
           >
             {emptyMessage}
           </div>
@@ -637,7 +637,7 @@ export function DataTable({
               className="bg-foreground/[0.025] hover:bg-foreground/[0.04] rounded-xl px-3 py-2 transition-colors motion-reduce:transition-none"
             >
               {primaryColumn ? (
-                <div className="text-foreground/90 text-[13px] leading-5 font-medium">
+                <div className="text-foreground/90 type-body font-medium">
                   <Value
                     column={primaryColumn}
                     row={row}
@@ -647,7 +647,7 @@ export function DataTable({
                 </div>
               ) : null}
               {columns.length > 1 ? (
-                <dl className="mt-1.5 grid grid-cols-1 gap-x-4 gap-y-1 text-[12px] leading-4 @xs:grid-cols-2">
+                <dl className="mt-1.5 grid grid-cols-1 gap-x-4 gap-y-1 type-muted @xs:grid-cols-2">
                   {columns
                     .filter((column) => column.key !== primaryColumn?.key)
                     .map((column) => (

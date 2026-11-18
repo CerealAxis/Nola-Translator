@@ -186,6 +186,16 @@ class ComicInpainter(ScreenOcr):
         finally:
             self._inference_gate.release(key)
 
+    async def close(self):
+        self._closed = True
+        # A hung worker holds the inference gate; terminate it before waiting for release.
+        if self._process is not None and self._process.returncode is None:
+            try:
+                self._process.kill()
+            except ProcessLookupError:
+                pass
+        await super().close()
+
     async def release(self):
         key = self.spec.model_id
         await self._inference_gate.acquire(key, 1, realtime=True)

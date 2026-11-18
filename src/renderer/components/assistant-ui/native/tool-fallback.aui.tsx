@@ -128,7 +128,7 @@ function ToolFallbackDuration({
     <span
       data-slot="tool-fallback-duration"
       className={cn(
-        "aui-tool-fallback-duration text-muted-foreground [font:var(--font-caption)] tabular-nums",
+        "aui-tool-fallback-duration text-muted-foreground type-muted tabular-nums",
         className,
       )}
       {...props}
@@ -170,7 +170,7 @@ function ToolFallbackTrigger({
     <CollapsibleTrigger
       data-slot="tool-fallback-trigger"
       className={cn(
-        "aui-tool-fallback-trigger group/trigger text-muted-foreground hover:text-foreground flex w-fit max-w-full origin-left items-center gap-2 py-1.5 text-sm transition-[color,scale] active:scale-[0.98]",
+        "aui-tool-fallback-trigger group/trigger text-muted-foreground hover:text-foreground flex w-fit max-w-full origin-left items-center gap-2 py-1.5 type-body transition-[color,scale] active:scale-[0.98]",
         className,
       )}
       {...props}
@@ -186,7 +186,7 @@ function ToolFallbackTrigger({
       <span
         data-slot="tool-fallback-trigger-label"
         className={cn(
-          "aui-tool-fallback-trigger-label-wrapper inline-block min-w-0 text-start leading-none wrap-anywhere",
+          "aui-tool-fallback-trigger-label-wrapper inline-block min-w-0 text-start wrap-anywhere",
           isCancelled && "text-muted-foreground line-through",
           isRunning && "shimmer motion-reduce:animate-none",
         )}
@@ -217,7 +217,7 @@ function ToolFallbackContent({
     <CollapsibleContent
       data-slot="tool-fallback-content"
       className={cn(
-        "aui-tool-fallback-content relative overflow-hidden text-sm outline-none",
+        "aui-tool-fallback-content relative overflow-hidden type-body outline-none",
         "group/collapsible-content ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:animate-none",
         "data-closed:animate-collapsible-up",
         "data-open:animate-collapsible-down",
@@ -257,7 +257,7 @@ function ToolFallbackArgs({
       className={cn("aui-tool-fallback-args", className)}
       {...props}
     >
-      <pre className="aui-tool-fallback-args-value bg-muted/50 text-foreground/90 rounded-md p-2.5 [font:var(--font-caption)] break-words whitespace-pre-wrap">
+      <pre className="aui-tool-fallback-args-value bg-muted/50 text-foreground/90 rounded-md p-2.5 type-code break-words whitespace-pre-wrap">
         {argsText}
       </pre>
     </div>
@@ -296,10 +296,10 @@ function ToolFallbackResult({
       className={cn("aui-tool-fallback-result", className)}
       {...props}
     >
-      <p className="aui-tool-fallback-result-header text-muted-foreground [font:var(--font-caption)] font-medium">
+      <p className="aui-tool-fallback-result-header text-muted-foreground type-small">
         Result:
       </p>
-      <pre className="aui-tool-fallback-result-content bg-muted/50 text-foreground/90 mt-1 rounded-md p-2.5 [font:var(--font-caption)] break-words whitespace-pre-wrap">
+      <pre className="aui-tool-fallback-result-content bg-muted/50 text-foreground/90 mt-1 rounded-md p-2.5 type-code break-words whitespace-pre-wrap">
         {formatUnknownValue(result, 2)}
       </pre>
     </div>
@@ -602,7 +602,7 @@ function ToolFallbackApprovalQuestions({
           >
             <p className="aui-tool-fallback-approval-question-prompt text-foreground whitespace-pre-line">
               {question.header ? (
-                <span className="text-muted-foreground me-1.5 [font:var(--font-caption)] font-medium uppercase">
+                <span className="text-muted-foreground me-1.5 type-small uppercase">
                   {question.header}
                 </span>
               ) : null}
@@ -635,7 +635,7 @@ function ToolFallbackApprovalQuestions({
                     >
                       <span>{option.label}</span>
                       {option.description ? (
-                        <span className="[font:var(--font-caption)] font-normal opacity-80">
+                        <span className="type-muted font-normal opacity-80">
                           {option.description}
                         </span>
                       ) : null}
@@ -962,7 +962,7 @@ function ToolFallbackApprovalImpl({
   const errorText = error ? (
     <p
       role="alert"
-      className="aui-tool-fallback-approval-error text-destructive [font:var(--font-caption)] whitespace-pre-line"
+      className="aui-tool-fallback-approval-error text-danger-soft-foreground type-body whitespace-pre-line"
     >
       {error}
     </p>
@@ -1048,7 +1048,7 @@ function ToolFallbackApprovalImpl({
           <ul className="aui-tool-fallback-approval-confirm-grants flex flex-col gap-1">
             {confirming.grants.map((grant) => (
               <li key={grant}>
-                <code className="aui-tool-fallback-approval-confirm-grant bg-muted rounded px-1.5 py-0.5 [font:var(--font-caption)]">
+                <code className="aui-tool-fallback-approval-confirm-grant bg-muted rounded px-1.5 py-0.5 type-code">
                   {grant}
                 </code>
               </li>

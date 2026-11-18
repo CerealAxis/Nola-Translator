@@ -111,7 +111,7 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="app-update-dialog modal__dialog--lg rounded-2xl border border-border">
         <DialogHeader className="app-update-dialog-header mb-0">
-          <DialogTitle data-slot="dialog-title" className="nola-title">{t(isCurrentVersion ? 'appUpdate.currentReleaseTitle' : 'appUpdate.title')}</DialogTitle>
+          <DialogTitle data-slot="dialog-title">{t(isCurrentVersion ? 'appUpdate.currentReleaseTitle' : 'appUpdate.title')}</DialogTitle>
           <div className="app-update-dialog-meta">
             <span>{t('appUpdate.version', { version: latestVersion })}</span>
             {!isCurrentVersion && <span>{t('appUpdate.currentVersion', { version: displayVersion(result.currentVersion) })}</span>}
@@ -120,7 +120,7 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
         <div className="app-update-dialog-body nola-scrollbar flex-1">
           {result.releaseNotes.trim()
             ? <ReleaseNotesMarkdown notes={result.releaseNotes} />
-            : <div className="nola-caption text-muted">{displayReleaseName(result.releaseName)}<p>{t('appUpdate.notesUnavailable')}</p></div>}
+            : <div className="type-muted text-muted">{displayReleaseName(result.releaseName)}<p>{t('appUpdate.notesUnavailable')}</p></div>}
         </div>
         <DialogFooter className="app-update-dialog-footer">
           <Button variant="tertiary" size="sm" onClick={() => onOpenChange(false)}>{t(isCurrentVersion ? 'common.close' : 'appUpdate.later')}</Button>

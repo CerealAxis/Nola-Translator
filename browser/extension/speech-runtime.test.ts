@@ -12,6 +12,19 @@ vi.mock('./native-provider', async importOriginal => ({ ...await importOriginal<
 vi.mock('./glossary-store', async importOriginal => ({ ...await importOriginal<typeof import('./glossary-store')>(), recoverExtensionConfiguration: vi.fn(), extensionGlossary: { snapshot: vi.fn(async () => migrateLegacyGlossary([{ source: 'Nola', target: '诺拉', sites: 'video.test' }, { source: 'Recognized', target: 'ignore', sites: 'other.test' }], 'Terms')), onChanged: vi.fn(() => () => {}) } }))
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
 
+it('rejects a blacklisted page even when its browser host permission is granted', async () => {
+  vi.mocked(loadPreferences).mockResolvedValue({ ...DEFAULT_PREFERENCES, siteBlacklist: ['video.test'] })
+  let connect!: (port: ChromePort) => void, receive!: (message: unknown) => void
+  const connectNative = vi.fn(), postMessage = vi.fn()
+  vi.stubGlobal('chrome', { permissions: { contains: vi.fn(async () => true) }, runtime: { onConnect: { addListener: (value: typeof connect) => { connect = value } }, connectNative } })
+  setupSpeechRuntime()
+  connect({ name: 'nola-speech', sender: { tab: { id: 1 }, frameId: 0, url: 'https://video.test/watch' }, onMessage: { addListener: (value: typeof receive) => { receive = value } }, onDisconnect: { addListener: vi.fn() }, postMessage, disconnect: vi.fn() } as unknown as ChromePort)
+  receive({ type: 'start', capability: 'asr', sourceLanguage: 'en', targetLanguage: 'zh' })
+  await vi.waitFor(() => expect(postMessage).toHaveBeenCalledWith({ type: 'error', code: 'providerPermission' }))
+  expect(connectNative).not.toHaveBeenCalled()
+  expect(getProvider).not.toHaveBeenCalled()
+})
+
 it('does not open native capture after stopping while preferences are still loading', async () => {
   let resolvePreferences!: (value: typeof DEFAULT_PREFERENCES) => void
   vi.mocked(loadPreferences).mockImplementationOnce(() => new Promise(resolve => { resolvePreferences = resolve }))

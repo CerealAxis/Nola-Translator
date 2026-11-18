@@ -53,7 +53,7 @@ export function GenerationLoader({
           );
         })}
       </div>
-      <ShimmerLabel className="text-muted-foreground relative inline-block text-sm">
+      <ShimmerLabel className="text-muted-foreground relative inline-block type-muted">
         {label}
       </ShimmerLabel>
     </div>

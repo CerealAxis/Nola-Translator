@@ -95,7 +95,7 @@ export function ComputerUse({
           <span className={cn(mono, "text-muted-foreground shrink-0")}>
             {active.action}
           </span>
-          <span className="text-foreground/80 min-w-0 flex-1 truncate text-[13px]">
+          <span className="text-foreground/80 min-w-0 flex-1 truncate type-body">
             {active.target}
           </span>
           <span

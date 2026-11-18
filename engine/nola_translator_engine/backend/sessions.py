@@ -14,6 +14,7 @@ import json
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from itertools import islice
 from typing import Callable
 from uuid import UUID, uuid4
 
@@ -91,6 +92,7 @@ class Session:
     _log: SessionEventLog = field(default=None)  # type: ignore[assignment]
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _commands: dict[str, _CommandRecord] = field(default_factory=dict)
+    _preparation: tuple[str, asyncio.Future] | None = field(default=None, repr=False)
 
     def snapshot(self, server_instance_id: str) -> SessionSnapshot:
         from .contracts import SubscriptionInfo
@@ -149,17 +151,20 @@ class SessionManager:
         journal: SessionJournal | None = None,
         command_effect: CommandEffect | None = None,
         clock: Callable[[], int] | None = None,
+        on_forget: Callable[[Session], None] | None = None,
     ) -> None:
         self.server_instance_id = server_instance_id
         self._journal = journal
         self._command_effect = command_effect
         self._clock = clock or (lambda: int(time.time() * 1000))
+        self._on_forget = on_forget
         self._sessions: dict[UUID, Session] = {}
         #: The single realtime slot: held from create (preparing counts) until
         #: closed/failed release.
         self._slot_session_id: UUID | None = None
         self._meeting_sessions: tuple[Session, ...] | None = None
         self._slot_lock = asyncio.Lock()
+        self._background: set[asyncio.Task] = set()
 
     # -- creation -----------------------------------------------------------
 
@@ -204,6 +209,14 @@ class SessionManager:
             ))
 
     def _new_session(self, owner: SessionOwner, config: SessionConfig) -> Session:
+        finished = [session for session in self._sessions.values()
+                    if session.state in ("closed", "failed") and session.session_id != self._slot_session_id]
+        # Keep recent reconnect/replay history without retaining every session for the whole boot.
+        for previous in finished[:-32]:
+            self._sessions.pop(previous.session_id, None)
+            previous._log.close_all()
+            if self._on_forget is not None:
+                self._on_forget(previous)
         session_id, pipeline_id = uuid4(), uuid4()
         session = Session(
             session_id=session_id, owner=owner, config=config, pipeline_id=pipeline_id,
@@ -273,6 +286,12 @@ class SessionManager:
 
     async def command(self, session_id: UUID, command: SessionCommand) -> CommandAck:
         session = self.get(session_id)
+        # Stop must cancel model admission/loading before waiting for its command lock.
+        if (command.type == "stop" and session._preparation is not None
+                and command.command_id not in session._commands
+                and command.command_id != session._preparation[0]):
+            session._preparation[1].cancel()
+            session._preparation = None
         async with session._lock:
             record = session._commands.get(command.command_id)
             fingerprint = _body_fingerprint(command)
@@ -298,7 +317,17 @@ class SessionManager:
             if self._command_effect is not None:
                 outcome = self._command_effect(session, command)
                 if asyncio.isfuture(outcome):
-                    effect_result = await outcome
+                    preparing = command.type in ("start", "resume", "reset_stream", "switch_pipeline")
+                    if preparing:
+                        session._preparation = (command.command_id, outcome)
+                    try:
+                        effect_result = await outcome
+                    except asyncio.CancelledError:
+                        if not preparing or asyncio.current_task().cancelling():
+                            raise
+                    finally:
+                        if preparing:
+                            session._preparation = None
                 else:
                     effect_result = outcome
 
@@ -314,6 +343,9 @@ class SessionManager:
                 result_state=session.state,
             )
             session._commands[command.command_id] = _CommandRecord(fingerprint, ack)
+            if len(session._commands) > 2048:
+                # Keep the create idempotency key while evicting the oldest command replay.
+                session._commands.pop(next(islice(session._commands, 1, None)))
 
             session._log.submit(
                 "pipeline_state",
@@ -350,7 +382,7 @@ class SessionManager:
         )
         session._log.submit("pipeline_state", {"state": session.state, "reason": "pipeline_failure"})
         if new_state in ("closed", "failed"):
-            asyncio.get_running_loop().create_task(self._release_slot(session_id))
+            self._release_slot_soon(session_id)
 
     def drain_session(self, session_id: UUID) -> None:
         """Natural EOF: internal lifecycle event, never a user command."""
@@ -374,7 +406,12 @@ class SessionManager:
         session.updated_at_unix_ms = self._clock()
         session._log.submit("pipeline_state", {"state": session.state, "reason": "input_eof"})
         session._log.close_all()
-        asyncio.get_running_loop().create_task(self._release_slot(session_id))
+        self._release_slot_soon(session_id)
+
+    def _release_slot_soon(self, session_id: UUID) -> None:
+        task = asyncio.create_task(self._release_slot(session_id))
+        self._background.add(task)
+        task.add_done_callback(self._background.discard)
 
     async def _release_slot(self, session_id: UUID) -> None:
         async with self._slot_lock:

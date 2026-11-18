@@ -5,7 +5,7 @@ import { setupContextMenus } from './context-menus'
 import { setupSpeechRuntime } from './speech-runtime'
 import { setupTabAudioRuntime } from './tab-audio-runtime'
 import { extensionGlossary, hasApplicableGlossary } from './glossary-store'
-import { loadPreferences } from './preferences'
+import { loadPreferences, siteEnabled } from './preferences'
 import { setupDiagnosticsRuntime } from './diagnostics'
 
 setupDiagnosticsRuntime()
@@ -98,7 +98,11 @@ chrome.runtime.onConnect.addListener(content => {
       const request = browserRequestSchema.safeParse(message)
       if (!request.success || closed) return
       if (popup && request.data.type !== 'hello') return
+      if (page && !['hello', 'start', 'stop', 'finish', 'pause', 'reset', 'audio', 'debug', 'runtimeSettings', 'cancel'].includes(request.data.type)) {
+        reply({ type: 'error', id: request.data.id, code: 'browserPermissionDenied', message: '' }); return
+      }
       try {
+        if (page && (request.data.type === 'hello' || request.data.type === 'start') && !siteEnabled(await loadPreferences(), content.sender!.url!)) { content.disconnect(); return }
         if (request.data.type === 'start' && content.sender?.url) {
           directTarget = request.data.targetLanguage ?? (await loadPreferences()).videoLanguage
           if (hasApplicableGlossary(await extensionGlossary.snapshot(), directTarget, content.sender.url)) {

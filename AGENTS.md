@@ -27,15 +27,33 @@
 
 ### 1.2 验证与交付
 
-- 根据改动范围选择测试，而非每次执行完整测试套件。
-- 发现本次改动导致的问题，应定位并修复。
-- 测试通过后，无需无理由重复执行。
+- 按第 5 节选择必要验证，修复本次改动引入的问题；通过后不无故重复检查。
 - 可能下载模型、调用付费云服务、覆盖数据或产生高成本的操作，先明确影响。
-- 完成任务后简要说明：
-  - 实际修改内容
-  - 已执行的验证及结果
-  - 尚未验证的内容或已知限制
+- 交付时简要说明实际修改、验证结果、未验证内容及已知限制。
 - 严禁将未执行、未通过的检查描述为已通过。
+
+### 1.3 Skill 调用
+
+用户点名的 Skill 必须读取；其他情况按下表选用，只加载当前任务需要的技能。优先使用当前环境已注册的同名技能；未注册时读取表中仓库副本的 `SKILL.md`，不重复加载全局与仓库副本。
+
+| Skill 与仓库位置 | 何时调用 |
+| --- | --- |
+| [ponytail](./skills/DietrichGebert/ponytail/ponytail/SKILL.md) | 编写、修复或重构代码，控制修改范围，采用最小完整方案。 |
+| [ponytail-review](./skills/DietrichGebert/ponytail/ponytail-review/SKILL.md) / [ponytail-audit](./skills/DietrichGebert/ponytail/ponytail-audit/SKILL.md) | 前者审查一次改动，后者审查整个仓库；仅输出审查结果。其余 `ponytail-*` 按用户要求查询帮助、技术债或收益。 |
+| [security-audit](./skills/security-audit/SKILL.md) | 安全问题、漏洞分析或安全审查；只有明确要求代码库安全审计、渗透测试或报告产物时，才进入完整审计流程。 |
+| [antislop](./skills/antislop/SKILL.md) | 检查界面、文案及注释中的模板化表达，作为以下 `antislop-*` 子技能的共同规则。 |
+| [antislop-ui](./skills/antislop-ui/SKILL.md) | 新建或修改界面的布局、颜色、组件与动效。 |
+| [antislop-human](./skills/antislop-human/SKILL.md) | 检查对比度、键盘操作、焦点、交互状态及可访问性。 |
+| [antislop-layoutmobile](./skills/antislop-layoutmobile/SKILL.md) | 修改响应式布局、窄屏适配、溢出及触控区域。 |
+| [antislop-copywriting](./skills/antislop-copywriting/SKILL.md) / [humanizer-zh](./skills/humanizer-zh/SKILL.md) | 前者用于产品文案、标题及操作名称；后者优先用于润色已有中文文章或文档，保留原意。 |
+| [antislop-code](./skills/antislop-code/SKILL.md) | 编写或清理代码注释；该技能只处理注释，不借机修改执行逻辑。 |
+| [shadcn](./skills/shadcn-ui/ui/shadcn/SKILL.md) / [migrate-radix-to-base](./skills/shadcn-ui/ui/migrate-radix-to-base/SKILL.md) | 前者用于 shadcn/ui 组件开发；后者仅在明确要求 Radix → Base UI 迁移时调用。 |
+| [assistant-ui](./skills/assistant-ui/skills/assistant-ui/SKILL.md) | 工作台的 Assistant-ui 界面、运行时、工具卡片及会话集成；按入口指引选读对应子技能。 |
+
+- **重叠时按职责组合**：组件 API 查 `shadcn` 或 `assistant-ui`，视觉方向遵循第 3 节及项目 `DESIGN.md`，`antislop` 检查质量，不替换项目设计规范；同一文案任务不默认叠加两套润色流程。
+- **模式按技能说明选择**：`antislop` 区分边做边检查（`during`）与事后审查（`after`），沿用用户已选模式或已保存偏好；未确定时按技能要求询问。
+- **审查与修复分开**：审查技能先给出问题和证据；用户已授权修复时继续处理授权范围内的问题。安全审计缺少所需隔离环境时，仅做源码分析并说明验证缺口，不绕过执行限制。
+- **授权不因技能扩大**：技能中的提交、清理工作区、改文档或生成资源等要求，仍须遵守当前任务授权及第 6 节；已有明确指示时不重复确认。
 
 ## 2. 技术架构与代码入口
 
@@ -98,8 +116,11 @@ src/
     available-models.ts      模型目录与选择回退
     bridge/                  NolaBridge 数据出口
     store/                   5 个领域 Store
-    index.css                软件端样式入口（含独立窗口和 CJK 字体）
-    theme/product.css        三端共用的设计 token、控件和毛玻璃
+    index.css                软件端样式入口（含独立窗口及可选 CJK 字体）
+    theme/product.css        三端共用的设计 token、控件及场景材质
+    theme/typography.css     共享字体栈及 H1、H2、H3、H4、Body、Small、Muted、Code 八种排版样式
+    theme/desktop-material.ts  桌面字体、密度及场景材质偏好
+    theme/interface-font.ts  用户所选备用字体的加载校验
     i18n/                    多语言字典
 
     components/
@@ -190,7 +211,7 @@ docs/
   design-system/             设计系统规范与组件示例文档
   .vitepress/                站点配置
   media-src/                 演示及截图素材
-    vis/design-demo.css      文档组件预览样式入口（含 CJK 字体）
+    vis/design-demo.css      文档组件预览样式入口（复用产品排版及密度）
   scripts/                   文档构建脚本
   public/                    静态资源
   PRD/                       内部需求与架构文档
@@ -209,11 +230,10 @@ skills/                      项目 Skills
 
 - 工作台通过 `#/workbench` 路由显示在主应用容器内，不创建独立窗口。
 - `application.tsx` 中的 `ApplicationShell` 按需加载并持续挂载 `WorkbenchPage.tsx`，切换页面仅隐藏工作台，保留会话、草稿和生成状态；离开工作台时停止麦克风采集。
-- 工作台通过 Portal 插槽复用 `AppShell` 的侧栏与标题栏，共用主应用的 `index.css`、主题及毛玻璃效果，不自行控制整页主题或窗口按钮。
+- 工作台通过 Portal 插槽复用 `AppShell` 的侧栏与标题栏，共用主应用的 `index.css`、主题及场景材质，不自行控制整页主题或窗口按钮。
 - `src/main/workbench.ts` 注册工作台模型 IPC，仅允许可信主应用窗口调用，按运行中的模型任务持有功能租约，并维护任务取消及退出清理。
 - 官方 Elements 源码位于 `components/assistant-ui/native/`。
 - Agent 界面、原生工具卡片及设置分别由 `NativeAgentSurface.tsx`、`native-agent-tools.tsx`、`NativeAgentSettings.tsx` 管理。
-- 旧聊天组件、旧侧栏和旧工作区组件已移除，不应重新依赖。
 
 **实时后端与模型**
 
@@ -236,7 +256,12 @@ skills/                      项目 Skills
 - 颜色、字号、间距、尺寸和圆角遵循该规范，通过 `src/renderer/theme/` 中的现有设计 token 实现。
 - 现有实现与规范不一致时，指出具体差异；不沿用过时数值。
 - 不新增无依据的硬编码视觉值。
-- 按钮统一采用 `--radius-xl`，禁止 `ghost` 变体；图标按钮允许透明背景。
+- 按钮统一采用 `--radius-xl`（18px），浅深色与所有尺寸一致，不允许组件或示例覆盖；禁止 `ghost` 变体及全圆角产品按钮，图标按钮允许透明背景。
+- 桌面界面默认优先使用操作系统原生界面字体。备用字体由用户主动选择，实际加载验证后应用到全部桌面窗口，并可恢复系统默认。代码、命令、日志及技术标识符使用独立等宽字体。浏览器扩展始终独立使用系统字体，不读取桌面字体偏好。
+- 桌面端、扩展和产品组件预览使用 `typography.css` 中的八种排版样式。文档站与首页使用各自的排版。产品根字号为 16px，字号与行高以 rem 表示，字重使用 400、500、600、800。深色模式将 Body 从 14px 调至 15px，Body 字距为 0.015em，Small 与 Muted 字距为 0.02em，其余排版指标与浅色一致。字体选择只改变界面字体家族，密度只改变布局。字幕及漫画画布保留独立用户字号，记录和文档查看器保留内容缩放。
+- Compact / Comfortable 为持久化的桌面外观偏好，只调整控件高度、面板内边距及布局间距。页面、面板、字段、标签和说明间距分别使用对应 Token。
+- 普通内容、卡片、设置、菜单、弹窗和侧栏默认实色。毛玻璃仅由字幕工具栏或媒体、画布上的少量工具面板主动声明，避免嵌套；主窗口底材独立管理。
+- 通用组件文档可介绍产品未开放的能力，但必须标明限制。开发前核对本地组件 API，产品设计规范优先于第三方示例，不直接复制冲突用法。
 - 非按钮元素按语义选择圆角 token；不存在 `rounded-pill` 档位。
 - 优先复用项目现有 shadcn/ui（Base UI）组件和 primitives，参考官方对应组件的示例代码，不自行实现重复基础组件。
 - 排版示例采用静态展示；需要说明状态变化时，加入必要的简单交互。
@@ -321,21 +346,6 @@ npm run dist:win
 node scripts/check-installer-paths.mjs [makensis.exe]
 ```
 
-命令用途：
-
-- `dev`：Electron 开发环境
-- `typecheck`：TypeScript 类型检查
-- `test`：Vitest
-- `build`：类型检查及 electron-vite 构建
-- `test:demo`：文档站演示回归
-- `test:onboarding`：首次引导、语言、主题、尺寸
-- `build:browser`：构建 MV3 扩展
-- `package:browser`：扩展 ZIP 发布包
-- `build:browser-host`：Native Messaging EXE
-- `build:python`：Python 3.12 基础组件
-- `dist:win`：Windows EXE + MSI
-- `check-installer-paths`：NSIS 安装目录回归检查
-
 ### 5.2 验证边界
 
 - 优先执行与修改直接相关的检查。
@@ -360,7 +370,6 @@ git status --porcelain -uall
 - 识别已有修改、未跟踪文件及潜在冲突。
 - 不覆盖用户或其他 Agent 的成果。
 - 并行任务须明确文件所有权；同一文件不可由多个 Worker 同时修改。
-- Verifier 负责审计、提供问题与证据；Worker 负责修复。
 - 仅在任务独立、并行有实际收益时拆分子 Agent。
 - 简单任务无需强制并行。
 

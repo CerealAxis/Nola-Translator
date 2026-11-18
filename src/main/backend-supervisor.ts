@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { app } from 'electron'
 
 import { createEngineLaunchSpec, type EngineLaunchSpec } from './engine-process'
 import { logActivity, logDiagnostic } from './session-log'
@@ -42,36 +41,6 @@ export type BackendSupervisorOptions = {
 }
 
 const READY_FRAME_TIMEOUT_MS = 60_000
-
-/**
- * Real Electron playback process tree for `windows_process_exclude` capture.
- *
- * Translated speech is rendered by the renderer / audio-service (utility)
- * processes, never by the Python backend, so process-exclude must cover the
- * whole Electron tree — main plus every child PID. Passing only the backend PID
- * (or only `process.pid`) would still re-capture Nola's own output and create a
- * feedback loop (research-audio-routing R02). Electron supplies this verbatim in
- * InputConfig.excluded_process_tree; the backend never auto-fills it.
- *
- * `app.getAppMetrics()` is Electron-only; outside Electron (unit tests) the
- * function falls back to the main PID so callers still get a non-empty tree.
- */
-export function electronPlaybackProcessTree(): number[] {
-  const pids = new Set<number>()
-  if (typeof process.pid === 'number' && process.pid > 0) pids.add(process.pid)
-  const metrics = app?.getAppMetrics
-  if (typeof metrics === 'function') {
-    try {
-      for (const metric of metrics.call(app)) {
-        if (typeof metric?.pid === 'number' && metric.pid > 0) pids.add(metric.pid)
-      }
-    } catch {
-      // Ignore probe failure; the main PID alone is still a valid (if smaller)
-      // tree and preflight will surface any remaining loop risk.
-    }
-  }
-  return [...pids]
-}
 
 export class BackendSupervisor extends EventEmitter {
   private child?: ChildProcessByStdio<null, Readable, Readable>

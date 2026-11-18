@@ -41,7 +41,7 @@ export function FeedbackDialog({
       className={cn(
         paper,
         "flex w-full max-w-sm p-4",
-        sent ? "items-center gap-2.5 text-[13.5px]" : "flex-col gap-3",
+        sent ? "items-center gap-2.5 type-body" : "flex-col gap-3",
         className,
       )}
 
@@ -62,7 +62,7 @@ export function FeedbackDialog({
       >
         {sent && (
           <>
-            <CheckIcon className="size-4 shrink-0 text-chart-2" />
+            <CheckIcon className="size-4 shrink-0 text-success-soft-foreground" />
             谢谢。这有助于我们调整模型。
           </>
         )}
@@ -74,7 +74,7 @@ export function FeedbackDialog({
             <span className="bg-foreground/[0.05] text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-lg">
               <ThumbsDownIcon className="size-3.5" />
             </span>
-            <span className="text-[13.5px] font-medium">出了什么问题？</span>
+            <span className="type-body font-medium">出了什么问题？</span>
             <span className={cn(mono, "text-muted-foreground ms-auto")}>
               可选
             </span>
@@ -84,7 +84,7 @@ export function FeedbackDialog({
             {reasons.map((reason) => {
               const active = selected.includes(reason);
               const className = cn(
-                "rounded-full px-2.5 py-1 text-xs transition-[background-color,color,scale] duration-150",
+                "rounded-full px-2.5 py-1 type-body transition-[background-color,color,scale] duration-150",
                 onToggleReason && "active:scale-[0.96]",
                 active
                   ? "bg-accent text-accent-foreground"
@@ -128,7 +128,7 @@ export function FeedbackDialog({
             aria-label={"还有吗？"}
             className={cn(
               field,
-              "text-foreground/80 placeholder:text-muted-foreground focus-visible:ring-foreground/20 resize-none rounded-xl px-3 py-2 text-xs outline-none focus-visible:ring-1",
+              "text-foreground/80 placeholder:text-muted-foreground focus-visible:ring-foreground/20 resize-none rounded-xl px-3 py-2 type-body outline-none focus-visible:ring-1",
             )}
           />
 

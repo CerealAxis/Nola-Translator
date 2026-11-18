@@ -44,7 +44,7 @@ export function ScoreBreakdown({
       {...props}
     >
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-medium tracking-tight tabular-nums">
+        <span className="type-body font-semibold tabular-nums">
           {total.toFixed(1)}
         </span>
         <span className={cn(mono, "text-muted-foreground tabular-nums")}>
@@ -52,12 +52,12 @@ export function ScoreBreakdown({
         </span>
         <span
           className={cn(
-            "ms-auto rounded-full px-2 py-0.5 text-xs font-medium",
+            "ms-auto rounded-full px-2 py-0.5 type-body font-medium",
             ratio >= 0.75
-              ? "bg-chart-2/12 text-chart-2"
+              ? "bg-chart-2/12 text-success-soft-foreground"
               : ratio >= 0.5
-                ? "bg-chart-4/12 text-chart-4"
-                : "bg-destructive/12 text-destructive",
+                ? "bg-chart-4/12 text-warning-soft-foreground"
+                : "bg-destructive/12 text-danger-soft-foreground",
           )}
         >
           {verdict}
@@ -71,7 +71,7 @@ export function ScoreBreakdown({
             className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex flex-col gap-1 duration-300"
           >
             <div className="flex items-baseline gap-2">
-              <span className="text-foreground/75 min-w-0 flex-1 truncate text-[13px]">
+              <span className="text-foreground/75 min-w-0 flex-1 truncate type-body">
                 {criterion.label}
               </span>
               <span className={cn(mono, "text-muted-foreground shrink-0")}>
@@ -103,7 +103,7 @@ export function ScoreBreakdown({
               />
             </span>
             {criterion.note && (
-              <span className="text-muted-foreground text-xs leading-relaxed break-words">
+              <span className="text-muted-foreground type-muted break-words">
                 {criterion.note}
               </span>
             )}

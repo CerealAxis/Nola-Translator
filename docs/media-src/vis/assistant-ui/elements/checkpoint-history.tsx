@@ -42,7 +42,7 @@ export function CheckpointHistory({
 
       {...props}
     >
-      <span className="px-1.5 pb-1 text-[13.5px] font-medium">检查点</span>
+      <span className="px-1.5 pb-1 type-body font-medium">检查点</span>
 
       {checkpoints.map((checkpoint, i) => {
         const ahead = currentIndex >= 0 && i > currentIndex;
@@ -70,7 +70,7 @@ export function CheckpointHistory({
             />
 
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[13px]">{checkpoint.label}</span>
+              <span className="truncate type-body">{checkpoint.label}</span>
               <span className={cn(mono, "text-muted-foreground")}>
                 {checkpoint.at} · {checkpoint.files} 文件
               </span>

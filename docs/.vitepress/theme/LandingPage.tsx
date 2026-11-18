@@ -58,7 +58,7 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
     <a className="site-skip z-overlay" href="#main">{t.nav.skip}</a>
     <header className={['site-nav', 'z-sticky', scrolled && 'site-nav--scrolled'].filter(Boolean).join(' ')}>
       <a className="site-brand" href={`${base}${localePath(locale).slice(1)}`}><img src={`${base}nola-logo.svg`} alt="" /><span>Nola Translator</span></a>
-      <nav className="site-nav-links" aria-label={t.nav.menu}><a href="#product">{t.nav.product}</a><a href="#scenarios">{t.nav.scenarios}</a><a href="#download">{t.nav.download}</a><a href={docUrl}>{t.nav.docs}</a><a href={`${base}vis/`}>{t.nav.designDocs}</a></nav>
+      <nav className="site-nav-links" aria-label={t.nav.menu}><a href="#product">{t.nav.product}</a><a href="#features">{t.nav.scenarios}</a><a href="#download">{t.nav.download}</a><a href={docUrl}>{t.nav.docs}</a><a href={`${base}vis/`}>{t.nav.designDocs}</a></nav>
       <div className="site-nav-end">
         <Menu.Root>
           <Menu.Trigger render={<Button variant="secondary" size="sm" />} className="site-locale" aria-label={t.nav.language}><Globe2 aria-hidden="true" /><span>{languagePreference === 'auto' ? autoLocaleNames[locale] : localeNames[locale]}</span><ChevronDown aria-hidden="true" /></Menu.Trigger>
@@ -74,7 +74,7 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
           <Menu.Trigger render={<Button variant="secondary" size="icon" />} className="site-mobile-menu" aria-label={t.nav.menu}><MenuIcon aria-hidden="true" /></Menu.Trigger>
           <Menu.Portal><Menu.Positioner className="z-dropdown" sideOffset={4} align="end"><Menu.Popup className="site-mobile-menu-popup" aria-label={t.nav.menu}>
             <Menu.Item render={<a href="#product" />}>{t.nav.product}</Menu.Item>
-            <Menu.Item render={<a href="#scenarios" />}>{t.nav.scenarios}</Menu.Item>
+            <Menu.Item render={<a href="#features" />}>{t.nav.scenarios}</Menu.Item>
             <Menu.Item render={<a href="#download" />}>{t.nav.download}</Menu.Item>
             <Menu.Item render={<a href={docUrl} />}>{t.nav.docs}</Menu.Item>
             <Menu.Item render={<a href={`${base}vis/`} />}>{t.nav.designDocs}</Menu.Item>

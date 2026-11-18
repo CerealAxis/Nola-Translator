@@ -51,11 +51,11 @@ const row =
 function OptionText({ option }: { option: OptionListOption }) {
   return (
     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-      <span className="text-[13.5px] leading-5 break-words">
+      <span className="type-body break-words">
         {option.label}
       </span>
       {option.description ? (
-        <span className="text-muted-foreground text-xs leading-4 break-words">
+        <span className="text-muted-foreground type-muted break-words">
           {option.description}
         </span>
       ) : null}
@@ -273,7 +273,7 @@ export function OptionList({
       {error ? (
         <p
           role="alert"
-          className="px-2 pb-1 text-xs break-words text-destructive"
+          className="px-2 pb-1 type-small break-words text-danger-soft-foreground"
         >
           {error}
         </p>

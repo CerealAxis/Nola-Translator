@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 export function ColorPairs() {
   return <div className="foundation-board" data-scene="appearance-color">
     <div className="fa-themes">{(['light', 'dark'] as const).map(appearance =>
-      <figure className="foundation-palette fa-theme" data-appearance={appearance} key={appearance}>
+      <figure className="foundation-palette fa-theme" data-appearance={appearance} data-theme={appearance} key={appearance}>
         <figcaption>{appearance === 'light' ? '浅色' : '深色'}</figcaption>
         <Card>
           <CardHeader><CardTitle>资料库</CardTitle></CardHeader>
@@ -29,7 +29,7 @@ export function ColorPairs() {
 export function AppearancePair() {
   return <div className="foundation-board" data-scene="appearance-dark-mode">
     <div className="fa-themes">{(['light', 'dark'] as const).map(appearance =>
-      <figure className="foundation-palette fa-theme" data-appearance={appearance} key={appearance}>
+      <figure className="foundation-palette fa-theme" data-appearance={appearance} data-theme={appearance} key={appearance}>
         <figcaption>{appearance === 'light' ? '浅色' : '深色'}</figcaption>
         <Card>
           <CardHeader><CardTitle>海岸观察</CardTitle><CardDescription>今天 16:42 更新</CardDescription></CardHeader>
@@ -47,11 +47,15 @@ export function AppearancePair() {
 export function TypeSpecimen() {
   return <div className="foundation-board" data-scene="appearance-typography">
     <article className="fa-type-article">
-      <header><p className="fa-caption">观察手记 · 6 月 18 日</p><h2 className="fa-page-title">退潮后的海湾</h2></header>
-      <section><h3 className="fa-panel-title">礁石之间</h3><p className="fa-reading">海水慢慢退去，潮间带露出一道道细密的纹理。沿着岸边向前走，浅水中还能看见小鱼游动。</p></section>
-      <footer className="fa-caption">记录人 林青 · 阅读约 2 分钟</footer>
+      <header><h2 className="type-h1">模型网关</h2><p className="type-muted">管理可供应用调用的模型。</p></header>
+      <section>
+        <h3 className="type-h2">启动模型</h3>
+        <h4 className="type-h3">语音识别</h4>
+        <h5 className="type-h4">对外 API</h5>
+        <p className="type-body">在应用的模型字段填入 <code className="type-code">nola-asr</code>。</p>
+        <span className="type-small">已停止</span>
+      </section>
     </article>
-    <dl className="fa-type-key"><div><dt>标题</dt><dd>title-1</dd></div><div><dt>分节</dt><dd>title-3</dd></div><div><dt>正文</dt><dd>reading</dd></div><div><dt>附加信息</dt><dd>caption</dd></div></dl>
   </div>;
 }
 

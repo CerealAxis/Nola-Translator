@@ -588,7 +588,7 @@ function enqueueDebounced(patch: AppSettingsPatch): Promise<void> {
   if (debounceTimer === null) {
     debounceTimer = setTimeout(() => {
       debounceTimer = null
-      void flushDebounced()
+      void flushDebounced().catch(() => {})
     }, DEBOUNCE_MS)
   }
   return settled
@@ -610,6 +610,7 @@ async function flushDebounced(): Promise<void> {
   } catch (error) {
     recordCommandFailure('update', error)
     for (const waiter of waiters) waiter.reject(error)
+    throw error
   }
 }
 
@@ -620,6 +621,7 @@ export async function flushPendingSettings(): Promise<void> {
     debounceTimer = null
   }
   if (debouncePatch) await flushDebounced()
+  await enqueue(async () => {})
 }
 
 /**

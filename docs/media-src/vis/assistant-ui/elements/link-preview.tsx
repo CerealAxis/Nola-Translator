@@ -88,7 +88,7 @@ export function LinkPreview({
               data-slot="link-preview-site-initial"
               className={cn(
                 field,
-                "text-muted-foreground flex size-4 shrink-0 items-center justify-center rounded-sm text-[9px] font-medium",
+                "text-muted-foreground flex size-4 shrink-0 items-center justify-center rounded-sm type-small",
               )}
             >
               {site?.charAt(0).toUpperCase() ?? "?"}
@@ -105,18 +105,18 @@ export function LinkPreview({
             href={safeUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-foreground/90 line-clamp-2 text-[13.5px] leading-5 font-medium after:absolute after:inset-0 after:z-10"
+            className="text-foreground/90 line-clamp-2 type-body font-medium after:absolute after:inset-0 after:z-10"
           >
             {label}
             <span className="sr-only">（在新选项卡中打开）</span>
           </a>
         ) : (
-          <span className="text-foreground/90 line-clamp-2 text-[13.5px] leading-5 font-medium">
+          <span className="text-foreground/90 line-clamp-2 type-body font-medium">
             {label}
           </span>
         )}
         {description ? (
-          <span className="text-muted-foreground line-clamp-2 text-xs leading-relaxed">
+          <span className="text-muted-foreground line-clamp-2 type-muted">
             {description}
           </span>
         ) : null}

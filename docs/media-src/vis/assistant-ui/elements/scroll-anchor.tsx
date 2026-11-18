@@ -107,7 +107,7 @@ export function ScrollAnchor({
           <div
             key={i}
             className={cn(
-              "fade-in slide-in-from-bottom-1 animate-in max-w-[85%] text-xs leading-relaxed duration-300 motion-reduce:animate-none",
+              "fade-in slide-in-from-bottom-1 animate-in max-w-[85%] type-small duration-300 motion-reduce:animate-none",
               message.role === "user"
                 ? cn(field, "self-end rounded-2xl px-3 py-1.5")
                 : "text-muted-foreground self-start",
@@ -127,7 +127,7 @@ export function ScrollAnchor({
           onClick={jump}
           className={cn(
             floating,
-            "fade-in slide-in-from-bottom-2 animate-in absolute inset-x-0 bottom-3 mx-auto flex w-fit items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs transition-transform duration-200 hover:-translate-y-px",
+            "fade-in slide-in-from-bottom-2 animate-in absolute inset-x-0 bottom-3 mx-auto flex w-fit items-center gap-1.5 rounded-full px-3.5 py-1.5 type-body transition-transform duration-200 hover:-translate-y-px",
           )}
         >
           <ArrowDownIcon className="size-3 opacity-60" />

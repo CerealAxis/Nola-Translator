@@ -161,6 +161,19 @@ export function useComicTasks() {
 export const comicSaveError = (id: string) => failures.get(id)
 export const comicSaving = (id: string) => !!queues.get(id)?.length
 
+export async function discardComicSaves(id: string) {
+  await flushing.get(id)?.catch(() => {})
+  const pending = [...(queues.get(id) ?? [])]
+  const book = await comicApi().openProject(id)
+  const current = queues.get(id) ?? []
+  if (current.length !== pending.length || current.some((operation, index) => operation !== pending[index]))
+    throw new Error('revisionConflict')
+  sessionStorage.removeItem(draftKey(id))
+  queues.delete(id)
+  failures.delete(id)
+  return install(book)
+}
+
 export function flushComicSaves(id: string): Promise<void> {
   const active = flushing.get(id)
   if (active) return active
@@ -542,6 +555,11 @@ export function useComicImage(
     failed?: boolean
   }>({ key })
   const [attempt, setAttempt] = useState(0)
+  const retry = () => {
+    imageCache.delete(key)
+    setValue({ key })
+    setAttempt((value) => value + 1)
+  }
   useEffect(() => {
     let active = true
     let notice: string | undefined
@@ -561,7 +579,7 @@ export function useComicImage(
           cause: error,
           action: {
             label: t('suite.retry'),
-            onPress: () => setAttempt((value) => value + 1),
+            onPress: retry,
           },
         })
       })
@@ -571,8 +589,8 @@ export function useComicImage(
     }
   }, [key, projectId, page.id, page.name, kind, maxPixels, attempt, t])
   return {
-    src: value.key === key ? value.src : imageCache.get(key),
+    src: value.key === key ? value.src ?? imageCache.get(key) : imageCache.get(key),
     failed: value.key === key && value.failed,
-    retry: () => setAttempt((value) => value + 1),
+    retry,
   }
 }

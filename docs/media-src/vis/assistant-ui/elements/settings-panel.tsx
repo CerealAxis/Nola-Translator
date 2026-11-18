@@ -63,7 +63,7 @@ export function SettingsPanel({
         <div className={cn(field, "flex gap-0.5 rounded-full p-0.5")}>
           {models.map((option) => {
             const className = cn(
-              "flex-1 rounded-full py-1 text-xs font-medium transition-[background-color,color,scale] duration-150",
+              "flex-1 rounded-full py-1 type-body font-medium transition-[background-color,color,scale] duration-150",
               onModelChange && "active:scale-[0.97]",
               option === model
                 ? "bg-accent text-accent-foreground"
@@ -106,7 +106,7 @@ export function SettingsPanel({
           aria-label={"系统提示"}
           className={cn(
             field,
-            "text-foreground/80 focus-visible:ring-foreground/20 resize-none rounded-xl px-3 py-2 text-xs leading-relaxed outline-none focus-visible:ring-1",
+            "text-foreground/80 focus-visible:ring-foreground/20 resize-none rounded-xl px-3 py-2 type-body outline-none focus-visible:ring-1",
           )}
         />
       </div>
@@ -138,8 +138,8 @@ export function SettingsPanel({
         {toggles.map((toggle) => (
           <div key={toggle.key} className="flex items-center gap-3">
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[13px]">{toggle.label}</span>
-              <span className="text-muted-foreground truncate text-xs">
+              <span className="truncate type-body">{toggle.label}</span>
+              <span className="text-muted-foreground truncate type-muted">
                 {toggle.detail}
               </span>
             </span>

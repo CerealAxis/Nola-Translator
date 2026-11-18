@@ -1,8 +1,14 @@
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { z } from 'zod'
 import type { EngineLaunchSpec } from './engine-process'
 
 export type GatewayWorkerResult = Record<string, unknown>
+const responseSchema = z.object({
+  id: z.string().min(1).max(128).optional(), session: z.string().min(1).max(128).optional(),
+  event: z.object({ type: z.string() }).loose().optional(), fatal: z.boolean().optional(),
+  error: z.string().optional(), result: z.record(z.string(), z.unknown()).optional(),
+}).loose()
 export class GatewayWorkerError extends Error {
   constructor(readonly code: 'invalid_request' | 'inference_failed' | 'out_of_memory' | 'authentication_failed' | 'rate_limited' | 'network_unavailable' | 'request_timeout', message: string) { super(message) }
 }
@@ -71,7 +77,7 @@ class PythonGatewayWorker implements GatewayWorker {
     while ((newline = this.output.indexOf('\n')) >= 0) {
       const line = this.output.slice(0, newline); this.output = this.output.slice(newline + 1)
       try {
-        const message = JSON.parse(line) as GatewayWorkerResult
+        const message = responseSchema.parse(JSON.parse(line))
         const request = this.pending.get(String(message.id))
         if (message.fatal && !request) { this.fail('Inference worker failed'); return }
         if (message.event) {

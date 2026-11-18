@@ -88,7 +88,7 @@ function MarkdownCode({
   if (!("data-block" in props)) {
     return (
       <code
-        className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.9em]"
+        className="rounded-sm bg-muted px-1 py-0.5 type-code"
         {...props}
       >
         {children}

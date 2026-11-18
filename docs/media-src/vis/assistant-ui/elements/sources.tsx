@@ -33,7 +33,7 @@ export function SourceGlyph({ domain }: { domain: string }) {
   return (
     <span
       aria-hidden
-      className="bg-foreground/[0.06] text-muted-foreground flex size-4 shrink-0 items-center justify-center rounded text-[9px] font-medium"
+      className="bg-foreground/[0.06] text-muted-foreground flex size-4 shrink-0 items-center justify-center rounded type-small"
     >
       {domain.charAt(0).toUpperCase()}
     </span>
@@ -83,7 +83,7 @@ export function Sources({
         <CollapsibleTrigger
           className={cn(
             fieldInteractive,
-            "group/trigger text-foreground/60 hover:text-foreground/90 inline-flex w-fit items-center gap-1.5 rounded-full px-3.5 py-2 text-xs outline-none",
+            "group/trigger text-foreground/60 hover:text-foreground/90 inline-flex w-fit items-center gap-1.5 rounded-full px-3.5 py-2 type-body outline-none",
           )}
         >
           {badgeDomains.length > 0 ? (
@@ -92,7 +92,7 @@ export function Sources({
                 <span
                   key={`${domain}-${index}`}
                   data-slot="sources-badge"
-                  className="bg-foreground/[0.08] text-muted-foreground ring-background dark:ring-popover flex size-4 items-center justify-center rounded-full text-[8px] font-medium ring-1"
+                  className="bg-foreground/[0.08] text-muted-foreground ring-background dark:ring-popover flex size-4 items-center justify-center rounded-full type-small ring-1"
                 >
                   {domain.charAt(0).toUpperCase()}
                 </span>
@@ -134,12 +134,12 @@ export function Sources({
             const details = (
               <>
                 {source.snippet ? (
-                  <span className="text-muted-foreground line-clamp-2 text-xs leading-relaxed">
+                  <span className="text-muted-foreground line-clamp-2 type-muted">
                     {source.snippet}
                   </span>
                 ) : null}
                 {meta ? (
-                  <span className="text-muted-foreground truncate text-xs">
+                  <span className="text-muted-foreground truncate type-muted">
                     {meta}
                   </span>
                 ) : null}
@@ -150,7 +150,7 @@ export function Sources({
                 <>
                   <div className="flex min-w-0 items-center gap-2.5">
                     {glyph}
-                    <span className="text-foreground/90 min-w-0 flex-1 truncate text-[13.5px]">
+                    <span className="text-foreground/90 min-w-0 flex-1 truncate type-body">
                       {source.title}
                     </span>
                     {domain ? (
@@ -188,7 +188,7 @@ export function Sources({
                     </div>
                   ) : null}
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className="text-foreground/90 line-clamp-2 text-[13px] leading-snug font-medium">
+                    <span className="text-foreground/90 line-clamp-2 type-body font-medium">
                       {source.title}
                     </span>
                     {details}

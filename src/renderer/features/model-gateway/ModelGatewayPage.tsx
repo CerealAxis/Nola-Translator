@@ -274,7 +274,7 @@ socket.on('open', async () => {
                 ? <FieldDescription>{t('session.s2sSessionHint')}</FieldDescription>
                 : <Badge variant="outline" className="text-muted">{t('gateway.proxyDisabled')}</Badge>
               : modelStatus(row)}</td>
-            <td>{row === 's2s' ? <span className="text-muted">—</span> : row === 'fallback' ? <span className="text-muted">{t('gateway.concurrencySharedMt')}</span> : <Field data-disabled={changing || concurrencyFor(row).maximum === 1 || undefined}>
+            <td>{row === 's2s' ? <span className="text-muted">—</span> : row === 'fallback' ? <span className="type-muted">{t('gateway.concurrencySharedMt')}</span> : <Field data-disabled={changing || concurrencyFor(row).maximum === 1 || undefined}>
               <FieldLabel className="sr-only" htmlFor={`gateway-concurrency-${row}`}>{t('gateway.concurrencyFor', { name: modelLabel(row) })}</FieldLabel>
               <Input key={`${gatewayBinding(row)}:${concurrencyFor(row).value}`} id={`gateway-concurrency-${row}`} type="number" min={1} max={concurrencyFor(row).maximum} step={1} disabled={changing || concurrencyFor(row).maximum === 1}
                 defaultValue={concurrencyFor(row).value} onBlur={event => {

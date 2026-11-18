@@ -2,7 +2,7 @@
 .docs-desktop-surface { position: relative; isolation: isolate; height: 100%; }
 .docs-overlay-backdrop { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--space-4); background: var(--backdrop); backdrop-filter: blur(4px); }
 .docs-overlay-panel { width: min(calc(var(--space-8) * 10), 100%); }
-.docs-overlay-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: 0 var(--space-1) var(--space-2); color: var(--foreground); font: var(--font-body); }
+.docs-overlay-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: 0 var(--space-1) var(--space-2); color: var(--foreground); }
 .docs-overlay-dismiss { flex: none; }
 .docs-overlay-dismiss svg { width: var(--space-2); height: var(--space-2); }
 .docs-live-overlay { width: 100%; height: calc(var(--space-8) * 3); }

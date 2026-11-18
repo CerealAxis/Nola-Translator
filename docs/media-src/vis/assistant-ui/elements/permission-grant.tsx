@@ -45,10 +45,10 @@ export function PermissionGrant({
           <KeyRoundIcon className="size-3.5" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13.5px] font-medium">
+          <span className="truncate type-body font-medium">
             {capability}
           </span>
-          <span className="text-muted-foreground truncate text-xs">
+          <span className="text-muted-foreground truncate type-muted">
             请求者 {requester}
           </span>
         </div>
@@ -59,7 +59,7 @@ export function PermissionGrant({
         {reach.map((item) => (
           <span
             key={item}
-            className="text-foreground/60 flex items-baseline gap-2 text-xs"
+            className="text-foreground/60 flex items-baseline gap-2 type-small"
           >
             <span
               aria-hidden

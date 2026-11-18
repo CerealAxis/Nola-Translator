@@ -344,7 +344,7 @@ function ImageSource({
     <div
       data-slot="image-source"
       className={cn(
-        "text-muted-foreground flex items-center gap-2 border-t px-2 py-1.5 [font:var(--font-caption)]",
+        "text-muted-foreground flex items-center gap-2 border-t px-2 py-1.5 type-muted",
         className,
       )}
       {...props}
@@ -361,7 +361,7 @@ function ImageSource({
         <span
           data-slot="image-source-icon-fallback"
           aria-hidden="true"
-          className="bg-muted flex size-4 shrink-0 items-center justify-center rounded-sm [font:var(--font-caption)] font-medium"
+          className="bg-muted flex size-4 shrink-0 items-center justify-center rounded-sm type-small"
         >
           {displayLabel.charAt(0).toUpperCase()}
         </span>
@@ -397,7 +397,7 @@ function ImageFilename({
     <span
       data-slot="image-filename"
       className={cn(
-        "text-muted-foreground block truncate px-2 py-1.5 [font:var(--font-caption)]",
+        "text-muted-foreground block truncate px-2 py-1.5 type-muted",
         className,
       )}
       {...props}
@@ -567,8 +567,8 @@ function ImageContentFilterError({
       )}
     >
       <ShieldAlertIcon className="text-muted-foreground size-8" />
-      <p className="text-sm font-medium">{label}</p>
-      {reason && <p className="text-muted-foreground [font:var(--font-caption)]">{reason}</p>}
+      <p className="type-body font-medium">{label}</p>
+      {reason && <p className="text-muted-foreground type-muted">{reason}</p>}
     </div>
   );
 }

@@ -4,5 +4,5 @@ import { cn } from '@/lib/utils'
 export interface LabelProps extends LabelHTMLAttributes<HTMLLabelElement> {}
 
 export function Label({ className, ...props }: LabelProps) {
-  return <label data-slot="label" className={cn('nola-label', className)} {...props} />
+  return <label data-slot="label" className={cn('type-body', className)} {...props} />
 }

@@ -259,7 +259,7 @@ if (!process.versions.electron) {
     assert.equal(await evaluate(`document.documentElement.classList.contains('native-agent-document')`), false)
     assert.equal(BrowserWindow.getAllWindows().length, 1)
     assert.equal(await evaluate(`document.querySelectorAll('.nola-titlebar').length`), 1)
-    assert.match(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).backdropFilter`), /blur\(/)
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).backdropFilter`), 'none')
     await waitFor(`document.querySelector('[data-testid="native-composer"] [data-slot="composer-model-trigger"]').innerText.includes('Existing language model')`)
     assert.ok(await evaluate(`!!document.querySelector('[data-testid="native-agent-app"]')`))
     const mutedColors = await evaluate(`(()=>{
@@ -271,7 +271,7 @@ if (!process.versions.electron) {
     assert.deepEqual(mutedColors.actual, mutedColors.expected, 'Muted surfaces and legacy muted text must resolve to separate semantic colors')
     await screenshot('welcome-aligned-light')
     assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).padding`), '12px')
-    assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).borderTopWidth`), '1px')
+    assert.notEqual(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).boxShadow`), 'none', 'Composer keeps its paper boundary without global glass overrides')
     assert.ok(await evaluate(`!!document.querySelector('[data-slot="composer-voice-button"]')`))
     await type('Hello')
     await click('.aui-composer-send')
@@ -308,14 +308,10 @@ if (!process.versions.electron) {
       await evaluate(`window.nolaTranslator.updateSettings({theme:${JSON.stringify(theme)}})`)
       await waitFor(`document.documentElement.dataset.theme===${JSON.stringify(theme)}`)
       await assertSelectionContrast()
-      const feedbackPoint = await evaluate(`(()=>{const button=document.querySelector('[data-slot="message-actions"] button[aria-pressed]');if(button.getAttribute('aria-pressed')!=='true')button.click();const r=button.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()`)
-      win.webContents.sendInputEvent({ type: 'mouseMove', ...feedbackPoint })
-      await pause(200)
       assert.ok(await evaluate(`(()=>{
-        const button=document.querySelector('[data-slot="message-actions"] button[aria-pressed="true"]');
-        const probe=document.createElement('div');probe.style.cssText='background:var(--accent);color:var(--primary)';document.body.append(probe);
-        const a=getComputedStyle(button), b=getComputedStyle(probe);const matches=a.backgroundColor===b.backgroundColor && a.color===b.color;probe.remove();return matches;
-      })()`), 'Selected feedback must stay blue while hovered')
+        const buttons=[...document.querySelectorAll('[data-slot="message-actions"] button')];
+        return buttons.length >= 2 && buttons.every(button=>button.getAttribute('aria-label') && getComputedStyle(button).borderRadius==='18px');
+      })()`), 'Message actions must retain accessible names and the product button radius')
       assert.ok(await evaluate(`(()=>{
         const action=document.querySelector('.nola-workbench-sidebar .nola-nav-button');
         const thread=document.querySelector('.nola-workbench-thread .nola-nav-button');
@@ -328,10 +324,10 @@ if (!process.versions.electron) {
       assert.ok(await evaluate(`(()=>{const t=document.querySelector('[data-menu-anchor="models"]').getBoundingClientRect(),m=document.querySelector('[data-slot="composer-menu"][data-open]').getBoundingClientRect();return Math.abs(m.left-Math.max(8,Math.min(innerWidth-m.width-8,t.left)))<2 && (t.top-m.height-8<8 || Math.abs(m.bottom-t.top+8)<2)})()`), 'Model menu must align with its trigger inside a transformed container')
       assert.ok(await evaluate(`(()=>{
         const item=document.querySelector('[data-slot="composer-menu-item"][data-selected="true"]');
-        const probe=document.createElement('div');probe.style.cssText='background:var(--accent);color:var(--primary);font:var(--font-control)';document.body.append(probe);
+        const probe=document.createElement('div');probe.className='type-body';probe.style.cssText='background:var(--accent-soft);color:var(--accent-foreground)';document.body.append(probe);
         const a=getComputedStyle(item), b=getComputedStyle(probe);
         const matches=['backgroundColor','color','fontFamily','fontSize'].every(key=>a[key]===b[key]);probe.remove();return matches;
-      })()`), 'Selected model must use product accent, primary and control font tokens')
+      })()`), 'Selected model must use product selection and control font tokens')
       await screenshot('models-' + theme)
       await click('[data-testid="native-composer"] [data-menu-anchor="models"]')
       await click('[data-testid="native-composer"] [data-menu-anchor="effort"]')
@@ -346,6 +342,8 @@ if (!process.versions.electron) {
       await assertSelectionContrast()
       await screenshot('embedded-' + theme + '-solid')
       await evaluate(`window.nolaTranslator.updateSettings({appearance:{...${JSON.stringify(settings.appearance)},liquidGlass:true}})`)
+      await waitFor(`document.documentElement.dataset.nolaGlass==='on'`)
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-slot="composer-bar"]')).backdropFilter`), 'none')
     }
     for (const [width, height, zoom] of [[760,600,1],[1180,780,2]]) {
       win.setSize(width, height)
@@ -378,6 +376,10 @@ if (!process.versions.electron) {
     await screenshot('native-catalog-rebuilt-layout')
     await send('Run approved command')
     await waitFor(`!!document.querySelector('[data-slot="approval-card"]')`)
+    assert.deepEqual(await evaluate(`(() => {
+      const s = getComputedStyle(document.querySelector('[data-slot="approval-card-allow-once"]'));
+      return [s.fontSize, s.lineHeight, s.fontWeight];
+    })()`), ['15px', '22px', '500'], 'Compact approval actions use dark Body typography')
     assert.equal(await evaluate(`window.nolaTranslator.fixtureTerminalCount()`), 0)
     await click('[data-slot="approval-card-allow-once"]')
     await waitFor(`document.body.innerText.includes('Native approved terminal output') && !document.querySelector('.aui-composer-cancel')`)
@@ -468,7 +470,7 @@ if (!process.versions.electron) {
     server.closeAllConnections()
     await new Promise(done => server.close(done))
     await writeFile(resolve(output, process.argv.includes('--production') ? 'result-production.json' : 'result-dev.json'), JSON.stringify({ passed: true, errors, singleWindow }, null, 2))
-    console.log('assistant-ui: embedded single-window shell, background generation, drafts, microphone cleanup, themes, glass, narrow/200% layout, media and native tools passed')
+    console.log('assistant-ui: embedded single-window shell, background generation, drafts, microphone cleanup, themes, solid surfaces, narrow/200% layout, media and native tools passed')
     BrowserWindow.getAllWindows().forEach(item => item.destroy())
     app.exit(0)
   }

@@ -172,7 +172,7 @@ export function AudioPlayer({
         )}
       </button>
       <div className="flex min-w-0 grow basis-16 flex-col gap-1.5">
-        <span className="truncate text-[13.5px] font-medium">
+        <span className="truncate type-body font-medium">
           {displayTitle}
         </span>
         <input
@@ -215,7 +215,7 @@ export function AudioPlayer({
         onError={() => update({ hasError: true, playing: false })}
       />
       {hasError ? (
-        <span role="alert" className="text-muted-foreground text-xs">
+        <span role="alert" className="text-muted-foreground type-muted">
           Can't play this audio
         </span>
       ) : null}
@@ -276,7 +276,7 @@ export function VideoPlayer({
       {(title || duration !== undefined) && (
         <div className="flex min-w-0 items-center gap-2 px-1">
           {title ? (
-            <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
+            <span className="min-w-0 flex-1 truncate type-body font-medium">
               {title}
             </span>
           ) : null}

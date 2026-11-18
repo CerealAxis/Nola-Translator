@@ -7,7 +7,7 @@ import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PR
 import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFF } from '../shared/pypi-mirrors'
 import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
 import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
-import { glassSettingsShape, settingsPatchSchema } from './settings-schema'
+import { desktopTypographyShape, glassSettingsShape, settingsPatchSchema } from './settings-schema'
 import { customModelSchema, synchronizeCustomModel } from '../shared/custom-models'
 import { LANGUAGE_CODES } from '../shared/languages'
 import { mergeModelPolicy, modelPolicyOf, modelPolicySchema } from '../shared/model-policy'
@@ -278,6 +278,7 @@ function migrateGithubAccelerate(raw: Partial<AppSettings['network']> | undefine
 export class SettingsStore {
   private settings: AppSettings = structuredClone(DEFAULT_SETTINGS)
   private writeQueue: Promise<unknown> = Promise.resolve()
+  private loadFailure?: unknown
 
   constructor(private readonly path: string) {}
 
@@ -286,8 +287,8 @@ export class SettingsStore {
   }
 
   async load(): Promise<AppSettings> {
-    await recoverSettingsMigration(this.path)
     try {
+      await recoverSettingsMigration(this.path)
       const raw = JSON.parse(await readFile(this.path, 'utf8')) as Partial<AppSettings> & {
         version?: unknown
         realtime?: unknown
@@ -399,6 +400,8 @@ export class SettingsStore {
         appearance: {
           ...DEFAULT_SETTINGS.appearance,
           ...raw.appearance,
+          interfaceFont: desktopTypographyShape.interfaceFont.safeParse(raw.appearance?.interfaceFont).data ?? DEFAULT_SETTINGS.appearance.interfaceFont,
+          density: desktopTypographyShape.density.safeParse(raw.appearance?.density).data ?? DEFAULT_SETTINGS.appearance.density,
           liquidGlass: typeof raw.appearance?.liquidGlass === 'boolean'
             ? raw.appearance.liquidGlass : DEFAULT_SETTINGS.appearance.liquidGlass,
           glassBlur: glassSettingsShape.glassBlur.safeParse(raw.appearance?.glassBlur).data ?? DEFAULT_SETTINGS.appearance.glassBlur,
@@ -494,9 +497,13 @@ export class SettingsStore {
         }
       }
     } catch (error) {
-      if (error instanceof SettingsMigrationError) throw error
+      if (error instanceof SettingsMigrationError || ((error as NodeJS.ErrnoException)?.code && (error as NodeJS.ErrnoException).code !== 'ENOENT')) {
+        this.loadFailure = error
+        throw error
+      }
       this.settings = structuredClone(DEFAULT_SETTINGS)
     }
+    this.loadFailure = undefined
     this.settings.modelPolicy = modelPolicyOf(this.settings)
     return structuredClone(this.settings)
   }
@@ -511,6 +518,7 @@ export class SettingsStore {
   }
 
   private async persist(patch: StorePatch): Promise<AppSettings> {
+    if (this.loadFailure) throw this.loadFailure
     const next: AppSettings = {
       ...this.settings,
       ...patch,

@@ -112,7 +112,7 @@ const AssistantModalHeader: FC<{
         ref={titleRef}
         id={titleId}
         tabIndex={-1}
-        className="aui-modal-title min-w-0 flex-1 truncate text-[13px] font-medium outline-none"
+        className="aui-modal-title min-w-0 flex-1 truncate type-body font-medium outline-none"
       >
         {view === "list" ? "会话列表" : title || "新会话"}
       </h2>

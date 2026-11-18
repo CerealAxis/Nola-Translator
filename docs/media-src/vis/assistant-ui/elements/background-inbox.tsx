@@ -39,7 +39,7 @@ export function BackgroundInbox({
       {...props}
     >
       <div className="flex items-baseline justify-between px-1 pb-1">
-        <span className="text-[13.5px] font-medium">后台运行</span>
+        <span className="type-body font-medium">后台运行</span>
         <span
           className={cn(
             mono,
@@ -68,16 +68,16 @@ export function BackgroundInbox({
               {run.state === "running" ? (
                 <Loader2Icon className="text-muted-foreground size-3 animate-spin motion-reduce:animate-none" />
               ) : run.state === "failed" ? (
-                <XIcon className="size-3 text-destructive" />
+                <XIcon className="size-3 text-danger-soft-foreground" />
               ) : (
-                <CheckIcon className="size-3 text-chart-2" />
+                <CheckIcon className="size-3 text-success-soft-foreground" />
               )}
             </span>
 
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span
                 className={cn(
-                  "truncate text-[13px]",
+                  "truncate type-body",
                   run.state === "running"
                     ? "text-muted-foreground"
                     : "text-foreground/90",

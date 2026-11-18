@@ -27,7 +27,7 @@ export function GenerativePreview({ spec }: { spec: unknown }) {
     <AssistantPreview>
       <div className="aui-generative-preview mx-auto w-full max-w-lg [--aui-success:var(--chart-2)] [--aui-warning:var(--chart-4)]">
         {renderGenerativeUI(spec, styledGenerativeUILibrary, { status: 'done', dispatch })}
-        <p role="status" className="mt-2 text-sm text-muted-foreground empty:hidden">{message}</p>
+        <p role="status" className="mt-2 type-muted text-muted-foreground empty:hidden">{message}</p>
       </div>
     </AssistantPreview>
   )

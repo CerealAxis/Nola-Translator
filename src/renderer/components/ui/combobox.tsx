@@ -32,7 +32,7 @@ function ComboboxItem({ className, children, ...props }: ComboboxPrimitive.Item.
 }
 
 function ComboboxEmpty({ className, ...props }: ComboboxPrimitive.Empty.Props) {
-  return <ComboboxPrimitive.Empty data-slot="combobox-empty" className={cn('text-sm text-muted-foreground', className)} {...props} />
+  return <ComboboxPrimitive.Empty data-slot="combobox-empty" className={cn('type-body text-muted-foreground', className)} {...props} />
 }
 
 export { Combobox, ComboboxTrigger, ComboboxInput, ComboboxContent, ComboboxList, ComboboxItem, ComboboxEmpty }

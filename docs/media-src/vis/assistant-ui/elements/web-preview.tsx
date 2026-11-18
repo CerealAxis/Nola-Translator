@@ -87,7 +87,7 @@ export function WebPreview({
         </div>
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <ShimmerLabel className="text-muted-foreground relative inline-block text-xs leading-none">
+            <ShimmerLabel className="text-muted-foreground relative inline-block type-muted">
               加载预览
             </ShimmerLabel>
           </div>

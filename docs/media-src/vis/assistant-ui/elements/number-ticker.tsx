@@ -6,13 +6,13 @@ import { mono } from "./surfaces";
 
 function RollingDigit({ digit }: { digit: number }) {
   return (
-    <span className="inline-flex h-[1.15em] overflow-hidden">
+    <span className="inline-flex h-[1lh] overflow-hidden">
       <span
         className="flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
-        style={{ transform: `translateY(-${digit * 1.15}em)` }}
+        style={{ transform: `translateY(-${digit}lh)` }}
       >
         {Array.from({ length: 10 }, (_, i) => (
-          <span key={i} className="h-[1.15em] leading-[1.15]">
+          <span key={i} className="h-[1lh]">
             {i}
           </span>
         ))}
@@ -40,14 +40,14 @@ export function NumberTicker({
       {...props}
     >
       <span
-        className="flex text-3xl font-medium tracking-tight tabular-nums"
+        className="flex type-body font-semibold tabular-nums"
         aria-label={formatted}
       >
         {formatted.split("").map((char, i) =>
           /\d/.test(char) ? (
             <RollingDigit key={i} digit={Number(char)} />
           ) : (
-            <span key={i} className="h-[1.15em] leading-[1.15]">
+            <span key={i} className="h-[1lh]">
               {char}
             </span>
           ),

@@ -15,14 +15,14 @@ export function Field({ className, ...props }: FieldProps) {
 }
 
 export function FieldLabel({ className, ...props }: FieldLabelProps) {
-  return <label data-slot="field-label" className={cn('text-sm font-medium text-foreground', className)} {...props} />
+  return <label data-slot="field-label" className={cn('type-body font-medium text-foreground', className)} {...props} />
 }
 
 export function FieldDescription({ className, ...props }: FieldDescriptionProps) {
-  return <p data-slot="field-description" className={cn('text-xs text-muted', className)} {...props} />
+  return <p data-slot="field-description" className={cn('type-muted text-muted', className)} {...props} />
 }
 
 export function FieldError({ className, children, ...props }: FieldDescriptionProps) {
   if (!children) return null
-  return <p data-slot="field-error" role="alert" className={cn('text-xs text-danger', className)} {...props}>{children}</p>
+  return <p data-slot="field-error" role="alert" className={cn('type-small text-danger', className)} {...props}>{children}</p>
 }

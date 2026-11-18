@@ -14,6 +14,8 @@ import { EngineDiagnostics, ResetSettingsGroup } from './tabs/AdvancedTab'
 import { parseRoute, SETTINGS_TABS } from '@/routes'
 import { StorageTab } from './tabs/StorageTab'
 import { AudioTab } from './tabs/AudioTab'
+import * as fontLoader from '@/theme/interface-font'
+import * as notifications from '@/components/primitives/notify'
 
 beforeEach(() => {
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
@@ -79,6 +81,30 @@ it('saves the main-window close preference independently of service settings', a
   await user.click(screen.getByRole('combobox', { name: '关闭窗口' }))
   await user.click(await screen.findByRole('option', { name: '退出应用' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ closeBehavior: 'quit' }))
+})
+
+it('saves density and restores appearance defaults without resetting subtitle settings', async () => {
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
+  render(<GeneralTab settings={DEFAULT_SETTINGS} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('combobox', { name: '界面密度' }))
+  await user.click(await screen.findByRole('option', { name: '宽松' }))
+  await waitFor(() => expect(update).toHaveBeenCalledWith({ appearance: { density: 'comfortable' } }))
+  await user.click(screen.getByRole('button', { name: '恢复默认' }))
+  expect(update).toHaveBeenLastCalledWith({ appearance: DEFAULT_SETTINGS.appearance })
+})
+
+it('keeps the saved font when the selected font cannot load', async () => {
+  vi.spyOn(fontLoader, 'loadInterfaceFont').mockRejectedValue(new Error('unavailable'))
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
+  const notify = vi.spyOn(notifications, 'notifyError').mockReturnValue('font-error')
+  render(<GeneralTab settings={DEFAULT_SETTINGS} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('combobox', { name: '界面字体' }))
+  await user.click(await screen.findByRole('option', { name: 'Noto Sans SC' }))
+  await waitFor(() => expect(notify).toHaveBeenCalled())
+  expect(update).not.toHaveBeenCalled()
+  expect(screen.getByRole('combobox', { name: '界面字体' })).toHaveTextContent('系统默认字体')
 })
 
 it('separates engine diagnostics, data reset and help content', async () => {

@@ -347,7 +347,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
         {filters.map(item => <TabsTrigger key={item.id} value={item.id}>{item.label}</TabsTrigger>)}
       </TabsList>
     </TabsRoot>
-    {failed && !awaiting ? <p className="nola-caption text-muted">{t('errors.searchFailed')}</p> : null}
+    {failed && !awaiting ? <p className="type-muted text-muted">{t('errors.searchFailed')}</p> : null}
     {awaiting ? <SearchSkeletons /> : null}
     {!awaiting && !failed && !nextCursor && visible.length === 0 ? <Empty>
       <EmptyTitle>{t('models.noResults')}</EmptyTitle>
@@ -370,7 +370,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
           onCancel={() => { void actions.models.manageResource(liveId, 'cancel').catch((cause: unknown) => {
             notifyError(t('errors.engineOperationFailed'), { cause })
           }) }}
-          footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onClick={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="secondary" size="sm" onClick={() => setDetail(hit)}>
+          footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onClick={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="outline" size="sm" onClick={() => setDetail(hit)}>
             {t('models.openDetails')}
           </Button></div>} />
       })}
@@ -378,7 +378,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
     {!awaiting && !failed ? <div ref={bottom} className="models-search__pagination" aria-live="polite">
       {nextCursor ? <Button disabled={loadingMore} aria-busy={loadingMore} variant="tertiary"  onClick={() => loadMore(announceSuccess)}>{loadingMore ? <Spinner /> : null}
         {loadingMore ? t('common.loading') : moreFailed ? t('models.retry') : t('models.loadMore')}
-      </Button> : visible.length > 0 ? <p className="nola-caption text-muted">{t('models.noMoreResults')}</p> : null}
+      </Button> : visible.length > 0 ? <p className="type-muted text-muted">{t('models.noMoreResults')}</p> : null}
     </div> : null}
     <DetailDrawer hit={detail} description={detail ? descriptionOf(detail.summary) : ''}
       onClose={() => setDetail(null)} onInstall={install} />
@@ -408,7 +408,7 @@ export function DetailDrawer({ hit, description, onClose, onInstall }: {
         <DialogCloseButton aria-label={t('common.close')} />
         <div className="nola-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
           {summary ? <>
-            <p className="nola-body text-muted">{description || t('models.noDescription')}</p>
+            <p className="type-body text-muted">{description || t('models.noDescription')}</p>
             {summary.author ? <Row label={t('models.author')} value={summary.author} /> : null}
             {summary.pipelineTag ? <Row label={t('models.taskType')} value={summary.pipelineTag} /> : null}
             {summary.libraryName ? <Row label={t('models.loader')} value={summary.libraryName} /> : null}
@@ -429,7 +429,7 @@ export function DetailDrawer({ hit, description, onClose, onInstall }: {
 
 function Row({ label, value }: { label: string; value: string }) {
   return <div className="flex items-baseline justify-between gap-4 border-b border-separator pb-2">
-    <span className="nola-caption text-muted">{label}</span>
-    <span className="nola-body-strong text-foreground tabular">{value}</span>
+    <span className="type-muted text-muted">{label}</span>
+    <span className="type-body font-semibold text-foreground tabular">{value}</span>
   </div>
 }

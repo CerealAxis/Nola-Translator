@@ -53,7 +53,7 @@ export const MessageTiming: FC<{
               data-slot="message-timing-trigger"
               aria-label="消息耗时"
               className={cn(
-                "text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center rounded-md p-1 font-mono text-xs tabular-nums transition-colors",
+                "text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center rounded-md p-1 type-muted tabular-nums transition-colors",
                 className,
               )}
             />
@@ -67,32 +67,32 @@ export const MessageTiming: FC<{
           data-slot="message-timing-popover"
           className="bg-popover text-popover-foreground border px-3 py-2 [&_[data-slot=tooltip-arrow]]:hidden"
         >
-          <div className="grid min-w-35 gap-1.5 text-xs">
+          <div className="grid min-w-35 gap-1.5 type-small">
             {timing.firstTokenTime !== undefined && (
               <div className="flex items-center justify-between gap-4">
                 <span className="text-muted-foreground">第一个令牌</span>
-                <span className="font-mono tabular-nums">
+                <span className="type-muted tabular-nums">
                   {formatTimingMs(timing.firstTokenTime)}
                 </span>
               </div>
             )}
             <div className="flex items-center justify-between gap-4">
               <span className="text-muted-foreground">总计</span>
-              <span className="font-mono tabular-nums">
+              <span className="type-muted tabular-nums">
                 {formatTimingMs(timing.totalStreamTime)}
               </span>
             </div>
             {timing.tokensPerSecond !== undefined && (
               <div className="flex items-center justify-between gap-4">
                 <span className="text-muted-foreground">速度</span>
-                <span className="font-mono tabular-nums">
+                <span className="type-muted tabular-nums">
                   {timing.tokensPerSecond.toFixed(1)} 托克/秒
                 </span>
               </div>
             )}
             <div className="flex items-center justify-between gap-4">
               <span className="text-muted-foreground">块</span>
-              <span className="font-mono tabular-nums">
+              <span className="type-muted tabular-nums">
                 {timing.totalChunks}
               </span>
             </div>

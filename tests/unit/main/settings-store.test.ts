@@ -8,6 +8,23 @@ import { GITHUB_PROXY_AUTO } from '../../../src/shared/github-proxies'
 import { PYPI_MIRROR_AUTO, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO } from '../../../src/shared/pypi-mirrors'
 
 describe('设置存储', () => {
+  it('persists desktop font and density, restores defaults, and rejects invalid saved preferences', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-typography-'))
+    const path = join(directory, 'settings.json')
+    try {
+      const store = new SettingsStore(path)
+      await store.load()
+      await store.update({ appearance: { interfaceFont: 'Noto Sans JP', density: 'comfortable' } })
+      const loaded = await new SettingsStore(path).load()
+      expect(loaded.appearance).toMatchObject({ interfaceFont: 'Noto Sans JP', density: 'comfortable' })
+      expect(loaded.overlay).toEqual(DEFAULT_SETTINGS.overlay)
+      await store.update({ appearance: { interfaceFont: 'system', density: 'compact' } })
+      expect((await new SettingsStore(path).load()).appearance).toMatchObject({ interfaceFont: 'system', density: 'compact' })
+      await writeFile(path, JSON.stringify({ version: 3, appearance: { interfaceFont: 'unavailable', density: 'tiny' } }))
+      expect((await new SettingsStore(path).load()).appearance).toMatchObject({ interfaceFont: 'system', density: 'compact' })
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
   it('为旧配置补齐毛玻璃参数并保留关闭前的调节值', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-appearance-'))
     const path = join(directory, 'settings.json')
@@ -19,6 +36,7 @@ describe('设置存储', () => {
       await store.update({ appearance: { glassBlur: 23, glassOpacity: 77, glassSaturation: 110 } })
       await store.update({ appearance: { liquidGlass: false } })
       expect((await new SettingsStore(path).load()).appearance).toEqual({
+        ...DEFAULT_SETTINGS.appearance,
         reduceMotion: true,
         liquidGlass: false,
         glassBlur: 23,

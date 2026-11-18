@@ -8,6 +8,8 @@ editLink: false
 
 显示按钮或外观类似按钮的组件。
 
+> **Nola 产品使用限制**：本页保留通用 shadcn/ui 能力介绍，实际开发以 [DESIGN.md](../../DESIGN) 和本地 `src/renderer/components/ui/button.tsx` 为准。产品按钮统一使用 18px 圆角，浅深色与所有尺寸一致；文字使用 Body，尺寸与密度不改变字号。产品不开放 `ghost`，不使用全圆角按钮。下文涉及这些能力的通用示例不属于产品推荐用法。
+
 <demo react="shadcn-base/button-demo.tsx" />
 
 ## 安装 {#installation}
@@ -87,6 +89,8 @@ Tailwind v4 将按钮组件的光标样式从 `cursor: pointer` [改为](https:/
 
 ## 幽灵 {#ghost}
 
+此变体属于通用组件 API，Nola 产品未开放，不能直接复制到产品中。图标操作可使用本地组件支持的透明背景形式。
+
 <demo react="shadcn-base/button-ghost.tsx" />
 
 ## 危险操作 {#destructive}
@@ -109,9 +113,12 @@ Tailwind v4 将按钮组件的光标样式从 `cursor: pointer` [改为](https:/
 
 ## 全圆角 {#rounded}
 
-使用 `rounded-full` 类可让按钮变为全圆角。
+通用组件可以通过 `rounded-full` 变为全圆角。Nola 产品按钮固定使用 `--radius-xl`（18px），不采用此覆盖。
 
-<demo react="shadcn-base/button-rounded.tsx" />
+```tsx
+// 通用 API 示例，Nola 产品不采用此覆盖。
+<Button className="rounded-full">按钮</Button>
+```
 
 ## 加载指示器 {#spinner}
 

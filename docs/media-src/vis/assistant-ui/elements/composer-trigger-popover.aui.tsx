@@ -95,7 +95,7 @@ const Categories: FC<CategoriesProps> = ({
             <ComposerPrimitive.TriggerPopoverCategoryItem
               key={cat.id}
               categoryId={cat.id}
-              className="hover:bg-accent focus:bg-accent data-[highlighted]:bg-accent flex items-center justify-between gap-2 px-3 py-2 text-sm transition-colors outline-none"
+              className="hover:bg-accent focus:bg-accent data-[highlighted]:bg-accent flex items-center justify-between gap-2 px-3 py-2 type-body transition-colors outline-none"
             >
               <span className="flex items-center gap-2">
                 <Icon className="text-muted-foreground size-4" />
@@ -106,7 +106,7 @@ const Categories: FC<CategoriesProps> = ({
           );
         })}
         {categories.length === 0 && (
-          <div className="text-muted-foreground px-3 py-2 text-sm">
+          <div className="text-muted-foreground px-3 py-2 type-muted">
             {emptyLabel}
           </div>
         )}
@@ -139,7 +139,7 @@ const Items: FC<ItemsProps> = ({
           data-slot="composer-trigger-popover-items"
           className="flex flex-col"
         >
-          <ComposerPrimitive.TriggerPopoverBack className="text-muted-foreground hover:bg-accent flex items-center gap-1.5 border-b px-3 py-2 text-xs tracking-wide uppercase transition-colors">
+          <ComposerPrimitive.TriggerPopoverBack className="text-muted-foreground hover:bg-accent flex items-center gap-1.5 border-b px-3 py-2 type-body transition-colors">
             <ChevronLeftIcon className="size-3.5" />
             {backLabel}
           </ComposerPrimitive.TriggerPopoverBack>
@@ -158,12 +158,12 @@ const Items: FC<ItemsProps> = ({
                   index={index}
                   className="hover:bg-accent focus:bg-accent data-[highlighted]:bg-accent flex w-full flex-col items-start gap-0.5 px-3 py-2 text-start transition-colors outline-none"
                 >
-                  <span className="flex items-center gap-2 text-sm font-medium">
+                  <span className="flex items-center gap-2 type-body font-medium">
                     <Icon className="text-primary size-3.5" />
                     {item.label}
                   </span>
                   {item.description && (
-                    <span className="text-muted-foreground ms-5.5 text-xs leading-tight">
+                    <span className="text-muted-foreground ms-5.5 type-muted">
                       {item.description}
                     </span>
                   )}
@@ -171,7 +171,7 @@ const Items: FC<ItemsProps> = ({
               );
             })}
             {items.length === 0 && (
-              <div className="text-muted-foreground px-3 py-2 text-sm">
+              <div className="text-muted-foreground px-3 py-2 type-muted">
                 {isLoading ? loadingLabel : emptyLabel}
               </div>
             )}

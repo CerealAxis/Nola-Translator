@@ -100,8 +100,8 @@ export function Chart({
               good === undefined
                 ? "text-muted-foreground"
                 : good
-                  ? "text-chart-2"
-                  : "text-destructive",
+                  ? "text-success-soft-foreground"
+                  : "text-danger-soft-foreground",
             )}
           >
             {delta}
@@ -109,7 +109,7 @@ export function Chart({
         )}
       </div>
 
-      <span className="text-2xl font-medium tracking-tight tabular-nums">
+      <span className="type-body font-semibold tabular-nums">
         {value}
       </span>
 

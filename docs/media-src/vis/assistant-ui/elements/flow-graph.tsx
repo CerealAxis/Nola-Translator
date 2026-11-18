@@ -96,7 +96,7 @@ export function FlowGraph({
           <div
             key={node.id}
             className={cn(
-              "fade-in zoom-in-95 animate-in fill-mode-both absolute flex items-center justify-center rounded-xl border text-center text-[11.5px] leading-tight duration-300",
+              "fade-in zoom-in-95 animate-in fill-mode-both absolute flex items-center justify-center rounded-xl border text-center type-muted duration-300",
               node.state === "done" &&
                 "border-foreground/10 bg-foreground/[0.04] text-muted-foreground",
               node.state === "active" &&

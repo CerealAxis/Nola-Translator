@@ -200,21 +200,21 @@ function FixedCloudModelDialog({ id, onClose }: FixedCloudModelDialogProps) {
           </SettingsRow> : <CloudRecognitionLanguageSupport codes={remoteSourceLanguages(recognition)} />}
           <AliyunConnection recognition={recognition} stored={stored} onUpdate={edit} credentialField={credentialField} showModel={!s2s} nativeTranslationSelected={translation.provider === 'recognition'} />
         </>
-          : id === 'recognition' ? <><CloudLanguageSupport sourceCodes={['auto', ...ALIYUN_LANGUAGES]} targetCodes={ALIYUN_LANGUAGES} /><SettingsRow label={t('settings.providerAliyun')}><span className="nola-caption text-muted">{description}</span></SettingsRow></>
+          : id === 'recognition' ? <><CloudLanguageSupport sourceCodes={['auto', ...ALIYUN_LANGUAGES]} targetCodes={ALIYUN_LANGUAGES} /><SettingsRow label={t('settings.providerAliyun')}><span className="type-muted text-muted">{description}</span></SettingsRow></>
           : id === 'minimax' ? <><CloudRecognitionLanguageSupport codes={remoteSourceLanguages(recognition)} /><MiniMaxConnection recognition={recognition} stored={stored} onUpdate={edit} credentialField={credentialField} showNotice={false} /></>
           : id === 'microsoft' ? <>
             <CloudLanguageSupport sourceCodes={SOURCE_LANGUAGE_OPTIONS} targetCodes={LANGUAGE_CODES} />
-            <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{DEFAULT_SETTINGS.translation.microsoftEndpoint}/translatetext</span></SettingsRow>
+            <SettingsRow label={t('settings.endpoint')}><span className="type-muted text-muted">{DEFAULT_SETTINGS.translation.microsoftEndpoint}/translatetext</span></SettingsRow>
           </> : id === 'mymemory' ? <>
             <CloudLanguageSupport sourceCodes={LANGUAGE_CODES} targetCodes={LANGUAGE_CODES} />
             <TextRow label={t('settings.endpoint')} value={translation.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint!} onCommit={mymemoryEndpoint => { void edit({ translation: { mymemoryEndpoint: mymemoryEndpoint.trim() } }) }} />
           </> : id === 'google' ? <>
             <CloudLanguageSupport sourceCodes={SOURCE_LANGUAGE_OPTIONS} targetCodes={LANGUAGE_CODES} />
-            <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{GOOGLE_TRANSLATE_ENDPOINT}</span></SettingsRow>
+            <SettingsRow label={t('settings.endpoint')}><span className="type-muted text-muted">{GOOGLE_TRANSLATE_ENDPOINT}</span></SettingsRow>
           </> : <>
             <CloudLanguageSupport sourceCodes={['auto', ...INDEX_TRANSLATE_LANGUAGES]} targetCodes={INDEX_TRANSLATE_LANGUAGES} />
-            <SettingsRow label={t('settings.model')}><span className="nola-caption">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow>
-            <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_ENDPOINT}</span></SettingsRow>
+            <SettingsRow label={t('settings.model')}><span className="type-muted">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow>
+            <SettingsRow label={t('settings.endpoint')}><span className="type-muted text-muted">{INDEX_TRANSLATE_ENDPOINT}</span></SettingsRow>
           </>}
       </div>
       <DialogFooter>

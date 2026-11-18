@@ -7,7 +7,7 @@ export function Breadcrumb({ className, ...props }: ComponentProps<'nav'>) {
 }
 
 export function BreadcrumbList({ className, ...props }: ComponentProps<'ol'>) {
-  return <ol className={cn('flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground', className)} {...props} />
+  return <ol className={cn('flex flex-wrap items-center gap-1.5 type-body text-muted-foreground', className)} {...props} />
 }
 
 export function BreadcrumbItem({ className, ...props }: ComponentProps<'li'>) {

@@ -5,15 +5,15 @@ import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useIsomorphicLayoutEffect } from "../utils/useIsomorphicLayoutEffect";
 
-export const paper = "nola-glass-paper bg-card text-card-foreground ring-1 ring-foreground/10 forced-colors:border";
+export const paper = "bg-card text-card-foreground ring-1 ring-foreground/10 forced-colors:border";
 
 export const floating = "nola-glass-popup bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/5 dark:ring-foreground/10";
 
 export const field =
-  "nola-glass-field bg-muted forced-colors:border";
+  "bg-muted forced-colors:border";
 
 export const fieldInteractive =
-  "nola-glass-field bg-muted transition-colors hover:bg-accent hover:text-accent-foreground forced-colors:border";
+  "bg-muted transition-colors hover:bg-accent hover:text-accent-foreground forced-colors:border";
 
 export const pressable =
   "transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.96] motion-reduce:transition-none";
@@ -22,7 +22,7 @@ export const ghostButton =
   "flex items-center justify-center rounded-[var(--radius-xl)] text-muted-foreground outline-hidden transition-[background-color,color,scale] duration-150 hover:bg-muted hover:text-foreground active:scale-[0.96] focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none";
 
 export const inkButton =
-  "bg-primary text-primary-foreground transition-[opacity,scale] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-90 active:scale-[0.96] motion-reduce:transition-none forced-colors:border";
+  "bg-primary text-primary-foreground transition-[background-color,scale] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-[var(--primary-hover)] active:scale-[0.96] motion-reduce:transition-none forced-colors:border";
 
 export const iconSwap =
   "[grid-area:1/1] transition-[opacity,scale,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none";
@@ -32,7 +32,7 @@ export const iconSwapIn = "scale-100 opacity-100 blur-none";
 export const iconSwapOut = "scale-[0.25] opacity-0 blur-[4px]";
 
 export const labelSwap =
-  "col-start-1 row-start-1 flex w-max items-center gap-1.5 leading-none transition-[opacity,filter] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none";
+  "col-start-1 row-start-1 flex w-max items-center gap-1.5 transition-[opacity,filter] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none";
 
 export const labelSwapIn = "opacity-100 blur-none";
 
@@ -44,7 +44,7 @@ export const collapsePanel =
 
 export const live = "text-primary";
 
-export const mono = "[font:var(--font-caption)] tracking-normal";
+export const mono = "type-small";
 
 export function ShimmerLabel({
   active = true,

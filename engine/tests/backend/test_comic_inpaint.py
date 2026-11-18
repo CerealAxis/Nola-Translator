@@ -17,6 +17,30 @@ def test_missing_weights_never_download(tmp_path, monkeypatch):
     assert not service._loaded
 
 
+async def test_shutdown_kills_a_hung_worker_before_waiting_for_its_inference_gate(tmp_path):
+    service = ComicInpainter(tmp_path)
+    killed = asyncio.Event()
+
+    class Process:
+        returncode = None
+        def kill(self):
+            self.returncode = 1
+            killed.set()
+        async def communicate(self):
+            return b"", b""
+
+    service._process = Process()
+    key = service.spec.model_id
+    await service._inference_gate.acquire(key, 1, realtime=False)
+    async def inference():
+        await killed.wait()
+        service._inference_gate.release(key)
+    task = asyncio.create_task(inference())
+    await asyncio.wait_for(service.close(), timeout=1)
+    await task
+    assert killed.is_set() and service._process is None
+
+
 def test_mask_compositing_and_odd_size():
     torch = pytest.importorskip("torch")
     class Recorder(torch.nn.Module):

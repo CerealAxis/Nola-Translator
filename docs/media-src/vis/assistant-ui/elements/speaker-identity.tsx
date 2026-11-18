@@ -55,14 +55,14 @@ export function SpeakerIdentity({
 
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex items-baseline gap-1.5">
-              <span className="text-[13px] font-medium">{turn.name}</span>
+              <span className="type-body font-medium">{turn.name}</span>
               {turn.detail && (
                 <span className={cn(mono, "text-muted-foreground")}>
                   {turn.detail}
                 </span>
               )}
             </span>
-            <span className="text-foreground/65 text-[13.5px] leading-relaxed break-words">
+            <span className="text-foreground/65 type-body break-words">
               {turn.text}
             </span>
           </div>

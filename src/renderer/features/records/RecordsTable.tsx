@@ -29,8 +29,8 @@ interface RecordsTableProps {
 /* The menu surface keeps the dropdown popover skin, so the sheet that opens over
    the table looks like the one it replaces. */
 const MENU_POPUP_CLASS = 'dropdown__popover p-1'
-const MENU_ITEM_CLASS = 'nola-menu-item flex cursor-pointer items-center gap-3 rounded-nola-ui-md px-3 py-2 text-sm'
-const CHECKBOX_CLASS = 'flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-nola-ui-md border border-nola-ui-border bg-nola-ui-secondary text-nola-ui-primary-foreground transition-colors data-[checked]:border-nola-ui-primary data-[checked]:bg-nola-ui-primary data-[indeterminate]:border-nola-ui-primary data-[indeterminate]:bg-nola-ui-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50'
+const MENU_ITEM_CLASS = 'nola-menu-item flex cursor-pointer items-center gap-3 rounded-nola-ui-md px-3 py-2 type-body'
+const CHECKBOX_CLASS = 'flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-nola-ui-md border border-nola-ui-input bg-nola-ui-secondary text-nola-ui-primary-foreground transition-colors data-[checked]:border-nola-ui-primary data-[checked]:bg-nola-ui-primary data-[indeterminate]:border-nola-ui-primary data-[indeterminate]:bg-nola-ui-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50'
 const CHECKBOX_INDICATOR_CLASS = 'flex size-3 items-center justify-center'
 
 export function RecordsTable({ meetings, onOpen, onRename, onExport, onDelete, pendingIds = [], sortAscending = false, onSortChange, selectedKeys, onSelectionChange }: RecordsTableProps): ReactNode {
@@ -86,7 +86,7 @@ export function RecordsTable({ meetings, onOpen, onRename, onExport, onDelete, p
               </th> : null}
               <th scope="col" className="nola-records-table__name table__column">{t('records.columnName')}</th>
               <th scope="col" className="nola-records-table__time table__column" aria-sort={onSortChange ? (sortAscending ? 'ascending' : 'descending') : undefined}>
-                {onSortChange ? <Button variant="tertiary" className="h-auto min-h-0 w-full justify-between border-0 bg-transparent p-0 text-xs font-medium text-inherit" onClick={() => onSortChange(!sortAscending)}>
+                {onSortChange ? <Button variant="tertiary" className="h-auto min-h-0 w-full justify-between border-0 bg-transparent p-0 type-body font-medium text-inherit" onClick={() => onSortChange(!sortAscending)}>
                   {t('homeRecordsUi.time')}
                   <span className="table__sortable-column-indicator" data-direction={sortAscending ? 'ascending' : 'descending'}><ChevronUp aria-hidden="true" size={12} /></span>
                 </Button> : t('homeRecordsUi.time')}

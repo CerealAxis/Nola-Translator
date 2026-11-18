@@ -40,4 +40,5 @@ onBeforeUnmount(() => { disposed = true; consent?.reset(false) })
 
 <template>
   <!-- The library mounts its dialogs on the document body. -->
+  <span hidden />
 </template>

@@ -29,7 +29,7 @@ function Toggle({ value }: { value: string }) {
       >
         <span data-preview-switch-thumb />
       </span>
-      <span className="text-muted-foreground text-xs">
+      <span className="text-muted-foreground type-muted">
         {enabled ? "开" : "关闭"}
       </span>
     </>
@@ -93,7 +93,7 @@ export function ElicitationForm({
         <span className="bg-foreground/[0.05] text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-lg">
           <PlugIcon className="size-3.5" />
         </span>
-        <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
+        <span className="min-w-0 flex-1 truncate type-body font-medium">
           {server}
         </span>
         <span className={cn(mono, "text-muted-foreground shrink-0")}>
@@ -101,7 +101,7 @@ export function ElicitationForm({
         </span>
       </div>
 
-      <p className="text-muted-foreground text-xs leading-relaxed">{message}</p>
+      <p className="text-muted-foreground type-muted">{message}</p>
 
       <div className="flex flex-col gap-2.5">
         {fields.map((item, index) => {
@@ -146,7 +146,7 @@ export function ElicitationForm({
                         data-preview-choice
                         onClick={() => onFieldChange(item.name, option)}
                         className={cn(
-                          "focus-visible:ring-foreground/20 rounded-full px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-1",
+                          "focus-visible:ring-foreground/20 rounded-full px-2.5 py-1 type-body transition-colors outline-none focus-visible:ring-1",
                           option === item.value
                             ? "bg-accent text-accent-foreground"
                             : cn(field, "text-muted-foreground"),
@@ -158,7 +158,7 @@ export function ElicitationForm({
                       <span
                         key={option}
                         className={cn(
-                          "rounded-full px-2.5 py-1 text-xs transition-colors",
+                          "rounded-full px-2.5 py-1 type-body transition-colors",
                           option === item.value
                             ? "bg-accent text-accent-foreground"
                             : cn(field, "text-muted-foreground"),
@@ -202,14 +202,14 @@ export function ElicitationForm({
                   }
                   className={cn(
                     field,
-                    "text-foreground/80 focus-visible:ring-foreground/20 rounded-lg px-2.5 py-1.5 text-xs outline-none focus-visible:ring-1",
+                    "text-foreground/80 focus-visible:ring-foreground/20 rounded-lg px-2.5 py-1.5 type-body outline-none focus-visible:ring-1",
                   )}
                 />
               ) : (
                 <span
                   className={cn(
                     field,
-                    "text-foreground/80 rounded-lg px-2.5 py-1.5 text-xs",
+                    "text-foreground/80 rounded-lg px-2.5 py-1.5 type-small",
                   )}
                 >
                   {item.value}
@@ -243,11 +243,11 @@ export function ElicitationForm({
             key={state}
             ref={receiptRef}
             tabIndex={-1}
-            className="fade-in animate-in text-muted-foreground flex items-center gap-2 text-xs duration-300"
+            className="fade-in animate-in text-muted-foreground flex items-center gap-2 type-muted duration-300"
           >
             {state === "accepted" ? (
               <>
-                <CheckIcon className="size-3.5 text-chart-2" />
+                <CheckIcon className="size-3.5 text-success-soft-foreground" />
                 发送至 {server}
               </>
             ) : (

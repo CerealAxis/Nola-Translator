@@ -52,7 +52,7 @@ export function ComparisonCard({
             >
               <div className="flex flex-col gap-0.5">
                 <span className="flex items-baseline gap-1.5">
-                  <span className="truncate text-[13px] font-medium">
+                  <span className="truncate type-body font-medium">
                     {option.name}
                   </span>
                   {recommended && (
@@ -66,7 +66,7 @@ export function ComparisonCard({
                     </span>
                   )}
                 </span>
-                <span className="text-muted-foreground truncate text-xs">
+                <span className="text-muted-foreground truncate type-muted">
                   {option.headline}
                 </span>
               </div>
@@ -78,12 +78,12 @@ export function ComparisonCard({
                   return (
                     <span
                       key={`${i}-${label}`}
-                      className="flex items-center gap-1.5 text-xs"
+                      className="flex items-center gap-1.5 type-small"
                     >
                       {absent ? (
                         <MinusIcon className="text-muted-foreground size-3 shrink-0" />
                       ) : (
-                        <CheckIcon className="size-3 shrink-0 text-chart-2" />
+                        <CheckIcon className="size-3 shrink-0 text-success-soft-foreground" />
                       )}
                       <span
                         className={cn(
@@ -104,7 +104,7 @@ export function ComparisonCard({
         })}
       </div>
 
-      <p className="text-muted-foreground text-xs leading-relaxed">{reason}</p>
+      <p className="text-muted-foreground type-muted">{reason}</p>
     </div>
   );
 }

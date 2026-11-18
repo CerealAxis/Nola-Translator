@@ -1,8 +1,27 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import type { MeetingMeta, NolaBridge } from '@/bridge'
-import { attachMeetingsStore, detachMeetingsStore, loadMeetings, meetingsStore, removeMeetings } from './meetingStore'
+import { attachMeetingsStore, detachMeetingsStore, loadMeetings, meetingsStore, removeMeetings, renameMeeting, setMeetingNotes } from './meetingStore'
 
 afterEach(detachMeetingsStore)
+
+it('serializes notes behind rename so both changes survive', async () => {
+  let meta = { meetingId: 'record', title: 'Before' } as MeetingMeta
+  let finish!: () => void
+  const rename = vi.fn(async (_id: string, title: string) => {
+    await new Promise<void>(resolve => { finish = resolve })
+    return meta = { ...meta, title }
+  })
+  const setNotes = vi.fn(async (_id: string, notes: string) => meta = { ...meta, notes })
+  attachMeetingsStore({ meetings: { list: async () => [meta], rename, setNotes }, events: { onEngineEvent: () => () => {} } } as unknown as NolaBridge)
+  await loadMeetings()
+  const renamed = renameMeeting(meta.meetingId, 'After')
+  const noted = setMeetingNotes(meta.meetingId, 'Notes')
+  await vi.waitFor(() => expect(rename).toHaveBeenCalledOnce())
+  expect(setNotes).not.toHaveBeenCalled()
+  finish()
+  await Promise.all([renamed, noted])
+  expect(meetingsStore.getState().meetings[0]).toMatchObject({ title: 'After', notes: 'Notes' })
+})
 
 it('keeps the current detail when its batch deletion fails and clears it only after removal', async () => {
   const meta = { meetingId: 'kept', title: 'Recording' } as MeetingMeta

@@ -134,7 +134,7 @@ function DiagnosticsReport() {
     return <SettingsRow label={t('settings.diagnosticsLoading')}><LoaderCircle className="animate-spin" aria-hidden="true" /></SettingsRow>
   }
   if (rows.length === 0) {
-    return <SettingsRow label={t('settings.diagnosticsEmpty')}><span className="nola-caption text-muted">-</span></SettingsRow>
+    return <SettingsRow label={t('settings.diagnosticsEmpty')}><span className="type-muted text-muted">-</span></SettingsRow>
   }
   return (
     <>
@@ -154,7 +154,7 @@ function DiagnosticsReport() {
 function CodeValue({ value }: { value: string }) {
   return (
     <span className="settings-code rounded-md border border-border px-3 py-1">
-      <code className="settings-code nola-mono text-foreground">{value}</code>
+      <span className="settings-code type-body text-foreground">{value}</span>
     </span>
   )
 }
@@ -208,7 +208,7 @@ function ResetAll({ pending }: { pending: boolean }) {
           <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
             <AlertDialogContent className="max-w-md">
               <DialogHeader>
-                <AlertDialog.Title className="nola-title text-foreground">
+                <AlertDialog.Title className="type-h4 text-foreground">
                   {t('settings.resetAllTitle')}
                 </AlertDialog.Title>
               </DialogHeader>

@@ -127,17 +127,17 @@ export function JobProgress({
     >
       <div className="flex items-center gap-2.5">
         {outcome?.status === "partial" ? (
-          <CircleAlertIcon className="size-3.5 shrink-0 text-chart-4" />
+          <CircleAlertIcon className="size-3.5 shrink-0 text-warning-soft-foreground" />
         ) : outcome?.status === "failed" ? (
-          <XIcon className="size-3.5 shrink-0 text-destructive" />
+          <XIcon className="size-3.5 shrink-0 text-danger-soft-foreground" />
         ) : outcome?.status === "cancelled" ? (
           <CircleSlashIcon className="text-muted-foreground size-3.5 shrink-0" />
         ) : !running ? (
-          <CheckIcon className="size-3.5 shrink-0 text-chart-2" />
+          <CheckIcon className="size-3.5 shrink-0 text-success-soft-foreground" />
         ) : (
           <Loader2Icon className="text-muted-foreground size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
         )}
-        <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
+        <span className="min-w-0 flex-1 truncate type-body font-medium">
           {title}
         </span>
         <span
@@ -196,13 +196,13 @@ export function JobProgress({
           ))}
         </div>
         {current?.description ? (
-          <p className="text-muted-foreground text-xs leading-4 break-words">
+          <p className="text-muted-foreground type-muted break-words">
             {current.description}
           </p>
         ) : null}
       </div>
       {outcome?.summary ? (
-        <p className="text-foreground/60 text-[13px] leading-snug break-words">
+        <p className="text-foreground/60 type-body break-words">
           {outcome.summary}
         </p>
       ) : null}

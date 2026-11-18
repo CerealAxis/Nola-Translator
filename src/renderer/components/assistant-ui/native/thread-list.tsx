@@ -84,7 +84,7 @@ export function ThreadList({
                   {onRename && <ComposerMenuItem onClick={() => { setDraft(thread.title); setEditing(i); setOpenMenu(null); }}><PencilIcon className="size-4" aria-hidden="true" />{labels?.rename}</ComposerMenuItem>}
                   {onPin && <ComposerMenuItem onClick={() => { onPin(i); setOpenMenu(null); }}><PinIcon className="size-4" aria-hidden="true" />{thread.pinned ? labels?.unpin : labels?.pin}</ComposerMenuItem>}
                   {onArchive && <ComposerMenuItem onClick={() => { onArchive(i); setOpenMenu(null); }}><ArchiveIcon className="size-4" aria-hidden="true" />{labels?.archive}</ComposerMenuItem>}
-                  {onDelete && <ComposerMenuItem className="text-destructive" onClick={() => { onDelete(i); setOpenMenu(null); }}><Trash2Icon className="size-4" aria-hidden="true" />{labels?.delete}</ComposerMenuItem>}
+                  {onDelete && <ComposerMenuItem className="text-danger-soft-foreground" onClick={() => { onDelete(i); setOpenMenu(null); }}><Trash2Icon className="size-4" aria-hidden="true" />{labels?.delete}</ComposerMenuItem>}
                 </PopoverContent>
               </Popover>
             )}

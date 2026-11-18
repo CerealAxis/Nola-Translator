@@ -131,14 +131,14 @@ export function RecordDetailPage(): ReactNode {
             <li className="flex shrink-0 items-center gap-1">
               <a
                 href={pathOf('records')}
-                className="text-sm leading-5 font-medium text-muted no-underline hover:underline"
+                className="type-body text-muted no-underline hover:underline"
               >
                 {t('nav.records')}
               </a>
               <ChevronRight className="size-3 text-muted" aria-hidden="true" />
             </li>
             <li aria-current="page" className="flex shrink-0 items-center gap-1">
-              <span className="text-sm leading-5 font-medium text-muted">{title}</span>
+              <span className="type-body text-muted">{title}</span>
             </li>
           </ol>
         </nav>
@@ -205,13 +205,13 @@ export function RecordDetailPage(): ReactNode {
             <DualSkeleton t={t} />
           ) : detailFailed ? (
             <div className="flex flex-col items-start gap-3 p-6">
-              <p className="nola-body text-muted">{t('errors.meetingsLoadFailed')}</p>
+              <p className="type-body text-muted">{t('errors.meetingsLoadFailed')}</p>
               <Button size="sm" onClick={() => load()}>{t('common.retry')}</Button>
             </div>
           ) : segments.length === 0 ? (
             <div className="flex flex-col items-start gap-4 p-6">
-              <h2 className="nola-body-strong text-foreground">{t('workspace.nothingYet')}</h2>
-              <p className="nola-caption text-muted">{t('workspace.nothingYetHint')}</p>
+              <h2 className="type-h4 text-foreground">{t('workspace.nothingYet')}</h2>
+              <p className="type-muted text-muted">{t('workspace.nothingYetHint')}</p>
               <Button size="sm" onClick={back}>
                 {t('nav.records')}
               </Button>
@@ -256,7 +256,7 @@ export function RecordDetailPage(): ReactNode {
             <CardContent className="card__content">
               <div className="flex flex-col gap-3">
 
-                <div className="nola-record-notes-markdown nola-body max-h-64 overflow-y-auto break-words text-foreground">
+                <div className="nola-record-notes-markdown type-body max-h-64 overflow-y-auto break-words text-foreground">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, [rehypeSanitize, { ...defaultSchema, tagNames: [...defaultSchema.tagNames ?? [], 'u'] }]]}>{notes}</ReactMarkdown>
                 </div>
               </div>
@@ -296,14 +296,14 @@ function DualSkeleton({ t }: { t: TFn }): ReactNode {
       className="grid min-h-0 flex-1 p-4"
     >
       <div className="flex flex-col gap-2 pr-3">
-        <span className="nola-subtitle text-foreground">{t('records.detailSource')}</span>
+        <span className="type-body font-semibold text-foreground">{t('records.detailSource')}</span>
         {Array.from({ length: SKELETON_PAIRS }, (_, index) => (
           <div key={index} className="h-4 w-full animate-pulse rounded-lg bg-surface-tertiary/70" />
         ))}
       </div>
       <div aria-hidden="true" className="self-stretch bg-separator" />
       <div className="flex flex-col gap-2 pl-3">
-        <span className="nola-subtitle text-foreground">{t('records.detailTranslation')}</span>
+        <span className="type-body font-semibold text-foreground">{t('records.detailTranslation')}</span>
         {Array.from({ length: SKELETON_PAIRS }, (_, index) => (
           <div key={index} className="h-4 w-full animate-pulse rounded-lg bg-surface-tertiary/70" />
         ))}

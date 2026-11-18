@@ -104,7 +104,7 @@ function DemoApp() {
     </div>
     {overlayOpen ? <div className="docs-overlay-backdrop z-overlay">
       <div className="docs-overlay-panel" role="dialog" aria-modal="true" aria-label={t('shellUi.overlay')}>
-        <div className="docs-overlay-heading">
+        <div className="docs-overlay-heading type-body">
           <span>{t('shellUi.overlay')}</span>
           <Button className="docs-overlay-dismiss" autoFocus variant="secondary" onClick={closeOverlay}><X aria-hidden="true" />{t('common.close')}</Button>
         </div>

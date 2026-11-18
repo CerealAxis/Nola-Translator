@@ -62,7 +62,7 @@ export function RegenerateMenu({
           {options.map((option) => {
             const content = (
               <>
-                <span className="min-w-0 flex-1 truncate text-[13px]">
+                <span className="min-w-0 flex-1 truncate type-body">
                   {option.label}
                 </span>
                 <span className={cn(mono, "text-muted-foreground shrink-0")}>

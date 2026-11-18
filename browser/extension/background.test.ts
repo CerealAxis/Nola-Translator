@@ -1,10 +1,13 @@
 import { expect, it, vi } from 'vitest'
 import { migrateLegacyGlossary } from './glossary-store'
+import { DEFAULT_PREFERENCES, loadPreferences } from './preferences'
 
 vi.mock('./provider-runtime', () => ({ setupProviderRuntime: vi.fn() }))
 vi.mock('./context-menus', () => ({ setupContextMenus: vi.fn() }))
 vi.mock('./speech-runtime', () => ({ setupSpeechRuntime: vi.fn() }))
 vi.mock('./tab-audio-runtime', () => ({ setupTabAudioRuntime: vi.fn() }))
+vi.mock('./diagnostics', () => ({ setupDiagnosticsRuntime: vi.fn() }))
+vi.mock('./preferences', async original => ({ ...await original<typeof import('./preferences')>(), loadPreferences: vi.fn(async () => DEFAULT_PREFERENCES) }))
 vi.mock('./glossary-store', async original => ({ ...await original<typeof import('./glossary-store')>(), extensionGlossary: { snapshot: vi.fn(), onChanged: vi.fn(() => () => {}) } }))
 
 it('allows diagnostics from a settings section without trusting another extension page', async () => {
@@ -134,5 +137,32 @@ it('keeps private extension terms out of a direct desktop audio session and prov
   runtime.onConnect.addListener.mock.calls[0][0](port)
   port.onMessage.addListener.mock.calls[0][0]({ type: 'start', id: 'start', source: 'tab', streamId: 'stream', epoch: 0, videoTimeMs: 0, playbackRate: 1, targetLanguage: 'zh' })
   await vi.waitFor(() => expect(port.postMessage).toHaveBeenCalledWith({ type: 'error', id: 'start', code: 'browserGlossaryModeUnsupported', message: '' }))
+  expect(runtime.connectNative).not.toHaveBeenCalled()
+})
+
+it('blocks the legacy native caption port on blacklisted sites before connecting', async () => {
+  vi.resetModules()
+  vi.mocked(loadPreferences).mockResolvedValueOnce({ ...DEFAULT_PREFERENCES, siteBlacklist: ['blocked.test'] })
+  const event = () => ({ addListener: vi.fn() })
+  const runtime = { onInstalled: event(), onStartup: event(), onMessage: event(), onConnect: event(), getURL: (path: string) => `chrome-extension://nola/${path}`, connectNative: vi.fn() }
+  vi.stubGlobal('chrome', { runtime, permissions: { onRemoved: event(), contains: vi.fn(async () => true) } })
+  await import('./background')
+  const port = { name: 'nola-captions', sender: { url: 'https://blocked.test/watch', frameId: 0, tab: { id: 1 } }, onMessage: event(), onDisconnect: event(), disconnect: vi.fn(), postMessage: vi.fn() }
+  runtime.onConnect.addListener.mock.calls[0][0](port)
+  port.onMessage.addListener.mock.calls[0][0]({ type: 'hello', id: 'hello' })
+  await vi.waitFor(() => expect(port.disconnect).toHaveBeenCalledOnce())
+  expect(runtime.connectNative).not.toHaveBeenCalled()
+})
+
+it.each(['generate', 'synthesize'] as const)('prevents bypassing provider bindings with a legacy caption-port %s request', async type => {
+  vi.resetModules()
+  const event = () => ({ addListener: vi.fn() })
+  const runtime = { onInstalled: event(), onStartup: event(), onMessage: event(), onConnect: event(), getURL: (path: string) => `chrome-extension://nola/${path}`, connectNative: vi.fn() }
+  vi.stubGlobal('chrome', { runtime, permissions: { onRemoved: event(), contains: vi.fn(async () => true) } })
+  await import('./background')
+  const port = { name: 'nola-captions', sender: { url: 'https://video.test/watch', frameId: 0, tab: { id: 1 } }, onMessage: event(), onDisconnect: event(), disconnect: vi.fn(), postMessage: vi.fn() }
+  runtime.onConnect.addListener.mock.calls[0][0](port)
+  port.onMessage.addListener.mock.calls[0][0]({ type, id: 'bypass', ...(type === 'generate' ? { messages: [{ role: 'user', content: 'Hello' }] } : { text: 'Hello' }) })
+  await vi.waitFor(() => expect(port.postMessage).toHaveBeenCalledWith({ type: 'error', id: 'bypass', code: 'browserPermissionDenied', message: '' }))
   expect(runtime.connectNative).not.toHaveBeenCalled()
 })

@@ -159,14 +159,16 @@ export async function setMeetingNotes(id: string, notes: string): Promise<Meetin
   inFlight = [...inFlight, record]
   publish()
 
-  try {
-    const saved = await bridge!.meetings.setNotes(id, notes)
-    confirmed = confirmed.map((meeting) => (meeting.meetingId === id ? saved : meeting))
-    return saved
-  } finally {
-    inFlight = inFlight.filter((item) => item !== record)
-    publish()
-  }
+  return enqueue(async () => {
+    try {
+      const saved = await bridge!.meetings.setNotes(id, notes)
+      confirmed = confirmed.map((meeting) => (meeting.meetingId === id ? saved : meeting))
+      return saved
+    } finally {
+      inFlight = inFlight.filter((item) => item !== record)
+      publish()
+    }
+  })
 }
 
 /** Optimistic delete. The row goes first and comes back if the write fails. */

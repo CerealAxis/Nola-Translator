@@ -45,7 +45,7 @@ const accountCopy = {
   ko: { login: '로그인', unavailable: '로그인 기능이 아직 활성화되지 않았습니다' },
   en: { login: 'Log in', unavailable: 'Login is not enabled yet' },
 } as const
-const ACCOUNT_MENU_ITEM = 'nola-menu-item flex cursor-pointer items-center gap-3 rounded-[var(--radius-xl)] px-3 py-2 text-sm'
+const ACCOUNT_MENU_ITEM = 'nola-menu-item flex cursor-pointer items-center gap-3 rounded-[var(--radius-xl)] px-3 py-2 type-body'
 
 export function AppShell({ children, navigation, title, sidebarContent, heading, actions, className = '' }: AppShellProps) {
   const { t, language } = useI18n()

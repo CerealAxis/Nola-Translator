@@ -98,7 +98,7 @@ export function PromptLibrary({
           aria-controls={listId}
           aria-autocomplete="list"
           aria-activedescendant={selected ? optionId(selected.id) : undefined}
-          className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent [font:var(--font-caption)] outline-none"
+          className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent type-body outline-none"
         />
       </div>
 
@@ -119,7 +119,7 @@ export function PromptLibrary({
           );
           const content = (
             <>
-              <span className="min-w-0 flex-1 truncate [font:var(--font-caption)]">
+              <span className="min-w-0 flex-1 truncate type-body">
                 {prompt.name}
               </span>
               {prompt.variables.length > 0 && (
@@ -166,7 +166,7 @@ export function PromptLibrary({
         })}
       </div>
       {matches.length === 0 && (
-        <span className="text-muted-foreground block px-2 py-3 text-center [font:var(--font-caption)] break-words">
+        <span className="text-muted-foreground block px-2 py-3 text-center type-muted break-words">
           Nothing matches “{query}”
         </span>
       )}
@@ -178,7 +178,7 @@ export function PromptLibrary({
             "fade-in animate-in flex flex-col gap-2 rounded-xl p-2.5 duration-200",
           )}
         >
-          <p className="text-foreground/65 [font:var(--font-caption)] leading-relaxed break-words">
+          <p className="text-foreground/65 type-muted break-words">
             {selected.body}
           </p>
           {selected.variables.length > 0 && (

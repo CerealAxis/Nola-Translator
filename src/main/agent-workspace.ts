@@ -1,6 +1,6 @@
 import { BrowserWindow, dialog } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, join, relative, isAbsolute } from 'node:path'
 import { runSandboxCommand, sandboxStatus } from './agent-sandbox'
 import type { AgentActivity, AgentProject, AgentSkill, AgentWorkspaceSnapshot, SubagentDefinition, WorkspaceAction } from '../shared/agent-workspace'
@@ -24,13 +24,18 @@ export class AgentWorkspace {
         this.disabledSkills = new Set(data.disabledSkills ?? [])
         this.subagents = data.subagents ?? []
       } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
-    })()
+    })().catch(error => { this.initialized = undefined; throw error })
   }
   private save() {
     const content = JSON.stringify({ projects: this.projects, selected: this.selected, disabledSkills: [...this.disabledSkills], subagents: this.subagents })
     return this.saves = this.saves.catch(() => undefined).then(async () => {
       await mkdir(this.directory, { recursive: true })
-      await writeFile(join(this.directory, 'workspace.json'), content, 'utf8')
+      const target = join(this.directory, 'workspace.json')
+      const temporary = `${target}.${randomUUID()}.tmp`
+      try {
+        await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx' })
+        await rename(temporary, target)
+      } finally { await rm(temporary, { force: true }) }
     })
   }
   async project() { await this.load(); return this.projects.find(project => project.id === this.selected) }

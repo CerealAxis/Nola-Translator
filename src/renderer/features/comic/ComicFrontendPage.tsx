@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useI18n } from '@/i18n'
 import { CardContent } from '@/components/ui/card'
 import { Upload } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
 import { notifyError } from '@/components/primitives/notify'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { ComicTranslationPage } from './ComicTranslationPage'
@@ -89,6 +90,7 @@ export function ComicFrontendPage({
               className="comic-quick-upload"
               data-dragging={dragging || undefined}
               disabled={importing}
+              aria-busy={importing || undefined}
               onClick={() => {
                 void chooseComicFiles()
                   .then(importQuick)
@@ -116,8 +118,8 @@ export function ComicFrontendPage({
                 void importQuick(Array.from(event.dataTransfer.files))
               }}
             >
-              <Upload aria-hidden="true" />
-              <span>{p('quickEmpty')}</span>
+              {importing ? <Spinner aria-hidden="true" /> : <Upload aria-hidden="true" />}
+              <span>{importing ? t('common.loading') : p('quickEmpty')}</span>
             </button>
           </CardContent>
         </DialogContent>

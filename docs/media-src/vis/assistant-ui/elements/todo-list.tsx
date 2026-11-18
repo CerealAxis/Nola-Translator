@@ -63,9 +63,9 @@ export function TodoList({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="text-[13.5px] font-medium">{title}</span>
+          <span className="type-body font-medium">{title}</span>
           {description ? (
-            <p className="text-muted-foreground text-xs leading-4 break-words">
+            <p className="text-muted-foreground type-muted break-words">
               {description}
             </p>
           ) : null}
@@ -89,7 +89,7 @@ export function TodoList({
             item.status !== "active" &&
             item.status !== "failed";
           const rowClassName =
-            "fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex items-start gap-2.5 py-0.5 text-[13.5px] duration-300 motion-reduce:animate-none";
+            "fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex items-start gap-2.5 py-0.5 type-body duration-300 motion-reduce:animate-none";
           const row = (
             <>
               <span
@@ -102,7 +102,7 @@ export function TodoList({
                   </span>
                 ) : item.status === "failed" ? (
                   <span className="flex size-3.5 items-center justify-center rounded-[5px] border border-destructive/25 bg-destructive/[0.08]">
-                    <XIcon className="size-2.5 text-destructive" />
+                    <XIcon className="size-2.5 text-danger-soft-foreground" />
                   </span>
                 ) : item.status === "cancelled" ? (
                   <span className="border-foreground/15 text-muted-foreground flex size-3.5 items-center justify-center rounded-[5px] border">
@@ -115,7 +115,7 @@ export function TodoList({
                 )}
               </span>
               <span className="sr-only">{statusLabels[item.status]}</span>
-              <div className="min-w-0 flex-1 leading-5 break-words">
+              <div className="min-w-0 flex-1 break-words">
                 <span
                   className={cn(
                     item.status === "done" &&
@@ -123,7 +123,7 @@ export function TodoList({
                     item.status === "active" && "text-foreground/90",
                     item.status === "pending" && "text-muted-foreground",
                     item.status === "failed" &&
-                      "text-destructive",
+                      "text-danger-soft-foreground",
                     item.status === "cancelled" &&
                       "text-muted-foreground line-through decoration-[1.5px]",
                   )}
@@ -132,12 +132,12 @@ export function TodoList({
                 </span>
                 {item.status === "failed" ? (
                   item.reason ? (
-                    <p className="text-muted-foreground text-xs leading-4 break-words">
+                    <p className="text-muted-foreground type-muted break-words">
                       {item.reason}
                     </p>
                   ) : null
                 ) : item.status !== "cancelled" && item.description ? (
-                  <p className="text-muted-foreground text-xs leading-4 break-words">
+                  <p className="text-muted-foreground type-muted break-words">
                     {item.description}
                   </p>
                 ) : null}

@@ -21,10 +21,10 @@ export interface SettingsRowProps {
   onboardingTarget?: string
 }
 
-const LABEL_CLASS = 'text-sm font-medium text-foreground'
+const LABEL_CLASS = 'type-body font-medium text-foreground'
 /** `.settings-row__help` boxes the button to 24px; the button's own min-height would stretch it. */
 const HELP_BUTTON_CLASS = 'settings-row__help min-h-6'
-const TOOLTIP_CLASS = 'z-overlay max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
+const TOOLTIP_CLASS = 'z-overlay max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 type-body text-overlay-foreground shadow-overlay'
 
 export function SettingsRow({ label, desc, children, className = '', descriptionTooltip = false, onboardingTarget }: SettingsRowProps) {
   const labelId = useId()
@@ -43,10 +43,10 @@ export function SettingsRow({ label, desc, children, className = '', description
              */}
             <TooltipTrigger delay={300} render={<Button variant="secondary" size="icon" className={HELP_BUTTON_CLASS} aria-labelledby={`${labelId} ${infoId}`}><CircleHelp aria-hidden="true" /></Button>} />
             <span id={infoId} className="sr-only">{t('common.info')}</span>
-            <TooltipContent className={[TOOLTIP_CLASS, 'settings-row__tooltip'].join(' ')} sideOffset={3}>{desc}</TooltipContent>
+            <TooltipContent data-description="true" className={[TOOLTIP_CLASS, 'settings-row__tooltip'].join(' ')} sideOffset={3}>{desc}</TooltipContent>
           </Tooltip> : null}
         </div>
-        {desc && !descriptionTooltip ? <p className="text-xs text-muted wrap-break-word">{desc}</p> : null}
+        {desc && !descriptionTooltip ? <p className="type-muted wrap-break-word">{desc}</p> : null}
       </div>
       <div className="settings-row__control">{children}</div>
     </div>

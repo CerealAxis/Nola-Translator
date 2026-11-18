@@ -329,7 +329,7 @@ function QuickWorkspacePage() {
           className="flex shrink-0 items-center gap-2 bg-warning-soft px-6 py-2 text-warning-soft-foreground"
         >
           <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true" />
-          <span className="nola-caption text-[13px] leading-[1.5] font-normal">{t('workspace.paused')}</span>
+          <span className="type-muted">{t('workspace.paused')}</span>
         </div>
       ) : null}
 
@@ -427,8 +427,8 @@ function IdleGuide({
         <span className="flex size-10 items-center justify-center rounded-[10px] bg-surface-tertiary text-primary">
           <Captions className="size-5" aria-hidden="true" />
         </span>
-        <h2 className="nola-display text-foreground">{t('workspaceUi.idleTitle')}</h2>
-        <p className="nola-body text-muted">{t('workspace.nothingYetHint')}</p>
+        <h2 className="type-h4 text-foreground">{t('workspaceUi.idleTitle')}</h2>
+        <p className="type-body text-muted">{t('workspace.nothingYetHint')}</p>
         {/*
          * A Toast is only for an engine that cannot start.
          *
@@ -457,7 +457,7 @@ function IdleGuide({
          * so that covers the engine handshake too.
          */}
         {engineStatus === 'recovering' ? (
-          <p className="nola-caption flex items-center gap-2 text-muted">
+          <p className="type-muted flex items-center gap-2 text-muted">
             <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true" />
             {t('workspaceUi.engineRecovering')}
           </p>

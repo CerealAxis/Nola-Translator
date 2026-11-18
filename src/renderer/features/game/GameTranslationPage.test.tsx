@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import * as store from '@/store'
 import type { NolaBridge } from '@/bridge'
@@ -7,6 +7,18 @@ import { GameTranslationPage, gameIssueKey } from './GameTranslationPage'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 const snapshot: GameSnapshot = { version: 1, revision: 9, profiles: [{ id: 'game', name: 'Visual novel', sourceLanguage: 'ja', targetLanguage: 'zh', source: 'clipboard', strategy: 'auto', glossarySelection: { mode: 'auto' } }], status: 'idle', lines: [], hookAvailable: false }
+it('keeps typed profile edits through unrelated snapshots and advances their save revision', async () => {
+  let changed!: (value: GameSnapshot) => void
+  const command = vi.fn(async () => ({ ...snapshot, revision: 11 }))
+  vi.spyOn(store, 'getBridge').mockReturnValue({ gameTranslation: { snapshot: async () => snapshot, command, sources: async () => [], onChanged: (callback: typeof changed) => { changed = callback; return () => {} } } } as unknown as NolaBridge)
+  render(<GameTranslationPage gameId="game" />)
+  const name = await screen.findByDisplayValue('Visual novel')
+  fireEvent.change(name, { target: { value: 'My draft' } })
+  act(() => changed({ ...snapshot, revision: 10, profiles: structuredClone(snapshot.profiles) }))
+  expect(name).toHaveValue('My draft')
+  fireEvent.click(screen.getByRole('button', { name: '保存' }))
+  await waitFor(() => expect(command).toHaveBeenCalledWith(expect.objectContaining({ action: 'saveProfile', expectedRevision: 10, profile: expect.objectContaining({ name: 'My draft' }) })))
+})
 it('names the game recovery action for known runtime and wrapped command failures', () => {
   expect(gameIssueKey(new Error("Error invoking remote method 'game:command': Error: permissionDenied"))).toBe('suite.gamePermissionDenied')
   expect(gameIssueKey('translationModelNotReady')).toBe('suite.modelsNeeded')

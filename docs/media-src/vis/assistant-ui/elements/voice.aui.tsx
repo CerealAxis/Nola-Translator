@@ -66,7 +66,7 @@ export const VoiceControl: FC<{ className?: string }> = ({ className }) => {
       </AuiIf>
 
       <AuiIf condition={(s) => s.thread.voice?.status.type === "starting"}>
-        <span className="aui-voice-status text-muted-foreground text-sm">
+        <span className="aui-voice-status text-muted-foreground type-muted">
           正在连接...
         </span>
       </AuiIf>
@@ -139,7 +139,7 @@ export const VoiceDisconnectButton: FC = () => {
   return (
     <TooltipIconButton
       tooltip={"断开"}
-      className="aui-voice-disconnect text-destructive hover:text-destructive"
+      className="aui-voice-disconnect text-danger-soft-foreground hover:text-danger-soft-foreground"
       onClick={() => disconnect()}
     >
       <PhoneOffIcon />

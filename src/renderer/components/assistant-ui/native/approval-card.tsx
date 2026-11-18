@@ -92,22 +92,22 @@ export function ApprovalCard({
           className={cn(
             "flex size-9 shrink-0 items-center justify-center rounded-xl",
             variant === "destructive"
-              ? "bg-destructive/10 text-destructive"
+              ? "bg-destructive/10 text-danger-soft-foreground"
               : "bg-foreground/[0.05] text-muted-foreground",
           )}
         >
           {icon ?? <TerminalIcon className="size-4" />}
         </span>
         <div className="flex flex-col">
-          <p id={titleId} className="[font:var(--font-label)] font-medium">
+          <p id={titleId} className="type-body font-medium">
             {title}
           </p>
-          <p className="text-muted-foreground [font:var(--font-caption)]">{subtitle}</p>
+          <p className="text-muted-foreground type-muted">{subtitle}</p>
         </div>
       </div>
 
       {description ? (
-        <p id={descriptionId} className="text-foreground/60 [font:var(--font-caption)]">
+        <p id={descriptionId} className="text-foreground/60 type-muted">
           {description}
         </p>
       ) : null}
@@ -116,7 +116,7 @@ export function ApprovalCard({
         <div
           className={cn(
             field,
-            "text-foreground/70 rounded-xl px-3.5 py-2.5 font-mono [font:var(--font-caption)]",
+            "text-foreground/70 rounded-xl px-3.5 py-2.5 type-code",
           )}
         >
           {command}
@@ -130,7 +130,7 @@ export function ApprovalCard({
           {details.map((detail, index) => (
             <div
               key={`${detail.label}-${index}`}
-              className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 [font:var(--font-caption)]"
+              className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 type-muted"
             >
               <dt className={cn(mono, "text-muted-foreground")}>
                 {detail.label}
@@ -151,7 +151,7 @@ export function ApprovalCard({
                 onClick={onDeny}
                 className={cn(
                   ghostButton,
-                  "h-8 px-3.5 [font:var(--font-caption)] font-medium whitespace-nowrap",
+                  "h-8 px-3.5 type-body whitespace-nowrap",
                 )}
               >
                 {denyLabel}
@@ -164,7 +164,7 @@ export function ApprovalCard({
                 onClick={onAlwaysAllow}
                 className={cn(
                   ghostButton,
-                  "h-8 px-3.5 [font:var(--font-caption)] font-medium whitespace-nowrap",
+                  "h-8 px-3.5 type-body whitespace-nowrap",
                 )}
               >
                 {alwaysAllowLabel}
@@ -177,9 +177,9 @@ export function ApprovalCard({
                 onClick={onAllowOnce}
                 className={cn(
                   variant === "destructive"
-                    ? "bg-destructive text-destructive-foreground transition-[background-color,scale] duration-150 hover:bg-destructive/90 active:scale-[0.96] motion-reduce:transition-none"
+                    ? "bg-destructive text-destructive-foreground transition-[background-color,scale] duration-150 hover:bg-[var(--destructive-hover)] active:scale-[0.96] motion-reduce:transition-none"
                     : inkButton,
-                  "flex h-8 items-center rounded-full px-3.5 [font:var(--font-caption)] font-medium whitespace-nowrap",
+                  "flex h-8 items-center rounded-full px-3.5 type-body whitespace-nowrap",
                 )}
               >
                 {allowOnceLabel}
@@ -192,7 +192,7 @@ export function ApprovalCard({
             ref={receiptRef}
             tabIndex={-1}
             role="status"
-            className="fade-in animate-in text-muted-foreground flex items-center gap-2 [font:var(--font-caption)] duration-300 motion-reduce:animate-none"
+            className="fade-in animate-in text-muted-foreground flex items-center gap-2 type-muted duration-300 motion-reduce:animate-none"
           >
             {state === "running" ? (
               <>
@@ -206,7 +206,7 @@ export function ApprovalCard({
               </>
             ) : (
               <>
-                <CheckIcon className="size-3.5 text-chart-2" />
+                <CheckIcon className="size-3.5 text-success-soft-foreground" />
                 {statusLabel ?? receiptText.done}
               </>
             )}

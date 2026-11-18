@@ -56,7 +56,7 @@ export function Citation({
         render={<button type="button" {...props} />}
         aria-label={`来源 ${index + 1}，${source.title}`}
         className={cn(
-          "bg-foreground/[0.06] text-muted-foreground hover:text-foreground/90 data-[popup-open]:bg-foreground data-[popup-open]:text-background ms-0.5 inline-flex h-4 min-w-4 translate-y-[-2px] cursor-default items-center justify-center rounded-[5px] px-1 align-middle font-mono text-[10px] font-medium tabular-nums transition-colors motion-reduce:transition-none",
+          "bg-foreground/[0.06] text-muted-foreground hover:text-foreground/90 data-[popup-open]:bg-foreground data-[popup-open]:text-background ms-0.5 inline-flex h-4 min-w-4 translate-y-[-2px] cursor-default items-center justify-center rounded-[5px] px-1 align-middle type-code tabular-nums transition-colors motion-reduce:transition-none",
           className,
         )}
       >
@@ -77,7 +77,7 @@ export function Citation({
               <div className="flex items-center gap-1.5">
                 {domain ? (
                   <>
-                    <span className="bg-foreground/[0.06] text-muted-foreground flex size-4 items-center justify-center rounded text-[9px] font-medium">
+                    <span className="bg-foreground/[0.06] text-muted-foreground flex size-4 items-center justify-center rounded type-small">
                       {domain[0]?.toUpperCase()}
                     </span>
                     <span className={cn(mono, "text-muted-foreground")}>
@@ -94,13 +94,13 @@ export function Citation({
             ) : null}
             <p
               className={cn(
-                "text-[13px] leading-snug font-medium",
+                "type-body font-medium",
                 hasMetadata && "mt-2",
               )}
             >
               {source.title}
             </p>
-            <p className="text-muted-foreground mt-1 text-[13px] leading-relaxed">
+            <p className="text-muted-foreground mt-1 type-body">
               {source.snippet}
             </p>
             {href ? (
@@ -108,7 +108,7 @@ export function Citation({
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground mt-3 inline-flex text-xs underline-offset-2 transition-colors hover:underline motion-reduce:transition-none"
+                className="text-muted-foreground hover:text-foreground mt-3 inline-flex type-body underline-offset-2 transition-colors hover:underline motion-reduce:transition-none"
               >
                 开源{" "}
                 <span className="sr-only">（在新选项卡中打开）</span>
@@ -132,7 +132,7 @@ export function InlineCitation({
     <p
       data-slot="inline-citation"
       className={cn(
-        "text-foreground/90 max-w-sm text-sm leading-relaxed",
+        "text-foreground/90 max-w-sm type-body",
         className,
       )}
       {...props}

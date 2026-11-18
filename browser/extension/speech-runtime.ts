@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { getProvider, type ProviderConnection } from './providers'
-import { loadPreferences, type Preferences } from './preferences'
+import { loadPreferences, siteEnabled, type Preferences } from './preferences'
 import { buildTranslationPrompt, scheduleProviderTranslation } from './provider-runtime'
 import { ProviderError, safeProviderError, translateWith } from './provider-execution'
 import { encodeBase64 } from './native-provider'
@@ -167,6 +167,7 @@ export function setupSpeechRuntime(): void {
           started = true; source = request.sourceLanguage; target = request.targetLanguage; capability = request.capability
           await recoverExtensionConfiguration()
           preferences = await loadPreferences()
+          if (!siteEnabled(preferences, url)) throw new ProviderError('providerPermission')
           if (capability === 's2s' && hasApplicableGlossary(await extensionGlossary.snapshot(), target, url)) throw new ProviderError('browserGlossaryModeUnsupported')
           if (capability === 'asr') mtProvider = await getProvider(preferences.subtitleProvider, 'mt')
           provider = await getProvider(capability === 's2s' ? preferences.s2sProvider : preferences.asrProvider, capability)

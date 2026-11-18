@@ -68,7 +68,7 @@ export function RenameDialog({ meetingId, initialTitle = '', onClose }: RenameDi
         <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
         <AlertDialogContent className="max-w-md">
           <DialogHeader>
-            <AlertDialog.Title className="nola-title text-foreground">
+            <AlertDialog.Title className="type-h4 text-foreground">
               {t('records.renameTitle')}
             </AlertDialog.Title>
           </DialogHeader>

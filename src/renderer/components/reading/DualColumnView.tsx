@@ -5,9 +5,6 @@ import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } 
 const MIN_SPLIT = 15
 const MAX_SPLIT = 85
 
-export function lineOpacity(distance: number): number {
-  return Math.max(0.42, 1 - 0.11 * Math.abs(distance))
-}
 export interface DualColumnSegment {
   id: string
   source: string
@@ -19,18 +16,15 @@ export interface DualColumnViewProps {
   sourceLabel: string
   targetLabel: string
   fontScale?: number
-  baseFontSize?: number
   currentIndex?: number
   className?: string
   onSplitChange?: (percent: number) => void
   empty?: ReactNode
 }
-export function DualColumnView({ segments, sourceLabel, targetLabel, fontScale = 1, baseFontSize = 16, currentIndex, className = '', empty, onSplitChange }: DualColumnViewProps): ReactNode {
+export function DualColumnView({ segments, sourceLabel, targetLabel, fontScale = 1, currentIndex, className = '', empty, onSplitChange }: DualColumnViewProps): ReactNode {
   const [split, setSplit] = useState(50)
   useEffect(() => { onSplitChange?.(split) }, [split, onSplitChange])
   if (segments.length === 0 && empty) return <div className={className}>{empty}</div>
-  const fontSize = baseFontSize * fontScale
-  const lineBox = Number((fontSize * 1.65).toFixed(2))
   return (
     <div data-split={split} style={{ '--dual-split': split + '%' } as React.CSSProperties} className={'nola-dual ' + className}>
       <div className="nola-dual__headers"><div>{sourceLabel}</div><div>{targetLabel}</div></div>
@@ -42,13 +36,12 @@ export function DualColumnView({ segments, sourceLabel, targetLabel, fontScale =
           </SliderTrack>
         </SliderControl>
       </SliderRoot>
-      <div className="nola-dual__scroll nola-scrollbar" style={{ lineHeight: lineBox + 'px', fontSize: fontSize + 'px' }}>
+      <div className="nola-dual__scroll nola-scrollbar" style={{ '--reading-scale': fontScale } as React.CSSProperties}>
         {segments.map((segment, index) => (
           <div className="nola-dual__pair" key={segment.id}>
             {(['source', 'target'] as const).map((variant) => {
               const isCurrent = currentIndex !== undefined && index === currentIndex
-              const opacity = lineOpacity(currentIndex === undefined ? 0 : index - currentIndex) * (segment.interim ? .72 : 1)
-              return <div key={variant} data-current={isCurrent ? 'true' : undefined} data-interim={segment.interim ? 'true' : undefined} className={'nola-dual__cell ' + (variant === 'source' ? 'text-foreground' : 'text-muted')} style={{ opacity, minHeight: lineBox, lineHeight: lineBox + 'px' }}>
+              return <div key={variant} data-current={isCurrent ? 'true' : undefined} data-interim={segment.interim ? 'true' : undefined} className={'nola-dual__cell ' + (variant === 'source' ? 'text-foreground' : 'text-muted')}>
                 {isCurrent ? <span aria-hidden="true" className="absolute top-1 bottom-1 left-0 w-[2px] rounded-full bg-primary" /> : null}
                 {variant === 'source' ? segment.source : segment.target}
               </div>

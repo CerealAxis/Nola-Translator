@@ -31,7 +31,7 @@ export function StoppedRun({
 
       {...props}
     >
-      <p className="text-foreground/80 text-[13.5px] leading-relaxed">
+      <p className="text-foreground/80 type-body">
         {words.join(wordSeparator)}
         <span
           aria-hidden

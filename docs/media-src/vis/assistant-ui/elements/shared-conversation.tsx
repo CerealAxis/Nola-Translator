@@ -44,7 +44,7 @@ export function SharedConversation({
       <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-3">
         <LinkIcon className="text-muted-foreground size-3.5 shrink-0" />
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13.5px] font-medium">{title}</span>
+          <span className="truncate type-body font-medium">{title}</span>
           <span className={cn(mono, "text-muted-foreground truncate")}>
             共享者 {sharedBy} · {sharedAt}
           </span>
@@ -56,7 +56,7 @@ export function SharedConversation({
           <div
             key={turn.id}
             className={cn(
-              "text-[13px] leading-relaxed",
+              "type-body",
               turn.role === "user"
                 ? "bg-foreground/[0.05] ms-auto max-w-[85%] rounded-2xl px-3 py-2"
                 : "text-foreground/70",

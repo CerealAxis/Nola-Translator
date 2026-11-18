@@ -157,16 +157,14 @@ export function SessionSetupDialog({
             </div>
             <Input id="session-name" value={draft.title || previewName} onChange={event => onDraftChange({ ...draft, title: event.target.value })} />
           </div>
-          <div className="rounded-2xl border border-border">
-            <SettingRow label={t('session.keepAudio')} desc={t('session.keepAudioHint')} descriptionTooltip className="hover:bg-transparent">
-              <SettingSwitch isSelected={draft.keepAudio} ariaLabel={t('session.keepAudio')} onChange={keepAudio => onDraftChange({ ...draft, keepAudio })} />
-            </SettingRow>
-          </div>
-          {unsupportedSource ? <p className="nola-caption text-warning">{t('modelConfig.sourceUnsupported')}</p> : null}
-          {incompatible ? <p className="nola-caption text-warning">{t('modelConfig.incompatibleTitle')}</p> : null}
-          {s2sModel && !s2sReady ? <p className="nola-caption text-warning">{t('session.s2sModelRequired')}</p> : null}
-          {!s2sTargetValid ? <p className="nola-caption text-warning">{t(outputMode === 'speech' ? 'session.speechLanguageUnavailable' : 'errors.translationUnsupportedLanguagePair')}</p> : null}
-          {missingExplicitOutput ? <p className="nola-caption text-warning">{t('session.explicitSpeechOutput')}</p> : null}
+          <SettingRow label={t('session.keepAudio')} desc={t('session.keepAudioHint')} descriptionTooltip className="px-0 py-0">
+            <SettingSwitch isSelected={draft.keepAudio} ariaLabel={t('session.keepAudio')} onChange={keepAudio => onDraftChange({ ...draft, keepAudio })} />
+          </SettingRow>
+          {unsupportedSource ? <p className="type-muted text-warning-soft-foreground">{t('modelConfig.sourceUnsupported')}</p> : null}
+          {incompatible ? <p className="type-muted text-warning-soft-foreground">{t('modelConfig.incompatibleTitle')}</p> : null}
+          {s2sModel && !s2sReady ? <p className="type-muted text-warning-soft-foreground">{t('session.s2sModelRequired')}</p> : null}
+          {!s2sTargetValid ? <p className="type-muted text-warning-soft-foreground">{t(outputMode === 'speech' ? 'session.speechLanguageUnavailable' : 'errors.translationUnsupportedLanguagePair')}</p> : null}
+          {missingExplicitOutput ? <p className="type-muted text-warning-soft-foreground">{t('session.explicitSpeechOutput')}</p> : null}
         </div>
         <DialogFooter>
           <Button variant="tertiary" size="sm" onClick={() => onOpenChange(false)}>{t('session.cancel')}</Button>

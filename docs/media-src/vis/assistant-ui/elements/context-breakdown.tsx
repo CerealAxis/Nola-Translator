@@ -38,13 +38,13 @@ export function ContextBreakdown({
       {...props}
     >
       <div className="flex items-baseline justify-between">
-        <span className="text-[13.5px] font-medium">背景信息</span>
+        <span className="type-body font-medium">背景信息</span>
         <span
           className={cn(
             mono,
             "tabular-nums",
             pressure > 0.85
-              ? "text-chart-4"
+              ? "text-warning-soft-foreground"
               : "text-muted-foreground",
           )}
         >
@@ -85,7 +85,7 @@ export function ContextBreakdown({
                 segment.tint,
               )}
             />
-            <span className="text-foreground/70 min-w-0 flex-1 truncate text-[13px]">
+            <span className="text-foreground/70 min-w-0 flex-1 truncate type-body">
               {segment.label}
             </span>
             <span
@@ -103,7 +103,7 @@ export function ContextBreakdown({
             aria-hidden
             className="bg-foreground/[0.08] inset-ring-border size-2 shrink-0 rounded-full inset-ring forced-colors:border"
           />
-          <span className="text-muted-foreground min-w-0 flex-1 truncate text-[13px]">
+          <span className="text-muted-foreground min-w-0 flex-1 truncate type-body">
             净空
           </span>
           <span

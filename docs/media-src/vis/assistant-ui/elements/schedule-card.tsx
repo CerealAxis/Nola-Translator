@@ -53,7 +53,7 @@ export function ScheduleCard({
           <ClockIcon className="size-3.5" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13.5px] font-medium">{name}</span>
+          <span className="truncate type-body font-medium">{name}</span>
           <span className={cn(mono, "text-muted-foreground")}>{cadence}</span>
         </div>
         <button
@@ -76,7 +76,7 @@ export function ScheduleCard({
         )}
       >
         <span className={cn(mono, "text-muted-foreground")}>下一个</span>
-        <span className="text-foreground/80 text-[13px]">
+        <span className="text-foreground/80 type-body">
           {enabled ? nextRun : "已暂停"}
         </span>
       </div>
@@ -86,11 +86,11 @@ export function ScheduleCard({
         {history.map((run) => (
           <div key={run.id} className="flex items-baseline gap-2">
             {run.ok ? (
-              <CheckIcon className="size-3 shrink-0 translate-y-0.5 text-chart-2" />
+              <CheckIcon className="size-3 shrink-0 translate-y-0.5 text-success-soft-foreground" />
             ) : (
-              <XIcon className="size-3 shrink-0 translate-y-0.5 text-destructive" />
+              <XIcon className="size-3 shrink-0 translate-y-0.5 text-danger-soft-foreground" />
             )}
-            <span className="text-foreground/60 min-w-0 flex-1 truncate text-xs">
+            <span className="text-foreground/60 min-w-0 flex-1 truncate type-small">
               {run.at}
             </span>
             <span className={cn(mono, "text-muted-foreground shrink-0")}>

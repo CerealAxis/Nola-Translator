@@ -34,6 +34,9 @@ runs:
       run: |
         npm ci
         if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
+    - name: Check JavaScript and Electron notices
+      shell: pwsh
+      run: node scripts/gen-third-party-notices.mjs --check-renderer
     - name: Build installer
       id: package
       shell: pwsh

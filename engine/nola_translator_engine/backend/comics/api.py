@@ -44,7 +44,7 @@ def build_comic_router(service: ComicService | None):
   async def import_book(body: ImportRequest):
     async def perform():
       value = await asyncio.to_thread(active().import_book, body)
-      return active().public_book(value)
+      return await asyncio.to_thread(active().public_book, value)
     return await invoke(perform)
 
   @router.post('/books/delete')
@@ -66,7 +66,7 @@ def build_comic_router(service: ComicService | None):
   @router.post('/books/{book_id}/document')
   async def document(book_id: UUID, body: Mutation):
     async def perform():
-      return active().public_book(await active().document(book_id, body))
+      return await asyncio.to_thread(active().public_book, await active().document(book_id, body))
     return await invoke(perform)
 
   @router.get('/books/{book_id}/pages/{page_id}/{kind}')

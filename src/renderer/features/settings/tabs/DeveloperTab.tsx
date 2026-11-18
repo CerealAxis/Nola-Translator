@@ -74,7 +74,6 @@ const FLOOD_TYPES: ReadonlyArray<ToastType> = [
 ]
 
 /** Soft danger styling for secondary actions in the component gallery. */
-const DANGER_SOFT_CLASS = 'bg-danger-soft text-danger-soft-foreground hover:bg-danger-soft-hover'
 
 const PILL_TONES: ReadonlyArray<{ tone: StatusPillTone; label: TranslationKey }> = [
   { tone: 'neutral', label: 'titleBar.engineIdle' },
@@ -103,7 +102,7 @@ export function DeveloperTab() {
 
   return (
     <div className="settings-panel">
-      <p className="nola-caption text-muted">{t('dev.intro')}</p>
+      <p className="type-muted text-muted">{t('dev.intro')}</p>
 
       <ButtonGroup />
       <ToastGroup />
@@ -130,7 +129,7 @@ function ButtonGroup() {
           <Button variant="tertiary">{t('dev.buttonTertiary')}</Button>
           <Button variant="outline">{t('dev.buttonOutline')}</Button>
           <Button variant="danger">{t('dev.buttonDanger')}</Button>
-          <Button variant="secondary" className={DANGER_SOFT_CLASS}>{t('dev.buttonDangerSoft')}</Button>
+          <Button variant="destructive">{t('dev.buttonDangerSoft')}</Button>
         </div>
       </SettingsRow>
 
@@ -155,7 +154,7 @@ function ButtonGroup() {
       <SettingsRow label={t('dev.buttonIconOnly')} desc={t('dev.buttonIconOnlyDesc')}>
         <div className="dev-strip">
           <Button variant="secondary" size="icon" aria-label={t('dev.buttonIconOnly')}><ArrowRight aria-hidden="true" /></Button>
-          <Button variant="secondary" size="icon" className={DANGER_SOFT_CLASS} aria-label={t('dev.buttonDelete')}><Trash2 aria-hidden="true" /></Button>
+          <Button variant="destructive" size="icon" aria-label={t('dev.buttonDelete')}><Trash2 aria-hidden="true" /></Button>
         </div>
       </SettingsRow>
 
@@ -380,10 +379,10 @@ function DialogTrigger({ label, desc, tone, pending, open, onOpenChange, title, 
           <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
           <AlertDialogContent className="max-w-md">
             <DialogHeader>
-              <AlertDialog.Title className="nola-title text-foreground">{title}</AlertDialog.Title>
+              <AlertDialog.Title className="type-h4 text-foreground">{title}</AlertDialog.Title>
             </DialogHeader>
             <div className="flex flex-col gap-3">
-              <p className="nola-body text-muted">{body}</p>
+              <p className="type-body text-muted">{body}</p>
             </div>
             <DialogFooter>
               <AlertDialog.Close render={<Button variant="tertiary" size="sm" />}>
@@ -497,10 +496,10 @@ function DialogGroup() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="nola-title text-foreground">{t('dev.dialogModalTitle')}</DialogTitle>
+            <DialogTitle className="type-h4 text-foreground">{t('dev.dialogModalTitle')}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
-            <p className="nola-body text-muted">{t('dev.dialogModalBody')}</p>
+            <p className="type-body text-muted">{t('dev.dialogModalBody')}</p>
           </div>
           <DialogFooter>
             <Button variant="tertiary" size="sm" onClick={() => setModalOpen(false)}>
@@ -790,7 +789,7 @@ function StatusGroup() {
       <StatusRow label={t('dev.statusProgress')} desc={t('dev.statusProgressDesc')}>
         <div className="dev-stack">
           <div className="dev-progress">
-            <span className="nola-micro text-muted">{t('dev.statusProgressPending')}</span>
+            <span className="type-muted text-muted">{t('dev.statusProgressPending')}</span>
             <Progress.Root value={0.35} min={0} max={1} className="w-full" aria-label={t('dev.statusProgressPending')}>
               <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-surface-secondary">
                 <Progress.Indicator className="h-full rounded-sm bg-primary" />
@@ -798,7 +797,7 @@ function StatusGroup() {
             </Progress.Root>
           </div>
           <div className="dev-progress">
-            <span className="nola-micro text-muted">{t('dev.statusProgressDone')}</span>
+            <span className="type-muted text-muted">{t('dev.statusProgressDone')}</span>
             <Progress.Root value={0.85} min={0} max={1} className="w-full" aria-label={t('dev.statusProgressDone')}>
               <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-surface-secondary">
                 <Progress.Indicator className="h-full rounded-sm bg-primary" />
@@ -834,13 +833,14 @@ const RADIUS_TOKENS = ['--radius-sm', '--radius-md', '--radius-lg', '--radius-xl
 const SPACE_TOKENS = ['--space-1', '--space-2', '--space-3', '--space-4', '--space-5', '--space-6', '--space-7', '--space-8'] as const
 
 const FONT_TOKENS = [
-  '--nola-text-display',
-  '--nola-text-title',
-  '--nola-text-subtitle',
-  '--nola-text-body',
-  '--nola-text-caption',
-  '--nola-text-micro',
-  '--nola-text-mono',
+  '--text-h1',
+  '--text-h2',
+  '--text-h3',
+  '--text-h4',
+  '--text-body',
+  '--text-small',
+  '--text-muted',
+  '--text-code',
 ] as const
 
 /**
@@ -854,10 +854,15 @@ function useTokenValues(tokens: readonly string[]): Record<string, string> {
   const [values, setValues] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    const style = getComputedStyle(document.documentElement)
-    const next: Record<string, string> = {}
-    for (const token of tokens) next[token] = style.getPropertyValue(token).trim()
-    setValues(next)
+    const root = document.documentElement
+    const refresh = () => {
+      const style = getComputedStyle(root)
+      setValues(Object.fromEntries(tokens.map(token => [token, style.getPropertyValue(token).trim()])))
+    }
+    refresh()
+    const observer = new MutationObserver(refresh)
+    observer.observe(root, { attributes: true, attributeFilter: ['class', 'data-theme'] })
+    return () => observer.disconnect()
   }, [tokens])
 
   return values
@@ -866,8 +871,8 @@ function useTokenValues(tokens: readonly string[]): Record<string, string> {
 function TokenCaption({ token, value }: { token: string; value: string | undefined }) {
   return (
     <span className="dev-token__caption">
-      <code className="nola-mono text-foreground">{token}</code>
-      <code className="nola-mono text-muted">{value || '-'}</code>
+      <code className="type-code text-foreground">{token}</code>
+      <code className="type-code text-muted">{value || '-'}</code>
     </span>
   )
 }
@@ -927,7 +932,7 @@ function TokenGroup() {
         <div className="dev-gallery">
           {FONT_TOKENS.map((token) => (
             <div key={token} className="dev-token">
-              <span className="dev-token__sample" style={{ font: `var(${token})` }} aria-hidden="true">
+              <span className={`dev-token__sample type-${token.slice('--text-'.length)}`} aria-hidden="true">
                 {t('dev.toastSampleTitle')}
               </span>
               <TokenCaption token={token} value={fonts[token]} />

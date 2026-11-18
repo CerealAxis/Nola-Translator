@@ -158,7 +158,7 @@ export function ImageGallery({
                 />
               )}
               {overflow ? (
-                <span className="bg-foreground/65 text-background absolute inset-0 flex items-center justify-center text-lg font-medium">
+                <span className="bg-foreground/65 text-background absolute inset-0 flex items-center justify-center type-body font-medium">
                   +{images.length - visibleCount}
                 </span>
               ) : null}
@@ -208,7 +208,7 @@ export function ImageGallery({
               >
                 <ChevronLeftIcon aria-hidden className="size-4" />
               </button>
-              <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+              <div className="flex min-w-0 flex-1 items-center gap-2 type-body">
                 {activeImage.caption ? (
                   <p className="text-foreground/75 truncate">
                     {activeImage.caption}

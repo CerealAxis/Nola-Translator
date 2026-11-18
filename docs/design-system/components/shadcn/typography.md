@@ -8,7 +8,7 @@ editLink: false
 
 标题、段落、列表等内容的排版样式。
 
-默认不附带任何排版样式。本页展示了如何使用工具类为文本添加样式。
+本页展示 shadcn/ui 上游的排版示例。开发 Nola 产品界面时使用[字体排印基础规范](../../foundations/typography)中的八种样式及深浅色规则。
 
 <demo react="shadcn-base/typography-demo.tsx" />
 

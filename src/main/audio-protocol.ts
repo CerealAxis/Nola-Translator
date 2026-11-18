@@ -49,11 +49,12 @@ function audioResponse(path: string, range: string | null): Promise<Response> {
   return stat(path).then((info) => {
     const total = info.size
     const match = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null
-    if (match) {
-      const start = match[1] ? Number(match[1]) : 0
-      const requested = match[2] ? Number(match[2]) : total - 1
+    if (match && (match[1] || match[2])) {
+      const suffix = !match[1]
+      const start = suffix ? Math.max(0, total - Number(match[2])) : Number(match[1])
+      const requested = suffix || !match[2] ? total - 1 : Number(match[2])
       const end = Math.min(requested, total - 1)
-      if (Number.isFinite(start) && start >= 0 && start <= end && start < total) {
+      if (Number.isSafeInteger(start) && start >= 0 && start <= end && start < total && (!suffix || Number(match[2]) > 0)) {
         return new Response(Readable.toWeb(createReadStream(path, { start, end })) as ReadableStream, {
           status: 206,
           headers: {
@@ -64,6 +65,7 @@ function audioResponse(path: string, range: string | null): Promise<Response> {
           },
         })
       }
+      return new Response(null, { status: 416, headers: { 'content-range': `bytes */${total}` } })
     }
     return new Response(Readable.toWeb(createReadStream(path)) as ReadableStream, {
       status: 200,

@@ -31,23 +31,23 @@ Use a compact desktop rhythm, semantic text styles, and familiar shadcn/ui shape
 ```yaml
 colors:
   background: "oklch(0.9700 0.0029 264.5420)"
-  foreground: "oklch(0.1801 0.0191 255.7673)"
+  foreground: "#000000E0"
   card: "oklch(1.0000 0 0)"
-  card-foreground: "oklch(0.1801 0.0191 255.7673)"
+  card-foreground: "#000000E0"
   popover: "oklch(1.0000 0 0)"
-  popover-foreground: "oklch(0.1801 0.0191 255.7673)"
-  primary: "oklch(0.6007 0.1903 257.9419)"
+  popover-foreground: "#000000E0"
+  primary: "oklch(0.5700 0.1903 257.9419)"
   primary-foreground: "oklch(1.0000 0 0)"
   secondary: "oklch(0.9394 0.0046 258.3251)"
   secondary-foreground: "oklch(0.2786 0.0211 257.2774)"
   muted: "oklch(0.9504 0.0042 236.4983)"
-  muted-foreground: "oklch(0.4789 0.0204 256.3497)"
+  muted-foreground: "#000000A6"
   accent: "oklch(0.9209 0.0294 257.7666)"
   accent-foreground: "oklch(0.3232 0.1376 260.7577)"
-  destructive: "oklch(0.6207 0.2203 24.8903)"
+  destructive: "oklch(0.5700 0.2203 24.8903)"
   destructive-foreground: "oklch(1.0000 0 0)"
   border: "oklch(0.8994 0.0064 255.4779)"
-  input: "oklch(0.9205 0.0052 247.8807)"
+  input: "oklch(0.6200 0.0052 247.8807)"
   ring: "oklch(0.6007 0.1903 257.9419)"
   chart-1: "oklch(0.6007 0.1903 257.9419)"
   chart-2: "oklch(0.6369 0.1247 171.0112)"
@@ -55,7 +55,7 @@ colors:
   chart-4: "oklch(0.6806 0.1901 45.0513)"
   chart-5: "oklch(0.6198 0.2297 5.1656)"
   sidebar: "oklch(0.9504 0.0042 236.4983)"
-  sidebar-foreground: "oklch(0.1801 0.0191 255.7673)"
+  sidebar-foreground: "#000000E0"
   sidebar-primary: "oklch(0.6007 0.1903 257.9419)"
   sidebar-primary-foreground: "oklch(1.0000 0 0)"
   sidebar-accent: "oklch(0.9209 0.0294 257.7666)"
@@ -63,23 +63,23 @@ colors:
   sidebar-border: "oklch(0.8994 0.0064 255.4779)"
   sidebar-ring: "oklch(0.6007 0.1903 257.9419)"
   background-dark: "oklch(0.1492 0.0093 263.9667)"
-  foreground-dark: "oklch(0.9602 0.0034 247.8587)"
+  foreground-dark: "#FFFFFFD9"
   card-dark: "oklch(0.1993 0.0111 260.6610)"
-  card-foreground-dark: "oklch(0.9602 0.0034 247.8587)"
+  card-foreground-dark: "#FFFFFFD9"
   popover-dark: "oklch(0.2298 0.0107 260.6838)"
-  popover-foreground-dark: "oklch(0.9602 0.0034 247.8587)"
+  popover-foreground-dark: "#FFFFFFD9"
   primary-dark: "oklch(0.6496 0.1885 257.7207)"
   primary-foreground-dark: "oklch(0.1205 0.0097 252.8876)"
   secondary-dark: "oklch(0.2411 0.0097 248.2290)"
   secondary-foreground-dark: "oklch(0.9008 0.0105 247.9427)"
   muted-dark: "oklch(0.2207 0.0091 255.6084)"
-  muted-foreground-dark: "oklch(0.6806 0.0194 245.5027)"
+  muted-foreground-dark: "#FFFFFFA6"
   accent-dark: "oklch(0.2804 0.0598 257.7090)"
   accent-foreground-dark: "oklch(0.8435 0.0803 251.0277)"
   destructive-dark: "oklch(0.6789 0.2096 21.9475)"
-  destructive-foreground-dark: "oklch(1.0000 0 0)"
+  destructive-foreground-dark: "#000000E0"
   border-dark: "oklch(0.2800 0.0102 260.7048)"
-  input-dark: "oklch(0.2800 0.0102 260.7048)"
+  input-dark: "oklch(0.5500 0.0102 260.7048)"
   ring-dark: "oklch(0.6496 0.1885 257.7207)"
   chart-1-dark: "oklch(0.6496 0.1885 257.7207)"
   chart-2-dark: "oklch(0.6943 0.1346 171.9868)"
@@ -87,7 +87,7 @@ colors:
   chart-4-dark: "oklch(0.7171 0.1878 45.3388)"
   chart-5-dark: "oklch(0.6604 0.2297 5.1368)"
   sidebar-dark: "oklch(0.1808 0.0095 255.6419)"
-  sidebar-foreground-dark: "oklch(0.9602 0.0034 247.8587)"
+  sidebar-foreground-dark: "#FFFFFFD9"
   sidebar-primary-dark: "oklch(0.6496 0.1885 257.7207)"
   sidebar-primary-foreground-dark: "oklch(0.1205 0.0097 252.8876)"
   sidebar-accent-dark: "oklch(0.2804 0.0598 257.7090)"
@@ -98,104 +98,51 @@ colors:
 
 ## Typography
 
-Desktop windows and live component previews use the same bundled Noto Sans CJK variable fonts in light and dark mode. Select the family from the interface language. English uses Noto Sans SC, which includes Latin glyphs. Text, shortcut labels, and code use the same family.
+| Style | Light size | Dark size | Line height | Weight | Dark tracking | Use |
+| --- | --- | --- | --- | --- | --- | --- |
+| H1 | 36px | 36px | 40px | 800 | normal | Main page title |
+| H2 | 30px | 30px | 36px | 600 | normal | Main section |
+| H3 | 24px | 24px | 32px | 600 | normal | Subsection |
+| H4 | 20px | 20px | 28px | 600 | normal | Nested group heading |
+| Body | 14px | 15px | 22px | 400 | 0.015em | Prose, navigation, controls, table values |
+| Small | 14px | 14px | 20px | 500 | 0.02em | Short status or emphasized supporting text |
+| Muted | 14px | 14px | 20px | inherit | 0.02em | Description or metadata |
+| Code | 14px | 14px | 20px | 600 | normal | Code, command, log or API model identifier |
 
-```yaml
-typography:
-  fontFamilyByLocale:
-    zh-CN: "Noto Sans SC"
-    zh-TW: "Noto Sans TC"
-    zh-HK: "Noto Sans HK"
-    ja: "Noto Sans JP"
-    ko: "Noto Sans KR"
-    en: "Noto Sans SC"
-  title:
-    fontSize: 1.25rem
-    fontWeight: 600
-    lineHeight: 1.4
-  body:
-    fontSize: 0.9375rem
-    fontWeight: 400
-    lineHeight: 1.55
-  body-strong:
-    fontSize: 0.9375rem
-    fontWeight: 600
-    lineHeight: 1.55
-  label:
-    fontSize: 0.875rem
-    fontWeight: 550
-    lineHeight: 1.5
-  caption:
-    fontSize: 0.8125rem
-    fontWeight: 400
-    lineHeight: 1.5
-  button-and-tab:
-    fontSize: 14px
-    fontWeight: 500
-    lineHeight: 1.5
-  toast-title:
-    fontSize: 0.875rem
-    fontWeight: 500
-    lineHeight: 1.5
-  foundation-display:
-    fontSize: 2rem
-    fontWeight: 600
-    lineHeight: 1.25
-  foundation-title-1:
-    fontSize: 1.625rem
-    fontWeight: 600
-    lineHeight: 1.25
-  foundation-title-2:
-    fontSize: 1.375rem
-    fontWeight: 600
-    lineHeight: 1.3
-  foundation-title-3:
-    fontSize: 1.0625rem
-    fontWeight: 600
-    lineHeight: 1.4
-  foundation-body:
-    fontSize: 0.875rem
-    fontWeight: 400
-    lineHeight: 1.6
-  foundation-body-strong:
-    fontSize: 0.875rem
-    fontWeight: 600
-    lineHeight: 1.6
-  foundation-label:
-    fontSize: 0.875rem
-    fontWeight: 500
-    lineHeight: 1.5
-  foundation-caption:
-    fontSize: 0.75rem
-    fontWeight: 400
-    lineHeight: 1.5
-  foundation-reading:
-    fontSize: 1.0625rem
-    fontWeight: 400
-    lineHeight: 1.65
-  foundation-code:
-    fontSize: 0.8125rem
-    fontWeight: 400
-    lineHeight: 1.5
-  tracking-normal:
-    letterSpacing: 0em
-```
+| Text role | Light | Dark |
+| --- | --- | --- |
+| `text-primary` | `#000000E0` | `#FFFFFFD9` |
+| `text-secondary` | `#000000A6` | `#FFFFFFA6` |
+| `text-disabled` | `#00000040` | `#FFFFFF40` |
 
 ## Layout
 
 ```yaml
 spacing:
   base: 0.25rem
-  control-height: 2.25rem
-  panel-padding: 1.25rem
-  field-gap: 0.875rem
+  page-padding: 24px
+  narrow-page-padding: 16px
+  panel-gap: 16px
+  control-height: 36px
+  panel-padding: 20px
+  field-gap: 16px
+  label-gap: 8px
+  description-gap: 4px
+  page-heading-gap: 16px
+  section-heading-gap: 12px
+  paragraph-gap: 8px
+  reading-paragraph-gap: 12px
   comfortable-control-height: 44px
   comfortable-panel-padding: 28px
+  comfortable-panel-gap: 20px
   comfortable-field-gap: 20px
-  foundation-control-height: 36px
-  foundation-panel-padding: 24px
-  foundation-field-gap: 16px
 ```
+
+## Materials
+
+Content, ordinary cards, settings, menus, dialogs, and other regular popups use solid surfaces. Remove global glass overrides from base components. A subtitle toolbar or a small tool panel over media or a canvas may explicitly opt into glass. Avoid applying it to both a panel and its children. At most one or two glass surfaces should appear together, each supporting its overlay context.
+
+Manage the main window backing material independently from content surfaces. Retain user transparency and reduced-transparency preferences in the allowed scenes. Verify text contrast over the actual backdrop, and provide solid fallbacks for unsupported blur, increased contrast, and reduced transparency. Blur, opacity, borders, and shadows must not turn ordinary content into glass by inheritance.
 
 ## Elevation & Depth
 
@@ -231,7 +178,7 @@ spacing:
   --shadow-md: 0px 4px 40px 0px hsl(0 0% 0% / 0.45), 0px 2px 4px -1px hsl(0 0% 0% / 0.45);
   --shadow-lg: 0px 4px 40px 0px hsl(0 0% 0% / 0.45), 0px 4px 6px -1px hsl(0 0% 0% / 0.45);
   --shadow-xl: 0px 4px 40px 0px hsl(0 0% 0% / 0.45), 0px 8px 10px -1px hsl(0 0% 0% / 0.45);
-  --shadow-2xl: 0px 4px 40px 0px hsl(0 0% 0% / 1.13);
+  --shadow-2xl: 0px 4px 40px 0px hsl(0 0% 0% / 1);
 }
 ```
 
@@ -248,8 +195,9 @@ rounded:
   sm-dark: 20px
   md-dark: 22px
   lg-dark: 24px
-  xl-dark: 28px
-  demo-control: 8px
+  xl-dark: 18px
+  button: 18px
+  demo-control: "{rounded.button}"
   demo-card: 14px
   demo-tab: 6px
   demo-dialog: 14px
@@ -265,8 +213,8 @@ components:
   demo-button:
     backgroundColor: "{colors.card}"
     textColor: "{colors.foreground}"
-    typography: "{typography.button-and-tab}"
-    rounded: "{rounded.demo-control}"
+    typography: "{typography.body}"
+    rounded: "{rounded.button}"
     padding: "0 16px"
     height: "{spacing.control-height}"
   demo-button-default:
@@ -303,7 +251,7 @@ components:
     padding: 4px
   demo-tab:
     textColor: "{colors.muted-foreground}"
-    typography: "{typography.button-and-tab}"
+    typography: "{typography.body}"
     rounded: "{rounded.demo-tab}"
     height: 28px
   demo-tab-selected:
@@ -312,13 +260,13 @@ components:
   demo-tooltip:
     backgroundColor: "{colors.foreground}"
     textColor: "{colors.card}"
-    typography: "{typography.caption}"
+    typography: "{typography.muted}"
     rounded: "{rounded.demo-tab}"
     padding: "4px 8px"
   foundation-button:
-    typography: "{typography.foundation-label}"
+    typography: "{typography.body}"
     padding: "0 12px"
-    height: "{spacing.foundation-control-height}"
+    height: "{spacing.control-height}"
   foundation-button-secondary:
     backgroundColor: "{colors.secondary}"
     textColor: "{colors.foreground}"
@@ -329,7 +277,7 @@ components:
     rounded: "{rounded.foundation-card}"
   foundation-code:
     backgroundColor: "{colors.secondary}"
-    typography: "{typography.foundation-code}"
+    typography: "{typography.code}"
     rounded: "{rounded.foundation-code}"
     padding: "2px 4px"
 ```

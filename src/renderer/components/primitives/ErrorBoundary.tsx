@@ -58,15 +58,15 @@ function CrashFallback(): ReactNode {
   const { t } = useI18n()
 
   return (
-    <div className="flex flex-col items-start gap-4 px-2 py-8 text-sm text-muted">
-      <h1 className="nola-display text-foreground">{t('status.error')}</h1>
-      <p className="nola-body max-w-[var(--nola-content-max)] text-muted">{t('errors.pageCrashed')}</p>
+    <div className="flex flex-col items-start gap-4 px-2 py-8 type-body text-muted">
+      <h1 className="type-h3 text-foreground">{t('status.error')}</h1>
+      <p className="type-body max-w-[var(--nola-content-max)] text-muted">{t('errors.pageCrashed')}</p>
 
       <div className="flex flex-wrap items-center gap-2">
         {/* The copy says "reload the window", so the primary action really reloads it. */}
         <Button
           variant="default"
-          className="rounded-full px-5"
+          className="px-5"
           onClick={() => {
             if (typeof window !== 'undefined') window.location.reload()
           }}
@@ -114,7 +114,7 @@ function CopyDiagnosticsButton(): ReactNode {
   }
 
   return (
-    <Button variant="tertiary" size="sm" className="rounded-[6px]" onClick={onClick} disabled={copied}>
+    <Button variant="tertiary" size="sm" onClick={onClick} disabled={copied}>
       {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
       {copied ? t('settings.copied') : t('errors.copyDiagnosticsAction')}
     </Button>

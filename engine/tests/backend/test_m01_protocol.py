@@ -8,6 +8,7 @@ Runs against the real FastAPI app via TestClient; no models, no network.
 from __future__ import annotations
 
 import json
+import asyncio
 import uuid
 from contextlib import contextmanager
 
@@ -18,6 +19,85 @@ from starlette.websockets import WebSocketDisconnect
 
 from nola_translator_engine.backend import create_app
 from nola_translator_engine.backend.contracts import SCHEMA_VERSION
+
+
+async def test_stop_cancels_preparation_before_waiting_for_the_session_lock():
+    from nola_translator_engine.backend.contracts import CreateSessionRequest, SessionCommand
+    from nola_translator_engine.backend.sessions import SessionManager
+
+    entered, cleaned = asyncio.Event(), asyncio.Event()
+
+    async def effect(session, command):
+        if command.type == "start":
+            entered.set()
+            try:
+                await asyncio.Future()
+            finally:
+                cleaned.set()
+        return "closed"
+
+    manager = SessionManager("test", command_effect=lambda session, command: asyncio.create_task(effect(session, command)))
+    session = await manager.create(CreateSessionRequest.model_validate({
+        "command_id": str(uuid.uuid4()), "owner": "quick_interpret", "config": cascade_config(),
+    }))
+    start = asyncio.create_task(manager.command(session.session_id, SessionCommand(command_id=str(uuid.uuid4()), type="start")))
+    await entered.wait()
+    stop = SessionCommand(command_id=str(uuid.uuid4()), type="stop")
+    ack = await asyncio.wait_for(manager.command(session.session_id, stop), timeout=1)
+    await start
+    assert cleaned.is_set()
+    assert ack.result_state == session.state == "closed"
+    assert manager.slot_holder is None
+    assert await manager.command(session.session_id, stop) == ack
+
+
+async def test_terminal_sessions_and_ingestions_have_bounded_retention():
+    from nola_translator_engine.backend.contracts import CreateSessionRequest, SessionCommand
+    from nola_translator_engine.backend.sessions import SessionManager
+
+    ingestions = {}
+    manager = SessionManager("test", command_effect=lambda _session, command: "closed" if command.type == "stop" else "running",
+                             on_forget=lambda session: ingestions.pop(session.session_id, None))
+    for _ in range(40):
+        session = await manager.create(CreateSessionRequest.model_validate({
+            "command_id": str(uuid.uuid4()), "owner": "browser_captions", "config": cascade_config(),
+        }))
+        ingestions[session.session_id] = object()
+        await manager.command(session.session_id, SessionCommand(command_id=str(uuid.uuid4()), type="stop"))
+    assert len(manager.list_sessions()) <= 33
+    assert set(ingestions) == {item.session_id for item in manager.list_sessions()}
+
+
+@pytest.mark.parametrize('reuse', ['create', 'start'])
+async def test_a_conflicting_stop_id_does_not_cancel_preparation(reuse):
+    from nola_translator_engine.backend.contracts import CreateSessionRequest, SessionCommand
+    from nola_translator_engine.backend.sessions import SessionManager, SessionError
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+    async def effect(_session, command):
+        if command.type == "start":
+            entered.set()
+            try:
+                await asyncio.Future()
+            finally:
+                cancelled.set()
+        return "closed"
+    manager = SessionManager("test", command_effect=lambda session, command: asyncio.create_task(effect(session, command)))
+    request = CreateSessionRequest.model_validate({
+        "command_id": str(uuid.uuid4()), "owner": "quick_interpret", "config": cascade_config(),
+    })
+    session = await manager.create(request)
+    start_command = SessionCommand(command_id=str(uuid.uuid4()), type="start")
+    start = asyncio.create_task(manager.command(session.session_id, start_command))
+    await entered.wait()
+    conflict = asyncio.create_task(manager.command(session.session_id, SessionCommand(
+        command_id=request.command_id if reuse == 'create' else start_command.command_id, type="stop")))
+    await asyncio.sleep(0)
+    assert not cancelled.is_set()
+    await asyncio.wait_for(manager.command(session.session_id, SessionCommand(command_id=str(uuid.uuid4()), type="stop")), 1)
+    await start
+    with pytest.raises(SessionError):
+        await conflict
 
 TOKEN = "test-control-token"
 

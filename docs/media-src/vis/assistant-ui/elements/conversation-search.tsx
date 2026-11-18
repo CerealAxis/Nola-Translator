@@ -58,7 +58,7 @@ export function ConversationSearch({
             onChange={(event) => onQueryChange?.(event.target.value)}
             placeholder={"在对话中查找"}
             aria-label={"在对话中查找"}
-            className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+            className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent type-body outline-none"
           />
           <span
             className={cn(mono, "text-muted-foreground shrink-0 tabular-nums")}
@@ -91,7 +91,7 @@ export function ConversationSearch({
           <div
             className={cn(
               field,
-              "fade-in animate-in rounded-xl px-3 py-2 text-xs leading-relaxed duration-200",
+              "fade-in animate-in rounded-xl px-3 py-2 type-small duration-200",
             )}
           >
             <span className="text-muted-foreground">{active.before}</span>

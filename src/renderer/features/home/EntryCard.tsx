@@ -38,12 +38,12 @@ const ICON_PLATE =
   'grid place-items-center rounded-lg bg-surface-secondary text-primary transition-colors duration-[var(--dur-micro)] group-hover:bg-surface-tertiary'
 
 const TOOLTIP_CLASS =
-  'z-overlay max-w-64 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
+  'z-overlay max-w-64 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 type-body text-overlay-foreground shadow-overlay'
 
 export interface EntryCardProps {
   /** Icon plate content at 24px; callers pass a lucide element. */
   icon: ReactNode
-  /** Card title. The main card uses `nola-title`, a sub card `nola-subtitle`. */
+  /** Card title. The main card uses `type-h3`, a sub card `type-h4`. */
   title: string
   /** Press handler. A sub card presses as a whole; on the main card the button calls it. */
   onPress: () => void
@@ -105,7 +105,7 @@ export function EntryCard({
     <span className="flex w-full flex-col items-start gap-1">
       <span
         className={[
-          isMain ? 'nola-title' : 'nola-subtitle',
+          isMain ? 'type-h3' : 'type-h4',
           'block w-full truncate text-foreground',
         ]
           .filter(Boolean)
@@ -113,7 +113,7 @@ export function EntryCard({
       >
         {title}
       </span>
-      {meta ? <span className="nola-caption block w-full text-muted">{meta}</span> : null}
+      {meta ? <span className="type-muted block w-full text-muted">{meta}</span> : null}
     </span>
   )
 
@@ -144,8 +144,8 @@ export function EntryCard({
           <CardContent><dl className="flex w-full flex-col gap-2">
             {facts.map(([label, value]) => (
               <div key={label} className="flex items-baseline justify-between gap-4">
-                <dt className="nola-caption shrink-0 text-muted">{label}</dt>
-                <dd className="nola-body-strong min-w-0 truncate text-foreground">{value}</dd>
+                <dt className="type-muted shrink-0 text-muted">{label}</dt>
+                <dd className="type-body font-semibold min-w-0 truncate text-foreground">{value}</dd>
               </div>
             ))}
           </dl></CardContent>
@@ -233,7 +233,7 @@ function SubCard({
           render={<span className={`block h-full w-full ${placement}`} tabIndex={0}>{button}</span>}
         />
         <TooltipContent sideOffset={3} className={TOOLTIP_CLASS}>
-              <p className="nola-caption max-w-64">{disabledReason}</p>
+              <p className="type-muted max-w-64">{disabledReason}</p>
             </TooltipContent>
       </Tooltip>
     )

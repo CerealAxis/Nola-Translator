@@ -164,6 +164,13 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   }
 }
 
+const rendererFlushes = new Set<() => Promise<void>>()
+ipcRenderer.on('comic:flush', (_event, token: string) => {
+  void Promise.all([...rendererFlushes].map(callback => Promise.resolve().then(callback)))
+    .then(() => invoke('comic:flush-result', { token, ok: true }), () => invoke('comic:flush-result', { token, ok: false }))
+    .catch(() => {})
+})
+
 const api: NolaTranslatorApi = {
   listComics: () => invoke('language-model:comics'),
   gameTranslation: {
@@ -184,10 +191,12 @@ const api: NolaTranslatorApi = {
   },
   comic: {
     onFlushRequested: callback => {
-      const receive = (_: Electron.IpcRendererEvent, token: string) => { void Promise.resolve().then(callback).then(() => invoke('comic:flush-result', { token, ok: true }), () => invoke('comic:flush-result', { token, ok: false })) }
-      ipcRenderer.on('comic:flush', receive)
-      void invoke('comic:flush-ready')
-      return () => ipcRenderer.off('comic:flush', receive)
+      rendererFlushes.add(callback)
+      void invoke('comic:flush-ready', true).catch(() => {})
+      return () => {
+        rendererFlushes.delete(callback)
+        if (!rendererFlushes.size) void invoke('comic:flush-ready', false).catch(() => {})
+      }
     },
     listProjects: () => invoke('comic:list'), openProject: id => invoke('comic:open', id),
     openQuickWorkspace: () => invoke('comic:quick'), saveQuickToLibrary: id => invoke('comic:save-quick', id),
@@ -341,7 +350,7 @@ const api: NolaTranslatorApi = {
   browserConnection: (action, enabled, browser) => invoke('browser:connection', action, enabled, browser),
   listComputeDevices: () => invoke(channels.listComputeDevices),
   getRuntimes: () => invoke(channels.getRuntimes),
-  prepareRuntimes: () => invoke(channels.prepareRuntimes),
+  prepareRuntimes: components => invoke(channels.prepareRuntimes, components),
   openRuntimeSettings: component => invoke(channels.openRuntimeSettings, component),
   installRuntime: (id, repair) => invoke(channels.installRuntime, id, repair),
   uninstallRuntime: (kind) => invoke(channels.uninstallRuntime, kind),

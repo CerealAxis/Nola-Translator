@@ -76,7 +76,7 @@ export function StorageTab({ settings }: SettingsPanelProps) {
         </SettingsRow>
 
         <SettingsRow label={t('modelsSettingsUi.storageUsage')}>
-          <p className={`nola-body-strong tabular-nums ${usedBytes === undefined ? 'text-muted' : 'text-foreground'}`}>
+          <p className={`type-body font-semibold tabular-nums ${usedBytes === undefined ? 'text-muted' : 'text-foreground'}`}>
             {usedBytes === undefined ? t('modelsSettingsUi.storageValueUnavailable') : formatBytes(usedBytes)}
           </p>
         </SettingsRow>
@@ -88,8 +88,8 @@ export function StorageTab({ settings }: SettingsPanelProps) {
             <div role="alert" className="flex items-start gap-3 rounded-nola-ui-lg bg-warning-soft px-4 py-3 text-warning-soft-foreground">
               <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
               <div className="flex min-w-0 flex-col gap-1">
-                <p className="nola-body-strong">{t('settings.restartRequired')}</p>
-                <p className="nola-caption">{t('errors.storageChangedAction')}</p>
+                <p className="type-body font-semibold">{t('settings.restartRequired')}</p>
+                <p className="type-muted">{t('errors.storageChangedAction')}</p>
               </div>
             </div>
             <div>

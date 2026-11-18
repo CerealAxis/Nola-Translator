@@ -40,7 +40,7 @@ export function ScrollAreaRtl() {
   return (
     <ScrollArea className="h-72 w-48 rounded-md border" dir={dir}>
       <div className="p-4">
-        <h4 className="mb-4 text-sm leading-none font-medium">{t.tags}</h4>
+        <h4 className="mb-4 text-sm font-medium">{t.tags}</h4>
         {tags.map((tag) => (
           <React.Fragment key={tag}>
             <div className="text-sm">{tag}</div>

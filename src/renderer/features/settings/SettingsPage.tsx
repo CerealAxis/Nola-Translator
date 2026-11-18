@@ -72,7 +72,7 @@ export function SettingsPage() {
         {panels ? panels[active] : loadError ? (
           <Card size="sm">
             <CardContent className="flex flex-col items-start gap-3">
-              <p className="nola-body-strong">{t('settings.loadFailed')}</p>
+              <p className="type-body font-semibold">{t('settings.loadFailed')}</p>
               <Button variant="secondary" size="sm" onClick={() => void actions.settings.loadSettings().catch(() => undefined)}>{t('models.retry')}</Button>
             </CardContent>
           </Card>

@@ -43,7 +43,7 @@ export function ActivityGraph({
       {...props}
     >
       <div className="flex items-baseline justify-between">
-        <span className="text-[13.5px] font-medium">{title}</span>
+        <span className="type-body font-medium">{title}</span>
         <span className={cn(mono, "text-muted-foreground tabular-nums")}>
           {total}
         </span>
@@ -63,7 +63,7 @@ export function ActivityGraph({
                 <span
                   className={cn(
                     mono,
-                    "text-muted-foreground flex h-[9px] items-center leading-none",
+                    "text-muted-foreground flex h-[9px] items-center",
                   )}
                 >
                   {label.row % 2 === 1

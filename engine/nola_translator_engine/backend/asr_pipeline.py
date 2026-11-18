@@ -209,7 +209,10 @@ class AsrPipeline:
             for segment in self.gate.flush():
                 self._queue_final(segment, "input_end", flags=("audio_gap",))
         self.next_sample = start_sample + frame.samples.size
-        for segment in self.gate.accept(AudioFrame(frame.samples, start_sample / 16)):
+        segments = await asyncio.to_thread(self.gate.accept, AudioFrame(frame.samples, start_sample / 16))
+        if self._closed or self._finishing:
+            return
+        for segment in segments:
             duration = segment.end_ms - segment.start_ms
             reason = "forced_duration" if duration >= self.gate.max_segment_ms else "hard_silence"
             self._queue_final(segment, reason)
@@ -344,7 +347,9 @@ class AsrPipeline:
         try:
             while not self._closed:
                 if self._final_jobs:
-                    await self._finalize(self._final_jobs.popleft())
+                    await self._finalize(self._final_jobs[0])
+                    if self._final_jobs:
+                        self._final_jobs.popleft()
                     continue
                 if self._pending_preview is not None and not self._finishing:
                     job, self._pending_preview = self._pending_preview, None

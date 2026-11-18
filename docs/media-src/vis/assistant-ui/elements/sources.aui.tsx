@@ -15,7 +15,7 @@ import { Badge } from "../../shadcn-base/ui/badge";
 import { hostOf, safeHref } from "../utils/href";
 
 const sourceVariants = cva(
-  "inline-flex items-center justify-center gap-1 rounded-md text-xs font-medium transition-colors motion-reduce:transition-none [&_svg]:size-3 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-1 rounded-md type-small transition-colors motion-reduce:transition-none [&_svg]:size-3 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -29,16 +29,16 @@ const sourceVariants = cva(
           "text-muted-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground bg-transparent",
         info: "bg-accent text-accent-foreground [a&]:hover:bg-accent/80",
         warning:
-          "bg-chart-4/10 text-chart-4 [a&]:hover:bg-chart-4/20",
+          "bg-chart-4/10 text-warning-soft-foreground [a&]:hover:bg-chart-4/20",
         success:
-          "bg-chart-2/10 text-chart-2 [a&]:hover:bg-chart-2/20",
+          "bg-chart-2/10 text-success-soft-foreground [a&]:hover:bg-chart-2/20",
         destructive:
-          "bg-destructive/10 text-destructive [a&]:hover:bg-destructive/20",
+          "bg-destructive/10 text-danger-soft-foreground [a&]:hover:bg-destructive/20",
       },
       size: {
         sm: "px-1.5 py-0.5",
         default: "px-2 py-1",
-        lg: "px-2.5 py-1.5 text-sm",
+        lg: "px-2.5 py-1.5 type-body",
       },
     },
     defaultVariants: {
@@ -81,7 +81,7 @@ const SourceIcon = forwardRef<
         ref={ref}
         data-slot="source-icon-fallback"
         className={cn(
-          "bg-muted flex size-3 shrink-0 items-center justify-center rounded-sm text-[10px] font-medium",
+          "bg-muted flex size-3 shrink-0 items-center justify-center rounded-sm type-small",
           className,
         )}
         {...props}

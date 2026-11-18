@@ -8,12 +8,45 @@ import { emptyGlossary } from '../../src/shared/glossary'
 
 beforeEach(() => { vi.stubGlobal('chrome', { runtime: { id: 'test-extension' }, declarativeNetRequest: { updateSessionRules: vi.fn().mockResolvedValue(undefined) }, permissions: { contains: vi.fn().mockResolvedValue(true), request: vi.fn().mockResolvedValue(true) } }); vi.restoreAllMocks() })
 describe('provider trust boundaries', () => {
+  it.each(['translate', 'generate', 'synthesize', 'translateImage', 'translationLimits'] as const)('rejects %s on a blacklisted page before any provider call', async type => {
+    const preferences = await import('./preferences')
+    const glossary = await import('./glossary-store')
+    vi.spyOn(glossary, 'recoverExtensionConfiguration').mockResolvedValue(undefined)
+    vi.spyOn(preferences, 'loadPreferences').mockResolvedValue({ ...DEFAULT_PREFERENCES, siteBlacklist: ['example.com'] })
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher)
+    const event = () => ({ addListener: vi.fn() })
+    const runtime = { ...chrome.runtime, onConnect: event(), getURL: (path: string) => `chrome-extension://nola/${path}` }
+    vi.stubGlobal('chrome', { ...chrome, runtime })
+    setupProviderRuntime()
+    const port = { name: 'nola-provider', sender: { url: 'https://example.com/article', frameId: 0, tab: { id: 2 } }, onMessage: event(), onDisconnect: event(), postMessage: vi.fn(), disconnect: vi.fn() }
+    runtime.onConnect.addListener.mock.calls[0][0](port)
+    port.onMessage.addListener.mock.calls[0][0](type === 'translate'
+      ? { type, id: 'blocked', text: 'Hello', sourceLanguage: 'en', targetLanguage: 'zh', purpose: 'web' }
+      : type === 'translateImage' ? { type, id: 'blocked', image: 'data:image/png;base64,AAAA', targetLanguage: 'zh' }
+        : { type, id: 'blocked', ...(type === 'translationLimits' ? { desktop: true } : { text: 'Hello' }), ...(type === 'synthesize' ? { language: 'en' } : {}) })
+    await vi.waitFor(() => expect(port.postMessage).toHaveBeenCalledWith({ id: 'blocked', error: 'providerPermission' }))
+    expect(fetcher).not.toHaveBeenCalled()
+    port.onDisconnect.addListener.mock.calls[0][0]()
+  })
+  it.each(['generate', 'synthesize'] as const)('keeps page %s requests bound to the configured provider', async type => {
+    const preferences = await import('./preferences')
+    vi.spyOn(preferences, 'loadPreferences').mockResolvedValue({ ...DEFAULT_PREFERENCES, llmProvider: 'chosen', ttsProvider: 'chosen' })
+    const event = () => ({ addListener: vi.fn() })
+    const runtime = { ...chrome.runtime, onConnect: event(), getURL: (path: string) => `chrome-extension://nola/${path}` }
+    vi.stubGlobal('chrome', { ...chrome, runtime })
+    setupProviderRuntime()
+    const port = { name: 'nola-provider', sender: { url: 'https://example.com/article', frameId: 0, tab: { id: 2 } }, onMessage: event(), onDisconnect: event(), postMessage: vi.fn(), disconnect: vi.fn() }
+    runtime.onConnect.addListener.mock.calls[0][0](port)
+    port.onMessage.addListener.mock.calls[0][0]({ type, id: 'switched', text: 'Hello', providerId: 'unselected', ...(type === 'synthesize' ? { language: 'en' } : {}) })
+    await vi.waitFor(() => expect(port.postMessage).toHaveBeenCalledWith({ id: 'switched', error: 'providerPermission' }))
+    port.onDisconnect.addListener.mock.calls[0][0]()
+  })
   it('rejects document translation requests from ordinary webpage senders', () => {
     const event = () => ({ addListener: vi.fn() })
     const runtime = { ...chrome.runtime, onConnect: event(), getURL: (path: string) => `chrome-extension://nola/${path}` }
     vi.stubGlobal('chrome', { ...chrome, runtime })
     setupProviderRuntime()
-    const port = { name: 'nola-provider', sender: { url: 'https://example.com/article', tab: { id: 2 } }, onMessage: event(), onDisconnect: event(), postMessage: vi.fn(), disconnect: vi.fn() }
+    const port = { name: 'nola-provider', sender: { url: 'https://example.com/article', frameId: 0, tab: { id: 2 } }, onMessage: event(), onDisconnect: event(), postMessage: vi.fn(), disconnect: vi.fn() }
     runtime.onConnect.addListener.mock.calls[0][0](port)
     port.onMessage.addListener.mock.calls[0][0]({ type: 'translate', id: 'doc', text: 'Hello', sourceLanguage: 'en', targetLanguage: 'zh', purpose: 'document' })
     expect(port.postMessage).toHaveBeenCalledWith({ id: 'doc', error: 'providerPermission' })
@@ -239,7 +272,7 @@ describe('provider execution', () => {
     const runtime = { ...chrome.runtime, onConnect: event(), connectNative: vi.fn(), getURL: (path: string) => `chrome-extension://nola/${path}` }
     vi.stubGlobal('chrome', { ...chrome, runtime, storage: { onChanged: event(), local: { get: vi.fn().mockResolvedValue({ pageProvider: index.id }) } } })
     setupProviderRuntime()
-    const port = { name: 'nola-provider', sender: { url: 'https://example.com/article', tab: { id: 2 } }, onMessage: event(), onDisconnect: event(), postMessage: vi.fn(), disconnect: vi.fn() }
+    const port = { name: 'nola-provider', sender: { url: 'https://example.com/article', frameId: 0, tab: { id: 2 } }, onMessage: event(), onDisconnect: event(), postMessage: vi.fn(), disconnect: vi.fn() }
     runtime.onConnect.addListener.mock.calls[0][0](port)
     port.onMessage.addListener.mock.calls[0][0]({ type: 'translate', id: 'web', text: 'Hello', sourceLanguage: 'en', targetLanguage: 'zh', purpose: 'web' })
     await vi.waitFor(() => expect(port.postMessage).toHaveBeenCalledWith({ id: 'web', result: { text: 'Translated' } }))

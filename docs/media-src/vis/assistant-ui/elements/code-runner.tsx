@@ -69,7 +69,7 @@ export function CodeRunner({
         ) : null}
       </div>
 
-      <pre className="border-foreground/[0.07] overflow-x-auto border-t px-3.5 py-2.5 font-mono text-xs leading-relaxed">
+      <pre className="border-foreground/[0.07] overflow-x-auto border-t px-3.5 py-2.5 type-code">
         <code className="text-foreground/75">{code}</code>
       </pre>
 
@@ -82,9 +82,9 @@ export function CodeRunner({
                 <span
                   key={`${i}-${line}`}
                   className={cn(
-                    "fade-in animate-in fill-mode-both font-mono text-xs leading-relaxed whitespace-pre",
+                    "fade-in animate-in fill-mode-both type-code whitespace-pre",
                     state === "error"
-                      ? "text-destructive"
+                      ? "text-danger-soft-foreground"
                       : "text-foreground/70",
                   )}
                   style={{ animationDelay: `${i * 80}ms` }}

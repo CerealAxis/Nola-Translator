@@ -246,7 +246,7 @@ function ProgressLine({ record, state }: { record: ResourceRecord; state: Resour
           <Progress.Indicator className="h-full rounded-sm bg-primary transition-[width] duration-[var(--dur-enter)]" />
         </Progress.Track>
       </Progress.Root>
-      <span className="nola-micro text-muted tabular">
+      <span className="type-muted text-muted tabular">
         {t('models.progress', { percent: Math.round(value * 100) })}
       </span>
     </div>

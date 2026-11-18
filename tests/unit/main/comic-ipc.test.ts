@@ -55,3 +55,37 @@ it('waits for the renderer save acknowledgment and propagates failure', async ()
   await expect(failed).rejects.toThrow('comicSaveFailed')
   await service.dispose()
 })
+
+it('rejects malformed backend project and task payloads at the IPC boundary', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ success: true, data: { id: 'not-a-project' } }) })))
+  const { service, invoke } = fixture()
+  await expect(invoke('comic:quick')).rejects.toThrow()
+  await expect(invoke('comic:tasks')).rejects.toThrow()
+  await service.dispose()
+})
+
+it('accepts an empty backend bookshelf entry without a cover page', async () => {
+  const id = crypto.randomUUID()
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ success: true, data: [
+    { id, title: 'Empty', revision: 0, updatedAt: '', pageCount: 0, chapterCount: 1, coverPageId: null },
+  ] }) })))
+  const { service, invoke } = fixture()
+  await expect(invoke('comic:list')).resolves.toEqual([expect.objectContaining({ id, coverPageId: undefined })])
+  await service.dispose()
+})
+
+it('drops stale readiness after a reload or crash, including an in-flight flush', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ success: true, data: null }) })))
+  const { service, invoke, sender } = fixture()
+  invoke('comic:flush-ready')
+  const pending = service.flushRenderer()
+  service.rendererUnavailable()
+  await pending
+  await service.flushRenderer()
+  expect(sender.send).toHaveBeenCalledTimes(1)
+  invoke('comic:flush-ready')
+  const readyAgain = service.flushRenderer()
+  invoke('comic:flush-result', { token: sender.send.mock.calls[1][1], ok: true })
+  await readyAgain
+  await service.dispose()
+})

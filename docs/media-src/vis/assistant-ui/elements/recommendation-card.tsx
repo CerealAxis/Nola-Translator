@@ -53,8 +53,8 @@ export function RecommendationCard({
       {...props}
       {...focusHandlers}
     >
-      <p className="text-sm font-medium">{question}</p>
-      <p className="text-muted-foreground text-[13px] leading-relaxed">
+      <p className="type-body font-medium">{question}</p>
+      <p className="text-muted-foreground type-body">
         {children}
       </p>
 
@@ -96,9 +96,9 @@ export function RecommendationCard({
             key="accepted"
             ref={receiptRef}
             tabIndex={-1}
-            className="fade-in animate-in text-muted-foreground flex items-center gap-2 text-xs duration-300"
+            className="fade-in animate-in text-muted-foreground flex items-center gap-2 type-muted duration-300"
           >
-            <CheckIcon className="size-3.5 text-chart-2" />
+            <CheckIcon className="size-3.5 text-success-soft-foreground" />
             {acceptedLabel}
           </div>
         )}

@@ -51,16 +51,16 @@ export function Onboarding({
         <span className={cn(mono, "text-muted-foreground tabular-nums")}>
           {current + 1} 的 {steps.length}
         </span>
-        <span className="text-[15px] font-medium tracking-tight">
+        <span className="type-body font-medium">
           {step.title}
         </span>
-        <p className="text-muted-foreground text-[13px] leading-relaxed break-words">
+        <p className="text-muted-foreground type-body break-words">
           {step.body}
         </p>
         <span
           className={cn(
             field,
-            "text-foreground/60 rounded-xl px-3 py-2 text-[13px] leading-relaxed",
+            "text-foreground/60 rounded-xl px-3 py-2 type-body",
           )}
         >
           {step.example}

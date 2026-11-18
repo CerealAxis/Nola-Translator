@@ -327,7 +327,7 @@ function ImageSource({
     <div
       data-slot="image-source"
       className={cn(
-        "text-muted-foreground flex items-center gap-2 border-t px-2 py-1.5 text-xs",
+        "text-muted-foreground flex items-center gap-2 border-t px-2 py-1.5 type-muted",
         className,
       )}
       {...props}
@@ -344,7 +344,7 @@ function ImageSource({
         <span
           data-slot="image-source-icon-fallback"
           aria-hidden="true"
-          className="bg-muted flex size-4 shrink-0 items-center justify-center rounded-sm text-[10px] font-medium"
+          className="bg-muted flex size-4 shrink-0 items-center justify-center rounded-sm type-small"
         >
           {displayLabel.charAt(0).toUpperCase()}
         </span>
@@ -380,7 +380,7 @@ function ImageFilename({
     <span
       data-slot="image-filename"
       className={cn(
-        "text-muted-foreground block truncate px-2 py-1.5 text-xs",
+        "text-muted-foreground block truncate px-2 py-1.5 type-muted",
         className,
       )}
       {...props}
@@ -543,8 +543,8 @@ function ImageContentFilterError({
       )}
     >
       <ShieldAlertIcon className="text-muted-foreground size-8" />
-      <p className="text-sm font-medium">Image could not be generated</p>
-      {reason && <p className="text-muted-foreground text-xs">{reason}</p>}
+      <p className="type-body font-medium">Image could not be generated</p>
+      {reason && <p className="text-muted-foreground type-muted">{reason}</p>}
     </div>
   );
 }

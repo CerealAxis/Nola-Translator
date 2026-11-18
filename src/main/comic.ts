@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { comicExportSchema, comicImportSchema, comicMutationSchema, comicRunSchema, type ComicProject, type ComicProjectSummary, type ComicTask, type ComicFont } from '../shared/comic'
+import { comicExportSchema, comicImportSchema, comicMutationSchema, comicRunSchema, comicProjectSchema, comicProjectSummarySchema, comicTaskSchema, type ComicProject, type ComicProjectSummary, type ComicTask, type ComicFont } from '../shared/comic'
 import { isTrustedRendererUrl } from './window-options'
 import { ComicTaskRunner, type ComicRequest } from './comic-jobs'
 import type { ComicModelInput } from './comic-model'
@@ -44,7 +44,7 @@ export class ComicTranslation {
       })
     }
     handle('comic:list', () => this.listProjects())
-    handle('comic:flush-ready', () => { this.rendererReady = true })
+    handle('comic:flush-ready', raw => { this.rendererReady = raw === undefined || z.boolean().parse(raw) })
     handle('comic:flush-result', raw => {
       const result = z.object({ token: z.string().uuid(), ok: z.boolean() }).strict().parse(raw)
       if (this.pendingFlush?.token === result.token) {
@@ -112,9 +112,13 @@ export class ComicTranslation {
     return response
   }
   private request: ComicRequest = async <T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> => {
-    const payload = await (await this.fetch(path, body, signal)).json() as { success: boolean; data: T; code?: string }
+    const payload = z.object({ success: z.boolean(), data: z.unknown(), code: z.string().optional() }).parse(await (await this.fetch(path, body, signal)).json())
     if (payload.success !== true) throw new Error(payload.code || 'comicInvalidResponse')
-    return payload.data
+    const schema = path === '/books' ? comicProjectSummarySchema.array()
+      : path === '/workspaces/quick' || /^\/books\/(?!delete$|restore$)/.test(path) ? comicProjectSchema
+        : path === '/jobs' ? body === undefined ? comicTaskSchema.array() : comicTaskSchema
+          : /^\/jobs\/[^/]+\/(control|complete)$/.test(path) ? comicTaskSchema : undefined
+    return (schema ? schema.parse(payload.data) : payload.data) as T
   }
   async listProjects() { return this.request<ComicProjectSummary[]>('/books') }
   async openProject(id: string) { return this.request<ComicProject>(`/books/${idSchema.parse(id)}`) }
@@ -173,6 +177,10 @@ export class ComicTranslation {
     } finally { await rm(temporary, { force: true }).catch(() => {}) }
   }
   async stop() { await this.runner.stop() }
+  rendererUnavailable() {
+    this.rendererReady = false
+    this.pendingFlush?.resolve()
+  }
   async flushRenderer() {
     const main = this.options.getMainWindow()
     if (!this.rendererReady || !main || main.isDestroyed()) return

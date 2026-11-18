@@ -36,7 +36,7 @@ export function MessageQueue({
           <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/60 motion-reduce:hidden" />
           <span className="relative inline-flex size-2 rounded-full bg-primary" />
         </span>
-        <span className="text-foreground/90 min-w-0 flex-1 truncate text-[13.5px]">
+        <span className="text-foreground/90 min-w-0 flex-1 truncate type-body">
           {running}
         </span>
         <span className={cn(mono, "text-muted-foreground shrink-0")}>
@@ -72,7 +72,7 @@ export function MessageQueue({
             >
               {index + 1}
             </span>
-            <span className="text-foreground/60 min-w-0 flex-1 truncate text-[13.5px]">
+            <span className="text-foreground/60 min-w-0 flex-1 truncate type-body">
               {message.text}
             </span>
             <ArrowUpIcon className="text-foreground/25 size-3 shrink-0" />

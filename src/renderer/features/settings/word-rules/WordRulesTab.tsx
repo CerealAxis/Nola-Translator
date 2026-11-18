@@ -218,7 +218,7 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
               <ArrowLeft />
             </Button>
           )}
-          <h2 className="nola-title">{library?.name ?? p(kind)}</h2>
+          <h2 className="type-body font-semibold">{library?.name ?? p(kind)}</h2>
         </div>
         {!library && (
           <div className="flex items-center gap-3">
@@ -296,7 +296,7 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>{p('entries') + ' · ' + library.entries.length}</CardTitle>
+              <CardTitle className="type-body font-semibold">{p('entries') + ' · ' + library.entries.length}</CardTitle>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={() => download('csv')}>
                   <Download data-icon="inline-start" />
@@ -488,7 +488,7 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>{t('suite.matchTest')}</CardTitle>
+              <CardTitle className="type-body font-semibold">{t('suite.matchTest')}</CardTitle>
             </CardHeader>
             <CardContent>
               <FieldGroup>

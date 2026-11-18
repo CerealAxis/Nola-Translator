@@ -36,11 +36,19 @@ async function main() {
       const computed = await page.evaluate(() => {
         const input = document.querySelector('[data-slot="input-group"]') || document.querySelector('input'); const selected = document.querySelector('nav [aria-current="page"]')
         const color = selector => { const value = getComputedStyle(selector).backgroundColor; const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1; const ctx = canvas.getContext('2d'); ctx.fillStyle = value; ctx.fillRect(0, 0, 1, 1); return { css: value, rgba: [...ctx.getImageData(0, 0, 1, 1).data] } }
-        return { input: color(input), selected: color(selected), font: getComputedStyle(document.body).fontFamily, headingFont: getComputedStyle(document.querySelector('.nola-options-header strong')).fontFamily }
+        const metrics = selector => {
+          const style = getComputedStyle(document.querySelector(selector))
+          return [style.fontSize, style.lineHeight, style.fontWeight, style.letterSpacing]
+        }
+        return { input: color(input), selected: color(selected), font: getComputedStyle(document.body).fontFamily, headingFont: getComputedStyle(document.querySelector('.nola-options-header strong')).fontFamily,
+          title: metrics('.nola-settings-title h1'), body: metrics('.nola-settings-shell'), description: metrics('.nola-settings-title p') }
       })
       colors.push({ locale, theme, width, ...computed })
       console.log({ locale, theme, ...computed })
       assert.ok(computed.font.includes('sans-serif') && computed.headingFont.includes('sans-serif'), 'Extension typography must use the independent system sans stack')
+      assert.deepEqual(computed.title, ['36px', '40px', '800', 'normal'])
+      assert.deepEqual(computed.body, theme === 'dark' ? ['15px', '22px', '400', '0.225px'] : ['14px', '22px', '400', 'normal'])
+      assert.deepEqual(computed.description, ['14px', '20px', '400', theme === 'dark' ? '0.28px' : 'normal'])
       if (theme === 'light') { assert.ok(computed.input.rgba[0] > 230, 'Light input must be near white'); assert.ok(computed.selected.rgba[0] > 200 && computed.selected.rgba[2] > computed.selected.rgba[0], 'Selected navigation must use the soft Nola surface') }
       else assert.ok(computed.input.rgba[0] < 100, 'Dark input must use the dark Nola surface')
       await page.screenshot({ path: path.join(output, `settings-${locale}-${theme}-${width}.png`), fullPage: true, animations: 'disabled' }); screenshots++

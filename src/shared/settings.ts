@@ -166,7 +166,12 @@ export const GLASS_CONTROLS = {
 
 export type GlassControl = keyof typeof GLASS_CONTROLS
 
+export const UI_FONTS = ['system', 'Noto Sans SC', 'Noto Sans TC', 'Noto Sans HK', 'Noto Sans JP', 'Noto Sans KR'] as const
+export type UiFont = typeof UI_FONTS[number]
+
 export type AppearancePrefs = Record<GlassControl, number> & {
+  interfaceFont: UiFont
+  density: 'compact' | 'comfortable'
   /** Set on the main window's document by the settings tab, so the caption overlay keeps animating. */
   reduceMotion: boolean
   liquidGlass: boolean
@@ -400,6 +405,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     keepAudio: true,
   },
   appearance: {
+    interfaceFont: 'system',
+    density: 'compact',
     reduceMotion: false,
     liquidGlass: true,
     glassBlur: GLASS_CONTROLS.glassBlur.initial,

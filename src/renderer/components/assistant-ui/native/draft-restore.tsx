@@ -34,7 +34,7 @@ export function DraftRestore({
     >
       <PencilLineIcon className="text-muted-foreground size-3.5 shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-foreground/70 truncate [font:var(--font-caption)]">{draft}</span>
+        <span className="text-foreground/70 truncate type-muted">{draft}</span>
         <span className={cn(mono, "text-muted-foreground")}>
           unsent draft · {savedAt}
         </span>
@@ -42,7 +42,7 @@ export function DraftRestore({
       <button
         type="button"
         onClick={onRestore}
-        className="text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground/95 shrink-0 rounded-full px-2.5 py-1 [font:var(--font-caption)] font-medium transition-[background-color,color,scale] duration-150 active:scale-[0.96]"
+        className="text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground/95 shrink-0 rounded-full px-2.5 py-1 type-small transition-[background-color,color,scale] duration-150 active:scale-[0.96]"
       >
         Restore
       </button>

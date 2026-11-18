@@ -36,7 +36,7 @@ export function AgentPlan({
       {...props}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[13.5px] font-medium">{title}</span>
+        <span className="type-body font-medium">{title}</span>
         <span className={cn(mono, "text-muted-foreground tabular-nums")}>
           {completed} 的 {total}
         </span>
@@ -66,7 +66,7 @@ export function AgentPlan({
             <li
               key={typeof step === "string" ? i : (step.id ?? i)}
               className={cn(
-                "flex gap-2.5 text-[13.5px]",
+                "flex gap-2.5 type-body",
                 active && item.description ? "items-start" : "items-center",
               )}
             >
@@ -100,7 +100,7 @@ export function AgentPlan({
                 </span>
                 <span className="sr-only">{` ${status}`}</span>
                 {active && item.description ? (
-                  <span className="text-muted-foreground mt-0.5 block text-xs">
+                  <span className="text-muted-foreground mt-0.5 block type-muted">
                     {item.description}
                   </span>
                 ) : null}

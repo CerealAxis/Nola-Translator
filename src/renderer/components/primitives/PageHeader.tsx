@@ -8,7 +8,7 @@ import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 
 export interface PageHeaderProps {
-  /** Page title. `.nola-display` is the only step carrying negative tracking. */
+  /** Page title. */
   title: ReactNode
   warning?: string
   /** Subtitle, not rendered unless passed. Only worth text the user cannot infer. */
@@ -31,7 +31,7 @@ const GAP_CLASS: Record<4 | 8 | 12, string> = {
 
 export function PageHeader({ title, warning, subtitle, actions, className, gap = 4 }: PageHeaderProps) {
   const hasSubtitle = subtitle !== undefined && subtitle !== null && subtitle !== ''
-  const heading = <h1 className="nola-display min-w-0 text-foreground">{title}</h1>
+  const heading = <h1 className="type-h3 min-w-0 text-foreground">{title}</h1>
 
   return (
     <header className={['flex min-w-0 flex-col', GAP_CLASS[gap], className ?? ''].filter(Boolean).join(' ')}>
@@ -41,7 +41,7 @@ export function PageHeader({ title, warning, subtitle, actions, className, gap =
             {heading}
             <Badge variant="warning" className="h-auto max-w-full whitespace-normal">{warning}</Badge>
           </div> : heading}
-          {hasSubtitle ? <p className="nola-body min-w-0 text-muted">{subtitle}</p> : null}
+          {hasSubtitle ? <p className="type-body min-w-0 text-muted">{subtitle}</p> : null}
         </div>
         {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
       </div>

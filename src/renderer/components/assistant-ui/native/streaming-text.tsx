@@ -38,7 +38,7 @@ export function StreamingText({
     <p
       data-slot="streaming-text"
       className={cn(
-        "min-h-[8.5rem] max-w-sm text-sm leading-relaxed text-pretty",
+        "min-h-[8.5rem] max-w-sm type-body text-pretty",
         className,
       )}
 
@@ -56,7 +56,7 @@ export function StreamingText({
                 "transition-colors duration-700 motion-reduce:transition-none",
                 fresh && "text-primary",
                 isMono &&
-                  "bg-foreground/[0.06] rounded-md px-1.5 py-0.5 font-mono text-[0.85em]",
+                  "bg-foreground/[0.06] rounded-md px-1.5 py-0.5 type-code",
               )}
             >
               {word}

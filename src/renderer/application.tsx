@@ -6,6 +6,7 @@ import { ArrowLeft, AudioLines, LayoutDashboard, SlidersHorizontal, Settings, Me
 import { useI18n } from './i18n'
 import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, ROUTE_TITLES, Routes, settingsPath, useRoute } from './routes'
 import { HomePage } from './features/home'
+import { ComicBooksLoading, ComicProjectLoading } from './features/comic/ComicLoading'
 import { SETTINGS_NAVIGATION } from './features/settings/settingsNavigation'
 import type { RoutesProps } from './routes'
 import type { AppShellNavigationItem } from './components/primitives/AppShell'
@@ -68,7 +69,11 @@ export const APPLICATION_PAGES = {
 
 function ComicRoutePage() {
   const { projectId, pageId, reader } = useRoute()
-  return <ComicTranslationPage projectId={projectId} pageId={pageId} reader={reader} />
+  return (
+    <Suspense fallback={projectId ? <ComicProjectLoading comparison={!reader} /> : <ComicBooksLoading />}>
+      <ComicTranslationPage projectId={projectId} pageId={pageId} reader={reader} />
+    </Suspense>
+  )
 }
 
 function GameRoutePage() {

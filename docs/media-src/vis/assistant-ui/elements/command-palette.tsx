@@ -111,7 +111,7 @@ export function CommandPalette({
               ? optionId(activeId)
               : undefined
           }
-          className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[13.5px] outline-none"
+          className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent type-body outline-none"
         />
         <span data-preview-kbd>
           esc
@@ -150,7 +150,7 @@ export function CommandPalette({
                 );
                 const content = (
                   <>
-                    <span className="min-w-0 flex-1 truncate text-[13px]">
+                    <span className="min-w-0 flex-1 truncate type-body">
                       {command.label}
                     </span>
                     <span className="flex shrink-0 gap-1">
@@ -201,7 +201,7 @@ export function CommandPalette({
       </div>
       {matches.length === 0 && (
         <div className="border-foreground/[0.07] border-t p-1.5">
-          <span className="text-muted-foreground block px-2 py-4 text-center text-xs break-words">
+          <span className="text-muted-foreground block px-2 py-4 text-center type-muted break-words">
             没有命令匹配“{query}”
           </span>
         </div>

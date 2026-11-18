@@ -11,7 +11,7 @@ export function ScrollAreaDemo() {
   return (
     <ScrollArea className="h-72 w-48 rounded-md border">
       <div className="p-4">
-        <h4 className="mb-4 text-sm leading-none font-medium">标签</h4>
+        <h4 className="mb-4 text-sm font-medium">标签</h4>
         {tags.map((tag) => (
           <React.Fragment key={tag}>
             <div className="text-sm">{tag}</div>

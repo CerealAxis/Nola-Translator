@@ -29,7 +29,7 @@ export function ToggleGroupFontWeightSelector() {
           aria-label="浅色"
           className="flex size-16 flex-col items-center justify-center rounded-xl"
         >
-          <span className="text-2xl leading-none font-light">Aa</span>
+          <span className="text-2xl font-light">Aa</span>
           <span className="text-xs text-muted-foreground">浅色</span>
         </ToggleGroupItem>
         <ToggleGroupItem
@@ -37,7 +37,7 @@ export function ToggleGroupFontWeightSelector() {
           aria-label="标准"
           className="flex size-16 flex-col items-center justify-center rounded-xl"
         >
-          <span className="text-2xl leading-none font-normal">Aa</span>
+          <span className="text-2xl font-normal">Aa</span>
           <span className="text-xs text-muted-foreground">标准</span>
         </ToggleGroupItem>
         <ToggleGroupItem
@@ -45,7 +45,7 @@ export function ToggleGroupFontWeightSelector() {
           aria-label="中"
           className="flex size-16 flex-col items-center justify-center rounded-xl"
         >
-          <span className="text-2xl leading-none font-medium">Aa</span>
+          <span className="text-2xl font-medium">Aa</span>
           <span className="text-xs text-muted-foreground">中</span>
         </ToggleGroupItem>
         <ToggleGroupItem
@@ -53,7 +53,7 @@ export function ToggleGroupFontWeightSelector() {
           aria-label="加粗"
           className="flex size-16 flex-col items-center justify-center rounded-xl"
         >
-          <span className="text-2xl leading-none font-bold">Aa</span>
+          <span className="text-2xl font-bold">Aa</span>
           <span className="text-xs text-muted-foreground">加粗</span>
         </ToggleGroupItem>
       </ToggleGroup>

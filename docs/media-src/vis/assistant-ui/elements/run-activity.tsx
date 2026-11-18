@@ -73,7 +73,7 @@ export function RunActivity({
         <Collapsible open={open} onOpenChange={onOpenChange}>
           <CollapsibleTrigger
             aria-busy={status === "running"}
-            className="group/trigger text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 flex max-w-full items-center gap-1.5 rounded-md py-1 text-sm outline-none focus-visible:ring-[3px]"
+            className="group/trigger text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 flex max-w-full items-center gap-1.5 rounded-md py-1 type-body outline-none focus-visible:ring-[3px]"
           >
             <ChevronRightIcon
               aria-hidden="true"
@@ -82,7 +82,7 @@ export function RunActivity({
             {summary}
           </CollapsibleTrigger>
           <CollapsibleContent className={cn(collapsePanel, "peer")}>
-            <ol className="border-border ms-1.5 flex min-w-0 flex-col gap-3 border-s ps-3.5 pt-2 text-sm wrap-anywhere">
+            <ol className="border-border ms-1.5 flex min-w-0 flex-col gap-3 border-s ps-3.5 pt-2 type-body wrap-anywhere">
               {entries.map((entry) => (
                 <li key={entry.id} data-activity-kind={entry.kind}>
                   {entry.content}
@@ -92,13 +92,13 @@ export function RunActivity({
           </CollapsibleContent>
           {!open && latestActivity && (
             // The panel stays mounted during its exit transition.
-            <p className="text-muted-foreground ps-5 text-sm wrap-anywhere peer-[:not([hidden])]:hidden">
+            <p className="text-muted-foreground ps-5 type-muted wrap-anywhere peer-[:not([hidden])]:hidden">
               {latestActivity}
             </p>
           )}
         </Collapsible>
       ) : (
-        <p className="text-muted-foreground py-1 text-sm">{summary}</p>
+        <p className="text-muted-foreground py-1 type-muted">{summary}</p>
       )}
       {/* Announce the settled duration without announcing streaming timer ticks. */}
       <span role="status" aria-atomic="true" className="sr-only">

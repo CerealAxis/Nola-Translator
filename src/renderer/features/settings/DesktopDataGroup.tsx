@@ -47,7 +47,7 @@ export function DesktopDataGroup() {
   return <>
     <SettingGroup id="desktop-data-usage" legend={t('desktopData.usage')}>
       {desktopDataKinds.map(kind => <SettingsRow key={kind} label={t(`desktopData.${kind}`)}>
-        <span className="nola-body-strong tabular-nums">{snapshot ? formatBytes(snapshot.usage[kind] ?? 0) : '—'}</span>
+        <span className="type-body font-semibold tabular-nums">{snapshot ? formatBytes(snapshot.usage[kind] ?? 0) : '—'}</span>
       </SettingsRow>)}
     </SettingGroup>
     <SettingGroup id="desktop-data-backup" legend={t('desktopData.title')}>
@@ -55,7 +55,7 @@ export function DesktopDataGroup() {
       <SettingsRow label={t('desktopData.restore')}><Button variant="secondary" size="sm" disabled={busy} onClick={() => open('restore')}>{t('desktopData.restore')}</Button></SettingsRow>
       {result && <div className="px-4 pb-4 break-words" role={result.state === 'failed' ? 'alert' : 'status'}>
         {result.state === 'completed' ? t(result.action === 'backup' ? 'desktopData.backupDone' : 'desktopData.restoreDone') : errorText(new Error(result.error))}
-        {result.path && <p className="nola-caption">{result.path}</p>}
+        {result.path && <p className="type-muted">{result.path}</p>}
       </div>}
       {!mode && error && <p role="alert" className="px-4 pb-4">{error}</p>}
     </SettingGroup>
@@ -73,7 +73,7 @@ export function DesktopDataGroup() {
         {(mode === 'restore' || keys) && <label className="flex flex-col gap-2">{t(mode === 'restore' ? 'desktopData.restorePassword' : 'desktopData.backupPassword')}
           <Input type="password" autoComplete="off" value={password} disabled={busy} onChange={event => setPassword(event.target.value)} />
         </label>}
-        {mode === 'restore' && <p className="nola-caption">{t('desktopData.omitted')}</p>}
+        {mode === 'restore' && <p className="type-muted">{t('desktopData.omitted')}</p>}
         {error && <p role="alert">{error}</p>}
         <Button disabled={busy || mode === 'backup' && keys && password.length < 12} onClick={() => void run()}>
           {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}

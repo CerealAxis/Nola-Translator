@@ -41,7 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const inputClassName =
-  "border-input selection:bg-primary selection:text-primary-foreground file:text-foreground placeholder:text-muted-foreground dark:bg-input/30 h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base transition-colors outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-1 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40";
+  "border-input selection:bg-primary selection:text-primary-foreground file:text-foreground placeholder:text-muted-foreground dark:bg-input/30 h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 type-body transition-colors outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:type-body file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-1 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40";
 export namespace McpConfigDialog {
   export type Props = {
     /** Trigger element. Defaults to a ghost button with a plug icon. */
@@ -137,7 +137,7 @@ const CustomServersSection: FC = () => {
           ref={addTriggerRef}
           className={cn(
             buttonVariants({ variant: "outline" }),
-            "aui-mcp-add-trigger h-9 justify-start gap-2 rounded-lg px-3 text-sm",
+            "aui-mcp-add-trigger h-9 justify-start gap-2 rounded-lg px-3 type-body",
           )}
           onClick={openForm}
         >
@@ -151,7 +151,7 @@ const CustomServersSection: FC = () => {
 };
 
 const SectionTitle: FC<{ children: ReactNode }> = ({ children }) => (
-  <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+  <h3 className="text-muted-foreground type-h3">
     {children}
   </h3>
 );
@@ -167,7 +167,7 @@ const ServerCard: FC = () => {
       <div className="flex items-center gap-3">
         <ServerAvatar />
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-medium">
+          <span className="truncate type-body font-medium">
             <McpServerPrimitive.Name />
           </span>
           <StatusLine />
@@ -177,7 +177,7 @@ const ServerCard: FC = () => {
           <McpServerPrimitive.RemoveButton
             className={cn(
               buttonVariants({ variant: "ghost", size: "icon" }),
-              "aui-mcp-server-remove text-muted-foreground hover:text-destructive size-7",
+              "aui-mcp-server-remove text-muted-foreground hover:text-danger-soft-foreground size-7",
             )}
           >
             <Trash2Icon className="size-4" />
@@ -210,7 +210,7 @@ const StatusLine: FC = () => {
   const variant = STATUS_VARIANT[status];
   const label = STATUS_LABEL[status];
   return (
-    <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+    <div className="text-muted-foreground flex items-center gap-1.5 type-muted">
       <Badge variant={variant}>
         {status === "connecting" && (
           <Loader2Icon className="size-3 animate-spin" />
@@ -235,7 +235,7 @@ const ServerError: FC = () => {
   const message = useAuiState((s) => s.mcpServer.lastError?.message ?? null);
   if (!message) return null;
   return (
-    <div className="border-destructive/40 bg-destructive/5 text-destructive flex items-start gap-2 rounded-md border px-2 py-1.5 text-xs">
+    <div className="border-destructive/40 bg-destructive/5 text-danger-soft-foreground flex items-start gap-2 rounded-md border px-2 py-1.5 type-small">
       <ShieldAlertIcon className="mt-0.5 size-3.5 shrink-0" />
       <span className="break-words">{message}</span>
     </div>
@@ -254,7 +254,7 @@ const ServerActions: FC = () => {
         ref={actionRef}
         className={cn(
           buttonVariants({ variant: "default", size: "sm" }),
-          "aui-mcp-server-connect h-8 gap-2 text-xs",
+          "aui-mcp-server-connect h-8 gap-2 type-body",
         )}
       >
         <PlugZapIcon className="size-3.5" />
@@ -263,7 +263,7 @@ const ServerActions: FC = () => {
       <McpServerPrimitive.OAuthLink
         className={cn(
           buttonVariants({ variant: "default", size: "sm" }),
-          "aui-mcp-server-authorize h-8 gap-2 text-xs",
+          "aui-mcp-server-authorize h-8 gap-2 type-body",
         )}
       >
         授权
@@ -272,7 +272,7 @@ const ServerActions: FC = () => {
         ref={actionRef}
         className={cn(
           buttonVariants({ variant: "outline", size: "sm" }),
-          "aui-mcp-server-disconnect h-8 text-xs",
+          "aui-mcp-server-disconnect h-8 type-body",
         )}
       >
         断开
@@ -288,7 +288,7 @@ const AddServerForm: FC<{ onClose: () => void }> = ({ onClose }) => {
     <McpAddFormPrimitive.Root onSubmitted={onClose} onCancel={onClose}>
       <div className="aui-mcp-add-form flex flex-col gap-3 rounded-lg border p-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium">新服务器</h4>
+          <h4 className="type-h4">新服务器</h4>
           <McpAddFormPrimitive.Cancel
             type="button"
             className={cn(
@@ -318,12 +318,12 @@ const AddServerForm: FC<{ onClose: () => void }> = ({ onClose }) => {
         <FormRow label={"正品"} htmlFor={fieldIds.auth}>
           <McpAddFormPrimitive.AuthSelect
             id={fieldIds.auth}
-            className="aui-mcp-auth-select bg-transparent h-9 w-full rounded-md border px-2 text-sm dark:bg-input/30"
+            className="aui-mcp-auth-select bg-transparent h-9 w-full rounded-md border px-2 type-body dark:bg-input/30"
           />
           <div
             className={cn(
-              "[&_[data-mcp-auth-field-label]]:text-xs [&_[data-mcp-auth-field-label]]:font-medium [&>div]:flex [&>div]:flex-col [&>div]:gap-1.5",
-              "[&_input]:border-input empty:hidden [&_input]:flex [&_input]:h-9 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:bg-transparent [&_input]:px-3 [&_input]:py-1 [&_input]:text-sm [&_input]:transition-colors [&_input]:outline-none",
+              "[&_[data-mcp-auth-field-label]]:type-small [&_[data-mcp-auth-field-label]]:font-medium [&>div]:flex [&>div]:flex-col [&>div]:gap-1.5",
+              "[&_input]:border-input empty:hidden [&_input]:flex [&_input]:h-9 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:bg-transparent [&_input]:px-3 [&_input]:py-1 [&_input]:type-body [&_input]:transition-colors [&_input]:outline-none",
               "[&_input:focus-visible]:border-ring [&_input:focus-visible]:ring-ring/50 [&_input:focus-visible]:ring-[3px]",
               "[&_input[aria-invalid=true]]:border-destructive [&_input[aria-invalid=true]]:ring-destructive/20 dark:[&_input[aria-invalid=true]]:ring-destructive/40",
               "[&_input::placeholder]:text-muted-foreground",
@@ -332,7 +332,7 @@ const AddServerForm: FC<{ onClose: () => void }> = ({ onClose }) => {
             <McpAddFormPrimitive.AuthFields />
           </div>
         </FormRow>
-        <McpAddFormPrimitive.Error className="text-destructive text-xs" />
+        <McpAddFormPrimitive.Error className="text-danger-soft-foreground type-small" />
         <div className="flex justify-end gap-2">
           <McpAddFormPrimitive.Cancel
             type="button"
@@ -358,7 +358,7 @@ const FormRow: FC<{ label: string; htmlFor: string; children: ReactNode }> = ({
   children,
 }) => (
   <div className="flex flex-col gap-1.5">
-    <Label className="text-xs" htmlFor={htmlFor}>
+    <Label className="type-small" htmlFor={htmlFor}>
       {label}
     </Label>
     <div className="flex flex-col gap-2">{children}</div>

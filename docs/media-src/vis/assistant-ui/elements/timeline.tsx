@@ -81,7 +81,7 @@ export function Timeline({
           >
             <span
               className={cn(
-                "text-[13px] break-words",
+                "type-body break-words",
                 event.when === "future"
                   ? "text-muted-foreground"
                   : "text-foreground/90",
@@ -91,7 +91,7 @@ export function Timeline({
               {event.title}
             </span>
             {event.detail && (
-              <span className="text-muted-foreground text-xs leading-relaxed break-words">
+              <span className="text-muted-foreground type-muted break-words">
                 {event.detail}
               </span>
             )}

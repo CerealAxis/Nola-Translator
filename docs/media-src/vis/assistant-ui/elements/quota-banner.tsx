@@ -51,9 +51,9 @@ export function QuotaBanner({
       <div className="flex items-baseline gap-2">
         <span
           className={cn(
-            "text-[13.5px] font-medium",
-            exhausted && "text-destructive",
-            tight && "text-chart-4",
+            "type-body font-medium",
+            exhausted && "text-danger-soft-foreground",
+            tight && "text-warning-soft-foreground",
           )}
         >
           {left} {unit} 左

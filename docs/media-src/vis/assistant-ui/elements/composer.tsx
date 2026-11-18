@@ -244,7 +244,7 @@ export function ComposerMenuItem({
       data-slot="composer-menu-item"
       data-active={active || undefined}
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors focus-visible:outline-ring",
+        "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 type-body transition-colors focus-visible:outline-ring",
         active
           ? "bg-accent text-accent-foreground"
           : "hover:bg-accent hover:text-accent-foreground",
@@ -267,7 +267,7 @@ export function ComposerCommandItem({
     <ComposerMenuItem active={active} {...props}>
       <command.icon className="text-muted-foreground size-3.5 shrink-0" />
       <span className="font-medium">/{command.name}</span>
-      <span className="text-muted-foreground flex-1 truncate text-start text-xs">
+      <span className="text-muted-foreground flex-1 truncate text-start type-muted">
         {command.description}
       </span>
       {active && (
@@ -289,7 +289,7 @@ export function ComposerPersonItem({
 }) {
   return (
     <ComposerMenuItem active={active} {...props}>
-      <span className="bg-foreground/[0.06] text-muted-foreground flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-medium">
+      <span className="bg-foreground/[0.06] text-muted-foreground flex size-5 shrink-0 items-center justify-center rounded-full type-small">
         {person.name[0]}
       </span>
       <span className="flex-1 truncate text-start">{person.name}</span>
@@ -336,14 +336,14 @@ export function ComposerAttachmentChip({
         <Icon className="size-4" />
       </span>
       <span className="flex flex-col">
-        <span className="max-w-36 truncate text-xs font-medium">
+        <span className="max-w-36 truncate type-small">
           {attachment.name}
         </span>
         <span
           className={cn(
-            "text-[11px]",
+            "type-muted",
             attachment.state === "error"
-              ? "text-destructive/80"
+              ? "text-danger-soft-foreground"
               : "text-muted-foreground",
           )}
         >
@@ -363,7 +363,7 @@ export function ComposerAttachmentChip({
             <XIcon />
           </button>
         ) : attachment.state === "done" ? (
-          <CheckIcon className="size-3.5 text-chart-2" />
+          <CheckIcon className="size-3.5 text-success-soft-foreground" />
         ) : null}
       </span>
       {attachment.state === "uploading" && (
@@ -399,7 +399,7 @@ export function ComposerInput({
         onSubmit?.();
       }}
       className={cn(
-        "placeholder:text-muted-foreground min-h-11 w-full bg-transparent px-3 text-[15px] caret-primary outline-none",
+        "placeholder:text-muted-foreground min-h-11 w-full bg-transparent px-3 type-body caret-primary outline-none",
         className,
       )}
       {...props}
@@ -446,7 +446,7 @@ export function ComposerVoice({
           0:{String(seconds).padStart(2, "0")}
         </span>
       ) : (
-        <ShimmerLabel className="text-muted-foreground relative text-[13px]">
+        <ShimmerLabel className="text-muted-foreground relative type-body">
           转录中
         </ShimmerLabel>
       )}
@@ -580,12 +580,12 @@ export function ComposerContext({
         )}
       >
         <div className="flex items-baseline justify-between">
-          <p className="text-[13.5px] font-medium">背景信息</p>
+          <p className="type-body font-medium">背景信息</p>
           <p
             className={cn(
               mono,
               "tabular-nums",
-              warn ? "text-destructive" : "text-muted-foreground",
+              warn ? "text-danger-soft-foreground" : "text-muted-foreground",
             )}
           >
             {Math.round(fraction * 100)}%
@@ -607,7 +607,7 @@ export function ComposerContext({
           {segments.map((segment) => (
             <div
               key={segment.label}
-              className="text-muted-foreground flex items-center gap-2.5 text-[13px]"
+              className="text-muted-foreground flex items-center gap-2.5 type-body"
             >
               <span
                 aria-hidden
@@ -624,7 +624,7 @@ export function ComposerContext({
           ))}
         </div>
         <div className="bg-foreground/[0.06] h-px" />
-        <div className="text-muted-foreground flex items-center justify-between text-[13px]">
+        <div className="text-muted-foreground flex items-center justify-between type-body">
           <span>总计</span>
           <span className={cn(mono, "text-muted-foreground tabular-nums")}>
             {used}k / {usage.total}k
@@ -637,7 +637,7 @@ export function ComposerContext({
         className={cn(
           ghostButton,
           "size-8",
-          warn && "text-destructive",
+          warn && "text-danger-soft-foreground",
         )}
       >
         <svg viewBox="0 0 16 16" className="size-4 -rotate-90" aria-hidden>

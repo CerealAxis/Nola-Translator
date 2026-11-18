@@ -6746,38 +6746,6 @@ limitations under the License.
 
 ---
 
-The following software may be included in this product: ag-psd (31.0.2)
-This software contains the following license and notice below:
-
-The MIT License (MIT)
-
-Copyright (c) 2016 Agamnentzar
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-
-
-Any image or brush files included in this repository are not covered by this
-license and belong to their copyright holders.
-
----
-
 The following software may be included in this product: ai (7.0.150)
 This software contains the following license and notice below:
 
@@ -7105,33 +7073,6 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
----
-
-The following software may be included in this product: base64-js (1.5.1)
-This software contains the following license and notice below:
-
-The MIT License (MIT)
-
-Copyright (c) 2014 Jameson Little
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 
 ---
 
@@ -27047,3 +26988,5 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
+
+<!-- nola-js-notices: ["@ai-sdk/anthropic@4.0.87","@ai-sdk/gateway@4.0.123","@ai-sdk/mcp@2.0.83","@ai-sdk/openai@4.0.101","@ai-sdk/openai-compatible@3.0.77","@ai-sdk/provider@4.0.33","@ai-sdk/provider-utils@5.0.67","@ai-sdk/react@4.0.154","@ant-design/cssinjs@2.1.2","@assistant-ui/ai-sdk@0.0.15","@assistant-ui/core@0.3.31","@assistant-ui/generative-ui@0.0.7","@assistant-ui/react@0.15.31","@assistant-ui/react-markdown@0.14.24","@assistant-ui/store@0.3.22","@assistant-ui/tap@0.9.24","@babel/code-frame@7.29.7","@babel/generator@7.29.7","@babel/helper-globals@7.29.7","@babel/helper-module-imports@7.29.7","@babel/helper-string-parser@7.29.7","@babel/helper-validator-identifier@7.29.7","@babel/parser@7.29.7","@babel/runtime@7.29.7","@babel/template@7.29.7","@babel/traverse@7.29.7","@babel/types@7.29.7","@base-ui/react@1.9.0","@base-ui/utils@0.5.0","@emotion/babel-plugin@11.13.5","@emotion/cache@11.14.0","@emotion/css@11.13.5","@emotion/hash@0.9.2","@emotion/memoize@0.9.0","@emotion/react@11.14.0","@emotion/serialize@1.3.3","@emotion/sheet@1.4.0","@emotion/unitless@0.10.0","@emotion/use-insertion-effect-with-fallbacks@1.2.0","@emotion/utils@1.4.2","@emotion/weak-memoize@0.4.0","@floating-ui/core@1.8.0","@floating-ui/dom@1.8.0","@floating-ui/react-dom@2.1.9","@floating-ui/utils@0.2.12","@jridgewell/gen-mapping@0.3.13","@jridgewell/resolve-uri@3.1.2","@jridgewell/sourcemap-codec@1.5.5","@jridgewell/trace-mapping@0.3.31","@lobehub/icons@5.22.0","@napi-rs/canvas@1.1.0","@napi-rs/canvas-win32-x64-msvc@1.1.0","@pdf-lib/fontkit@1.1.1","@pdf-lib/standard-fonts@1.0.0","@pdf-lib/upng@1.0.1","@primer/octicons@19.38.0","@radix-ui/number@1.1.3","@radix-ui/primitive@1.2.0","@radix-ui/react-accessible-icon@1.2.0","@radix-ui/react-accordion@1.3.1","@radix-ui/react-alert-dialog@1.2.1","@radix-ui/react-arrow@1.1.17","@radix-ui/react-aspect-ratio@1.2.0","@radix-ui/react-avatar@1.3.1","@radix-ui/react-checkbox@1.4.1","@radix-ui/react-collapsible@1.2.1","@radix-ui/react-collection@1.2.0","@radix-ui/react-compose-refs@1.1.5","@radix-ui/react-context@1.3.0","@radix-ui/react-context-menu@2.4.1","@radix-ui/react-dialog@1.3.1","@radix-ui/react-direction@1.2.0","@radix-ui/react-dismissable-layer@1.2.1","@radix-ui/react-dropdown-menu@2.2.1","@radix-ui/react-focus-guards@1.2.0","@radix-ui/react-focus-scope@1.3.1","@radix-ui/react-form@0.3.0","@radix-ui/react-hover-card@1.2.1","@radix-ui/react-id@1.1.4","@radix-ui/react-label@2.1.17","@radix-ui/react-menu@2.2.1","@radix-ui/react-menubar@1.2.1","@radix-ui/react-navigation-menu@1.4.1","@radix-ui/react-one-time-password-field@0.2.1","@radix-ui/react-password-toggle-field@0.2.1","@radix-ui/react-popover@1.3.1","@radix-ui/react-popper@1.4.0","@radix-ui/react-portal@1.2.0","@radix-ui/react-presence@1.1.11","@radix-ui/react-primitive@2.2.0","@radix-ui/react-progress@1.2.1","@radix-ui/react-radio-group@1.5.1","@radix-ui/react-roving-focus@1.2.1","@radix-ui/react-scroll-area@1.4.0","@radix-ui/react-select@2.4.1","@radix-ui/react-separator@1.2.0","@radix-ui/react-slider@1.6.1","@radix-ui/react-slot@1.5.0","@radix-ui/react-switch@1.4.1","@radix-ui/react-tabs@1.2.1","@radix-ui/react-toast@1.3.1","@radix-ui/react-toggle@1.2.1","@radix-ui/react-toggle-group@1.2.1","@radix-ui/react-toolbar@1.2.1","@radix-ui/react-tooltip@1.4.1","@radix-ui/react-use-callback-ref@1.1.5","@radix-ui/react-use-controllable-state@1.3.0","@radix-ui/react-use-effect-event@0.0.5","@radix-ui/react-use-escape-keydown@1.1.6","@radix-ui/react-use-is-hydrated@0.1.3","@radix-ui/react-use-layout-effect@1.1.4","@radix-ui/react-use-previous@1.1.4","@radix-ui/react-use-rect@1.1.4","@radix-ui/react-use-size@1.1.5","@radix-ui/react-visually-hidden@1.2.13","@radix-ui/rect@1.1.3","@rc-component/util@1.13.0","@reduxjs/toolkit@2.14.0","@standard-schema/spec@1.1.0","@standard-schema/utils@0.3.0","@tiptap/core@3.32.0","@tiptap/extension-blockquote@3.32.0","@tiptap/extension-bold@3.32.0","@tiptap/extension-bubble-menu@3.32.0","@tiptap/extension-bullet-list@3.32.0","@tiptap/extension-code@3.32.0","@tiptap/extension-code-block@3.32.0","@tiptap/extension-document@3.32.0","@tiptap/extension-dropcursor@3.32.0","@tiptap/extension-floating-menu@3.32.0","@tiptap/extension-gapcursor@3.32.0","@tiptap/extension-hard-break@3.32.0","@tiptap/extension-heading@3.32.0","@tiptap/extension-horizontal-rule@3.32.0","@tiptap/extension-image@3.32.0","@tiptap/extension-italic@3.32.0","@tiptap/extension-link@3.32.0","@tiptap/extension-list@3.32.0","@tiptap/extension-list-item@3.32.0","@tiptap/extension-list-keymap@3.32.0","@tiptap/extension-ordered-list@3.32.0","@tiptap/extension-paragraph@3.32.0","@tiptap/extension-strike@3.32.0","@tiptap/extension-table@3.32.0","@tiptap/extension-text@3.32.0","@tiptap/extension-underline@3.32.0","@tiptap/extensions@3.32.0","@tiptap/markdown@3.32.0","@tiptap/pm@3.32.0","@tiptap/react@3.32.0","@tiptap/starter-kit@3.32.0","@types/d3-array@3.2.2","@types/d3-color@3.1.3","@types/d3-ease@3.0.2","@types/d3-interpolate@3.0.4","@types/d3-path@3.1.1","@types/d3-scale@4.0.9","@types/d3-shape@3.2.0","@types/d3-time@3.0.4","@types/d3-timer@3.0.2","@types/debug@4.1.13","@types/estree@1.0.9","@types/estree-jsx@1.0.5","@types/hast@3.0.5","@types/json-schema@7.0.15","@types/mdast@4.0.4","@types/ms@2.1.0","@types/parse-json@4.0.2","@types/trusted-types@2.0.7","@types/unist@3.0.3","@types/use-sync-external-store@0.0.6","@ungap/structured-clone@1.4.0","@vercel/oidc@3.2.0","@workflow/serde@4.1.0","@zip.js/zip.js@2.24.0","Chromium@150.0.7871.114","Electron@43.1.1","Lumina@b19fb886abc474b39b217d80806ecc1297876f61","Node.js@24.18.0","Noto Sans CJK@f8d157532fbfaeda587e826d4cd5b21a49186f7c","ai@7.0.150","antd-style@4.1.0","aria-hidden@1.2.6","assistant-cloud@0.2.8","assistant-stream@0.3.54","babel-plugin-macros@3.1.0","bail@2.0.2","beautiful-mermaid@1.1.3","callsites@3.1.0","ccount@2.0.1","character-entities@2.0.2","character-entities-html4@2.1.0","character-entities-legacy@3.0.0","character-reference-invalid@2.0.1","class-variance-authority@0.7.1","classnames@2.5.1","clsx@2.1.1","cmdk@1.1.1","comma-separated-tokens@2.0.3","convert-source-map@2.0.0","cosmiconfig@7.1.0","cross-spawn@7.0.6","csstype@3.2.3","d3-array@3.2.5","d3-color@3.1.1","d3-ease@3.0.2","d3-format@3.1.3","d3-interpolate@3.0.2","d3-path@3.1.1","d3-scale@4.0.3","d3-shape@3.2.1","d3-time@3.1.1","d3-time-format@4.1.1","d3-timer@3.0.2","debug@4.4.3","decimal.js-light@2.5.1","decode-named-character-reference@1.3.0","dequal@2.0.3","detect-node-es@1.1.0","devlop@1.1.0","dompurify@3.4.17","elkjs@0.11.1","entities@8.0.0","error-ex@1.3.4","es-errors@1.3.0","es-toolkit@1.52.0","escape-string-regexp@4.0.0","estree-util-is-identifier-name@3.0.0","eventemitter3@5.0.4","eventsource-parser@3.1.1","extend@3.0.2","fast-equals@5.4.5","find-root@1.1.0","framer-motion@12.43.0","function-bind@1.1.2","get-nonce@1.0.1","hasown@2.0.4","hast-util-from-html@2.0.3","hast-util-from-parse5@8.0.3","hast-util-is-element@3.0.0","hast-util-parse-selector@4.0.0","hast-util-raw@9.1.0","hast-util-sanitize@5.0.2","hast-util-to-jsx-runtime@2.3.6","hast-util-to-parse5@8.0.1","hast-util-whitespace@3.0.0","hastscript@9.0.1","heat-graph@0.0.26","hoist-non-react-statics@3.3.2","html-url-attributes@3.0.1","html-void-elements@3.0.0","immer@11.2.9","import-fresh@3.3.1","inline-style-parser@0.2.7","internmap@2.0.3","is-alphabetical@2.0.1","is-alphanumerical@2.0.1","is-arrayish@0.2.1","is-core-module@2.17.0","is-decimal@2.0.1","is-hexadecimal@2.0.1","is-mobile@5.0.0","is-plain-obj@4.1.0","isexe@3.1.5","js-tokens@4.0.0","jsesc@3.1.0","json-parse-even-better-errors@2.3.1","json-schema@0.4.0","leaflet@1.9.4","lines-and-columns@1.2.4","linkifyjs@4.3.3","longest-streak@3.1.0","lucide-react@0.468.0","markdown-table@3.0.4","marked@18.0.14","mdast-util-find-and-replace@3.0.2","mdast-util-from-markdown@2.0.3","mdast-util-gfm@3.1.0","mdast-util-gfm-autolink-literal@2.0.1","mdast-util-gfm-footnote@2.1.0","mdast-util-gfm-strikethrough@2.0.1","mdast-util-gfm-table@2.0.0","mdast-util-gfm-task-list-item@2.0.0","mdast-util-mdx-expression@2.0.1","mdast-util-mdx-jsx@3.2.0","mdast-util-mdxjs-esm@2.0.1","mdast-util-phrasing@4.1.0","mdast-util-to-hast@13.2.1","mdast-util-to-markdown@2.1.3","mdast-util-to-string@4.0.0","micromark@4.0.3","micromark-core-commonmark@2.0.4","micromark-extension-gfm@3.0.0","micromark-extension-gfm-autolink-literal@2.1.0","micromark-extension-gfm-footnote@2.1.0","micromark-extension-gfm-strikethrough@2.1.0","micromark-extension-gfm-table@2.1.2","micromark-extension-gfm-tagfilter@2.0.0","micromark-extension-gfm-task-list-item@2.1.0","micromark-factory-destination@2.0.1","micromark-factory-label@2.0.1","micromark-factory-space@2.1.0","micromark-factory-title@2.0.1","micromark-factory-whitespace@2.0.1","micromark-util-character@2.1.1","micromark-util-chunked@2.0.1","micromark-util-classify-character@2.0.1","micromark-util-combine-extensions@2.0.1","micromark-util-decode-numeric-character-reference@2.0.2","micromark-util-decode-string@2.0.1","micromark-util-edit-map@1.0.0","micromark-util-encode@2.0.1","micromark-util-html-tag-name@2.0.1","micromark-util-normalize-identifier@2.0.1","micromark-util-resolve-all@2.0.1","micromark-util-sanitize-uri@2.0.1","micromark-util-subtokenize@2.1.0","micromark-util-symbol@2.0.1","micromark-util-types@2.0.3","motion@12.43.0","motion-dom@12.43.0","motion-utils@12.39.0","ms@2.1.3","nanoid@3.3.16","object-assign@4.1.1","opencc-js@1.4.2","orderedmap@2.1.1","pako@1.0.11","parent-module@1.0.1","parse-entities@4.0.2","parse-json@5.2.0","parse5@8.0.1","path-key@3.1.1","path-parse@1.0.7","path-type@4.0.0","pdf-lib@1.17.1","pdfjs-dist@6.5.438","picocolors@1.1.1","pkce-challenge@5.0.1","polished@4.3.1","property-information@7.2.0","prosemirror-changeset@2.4.4","prosemirror-commands@1.7.2","prosemirror-dropcursor@1.8.4","prosemirror-gapcursor@1.4.1","prosemirror-history@1.5.1","prosemirror-inputrules@1.5.1","prosemirror-keymap@1.2.3","prosemirror-model@1.25.12","prosemirror-schema-list@1.5.1","prosemirror-state@1.4.4","prosemirror-tables@1.8.5","prosemirror-transform@1.12.2","prosemirror-view@1.42.6","radix-ui@1.8.1","react@19.2.7","react-dom@19.2.7","react-is@17.0.2","react-markdown@10.1.0","react-redux@9.3.1","react-remove-scroll@2.7.2","react-remove-scroll-bar@2.3.8","react-resizable-panels@4.19.1","react-style-singleton@2.2.3","react-textarea-autosize@8.5.9","recharts@3.8.0","redux@5.0.1","redux-thunk@3.1.0","rehype-github-alerts@4.2.0","rehype-raw@7.0.0","rehype-sanitize@6.0.0","remark-gfm@4.0.1","remark-parse@11.0.0","remark-rehype@11.1.2","remark-stringify@11.0.0","reselect@5.3.0","resolve@1.22.12","resolve-from@4.0.0","rope-sequence@1.3.4","safe-content-frame@0.0.34","scheduler@0.27.0","secure-json-parse@4.1.1","shebang-command@2.0.0","shebang-regex@3.0.0","source-map@0.6.1","space-separated-tokens@2.0.2","stringify-entities@4.0.4","style-to-js@1.1.21","style-to-object@1.0.14","stylis@4.4.0","supports-preserve-symlinks-flag@1.0.0","swr@2.5.1","tailwind-merge@3.7.0","throttleit@2.1.0","tiny-invariant@1.3.3","trim-lines@3.0.1","trough@2.2.0","tslib@2.8.1","tw-shimmer@0.4.14","undici@7.30.1","unified@11.0.5","unist-util-is@6.0.1","unist-util-position@5.0.0","unist-util-stringify-position@4.0.0","unist-util-visit@5.1.0","unist-util-visit-parents@6.0.2","use-callback-ref@1.3.3","use-composed-ref@1.4.0","use-isomorphic-layout-effect@1.2.1","use-latest@1.3.0","use-merge-value@1.2.0","use-sidecar@1.1.3","use-sync-external-store@1.7.0","vfile@6.0.3","vfile-location@5.0.3","vfile-message@4.0.3","victory-vendor@37.4.1","w3c-keyname@2.2.8","web-namespaces@2.0.1","which@5.0.0","ws@8.22.0","zod@4.6.7","zustand@5.0.16","zwitch@2.0.4"] -->

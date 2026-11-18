@@ -42,7 +42,7 @@ export function MessageBranches({
     >
       <p
         key={index}
-        className="fade-in slide-in-from-bottom-1 animate-in text-foreground/90 min-h-[4.25rem] text-sm leading-relaxed duration-300 motion-reduce:animate-none"
+        className="fade-in slide-in-from-bottom-1 animate-in text-foreground/90 min-h-[4.25rem] type-body duration-300 motion-reduce:animate-none"
       >
         {message}
       </p>

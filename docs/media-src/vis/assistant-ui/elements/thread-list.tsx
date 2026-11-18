@@ -48,7 +48,7 @@ export function ThreadList({
         const hasActions = onRename !== undefined || onDelete !== undefined;
         const hasTwoActions = onRename !== undefined && onDelete !== undefined;
         const rowClassName = cn(
-          "group relative flex w-full items-center rounded-xl text-[13.5px] transition-colors",
+          "group relative flex w-full items-center rounded-xl type-body transition-colors",
           active
             ? "bg-accent text-accent-foreground"
             : onActiveIndexChange

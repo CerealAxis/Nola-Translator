@@ -65,7 +65,7 @@ export function StatusPill({
       className={[
         'inline-flex w-fit shrink-0 items-center gap-1 rounded-full',
         SIZE_CLASS[size],
-        'text-[12px] leading-[1.45] font-normal',
+        'type-small',
         TONE_CLASS[tone],
         className ?? '',
       ]

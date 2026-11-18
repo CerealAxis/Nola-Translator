@@ -15,8 +15,8 @@ export function HomeListRow({ icon: Icon, title, detail, action }: HomeListRowPr
         <Icon className="size-4" aria-hidden="true" />
       </span>
       <div className="nola-home-list-row__text">
-        <span className="nola-body-strong">{title}</span>
-        <span className="nola-caption text-nola-ui-muted-foreground">{detail}</span>
+        <span className="type-body font-semibold">{title}</span>
+        <span className="type-muted text-nola-ui-muted-foreground">{detail}</span>
       </div>
       {action}
     </div>

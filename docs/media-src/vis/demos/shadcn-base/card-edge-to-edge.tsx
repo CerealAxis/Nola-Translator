@@ -18,7 +18,7 @@ export function CardEdgeToEdge() {
         </CardDescription>
       </CardHeader>
       <CardContent className="-mb-(--card-spacing)">
-        <div className="-mx-(--card-spacing) max-h-48 space-y-4 overflow-y-scroll border-t bg-muted/50 px-(--card-spacing) py-4 text-sm leading-relaxed">
+        <div className="-mx-(--card-spacing) max-h-48 space-y-4 overflow-y-scroll border-t bg-muted/50 px-(--card-spacing) py-4 text-sm">
           <p>
             这些条款规定了工作区的使用方式，包括共享文档、项目文件和协作工具的访问权限。
           </p>

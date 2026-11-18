@@ -271,7 +271,7 @@ export function ModelsPage() {
         className="models-tabs"
       >
         <div className="tabs__list-container" data-onboarding="models-tabs">
-          <TabsList variant="line" aria-label={t('modelsSettingsUi.catalogTabs')}>
+          <TabsList aria-label={t('modelsSettingsUi.catalogTabs')}>
             <CountTab id="recommended" label={t('models.tabRecommended')} count={null} />
             <CountTab id="installed" label={t('models.tabInstalled')} count={installed.length + installedCloudModels.length} />
             <CountTab id="search" label={t('models.tabSearch')} count={null} />
@@ -325,7 +325,7 @@ interface CountTabProps {
 
 function CountTab({ id, label, count }: CountTabProps) {
   return (
-    <TabsTrigger data-onboarding={id === 'downloads' ? 'models-downloads-tab' : undefined} value={id} className="nola-body-strong">
+    <TabsTrigger data-onboarding={id === 'downloads' ? 'models-downloads-tab' : undefined} value={id} className="type-body font-semibold">
       <span className="flex items-center gap-2">
         {label}
         {count === null ? null : (
@@ -333,7 +333,7 @@ function CountTab({ id, label, count }: CountTabProps) {
             variant="secondary"
 
             // Utility typography keeps compact counts aligned with the tab label.
-            className="rounded-full text-[12px] leading-[1.45] font-normal tabular"
+            className="rounded-full type-muted tabular"
           >
             {count}
           </Badge>

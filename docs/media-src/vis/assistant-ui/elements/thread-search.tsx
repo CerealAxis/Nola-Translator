@@ -113,11 +113,11 @@ export function ThreadSearch({
           {thread.pinned && (
             <PinIcon className="text-muted-foreground size-2.5 shrink-0" />
           )}
-          <span className="min-w-0 flex-1 truncate text-[13px]">
+          <span className="min-w-0 flex-1 truncate type-body">
             {thread.title}
           </span>
         </span>
-        <span className="text-muted-foreground truncate text-xs">
+        <span className="text-muted-foreground truncate type-muted">
           {thread.preview}
         </span>
       </>
@@ -187,7 +187,7 @@ export function ThreadSearch({
               ? optionId(activeId)
               : undefined
           }
-          className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+          className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent type-body outline-none"
         />
       </div>
 
@@ -232,7 +232,7 @@ export function ThreadSearch({
       {matches.length === 0 && (
         <span
           role="status"
-          className="text-muted-foreground px-2 py-4 text-center text-xs"
+          className="text-muted-foreground px-2 py-4 text-center type-muted"
         >
           无螺纹匹配“{query}”
         </span>

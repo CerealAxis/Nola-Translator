@@ -129,10 +129,12 @@ import {
   ComicFrontendImage,
   type ComicCanvasTool,
 } from './ComicBubbleCanvas'
+import { ComicProjectLoading } from './ComicLoading'
 import { ComicChoiceField } from './ComicChoiceField'
 import {
   comicApi,
   comicSaveError,
+  discardComicSaves,
   flushComicSaves,
   loadComicBook,
   controlComicTask,
@@ -159,7 +161,7 @@ import {
 import { comicErrorMessage } from './comic-errors'
 
 type WorkspaceDialog =
-  'settings' | 'export' | 'tasks' | 'style' | 'proof' | null
+  'settings' | 'export' | 'tasks' | 'style' | 'proof' | 'discard' | null
 const workflows = ['normal', 'visual', 'proof', 'erase'] as const
 const exportKinds = [
   'png',
@@ -715,10 +717,7 @@ export function ComicTranslationWorkspace({
         </Empty>
       </div>
     )
-  if (!book)
-    return saveFailure ? null : (
-      <Spinner role="status" aria-label={t('common.loading')} />
-    )
+  if (!book) return saveFailure ? null : <ComicProjectLoading comparison />
   if (!book || !page || !renderSettings)
     return (
       <Empty>
@@ -1067,6 +1066,11 @@ export function ComicTranslationWorkspace({
           </span>
         </div>
         <div className="comic-workflow__actions">
+          {Boolean(saveFailure) && (
+            <Button variant="outline" size="sm" onClick={() => setDialog('discard')}>
+              {t('suite.discard')}
+            </Button>
+          )}
           {book.quick && (
             <Button
               variant="outline"
@@ -2035,7 +2039,7 @@ export function ComicTranslationWorkspace({
         >
           <DialogHeader>
             <DialogTitle>
-              {dialog === 'settings'
+              {dialog === 'discard' ? t('suite.discard') : dialog === 'settings'
                 ? p('settings')
                 : dialog === 'tasks'
                   ? p('tasks')
@@ -2048,6 +2052,14 @@ export function ComicTranslationWorkspace({
             <DialogCloseButton disabled={exporting} />
           </DialogHeader>
           <CardContent className="comic-workflow__dialog-content">
+            {dialog === 'discard' && (
+              <div className="comic-workflow__actions">
+                <Button variant="outline" onClick={() => setDialog(null)}>{p('keep')}</Button>
+                <Button variant="destructive" onClick={() => {
+                  void discardComicSaves(projectId).then(() => setDialog(null)).catch(report)
+                }}>{t('suite.discard')}</Button>
+              </div>
+            )}
             {dialog === 'settings' && (
               <Tabs defaultValue="translate">
                 <TabsList>
@@ -2494,7 +2506,10 @@ export function ComicTranslationWorkspace({
                               regions.find((region) => region.id === change.id)
                                 ?.targetText !== change.from,
                           )
-                        if (conflicts) notifyError(t('suite.revisionConflict'))
+                        if (conflicts) {
+                          notifyError(t('suite.revisionConflict'))
+                          return
+                        }
                         void applyComicProof(projectId, proofId)
                           .then(() => setDialog(null))
                           .catch(report)

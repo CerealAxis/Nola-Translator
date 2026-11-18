@@ -40,33 +40,33 @@ export function CodeDiff({
       data-slot="code-diff"
       className={cn(
         paper,
-        "w-full max-w-md overflow-hidden rounded-2xl font-mono [font:var(--font-caption)]",
+        "w-full max-w-md overflow-hidden rounded-2xl",
         className,
       )}
 
       {...props}
     >
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <span className="text-foreground/90">{filename}</span>
+        <span className="text-foreground/90 type-body font-medium">{filename}</span>
         <span className={cn(mono, "tabular-nums")}>
-          <span className="text-chart-2">
+          <span className="text-success-soft-foreground">
             +{additions}
           </span>{" "}
-          <span className="text-destructive">−{deletions}</span>
+          <span className="text-danger-soft-foreground">−{deletions}</span>
         </span>
       </div>
       <div className={codeScroll}>
-        <div className={codeSurface}>
+        <div className={cn(codeSurface, "type-code")}>
           {lines.map((line, i) => (
             <div
               key={`${cycle}-${i}-${line.text}`}
               className={cn(
-                "fade-in animate-in fill-mode-both flex px-4 py-0.5 leading-relaxed whitespace-pre duration-300",
+                "fade-in animate-in fill-mode-both flex px-4 py-0.5 whitespace-pre duration-300",
                 line.kind === "context" && "text-muted-foreground",
                 line.kind === "added" &&
-                  "bg-chart-2/10 text-chart-2",
+                  "bg-chart-2/10 text-success-soft-foreground",
                 line.kind === "removed" &&
-                  "bg-destructive/10 text-destructive",
+                  "bg-destructive/10 text-danger-soft-foreground",
               )}
               style={{ animationDelay: `${i * 60}ms` }}
             >

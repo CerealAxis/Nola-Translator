@@ -6,6 +6,7 @@ import { createComicTestBridge } from './comic-test-fixture'
 import {
   failedComicPages,
   flushComicSaves,
+  discardComicSaves,
   importComicFiles,
   loadComicBook,
   parseComicPageNumbers,
@@ -258,4 +259,11 @@ it('restores unsaved operations as a draft and preserves them on revision confli
     JSON.parse(sessionStorage.getItem(`nola-comic-pending:${book.id}`)!)[0]
       .operationId,
   ).toBe(request.operationId)
+  await act(async () => { await discardComicSaves(book.id) })
+  expect(sessionStorage.getItem(`nola-comic-pending:${book.id}`)).toBeNull()
+  const restored = result.current.find(item => item.id === book.id)!
+  expect(restored.pages[0].regions[0].targetText).toBe('Translation')
+  act(() => saveComicBook({ ...restored, config: { ...restored.config, rounds: 1 } }))
+  await act(async () => { await flushComicSaves(book.id) })
+  expect(fixture.book().config.rounds).toBe(1)
 })

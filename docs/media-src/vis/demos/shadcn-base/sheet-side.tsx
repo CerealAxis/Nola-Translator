@@ -34,7 +34,7 @@ export default function SheetSide() {
             </SheetHeader>
             <div className="no-scrollbar overflow-y-auto px-4">
               {Array.from({ length: 10 }).map((_, index) => (
-                <p key={index} className="mb-2 leading-relaxed">
+                <p key={index} className="mb-2">
                   这是一段用于展示排版效果的示例文字。它可以用来观察段落、行距和文本长度在界面中的呈现方式。
                 </p>
               ))}

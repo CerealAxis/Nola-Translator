@@ -83,7 +83,7 @@ export function ModelImportPanel({ children }: ModelImportPanelProps) {
           </div>
           <Button variant="secondary" className="model-import-path" disabled={busy || task?.state === 'running'} onClick={() => void offlineActions.selectDestination()}>{t('offline.choosePath')}</Button>
         </div>
-        <span className="nola-micro text-muted">{t('offline.pathAfterChoose')}</span>
+        <span className="type-muted text-muted">{t('offline.pathAfterChoose')}</span>
       </div>
       {!task || task.state === 'idle' || task.state === 'failed' || task.state === 'cancelled' ? <Button variant="default" className="model-import-download" disabled={(!available || !model || !files || !savePath.trim() || busy) || (busy)} aria-busy={busy}  onClick={() => { if (task?.state === 'failed' || task?.state === 'cancelled') offlineActions.reset(); void offlineActions.downloadModel(modelId, selectedSource, savePath.trim()) }}>{busy ? <Spinner /> : null}{t('offline.downloadModel')}</Button> : null}
     </TabsContent>

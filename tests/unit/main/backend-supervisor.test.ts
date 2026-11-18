@@ -3,14 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const spawnMock = vi.hoisted(() => vi.fn())
 const execFileMock = vi.hoisted(() => vi.fn())
-const appMetricsMock = vi.hoisted(() => vi.fn())
-vi.mock('electron', () => ({ app: { getAppMetrics: appMetricsMock } }))
 vi.mock('node:child_process', async importOriginal => {
   const actual = await importOriginal<typeof import('node:child_process')>()
   return { ...actual, default: { ...actual, spawn: spawnMock, execFile: execFileMock }, spawn: spawnMock, execFile: execFileMock }
 })
 
-import { BackendSupervisor, electronPlaybackProcessTree } from '../../../src/main/backend-supervisor'
+import { BackendSupervisor } from '../../../src/main/backend-supervisor'
 
 function fakeChild(stdoutLines: string[], opts?: { exitCode?: number | null; exitSignal?: string | null }) {
   const child = Object.assign(new EventEmitter(), {
@@ -136,35 +134,5 @@ describe('BackendSupervisor', () => {
   it('health reports false before ready', async () => {
     const supervisor = new BackendSupervisor({ spec })
     expect(await supervisor.health()).toBe(false)
-  })
-})
-
-describe('electronPlaybackProcessTree', () => {
-  it('falls back to the main PID outside Electron', () => {
-    appMetricsMock.mockReturnValue(undefined)
-    const tree = electronPlaybackProcessTree()
-    expect(tree).toContain(process.pid)
-    expect(tree.length).toBeGreaterThan(0)
-  })
-
-  it('includes every child PID and de-duplicates the tree', () => {
-    appMetricsMock.mockReturnValue([
-      { pid: process.pid },
-      { pid: 4242 },
-      { pid: 8080 },
-      { pid: 4242 },
-    ])
-    const tree = electronPlaybackProcessTree()
-    expect(tree).toContain(process.pid)
-    expect(tree).toContain(4242)
-    expect(tree).toContain(8080)
-    // The real playback tree covers main + renderer/utility children, deduped.
-    expect(new Set(tree).size).toBe(tree.length)
-    expect(tree.length).toBeGreaterThanOrEqual(3)
-  })
-
-  it('survives a throwing app.getAppMetrics probe', () => {
-    appMetricsMock.mockImplementation(() => { throw new Error('probe failed') })
-    expect(electronPlaybackProcessTree()).toContain(process.pid)
   })
 })

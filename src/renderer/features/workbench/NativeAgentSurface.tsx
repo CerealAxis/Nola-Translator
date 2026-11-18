@@ -212,7 +212,7 @@ function NativeConversation(props: NativeAgentSurfaceProps & { memoryOpen: boole
   return <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col" data-testid="native-conversation">
     <ThreadPrimitive.Viewport data-hide-scrollbar className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6" turnAnchor="top" autoScroll>
       {props.memoryOpen ? <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6"><Breadcrumb aria-label={t('workbench.chats')} className="py-5"><BreadcrumbList><BreadcrumbItem><button type="button" className="rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring" onClick={props.onMemoryClose}>{t('workbench.chats')}</button></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{t('workbench.memory')}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb><div className="flex flex-1 items-start justify-center"><NativeAgentSettings page="memory" snapshot={props.snapshot} onAction={props.onAction} busy={props.busy} model={props.models.find(model => model.id === props.config.model)?.name ?? ''} onPrompt={() => undefined} memories={props.memories} onMemories={props.onMemories} /></div></div> : <div className="mx-auto flex min-h-full w-full max-w-3xl flex-1 flex-col">
-        {empty ? <div className="flex flex-1 flex-col items-center justify-center gap-6 py-8"><h1 className="[font:var(--font-title)]">{t('workbench.welcomeHeading')}</h1><div className="w-full px-6"><NativeComposer key={threadId} {...props} /></div></div> : <>
+        {empty ? <div className="flex flex-1 flex-col items-center justify-center gap-6 py-8"><h1 className="type-h3">{t('workbench.welcomeHeading')}</h1><div className="w-full px-6"><NativeComposer key={threadId} {...props} /></div></div> : <>
           <WorkbenchBranchContext.Provider value={{ browsing, setBrowsing }}><WorkbenchConfigContext.Provider value={props.config}><WorkbenchModelReadyContext.Provider value={props.models.some(model => model.id === props.config.model && model.kind === props.config.kind)}><div className="flex-1 py-8"><ThreadPrimitive.Messages components={{ UserMessage: NativeUserMessage, UserEditComposer: NativeUserEditComposer, AssistantMessage: NativeAssistantMessage }} /></div></WorkbenchModelReadyContext.Provider></WorkbenchConfigContext.Provider></WorkbenchBranchContext.Provider>
           <div className="sticky bottom-0 w-full shrink-0 bg-background pb-5 pt-3"><NativeComposer key={threadId} {...props} /></div>
         </>}
@@ -231,13 +231,13 @@ function NativeUserMessage() {
   const hasAttachments = useAuiState(s => !!s.message.attachments?.length)
   const copied = useAuiState(s => s.message.isCopied)
   return <div className="mb-8"><NativeDaySeparator /><MessagePrimitive.Root data-role="user" className="group/message flex w-full flex-col items-end gap-2">
-    <div className={['min-w-0 rounded-2xl bg-muted px-3.5 py-2 [font:var(--font-body)]', hasAttachments ? 'w-full max-w-sm' : 'max-w-[85%]'].join(' ')}>
+    <div className={['min-w-0 rounded-2xl bg-muted px-3.5 py-2 type-body', hasAttachments ? 'w-full max-w-sm' : 'max-w-[85%]'].join(' ')}>
       <MessagePrimitive.Attachments components={{ Image: NativeUserAttachment, File: NativeUserAttachment, Document: NativeUserAttachment }} /><MessagePrimitive.Parts components={{ Text: NativeMarkdown }} />
     </div>
     <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100">
       <BranchPickerPrimitive.Root hideWhenSingleBranch className="flex items-center gap-1 text-muted-foreground">
         <BranchPickerPrimitive.Previous aria-label={t('workbench.previous')} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronLeft aria-hidden="true" className="size-4" /></BranchPickerPrimitive.Previous>
-        <span className="text-xs tabular-nums"><BranchPickerPrimitive.Number /> / <BranchPickerPrimitive.Count /></span>
+        <span className="type-small tabular-nums"><BranchPickerPrimitive.Number /> / <BranchPickerPrimitive.Count /></span>
         <BranchPickerPrimitive.Next aria-label={t('workbench.next')} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronRight aria-hidden="true" className="size-4" /></BranchPickerPrimitive.Next>
       </BranchPickerPrimitive.Root>
       <ActionBarPrimitive.Root className="flex items-center gap-1">
@@ -260,7 +260,7 @@ function NativeUserEditComposer() {
   const attachments = useAuiState(s => s.composer.attachments)
   return <div className="mb-8 w-full"><NativeDaySeparator /><ComposerPrimitive.Root className="flex w-full flex-col gap-2 rounded-[var(--radius-lg)] bg-muted p-3">
     {attachments.length > 0 && <div className="flex flex-wrap gap-2"><ComposerPrimitive.Attachments components={{ Attachment: NativeComposerAttachment }} /></div>}
-    <ComposerPrimitive.Input autoFocus aria-label={t('workbench.editMessage')} className="min-h-16 w-full resize-y bg-transparent px-1 py-1 [font:var(--font-body)] outline-none" />
+    <ComposerPrimitive.Input autoFocus aria-label={t('workbench.editMessage')} className="min-h-16 w-full resize-y bg-transparent px-1 py-1 type-body outline-none" />
     <div className="flex items-center gap-2">
       <Button type="button" variant="bare" size="icon-sm" aria-label={t('workbench.addAttachment')} onClick={() => inputRef.current?.click()}><Plus aria-hidden="true" /></Button>
       <input ref={inputRef} type="file" multiple className="hidden" onChange={event => { for (const file of event.target.files ?? []) void aui.composer.addAttachment(file).catch(error => notifyError(t('workbench.actionFailed'), { cause: error })); event.target.value = '' }} />
@@ -296,7 +296,7 @@ function NativeMessageTimestamp() {
   const createdAt = new Date(dates[id])
   if (Number.isNaN(createdAt.getTime())) return null
   const time = createdAt.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })
-  return <time dateTime={createdAt.toISOString()} className="shrink-0 [font:var(--font-caption)] tabular-nums text-muted-foreground">{time}</time>
+  return <time dateTime={createdAt.toISOString()} className="shrink-0 type-muted tabular-nums text-muted-foreground">{time}</time>
 }
 
 function NativeImage(props: Omit<React.ComponentProps<typeof Image>, 'labels'>) {
@@ -322,7 +322,7 @@ function NativeComposerAttachment() {
   return <AttachmentPrimitive.Root className="flex min-w-0 max-w-full flex-col gap-1">
     {src && <img src={src} alt={attachment.name} className="max-h-32 max-w-40 rounded-[var(--radius-md)] object-contain" />}
     <File.Root className="max-w-full min-w-0"><File.Icon mimeType={attachment.contentType} /><File.Name title={attachment.name}><AttachmentPrimitive.Name /></File.Name>{attachment.file && <File.Size bytes={attachment.file.size} />}<AttachmentPrimitive.Remove aria-label={t('workbench.removeAttachment', { name: attachment.name })} className={ghostButton}><X className="size-4" aria-hidden="true" /></AttachmentPrimitive.Remove></File.Root>
-    {attachment.status.type === 'incomplete' && <p role="alert" className="text-sm text-destructive">{attachment.status.message || t('workbench.actionFailed')}</p>}
+    {attachment.status.type === 'incomplete' && <p role="alert" className="type-body text-destructive">{attachment.status.message || t('workbench.actionFailed')}</p>}
   </AttachmentPrimitive.Root>
 }
 
@@ -342,7 +342,7 @@ function NativeMediaStep({ part, running }: NativeMediaStepProps) {
   const label = t(`workbench.${MEDIA_TOOLS[part.toolName]}`)
   const result = part.result && typeof part.result === 'object' ? part.result as Record<string, unknown> : undefined
   const query = String(part.args.filename || part.args.model || result?.model || part.args.target || '')
-  if (part.isError || (!running && part.result === undefined)) return <div className="text-sm text-muted-foreground"><p>{label} · {t(part.isError ? 'workbench.taskFailed' : 'workbench.cancel')}</p>{part.isError && <p role="alert">{errorDetail(part.result)}</p>}</div>
+  if (part.isError || (!running && part.result === undefined)) return <div className="type-body text-muted-foreground"><p>{label} · {t(part.isError ? 'workbench.taskFailed' : 'workbench.cancel')}</p>{part.isError && <p role="alert">{errorDetail(part.result)}</p>}</div>
   return <ToolCall labels={{ request: t('workbench.requestLabel'), result: t('workbench.resultLabel') }} label={label} activeLabel={label} query={query} request={part.argsText} result={typeof part.result === 'string' ? part.result : JSON.stringify(part.result, null, 2) ?? ''}
     running={running && part.result === undefined} open={open} onOpenChange={setOpen} />
 }
@@ -383,7 +383,7 @@ function NativeQuestionBranches() {
   if (branchCount < 2) return null
   return <div className="flex items-center gap-1 text-muted-foreground">
     <button type="button" aria-label={t('workbench.previous')} disabled={branchNumber <= 1} onClick={() => message.switchToBranch({ position: 'previous' })} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronLeft aria-hidden="true" className="size-4" /></button>
-    <span className="text-xs tabular-nums">{branchNumber} / {branchCount}</span>
+    <span className="type-small tabular-nums">{branchNumber} / {branchCount}</span>
     <button type="button" aria-label={t('workbench.next')} disabled={branchNumber >= branchCount} onClick={() => message.switchToBranch({ position: 'next' })} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronRight aria-hidden="true" className="size-4" /></button>
   </div>
 }
@@ -429,7 +429,7 @@ function NativeAssistantMessage() {
   return <div className="mb-8"><NativeDaySeparator /><MessagePrimitive.Root data-role="assistant" className="group/message flex w-full flex-col items-start gap-3">
     <NativeMediaWorkflow />
     {running && !hasContent && <ThinkingIndicator role="status" label={t(audioRequest ? 'workbench.transcribingMedia' : 'workbench.thinkingProcess')} />}
-    {!running && !hasContent && (!error || browsing) && <p role="status" className="text-sm text-muted-foreground">{t('workbench.emptyResult')}</p>}
+    {!running && !hasContent && (!error || browsing) && <p role="status" className="type-body text-muted-foreground">{t('workbench.emptyResult')}</p>}
     <MessagePrimitive.Parts components={{ Text: NativeMarkdown, Reasoning: NativeReasoning, tools: { Fallback: NativeTool }, File, Image: NativeImage, Source: Sources }} />
     {!hasWorkflow && <NativeMessageTiming />}
     {error && !browsing && <ErrorState
@@ -441,7 +441,7 @@ function NativeAssistantMessage() {
     />}
     {!running && <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100"><NativeQuestionBranches /><BranchPickerPrimitive.Root hideWhenSingleBranch className="flex items-center gap-1 text-muted-foreground">
       <BranchPickerPrimitive.Previous onClick={() => setBrowsing(true)} aria-label={t('workbench.previous')} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronLeft aria-hidden="true" className="size-4" /></BranchPickerPrimitive.Previous>
-      <span className="text-xs tabular-nums"><BranchPickerPrimitive.Number /> / <BranchPickerPrimitive.Count /></span>
+      <span className="type-small tabular-nums"><BranchPickerPrimitive.Number /> / <BranchPickerPrimitive.Count /></span>
       <BranchPickerPrimitive.Next onClick={() => setBrowsing(true)} aria-label={t('workbench.next')} className={`${ghostButton} size-7 disabled:opacity-50`}><ChevronRight aria-hidden="true" className="size-4" /></BranchPickerPrimitive.Next>
     </BranchPickerPrimitive.Root><MessageActions labels={{ copied: t('workbench.copiedResponse'), copy: t('workbench.copyResponse'), helpful: t('workbench.helpfulResponse'), unhelpful: t('workbench.unhelpfulResponse'), regenerate: t('workbench.regenerateResponse'), more: t('workbench.moreOptions') }} copied={copied} regenerating={false} onCopy={() => { void navigator.clipboard.writeText(content.filter(part => part.type === 'text').map(part => part.text).join('\n')).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }} onRegenerate={retry} /><NativeMessageTimestamp /></div>}
   </MessagePrimitive.Root></div>
@@ -453,7 +453,7 @@ function NativeMessageTiming() {
   const milliseconds = timing?.totalStreamTime
   if (milliseconds === undefined) return null
   const duration = milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${(milliseconds / 1000).toFixed(1)} s`
-  return <span className="[font:var(--font-caption)] tabular-nums text-muted-foreground">{t('workbench.nativeReplyTime', { duration })}</span>
+  return <span className="type-muted tabular-nums text-muted-foreground">{t('workbench.nativeReplyTime', { duration })}</span>
 }
 
 function errorDetail(error: unknown): string {
@@ -582,7 +582,7 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
   }
   return <Composer className="max-w-none" data-testid="native-composer">
     {!!savedDraft && !text && <DraftRestore draft={savedDraft} savedAt={t('workbench.nativeDraft')} onRestore={() => { aui.thread.composer().setText(savedDraft); setSavedDraft('') }} onDiscard={() => { setSavedDraft(''); try { localStorage.removeItem(`nola.native.draft:${threadId}`) } catch { /* Keep dismissing usable when storage is unavailable. */ } }} />}
-    {menu === 'models' && <ComposerMenu open anchor="models" className="max-h-[min(70vh,32rem)] overflow-y-auto"><p className="px-2.5 py-2 [font:var(--font-caption)] text-muted-foreground"><ModelAvailabilityLabel label={t('nav.modelGateway')} hint={t('gateway.modelNoneHint')} /></p><TooltipProvider>{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 [font:var(--font-caption)] text-muted-foreground">{t(`workbench.${kind}`)}</p>{props.modelCatalog.filter(model => model.kind === kind).map(model => {
+    {menu === 'models' && <ComposerMenu open anchor="models" className="max-h-[min(70vh,32rem)] overflow-y-auto"><p className="px-2.5 py-2 type-muted text-muted-foreground"><ModelAvailabilityLabel label={t('nav.modelGateway')} hint={t('gateway.modelNoneHint')} /></p><TooltipProvider>{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 type-muted text-muted-foreground">{t(`workbench.${kind}`)}</p>{props.modelCatalog.filter(model => model.kind === kind).map(model => {
       const available = props.models.some(item => item.id === model.id && item.kind === model.kind)
       const item = <ComposerMenuItem className="nola-menu-item" active={props.config.model === model.id} aria-disabled={!available} onClick={() => { if (available) pick({ model: model.id, kind: model.kind, images: model.images, voice: '' }) }}><span className="min-w-0 flex-1 truncate text-start">{model.name}</span><Badge variant={available ? 'success' : 'secondary'}>{t(available ? 'workbench.modelAvailable' : 'workbench.modelNotStarted')}</Badge></ComposerMenuItem>
       return available ? <div key={model.id}>{item}</div> : <Tooltip key={model.id}><TooltipTrigger render={item} /><TooltipContent>{t('gateway.modelGatewayStartHint')}</TooltipContent></Tooltip>
@@ -594,7 +594,7 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
     {menu === 'context' && <ComposerMenu open align="end"><ContextBreakdown limit={contextWindow} segments={[{ label: t('workbench.inputTokens'), tokens: usage?.inputTokens ?? 0, tint: 'bg-chart-2' }, { label: t('workbench.outputTokens'), tokens: usage?.outputTokens ?? 0, tint: 'bg-chart-1' }]} /></ComposerMenu>}
     <ComposerBar>
       {attachments.length > 0 && <ComposerAttachments><ComposerPrimitive.Attachments components={{ Attachment: NativeComposerAttachment }} /></ComposerAttachments>}
-      {dictation ? <ComposerVoice recording={dictation.status.type === 'running'} seconds={seconds} /> : <ComposerPrimitive.Input data-slot="composer-input" className="aui-composer-input min-h-11 max-h-40 w-full resize-none bg-transparent px-3 py-2 [font:var(--font-body)] caret-primary outline-none placeholder:text-muted-foreground" rows={1} addAttachmentOnPaste={false} placeholder={props.placeholder} readOnly={!props.config.model} onPaste={event => {
+      {dictation ? <ComposerVoice recording={dictation.status.type === 'running'} seconds={seconds} /> : <ComposerPrimitive.Input data-slot="composer-input" className="aui-composer-input min-h-11 max-h-40 w-full resize-none bg-transparent px-3 py-2 type-body caret-primary outline-none placeholder:text-muted-foreground" rows={1} addAttachmentOnPaste={false} placeholder={props.placeholder} readOnly={!props.config.model} onPaste={event => {
         const kind = props.config.kind
         if (kind === 'tts' || kind === 'mt' && !props.config.images) return
         const clipboard = event.clipboardData

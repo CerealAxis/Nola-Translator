@@ -163,7 +163,7 @@ export function RuntimeComponents() {
   const speed = operation?.phase === 'download' ? downloadSpeed(operation.bytes, operation.startedAt) : ''
   const versions = runtimeVersionRows(local)
   return <>
-    <SettingGroup legend={t('runtime.components')} actions={<Button variant="secondary" size="sm" className="bg-surface-tertiary" disabled={busy}
+    <SettingGroup legend={t('runtime.components')} actions={<Button variant="secondary" size="sm" disabled={busy}
       onClick={() => void recheck()}>{state.runtimeChecking ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}{t('runtime.recheck')}</Button>}>
       <SettingsRow label={t('runtime.python')} desc={runtimes?.python?.reason || undefined}><span>{t('runtime.builtInPython')}</span></SettingsRow>
       {versions.map(({ kind, version }) => <SettingsRow key={kind}
@@ -216,7 +216,7 @@ export function RuntimeComponents() {
         <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
           <AlertDialogContent className="max-w-md">
             <DialogHeader>
-              <AlertDialog.Title className="nola-title text-foreground">{t('runtime.uninstallTitle')}</AlertDialog.Title>
+              <AlertDialog.Title className="type-h4 text-foreground">{t('runtime.uninstallTitle')}</AlertDialog.Title>
             </DialogHeader>
             <AlertDialog.Description>
               {t('runtime.uninstallBody')}
@@ -230,7 +230,7 @@ export function RuntimeComponents() {
           </AlertDialogContent>
       </AlertDialog.Portal>
     </AlertDialog.Root>
-    {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" size="sm" className="bg-surface-tertiary" disabled={busy || !Object.values(repairs).some(Boolean)} onClick={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>
+    {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" size="sm" disabled={busy || !Object.values(repairs).some(Boolean)} onClick={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>
       <ToggleGroup multiple disabled={busy} aria-label={t('runtime.repair')} className="runtime-repair runtime-repair__list"
         value={KINDS.filter(kind => repairs[kind])}
         onValueChange={values => setRepairs({ engine: values.includes('engine'), llama: values.includes('llama'), crisp: values.includes('crisp') })}>

@@ -153,6 +153,7 @@ function errorCodeOf(error: unknown): string {
     return error.code.toUpperCase()
   }
   const message = errorMessage(error)
+  if (/(?:^|:\s*)sessionNotRunning$/.test(message)) return 'SESSIONNOTRUNNING'
   if (/^[A-Z][A-Z0-9_]{2,63}$/.test(message)) return message
   const match = /([a-zA-Z_]+)[:：]/.exec(message)
   return match ? match[1].toUpperCase() : 'SESSION_ERROR'

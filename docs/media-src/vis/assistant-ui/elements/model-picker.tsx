@@ -67,7 +67,7 @@ export function ModelPicker({
                   </span>
 
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="truncate text-[13.5px]">{model.name}</span>
+                    <span className="truncate type-body">{model.name}</span>
                     <span className="flex flex-wrap gap-1">
                       {model.capabilities.map((capability) => (
                         <span

@@ -44,7 +44,7 @@ export function ChatPanelUserMessage({
       data-slot="chat-panel-user-message"
       className={cn(
         field,
-        "fade-in slide-in-from-bottom-1 animate-in self-end rounded-2xl px-3 py-1.5 text-xs duration-300",
+        "fade-in slide-in-from-bottom-1 animate-in self-end rounded-2xl px-3 py-1.5 type-body duration-300",
         className,
       )}
       {...props}
@@ -60,7 +60,7 @@ export function ChatPanelAssistantMessage({
     <p
       data-slot="chat-panel-assistant-message"
       className={cn(
-        "text-foreground/70 max-w-[85%] self-start text-xs leading-relaxed",
+        "text-foreground/70 max-w-[85%] self-start type-body",
         className,
       )}
       {...props}
@@ -111,7 +111,7 @@ export function ChatPanelComposer({
       )}
       {...props}
     >
-      <span className="text-muted-foreground text-[13px]">{placeholder}</span>
+      <span className="text-muted-foreground type-body">{placeholder}</span>
       <button
         type="button"
         aria-label={"发送"}

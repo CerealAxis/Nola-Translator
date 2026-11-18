@@ -449,8 +449,8 @@ const MermaidDiagramImpl: FC<MermaidDiagramProps> = ({
           className,
         )}
       >
-        <pre className="overflow-x-auto p-4 text-sm">{code.trim()}</pre>
-        <p className="text-muted-foreground border-border border-t px-4 py-1.5 text-xs">
+        <pre className="overflow-x-auto p-4 type-body">{code.trim()}</pre>
+        <p className="text-muted-foreground border-border border-t px-4 py-1.5 type-muted">
           图无法渲染
         </p>
       </div>

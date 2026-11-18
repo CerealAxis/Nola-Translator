@@ -132,7 +132,7 @@ export function RecentMeetings(): ReactNode {
                     </div>
                   ) : canHaveRecords && failed ? (
                     <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-                      <p role="status" className="nola-caption text-nola-ui-muted-foreground">{t('errors.meetingsLoadFailed')}</p>
+                      <p role="status" className="type-muted text-nola-ui-muted-foreground">{t('errors.meetingsLoadFailed')}</p>
                       <Button variant="outline" size="sm" onClick={retryLoad}>{t('common.retry')}</Button>
                     </div>
                   ) : (

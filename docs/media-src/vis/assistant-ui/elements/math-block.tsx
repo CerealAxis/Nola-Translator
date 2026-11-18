@@ -44,7 +44,7 @@ export function MathBlock({
           key={i}
           className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex flex-col gap-1 duration-300"
         >
-          <span className="text-foreground/90 overflow-x-auto py-1 text-center font-serif text-[17px] leading-relaxed italic">
+          <span className="text-foreground/90 overflow-x-auto py-1 text-center type-body italic">
             {step.expression}
           </span>
           {step.note && (
@@ -68,7 +68,7 @@ export function Frac({
   return (
     <span
       data-slot="frac"
-      className="inline-flex flex-col items-center align-middle text-[0.85em] leading-tight"
+      className="inline-flex flex-col items-center align-middle type-muted"
     >
       <span className="px-1">{over}</span>
       <span className="border-foreground/40 w-full border-t px-1">{under}</span>
@@ -77,9 +77,9 @@ export function Frac({
 }
 
 export function Sup({ children }: { children: React.ReactNode }) {
-  return <sup className="text-[0.65em] not-italic">{children}</sup>;
+  return <sup className="type-muted not-italic">{children}</sup>;
 }
 
 export function Sub({ children }: { children: React.ReactNode }) {
-  return <sub className="text-[0.65em] not-italic">{children}</sub>;
+  return <sub className="type-muted not-italic">{children}</sub>;
 }

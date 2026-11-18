@@ -25,7 +25,7 @@ const SPONSOR_URL = 'https://nola.xaviermc.top/zh-CN/contributing/sponsor'
 const REPOSITORY_URL = 'https://github.com/CerealAxis/Nola-Translator'
 const SHADCN_UI_URL = 'https://ui.shadcn.com/'
 const COPIED_HOLD_MS = 1500
-const TOOLTIP_CLASS = 'z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
+const TOOLTIP_CLASS = 'z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 type-body text-overlay-foreground shadow-overlay'
 
 function isReleaseUrl(value: unknown): value is string {
   if (typeof value !== 'string') return false
@@ -142,7 +142,7 @@ export function MoreTab() {
           <ExternalAction href={`${REPOSITORY_URL}/issues`} label={t('settings.openInBrowser')} />
         </SettingsRow>
         <SettingsRow label={t('settings.qqGroup')}>
-          <code className="settings-more__code nola-mono text-foreground">701699932</code>
+          <span className="settings-more__code type-muted text-foreground">701699932</span>
         </SettingsRow>
       </SettingGroup>
 

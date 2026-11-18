@@ -80,7 +80,7 @@ it('uses the shared page header and renders actual source and translated results
   render(<ScreenTranslationPage />)
   await screen.findByRole('button', { name: '选择区域' })
   expect(screen.getByRole('button', { name: '开始翻译' })).toBeEnabled()
-  expect(screen.getByRole('heading', { name: '屏幕翻译', level: 1 })).toHaveClass('nola-display')
+  expect(screen.getByRole('heading', { name: '屏幕翻译', level: 1 })).toHaveClass('type-h3')
   expect(screen.getByRole('heading', { name: '屏幕翻译', level: 1 }).closest('.card')).toBeNull()
   expect(screen.getByRole('combobox', { name: 'OCR 模型' })).toBeDisabled()
   expect(screen.queryByRole('button', { name: '管理模型' })).not.toBeInTheDocument()

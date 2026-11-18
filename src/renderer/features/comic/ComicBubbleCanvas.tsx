@@ -14,9 +14,8 @@ import {
 } from './comic-data'
 import { validComicQuad } from '../../../shared/comic'
 import { useComicPrototypeText } from './comic-prototype-copy'
-import { Spinner } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
-import { useI18n } from '@/i18n'
+import { ComicImage } from './ComicLoading'
 
 export type ComicCanvasTool =
   'select' | 'add' | 'repair' | 'restore' | 'perspective'
@@ -54,7 +53,6 @@ export function ComicBubbleCanvas({
   onMask,
 }: CanvasProps) {
   const p = useComicPrototypeText()
-  const { t } = useI18n()
   useEffect(() => {
     if (typeof FontFace === 'undefined' || !document.fonts) return
     let active = true
@@ -137,6 +135,7 @@ export function ComicBubbleCanvas({
   }
   const start = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
+    if (!root.current?.querySelector('.comic-image[data-state="ready"]')) return
     const hit = (event.target as Element).closest<HTMLElement>(
       '[data-comic-region]',
     )
@@ -305,23 +304,13 @@ export function ComicBubbleCanvas({
       onPointerUp={finish}
       onPointerCancel={finish}
     >
-      {image.src ? (
-        <img
-          src={image.src}
-          alt={`${page.name} · ${original ? p('source') : p('result')}`}
-          draggable={false}
-        />
-      ) : (
-        <div className="comic-bubble-canvas__loading" aria-busy={!image.failed}>
-          {image.failed ? (
-            <Button variant="outline" onClick={image.retry}>
-              {t('suite.retry')}
-            </Button>
-          ) : (
-            <Spinner />
-          )}
-        </div>
-      )}
+      <ComicImage
+        src={image.src}
+        alt={`${page.name} · ${original ? p('source') : p('result')}`}
+        failed={image.failed}
+        retry={image.retry}
+        showStatus
+      />
       {!original && (
         <svg
           className="comic-bubble-canvas__masks"
@@ -448,9 +437,12 @@ export function ComicFrontendImage({
   kind?: 'source' | 'clean' | 'rendered'
 }) {
   const image = useComicImage(projectId, page, kind, 400_000)
-  return image.src ? (
-    <img src={image.src} alt={page.name} />
-  ) : image.failed ? null : (
-    <Spinner />
+  return (
+    <ComicImage
+      src={image.src}
+      alt={page.name}
+      failed={image.failed}
+      aspectRatio={`${page.width} / ${page.height}`}
+    />
   )
 }

@@ -39,15 +39,15 @@ export function WebSearch({
       <span
         className={cn(
           field,
-          "text-foreground/70 inline-flex w-fit items-center gap-1.5 rounded-full px-3.5 py-2 text-xs",
+          "text-foreground/70 inline-flex w-fit items-center gap-1.5 rounded-full px-3.5 py-2 type-body",
         )}
       >
         <SearchIcon className="text-muted-foreground size-3" />
         {query}
       </span>
-      <div className="text-muted-foreground text-xs">
+      <div className="text-muted-foreground type-muted">
         {searching ? (
-          <ShimmerLabel className="relative inline-block leading-none">
+          <ShimmerLabel className="relative inline-block">
             搜索中
           </ShimmerLabel>
         ) : (
@@ -62,10 +62,10 @@ export function WebSearch({
             key={`${cycle}-${result.domain}`}
             className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both hover:bg-foreground/[0.03] -mx-2.5 flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 transition-colors duration-300"
           >
-            <span className="bg-foreground/[0.06] text-muted-foreground flex size-4 shrink-0 items-center justify-center rounded text-[9px] font-medium">
+            <span className="bg-foreground/[0.06] text-muted-foreground flex size-4 shrink-0 items-center justify-center rounded type-small">
               {result.domain.charAt(0).toUpperCase()}
             </span>
-            <span className="text-foreground/90 min-w-0 flex-1 truncate text-[13.5px]">
+            <span className="text-foreground/90 min-w-0 flex-1 truncate type-body">
               {result.title}
             </span>
             <span className={cn(mono, "text-muted-foreground shrink-0")}>

@@ -37,9 +37,9 @@ export function AgentStatus({
       {...props}
     >
       {state === "done" ? (
-        <CheckIcon aria-hidden className="size-3 shrink-0 text-chart-2" />
+        <CheckIcon aria-hidden className="size-3 shrink-0 text-success-soft-foreground" />
       ) : state === "failed" ? (
-        <XIcon aria-hidden className="text-destructive size-3 shrink-0" />
+        <XIcon aria-hidden className="text-danger-soft-foreground size-3 shrink-0" />
       ) : (
         <span
           aria-hidden
@@ -54,7 +54,7 @@ export function AgentStatus({
       <span className="sr-only">{taskStateLabels[state]}</span>
       <span
         key={label}
-        className="fade-in blur-in-[2px] animate-in max-w-44 truncate text-xs duration-300 motion-reduce:animate-none"
+        className="fade-in blur-in-[2px] animate-in max-w-44 truncate type-small duration-300 motion-reduce:animate-none"
       >
         {label}
       </span>

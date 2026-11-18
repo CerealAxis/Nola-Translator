@@ -99,7 +99,7 @@ export function PromptLibrary({
           aria-controls={listId}
           aria-autocomplete="list"
           aria-activedescendant={selected ? optionId(selected.id) : undefined}
-          className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+          className="text-foreground/85 placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent type-body outline-none"
         />
       </div>
 
@@ -120,7 +120,7 @@ export function PromptLibrary({
           );
           const content = (
             <>
-              <span className="min-w-0 flex-1 truncate text-[13px]">
+              <span className="min-w-0 flex-1 truncate type-body">
                 {prompt.name}
               </span>
               {prompt.variables.length > 0 && (
@@ -167,7 +167,7 @@ export function PromptLibrary({
         })}
       </div>
       {matches.length === 0 && (
-        <span className="text-muted-foreground block px-2 py-3 text-center text-xs break-words">
+        <span className="text-muted-foreground block px-2 py-3 text-center type-muted break-words">
           没有匹配“{query}”
         </span>
       )}
@@ -179,7 +179,7 @@ export function PromptLibrary({
             "fade-in animate-in flex flex-col gap-2 rounded-xl p-2.5 duration-200",
           )}
         >
-          <p className="text-foreground/65 text-xs leading-relaxed break-words">
+          <p className="text-foreground/65 type-small break-words">
             {selected.body}
           </p>
           {selected.variables.length > 0 && (

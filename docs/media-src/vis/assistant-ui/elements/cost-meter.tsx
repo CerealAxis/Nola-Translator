@@ -40,7 +40,7 @@ export function CostMeter({
       {...props}
     >
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-medium tracking-tight tabular-nums">
+        <span className="type-body font-semibold tabular-nums">
           {runCost}
         </span>
         <span className={cn(mono, "text-muted-foreground")}>本次运行</span>
@@ -83,7 +83,7 @@ export function CostMeter({
             key={line.model}
             className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
           >
-            <span className="text-foreground/75 min-w-0 grow truncate text-[13px]">
+            <span className="text-foreground/75 min-w-0 grow truncate type-body">
               {line.model}
             </span>
             <span className="ms-auto flex min-w-0 items-baseline gap-2">

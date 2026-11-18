@@ -144,7 +144,7 @@ export function TypographyRtl() {
       <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight text-balance">
         {t.title}
       </h1>
-      <p className="text-xl leading-7 text-muted-foreground [&:not(:first-child)]:mt-6">
+      <p className="text-xl text-muted-foreground [&:not(:first-child)]:mt-6">
         {t.leadParagraph}
       </p>
       <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0">

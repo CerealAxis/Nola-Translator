@@ -63,7 +63,7 @@ export function ImageTranslation({ initialRect, preferences, container, capture,
   useEffect(() => () => controller.current.abort(), [])
   useEffect(() => { void capture(initialRect).then(setImage).catch(e => notifyError(e, 'imageCaptureFailed')) }, [])
   return <Dialog.Root open onOpenChange={open => { if (!open) close() }}><Dialog.Portal container={container}><Dialog.Backdrop className="fixed inset-0 bg-nola-ui-backdrop" /><Dialog.Popup render={<Card />} className="nola-dialog-content" aria-describedby={undefined}>
-    <Dialog.Title className="font-semibold">{t('imageTranslate')}</Dialog.Title>
+    <Dialog.Title className="type-h4">{t('imageTranslate')}</Dialog.Title>
     {image && <img src={image} alt={t('imageTranslate')} className="max-h-60 max-w-full object-contain" />}
     {result && <p dir="auto" className="whitespace-pre-wrap">{result}</p>}
     <div className="flex justify-end gap-2">{result && <Button variant="outline" onClick={() => { void Promise.resolve().then(() => navigator.clipboard.writeText(result)).then(() => showToast({ type: 'success', description: t('copied') })).catch(() => notifyError('imageCopyFailed', 'imageCopyFailed')) }}>{t('copyTranslation')}</Button>}<Button variant="outline" onClick={close}>{t('close')}</Button><Button disabled={!image || pending} onClick={() => { setPending(true); void translateImage(image, preferences.pageLanguage, controller.current.signal).then(setResult).catch(e => notifyError(e, 'providerRequestFailed')).finally(() => setPending(false)) }}>{t(pending ? 'translating' : 'imageTranslate')}</Button></div>

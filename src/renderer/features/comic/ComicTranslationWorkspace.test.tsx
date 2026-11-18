@@ -101,6 +101,12 @@ it('does not mount an image without a source while a page is loading', async () 
   expect(
     document.querySelector('.comic-bubble-canvas [aria-busy="true"]'),
   ).toBeInTheDocument()
+  expect(
+    document.querySelector('.comic-bubble-canvas [data-slot="skeleton"]'),
+  ).toBeInTheDocument()
+  expect(
+    document.querySelector('.comic-workflow__thumbnail [data-slot="skeleton"]'),
+  ).toBeInTheDocument()
 })
 it('offers only MT for normal translation and only LLMs for LLM translation and proofreading', async () => {
   vi.mocked(useAvailableModels).mockReturnValue({

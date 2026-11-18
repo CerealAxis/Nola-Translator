@@ -69,6 +69,7 @@ import type {
 import { comicApi, useComicImage } from './comic-data'
 import { useComicPrototypeText } from './comic-prototype-copy'
 import { comicErrorMessage } from './comic-errors'
+import { ComicBooksLoading, ComicImage, ComicProjectLoading } from './ComicLoading'
 
 const importLabels = {
   auto: 'suite.comicFiles',
@@ -93,7 +94,7 @@ function BookCover({
   api: ComicBridge
 }) {
   const { t } = useI18n()
-  const [image, setImage] = useState<string>()
+  const [image, setImage] = useState<string | null>()
   useEffect(() => {
     let active = true
     setImage(undefined)
@@ -103,7 +104,9 @@ function BookCover({
         .then((src) => {
           if (active) setImage(src)
         })
-        .catch(() => {})
+        .catch(() => {
+          if (active) setImage(null)
+        })
     return () => {
       active = false
     }
@@ -128,11 +131,12 @@ function BookCover({
             />
           }
         >
-          {image ? (
-            <img src={image} alt={book.title} draggable={false} />
-          ) : (
-            <BookOpen aria-hidden="true" />
-          )}
+          <ComicImage
+            src={image ?? undefined}
+            alt={book.title}
+            loading={!!book.coverPageId && image === undefined}
+            fallback={<BookOpen aria-hidden="true" />}
+          />
         </TooltipTrigger>
         <TooltipContent>{book.title}</TooltipContent>
       </Tooltip>
@@ -179,11 +183,14 @@ function LoadedReaderImage({
     kind === 'rendered' && !page.hasRendered && page.hasClean ? 'clean' : kind,
     4_000_000,
   )
-  if (image.failed) return null
-  return image.src ? (
-    <img src={image.src} alt={page.name} draggable={false} />
-  ) : (
-    <Spinner />
+  return (
+    <ComicImage
+      src={image.src}
+      alt={page.name}
+      failed={image.failed}
+      retry={image.retry}
+      showStatus
+    />
   )
 }
 
@@ -210,8 +217,9 @@ function ComicReader({
   const [visible, setVisible] = useState(new Set<string>())
   const host = useRef<HTMLDivElement>(null)
   const initialized = useRef(false)
-  const load = () =>
-    api
+  const load = () => {
+    setFailed(false)
+    return api
       .openProject(projectId)
       .then((value) => {
         setProject(value)
@@ -224,6 +232,7 @@ function ComicReader({
           action: { label: t('suite.retry'), onPress: () => void load() },
         })
       })
+  }
   useEffect(() => {
     initialized.current = false
     void load()
@@ -308,8 +317,7 @@ function ComicReader({
     return () => observer.disconnect()
   }, [project?.id, project?.pages.length])
   if (failed && !project) return null
-  if (!project)
-    return <Spinner role="status" aria-label={t('common.loading')} />
+  if (!project) return <ComicProjectLoading />
   return (
     <div className="comic-page comic-page--workspace comic-page--reader">
       <section className="comic-canvas">
@@ -439,7 +447,7 @@ function ComicReader({
                   if (event.target.value) jump(event.target.valueAsNumber - 1)
                 }}
               />
-              <span className="nola-caption">/{project.pages.length}</span>
+              <span className="type-muted">/{project.pages.length}</span>
               <Button
                 variant="bare"
                 size="icon-sm"
@@ -555,8 +563,9 @@ export function ComicTranslationPage({
     [first, setFirst] = useState('1'),
     [last, setLast] = useState(''),
     [firstFrame, setFirstFrame] = useState(false)
-  const load = () =>
-    api
+  const load = () => {
+    setFailed(false)
+    return api
       .listProjects()
       .then((value) => {
         setBooks(value)
@@ -569,6 +578,7 @@ export function ComicTranslationPage({
           action: { label: t('suite.retry'), onPress: () => void load() },
         })
       })
+  }
   useEffect(() => {
     if (projectId) return
     void load()
@@ -589,7 +599,7 @@ export function ComicTranslationPage({
     }
   }
   if (projectId)
-    return <ComicReader projectId={projectId} pageId={pageId} api={api} />
+    return <ComicReader key={projectId} projectId={projectId} pageId={pageId} api={api} />
   return (
     <div className="comic-page">
       <PageHeader
@@ -643,7 +653,7 @@ export function ComicTranslationPage({
         }
       />
       {failed && !books ? null : !books ? (
-        <Spinner />
+        <ComicBooksLoading />
       ) : (
         <>
           {!!books.length && (

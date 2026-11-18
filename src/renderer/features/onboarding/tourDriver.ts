@@ -63,7 +63,8 @@ function waitForTourRemoval(selector: string, signal: AbortSignal): Promise<void
 }
 
 /** Scroll only the owning panel, leaving the native title bar and outer document stationary. */
-export async function scrollTourTarget(target: HTMLElement, signal: AbortSignal): Promise<void> {
+export async function scrollTourTarget(target: HTMLElement, signal: AbortSignal, behavior: ScrollBehavior = reducedMotion() ? 'instant' : 'smooth'): Promise<void> {
+  signal.throwIfAborted()
   let scroller = target.parentElement
   while (scroller && scroller !== document.body) {
     if (/(auto|scroll)/.test(getComputedStyle(scroller).overflowY) && scroller.scrollHeight > scroller.clientHeight) break
@@ -79,7 +80,7 @@ export async function scrollTourTarget(target: HTMLElement, signal: AbortSignal)
     : bounds.top + space * 2 + Math.max(0, (room - rect.height) / 2)
   const top = Math.max(0, Math.min(scroller.scrollHeight - scroller.clientHeight, scroller.scrollTop + rect.top - desired))
   if (Math.abs(top - scroller.scrollTop) < 1) return
-  scroller.scrollTo({ top, behavior: reducedMotion() ? 'instant' : 'smooth' })
+  scroller.scrollTo({ top, behavior })
 }
 
 export function closeTourList(): void {
@@ -104,7 +105,11 @@ export async function prepareTourStep(step: TourStep, navigate: (path: string) =
   }
   if (window.location.hash !== step.path) {
     const opener = step.via ? findTourTarget(step.via) : null
-    if (opener) { await scrollTourTarget(opener, signal); await demonstrateClick(opener, signal) }
+    if (opener) {
+      // The scroll container survives navigation, so finish scrolling before changing routes.
+      await scrollTourTarget(opener, signal, 'instant')
+      await demonstrateClick(opener, signal)
+    }
     signal.throwIfAborted()
     if (window.location.hash !== step.path) navigate(step.path)
   }

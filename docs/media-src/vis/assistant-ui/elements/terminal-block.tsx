@@ -277,7 +277,7 @@ export function TerminalBlock({
     <div
       className={cn(
         ink ? "bg-foreground dark:bg-popover" : paper,
-        "w-full max-w-md overflow-hidden rounded-2xl font-mono text-xs",
+        "w-full max-w-md overflow-hidden rounded-2xl type-code",
         className,
       )}
       {...props}
@@ -309,15 +309,15 @@ export function TerminalBlock({
         {done ? (
           <div className="flex shrink-0 items-center gap-1">
             {failed ? (
-              <XIcon className="size-3 text-destructive" />
+              <XIcon className="size-3 text-danger-soft-foreground" />
             ) : (
-              <CheckIcon className="size-3 text-chart-2" />
+              <CheckIcon className="size-3 text-success-soft-foreground" />
             )}
             <span
               className={cn(
                 mono,
                 failed
-                  ? "text-destructive"
+                  ? "text-danger-soft-foreground"
                   : ink
                     ? "text-background/40 dark:text-muted-foreground"
                     : "text-muted-foreground",
@@ -354,7 +354,7 @@ export function TerminalBlock({
                 )}
               >
                 {isCopied ? (
-                  <CheckIcon className="size-3.5 text-chart-2" />
+                  <CheckIcon className="size-3.5 text-success-soft-foreground" />
                 ) : (
                   <CopyIcon className="size-3.5" />
                 )}
@@ -389,7 +389,7 @@ export function TerminalBlock({
                 className={cn(
                   "fade-in animate-in fill-mode-both break-words whitespace-pre-wrap duration-300 motion-reduce:animate-none",
                   isStderr
-                    ? "text-destructive"
+                    ? "text-danger-soft-foreground"
                     : isLast &&
                         (ink
                           ? "text-background/90 dark:text-foreground/90"
@@ -403,7 +403,7 @@ export function TerminalBlock({
                       !isStderr &&
                         segment.color !== undefined &&
                         ansiColor(segment.color, ink),
-                      segment.bold && "font-bold",
+                      segment.bold && "font-semibold",
                       segment.dim && "opacity-60",
                     )}
                   >

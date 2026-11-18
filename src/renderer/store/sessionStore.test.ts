@@ -179,7 +179,7 @@ it('keeps a failed stop retryable until the engine confirms the session ended', 
   attachSessionStore(bridge)
   vi.spyOn(bridge.engine, 'stopSession')
     .mockRejectedValueOnce(new Error('temporary failure'))
-    .mockRejectedValueOnce(Object.assign(new Error('sessionNotRunning'), { code: 'sessionNotRunning' }))
+    .mockRejectedValueOnce(new Error("Error invoking remote method 'session:stop': Error: sessionNotRunning"))
   sessionStore.setState({ status: 'running', sessionId: 'session-1', meetingId: 'meeting-1', startedAtMs: Date.now(), elapsedMs: 1000 })
 
   await expect(stopSession()).rejects.toThrow('temporary failure')

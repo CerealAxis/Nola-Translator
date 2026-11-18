@@ -54,7 +54,7 @@ export function ComposerBar() {
       <ComposerPrimitive.Input
         placeholder="输入消息…"
         rows={1}
-        className="placeholder:text-muted-foreground min-h-11 w-full resize-none bg-transparent px-3 text-[15px] outline-none"
+        className="placeholder:text-muted-foreground min-h-11 w-full resize-none bg-transparent px-3 type-body outline-none"
       />
       <div className="flex items-center justify-between">
         <ComposerPrimitive.AddAttachment

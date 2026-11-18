@@ -10,7 +10,7 @@
  * nothing leaves the overflow checks vacuously green, so an empty match is a
  * failure rather than a skipped page section.
  */
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { app, BrowserWindow, protocol } from 'electron'
 import { build } from 'esbuild'
@@ -20,6 +20,8 @@ const { DEFAULT_SETTINGS } = await import('data:text/javascript;base64,' + Buffe
 const screenBundle = await build({ entryPoints: ['src/shared/screen-translation.ts'], bundle: true, platform: 'node', format: 'esm', write: false })
 const { screenConfigSchema } = await import('data:text/javascript;base64,' + Buffer.from(screenBundle.outputFiles[0].text).toString('base64'))
 const SCREEN_CONFIG = screenConfigSchema.parse({})
+const comicBundle = await build({ entryPoints: ['src/shared/comic.ts'], bundle: true, platform: 'node', format: 'esm', write: false })
+const { comicConfigSchema } = await import('data:text/javascript;base64,' + Buffer.from(comicBundle.outputFiles[0].text).toString('base64'))
 
 app.disableHardwareAcceleration()
 protocol.registerSchemesAsPrivileged([{ scheme: 'nola-audio', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }])
@@ -27,7 +29,7 @@ const output = resolve('artifacts/layout')
 app.setPath('userData', resolve(output, `electron-cache-${process.pid}`))
 const delay = (ms) => new Promise((done) => setTimeout(done, ms))
 
-const SETTINGS_TABS = ['general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'help']
+const SETTINGS_TABS = ['general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'preserve-words', 'subtitle-words', 'help']
 
 /** Each entry names the `data-page` its route root renders, which is what the run asserts; the settings tabs all collapse to `settings`. */
 const PAGES = [
@@ -186,7 +188,7 @@ const fixtureAudioUrl = 'nola-audio://local/layout/audio.wav'
 const suiteId = '7a643bd5-d87b-4ec8-a80f-31cdb4e292f3'
 const suitePageId = 'e0344cb6-a6dd-4c67-bba1-c533de38236b'
 const suiteProject = { id: suiteId, title: '夜航 · 第一卷', revision: 1, updatedAt: '2026-11-06T00:00:00.000Z', pageCount: 1, chapterCount: 1,
-  config: { sourceLanguage: 'ja', targetLanguage: 'zh', model: '', readingDirection: 'rtl', glossary: { mode: 'auto' } },
+  config: comicConfigSchema.parse({ sourceLanguage: 'ja', targetLanguage: 'zh' }),
   chapters: [{ id: suiteId, title: '第一章' }], pages: [{ id: suitePageId, chapterId: suiteId, name: '001.png', width: 600, height: 800,
     regions: [{ id: suiteId, sourceText: '灯台へ行こう。', targetText: '去灯塔吧。', x: 310, y: 65, width: 180, height: 180, confidence: 0.98, locked: false, ignored: false,
       style: { fontSize: 24, color: '#000000', direction: 'vertical-rl', align: 'center' }, qa: [] }], status: 'translated', hasClean: false, hasRendered: false }], jobs: [], canUndo: true, canRedo: false }
@@ -257,6 +259,7 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
     onChanged: () => () => {},
   },
   comic: { listProjects: async () => [${JSON.stringify(suiteProject)}], openProject: async () => (${JSON.stringify(suiteProject)}),
+    listTasks: async () => [], listFonts: async () => [],
     image: async () => ${JSON.stringify(suiteImage)}, onChanged: () => () => {} },
   glossary: { snapshot: async () => ({ schemaVersion: 1, revision: 0, matchingRevision: 0, enabled: true,
     libraries: [{ id: '${suiteId}', name: '游戏专名', description: '', enabled: true, scope: { mode: 'global' },
@@ -303,7 +306,7 @@ contextBridge.exposeInMainWorld('layoutFixture', { emit,
 
 // Two rAFs only cover paint; the stub's async bridge calls need wall-clock time on top.
 async function settle(window) {
-  if (process.argv.includes('--sidebar-resize') || process.argv.includes('--translation-suite') || process.argv.includes('--settings-navigation') || process.argv.includes('--meeting-stage') || process.argv.includes('--meeting-settings') || process.argv.includes('--screen-page')) {
+  if (process.argv.includes('--design-system') || process.argv.includes('--sidebar-resize') || process.argv.includes('--translation-suite') || process.argv.includes('--settings-navigation') || process.argv.includes('--meeting-stage') || process.argv.includes('--meeting-settings') || process.argv.includes('--screen-page')) {
     // Hidden windows throttle animation frames; state and computed layout are asserted below.
     await window.webContents.executeJavaScript('document.fonts.ready.then(() => true)')
     if (process.argv.includes('--meeting-settings') || process.argv.includes('--screen-page')) await window.webContents.executeJavaScript('new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))')
@@ -381,6 +384,276 @@ async function main() {
     if (details.level === 'error') console.log(`[renderer] ${details.message}`)
   })
   await window.loadFile(resolve('out/renderer/index.html'))
+
+  if (process.argv.includes('--design-browser')) {
+    const assets = await readdir('browser/extension/dist/assets')
+    const css = await readFile(resolve('browser/extension/dist/assets', assets.find(file => /^styles-.*\.css$/.test(file))), 'utf8')
+    const browser = new BrowserWindow({ width: 900, height: 700, show: false, webPreferences: { offscreen: true, sandbox: true, contextIsolation: true } })
+    await browser.loadURL('about:blank')
+    const state = await browser.webContents.executeJavaScript(`(() => {
+      document.documentElement.style.fontSize='36px'; document.documentElement.style.setProperty('--nola-font-family','"Noto Sans JP"');
+      const host=document.createElement('div'); document.body.append(host); const shadow=host.attachShadow({mode:'open'});
+      const style=document.createElement('style'); style.textContent=${JSON.stringify(css)}; shadow.append(style);
+      const root=document.createElement('div');root.className='nola-extension';root.innerHTML='<p class="type-body">Browser text</p><button data-slot="button" class="button">Translate</button><code>const code = 1</code>';shadow.append(root);
+      const snapshot=el=>{const s=getComputedStyle(el);return {family:s.fontFamily,size:s.fontSize,line:s.lineHeight,radius:s.borderRadius,weight:s.fontWeight}};
+      const documentPreview=document.createElement('div');documentPreview.className='nola-doc-sheet';
+      documentPreview.innerHTML='<h1>Title</h1><h2>Section</h2><p>Reading</p>';
+      root.append(documentPreview);
+      const documentText=documentPreview.querySelector('p'), before=documentText.getBoundingClientRect().height;
+      const heading=snapshot(documentPreview.querySelector('h1')), section=snapshot(documentPreview.querySelector('h2')), reading=snapshot(documentText);
+      documentPreview.style.setProperty('--doc-zoom','1.5');
+      root.insertAdjacentHTML('beforeend', '<header class="nola-settings-title"><h1>Settings</h1></header><section class="nola-settings-section"><h2>General</h2></section><header class="nola-popup-header"><h1>Nola Translator</h1></header>');
+      const titleSizes=()=>['.nola-settings-title h1','.nola-settings-section h2','.nola-popup-header h1'].map(selector=>snapshot(root.querySelector(selector)).size);
+      const lightTitles=titleSizes();
+      host.dataset.theme='dark';
+      const darkTitles=titleSizes();
+      delete host.dataset.theme;
+      return {hostRoot:getComputedStyle(document.documentElement).fontSize,body:snapshot(root.querySelector('p')),button:snapshot(root.querySelector('button')),code:snapshot(root.querySelector('code')),heading,section,reading,viewerScale:documentText.getBoundingClientRect().height/before,lightTitles,darkTitles};
+    })()`)
+    if (state.hostRoot !== '36px' || state.body.size !== '14px' || state.body.line !== '22px' || state.body.family.includes('Noto Sans JP') || state.button.radius !== '18px' || state.code.size !== '14px' || state.code.weight !== '600') fail({ target: 'browser-shadow' }, 'Browser font isolation failed', state)
+    if (state.heading.size !== '24px' || state.heading.line !== '32px' || state.heading.weight !== '600' || state.section.size !== '20px' || state.section.line !== '28px' || state.reading.size !== '14px' || state.reading.line !== '22px' || Math.abs(state.viewerScale - 1.5) > 0.01 || state.button.size !== '14px') fail({ target: 'browser-document' }, 'Document typography or zoom failed', state)
+    if (state.lightTitles.join(',') !== '24px,20px,14px' || state.darkTitles.join(',') !== '24px,20px,15px') fail({ target: 'browser-headings' }, 'Extension heading hierarchy mismatch', state)
+    await writeFile(resolve(output, 'design-browser-results.json'), JSON.stringify({ state, failures }, null, 2))
+    console.log(JSON.stringify({ state, failures }, null, 2)); app.exit(failures.length ? 1 : 0); return
+  }
+
+  if (process.argv.includes('--design-system')) {
+    const consoleErrors = []
+    const interactions = []
+    const contrast = []
+    window.webContents.on('console-message', details => {
+      if (details.level === 'error') consoleErrors.push(details.message)
+    })
+    const state = () => window.webContents.executeJavaScript(`(() => {
+      const visible = el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden';
+      const inspect = el => { const s = getComputedStyle(el); return { text: el.textContent.trim().slice(0, 45), size: s.fontSize, weight: s.fontWeight, line: s.lineHeight, family: s.fontFamily, radius: s.borderRadius, blur: s.backdropFilter } };
+      const root = getComputedStyle(document.documentElement);
+      const content = document.querySelector('.nola-route-content');
+      const dark = document.documentElement.matches('.dark,[data-theme="dark"]');
+      const bodySize = dark ? '15px' : '14px';
+      const heights = { '14px': dark ? ['20px'] : ['20px','22px'], '20px':['28px'], '24px':['32px'], '30px':['36px'], '36px':['40px'] };
+      if (dark) heights['15px'] = ['22px'];
+      const invalidText = [...document.querySelectorAll('.nola-main *')].filter(el => visible(el) && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && !el.closest('svg, .nola-caption-preview, .nola-caption-card, .comic-bubble-canvas__stage')).map(inspect).filter(s => !heights[s.size]?.includes(s.line) || !['400', '500', '600','800'].includes(s.weight));
+      const buttons = [...document.querySelectorAll('[data-slot="button"]')].filter(visible).map(inspect);
+      const glass = [...document.querySelectorAll('.card, [data-slot="dialog-content"], [data-slot="sidebar-inner"], [data-slot="popover-content"]')].filter(visible).map(inspect).filter(s => s.blur !== 'none');
+      return { page: document.querySelector('[data-page]')?.dataset.page, root: root.fontSize, family: getComputedStyle(document.body).fontFamily, density: document.documentElement.dataset.density, fontState: document.documentElement.dataset.fontState,
+        overflow: document.documentElement.scrollWidth > innerWidth + 2 || !!content && content.scrollWidth > content.clientWidth + 2,
+        controlHeight: root.getPropertyValue('--field-control-height').trim(), invalidText, invalidButtons: buttons.filter(s => s.radius !== '18px' || s.size !== bodySize || s.line !== '22px' || !['400','500','600'].includes(s.weight)), glass,
+        crash: !!document.querySelector('.nola-main pre[role="alert"]') };
+    })()`)
+    const suite = [...PAGES,
+      { name: 'model-gateway', hash: '#/model-gateway' },
+      { name: 'game-translation', hash: '#/game-translation' },
+      { name: 'comic-translation', hash: '#/comic-translation' },
+      { name: 'comic-editor', page: 'comic-translation', hash: '#/comic-translation/' + suiteId },
+    ]
+    for (const theme of ['light', 'dark']) for (const density of ['compact', 'comfortable']) {
+      await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings(${JSON.stringify({ theme, appearance: { interfaceFont: 'system', density } })})`)
+      await settle(window)
+      const dark = theme === 'dark'
+      const roles = {
+        h1: [36, 40, 800, 0], h2: [30, 36, 600, 0], h3: [24, 32, 600, 0], h4: [20, 28, 600, 0],
+        body: [dark ? 15 : 14, 22, 400, dark ? 0.225 : 0], small: [14, 20, 500, dark ? 0.28 : 0],
+        muted: [14, 20, 600, dark ? 0.28 : 0], code: [14, 20, 600, 0],
+      }
+      const metrics = await window.webContents.executeJavaScript(`(() => {
+        const parent = document.createElement('div');
+        parent.style.fontWeight = '600';
+        document.body.append(parent);
+        const result = Object.fromEntries(${JSON.stringify(Object.keys(roles))}.map(role => {
+          const child = document.createElement('span');
+          child.className = 'type-' + role;
+          parent.append(child);
+          const s = getComputedStyle(child);
+          return [role, [parseFloat(s.fontSize),parseFloat(s.lineHeight),Number(s.fontWeight),parseFloat(s.letterSpacing) || 0]];
+        }));
+        parent.remove();
+        return result;
+      })()`)
+      for (const [role, expected] of Object.entries(roles)) {
+        scenarios++
+        if (metrics[role].some((value, i) => Math.abs(value - expected[i]) > 0.001)) fail({ theme, density, role }, 'Typography role mismatch', { actual: metrics[role], expected })
+      }
+      if (density === 'compact') {
+        const pairs = await window.webContents.executeJavaScript(`(() => {
+          const style = getComputedStyle(document.documentElement);
+          const canvas = document.createElement('canvas'); canvas.width=1; canvas.height=1;
+          const ctx = canvas.getContext('2d', { willReadFrequently:true });
+          const pixel = (fg,bg) => { ctx.clearRect(0,0,1,1); ctx.fillStyle=style.getPropertyValue('--card'); ctx.fillRect(0,0,1,1); ctx.fillStyle=bg; ctx.fillRect(0,0,1,1); if(fg) {ctx.fillStyle=fg;ctx.fillRect(0,0,1,1)} return [...ctx.getImageData(0,0,1,1).data].slice(0,3) };
+          const luminance = rgb => rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+          return [['body','--foreground','--background',4.5],['card','--foreground','--card',4.5],['caption','--muted-foreground','--card',4.5],['caption-muted','--muted-foreground','--muted',4.5],['button','--primary-foreground','--primary',4.5],['link','--primary','--card',4.5],['tooltip','--card','--foreground',4.5],['field-border','--input','--card',3],['field-outer-border','--input','--background',3],['field-muted-border','--input','--secondary',3],['selection','--accent-foreground','--accent-soft',4.5],['success','--success-soft-foreground','--success-soft',4.5],['warning','--warning-soft-foreground','--warning-soft',4.5],['danger','--danger-soft-foreground','--danger-soft',4.5],['destructive','--destructive-foreground','--destructive',4.5],['button-hover','--primary-foreground','--primary-hover',4.5],['destructive-hover','--destructive-foreground','--destructive-hover',4.5]].map(([name,f,b,min])=>{const fg=style.getPropertyValue(f),bg=style.getPropertyValue(b);const a=luminance(pixel(fg,bg)),z=luminance(pixel(null,bg));return {name,min,ratio:(Math.max(a,z)+.05)/(Math.min(a,z)+.05)} });
+        })()`)
+        contrast.push({ theme, pairs })
+        for (const pair of pairs) { scenarios++; if (pair.ratio < pair.min) fail({ theme, pair: pair.name }, 'Contrast below required minimum', pair) }
+      }
+      for (const [width, zoom] of [[1180, 1], [760, 1], [1180, 2]]) {
+        window.setContentSize(width, HEIGHT)
+        window.webContents.setZoomFactor(zoom)
+        for (const target of suite) {
+          const context = { theme, density, width, zoom, page: target.name }
+          scenarios++
+          const reached = await goto(window, target.hash, target.page ?? target.name)
+          for (let attempt = 0; attempt < 50; attempt++) {
+            const ready = await window.webContents.executeJavaScript(`!!document.querySelector('.nola-route-content > :not([role="status"])')`)
+            if (ready) break
+            await delay(100)
+          }
+          await settle(window)
+          const current = await state()
+          if (target.page === 'settings') {
+            const headings = await window.webContents.executeJavaScript(`(() => {
+              const metrics = el => {
+                const s = getComputedStyle(el);
+                return s.fontSize + '/' + s.lineHeight + '/' + s.fontWeight;
+              };
+              const title = document.querySelector('.settings-page__heading');
+              const groups = [...document.querySelectorAll('.settings-group__heading h2')].map(metrics);
+              const browserNames = [...document.querySelectorAll('.browser-settings__identity :is(h2, h3)')].map(metrics);
+              return { title: title && metrics(title), groups, browserNames };
+            })()`)
+            const bodyHeading = dark ? '15px/22px/600' : '14px/22px/600'
+            if (headings.title !== '20px/28px/600' ||
+                headings.groups.some(value => value !== bodyHeading) ||
+                (target.name === 'settings/browser' && (headings.browserNames.length !== 4 || headings.browserNames.some(value => value !== bodyHeading)))) {
+              fail(context, 'Settings typography mismatch', { headings })
+            }
+          }
+          if (target.name === 'home' && zoom === 1 && width === 1180) {
+            const levels = await window.webContents.executeJavaScript(`['#home-poster-title','.nola-home-section__heading','.nola-home-bento-copy h3'].map(selector => {
+              const el = document.querySelector(selector);
+              return el && [getComputedStyle(el).fontSize,getComputedStyle(el).fontWeight].join('/');
+            })`)
+            if (levels.join(',') !== '36px/800,30px/600,20px/600') fail(context, 'Home heading hierarchy mismatch', { levels })
+          }
+          if (zoom === 1 && width === 1180 && ['overlay', 'model-gateway', 'models'].includes(target.name)) {
+            const body = dark ? '15px/22px' : '14px/22px'
+            const expected = {
+              overlay: {
+                '.nola-page-heading h1': '24px/32px', '.nola-settings-heading': '20px/28px',
+                '[data-onboarding="open-overlay"]': body, '[data-onboarding="quick-audio"] > span': body,
+              },
+              'model-gateway': {
+                '.nola-page-heading h1': '24px/32px', '[data-onboarding="gateway-capabilities"] .card__title': '20px/28px',
+                '.model-gateway-table thead th': body, '.model-gateway-model-id code': '14px/20px',
+                '.model-gateway-table .nola-badge': '14px/20px', '[data-onboarding="gateway-fallback"] .type-muted': '14px/20px',
+              },
+              models: {
+                '.models-page h1': '24px/32px', '.models-section-title': '20px/28px', '.models-card .card__title': body,
+              },
+            }[target.name]
+            const actual = await window.webContents.executeJavaScript(`Object.fromEntries(${JSON.stringify(Object.keys(expected))}.map(selector => {
+              const el = document.querySelector(selector);
+              const s = el && getComputedStyle(el);
+              return [selector, s && s.fontSize + '/' + s.lineHeight];
+            }))`)
+            for (const [selector, metrics] of Object.entries(expected)) {
+              if (actual[selector] !== metrics) fail({ ...context, selector }, 'Component typography mismatch', { actual: actual[selector], expected: metrics })
+            }
+          }
+          if (!reached || current.overflow || current.crash || current.invalidText.length || current.invalidButtons.length || current.glass.length || current.root !== '16px') fail(context, 'Design system mismatch', current)
+          if (width === 1180 && zoom === 1 && ['home', 'overlay', 'model-gateway', 'models', 'records', 'settings/general', 'settings/browser', 'comic-editor'].includes(target.name)) await writeFile(resolve(output, `design-${target.name.replace('/', '-')}-${theme}-${density}.png`), (await window.webContents.capturePage()).toPNG())
+        }
+      }
+    }
+    window.setContentSize(1180, HEIGHT)
+    window.webContents.setZoomFactor(1)
+    await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({ uiLanguage: 'zh-CN', appearance: { interfaceFont: 'system', density: 'compact' } })`)
+    await goto(window, '#/settings/general', 'settings')
+    const openAppearanceSelect = async selector => {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const clicked = await window.webContents.executeJavaScript(`(() => {
+          const el = document.querySelector(${JSON.stringify(selector)});
+          if (!el || el.disabled) return false;
+          if (el.getAttribute('aria-expanded') !== 'true') el.click();
+          return true;
+        })()`)
+        if (clicked) break
+        await delay(50)
+      }
+      for (let attempt = 0; attempt < 60; attempt++) {
+        if (await window.webContents.executeJavaScript(`!!document.querySelector('[role="option"]')`)) return
+        await delay(50)
+      }
+      fail({ selector }, 'Appearance selector did not open')
+    }
+    await openAppearanceSelect('[role="combobox"][aria-label="界面密度"]')
+    const densityOption = await window.webContents.executeJavaScript(`(() => { const option = [...document.querySelectorAll('[role="option"]')].find(el => el.textContent.includes('宽松')); option?.click(); return !!option })()`)
+    for (let attempt = 0; attempt < 60; attempt++) {
+      if (await window.webContents.executeJavaScript(`document.documentElement.dataset.density === 'comfortable'`)) break
+      await delay(50)
+    }
+    await settle(window)
+    let current = await state()
+    scenarios++
+    if (!densityOption || current.density !== 'comfortable') fail({ action: 'density selection' }, 'Density did not apply', current)
+    else interactions.push('Density selector -> Comfortable applies')
+
+    const fonts = []
+    for (const font of ['Noto Sans SC', 'Noto Sans TC', 'Noto Sans HK', 'Noto Sans JP', 'Noto Sans KR']) {
+      await openAppearanceSelect('[role="combobox"][aria-label="界面字体"]')
+      const selected = await window.webContents.executeJavaScript(`(() => { const el = [...document.querySelectorAll('[role="option"]')].find(el => el.textContent.trim() === ${JSON.stringify(font)}); el?.click(); return !!el })()`)
+      for (let attempt = 0; attempt < 300; attempt++) {
+        const saved = await window.webContents.executeJavaScript(`window.nolaTranslator.getSettings().then(s => s.appearance.interfaceFont)`)
+        if (saved === font) break
+        await delay(100)
+      }
+      await settle(window)
+      current = await state()
+      const code = await window.webContents.executeJavaScript(`(() => { const el = document.createElement('code'); el.textContent='const test = 1'; document.body.append(el); const s=getComputedStyle(el); const result={ family:s.fontFamily, size:s.fontSize }; el.remove(); return result })()`)
+      fonts.push({ font, current, code })
+      scenarios++
+      if (!selected || current.fontState !== 'ready' || !current.family.includes(font) || code.family.includes('Noto') || code.size !== '14px') fail({ action: 'font selection', font }, 'Font isolation failed', { current, code })
+      else interactions.push('Font selector -> ' + font + ' loads; code font stays independent')
+    }
+    const reset = await window.webContents.executeJavaScript(`(() => { const button = [...document.querySelectorAll('.settings-group__actions button')].find(el => el.textContent.includes('恢复默认')); button?.click(); return !!button })()`)
+    await settle(window)
+    current = await state()
+    scenarios++
+    if (!reset || current.density !== 'compact' || current.family.includes('Noto Sans SC')) fail({ action: 'reset appearance' }, 'Appearance defaults were not restored', current)
+    else interactions.push('Restore defaults -> system font and Compact')
+    const fontTrigger = '[role="combobox"][aria-label="界面字体"]'
+    const isFontMenuOpen = () => window.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(fontTrigger)}).getAttribute('aria-expanded') === 'true'`)
+    const focusFontTrigger = () => window.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(fontTrigger)}).focus()`)
+    window.webContents.debugger.attach('1.3')
+    const press = async (key, code, windowsVirtualKeyCode) => {
+      const event = { key, code, windowsVirtualKeyCode }
+      await window.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { ...event, type: 'keyDown', ...(code === 'Space' ? { text: ' ' } : {}) })
+      await window.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { ...event, type: 'keyUp' })
+    }
+    await focusFontTrigger()
+    await openAppearanceSelect(fontTrigger)
+    await press('Escape', 'Escape', 27)
+    await settle(window)
+    const popupClosed = !(await isFontMenuOpen())
+    scenarios++
+    if (!popupClosed) fail({ action: 'Escape' }, 'Font menu did not close')
+    else interactions.push('Font menu -> Escape closes')
+    await focusFontTrigger()
+    await press(' ', 'Space', 32)
+    await settle(window)
+    const keyboardOpen = await isFontMenuOpen()
+    await press('Escape', 'Escape', 27)
+    await settle(window)
+    await press('Tab', 'Tab', 9)
+    await settle(window)
+    const focus = await window.webContents.executeJavaScript(`({ name: document.activeElement?.getAttribute('aria-label'), outline: getComputedStyle(document.activeElement).outlineWidth, popup: document.querySelector(${JSON.stringify(fontTrigger)}).getAttribute('aria-expanded') === 'true' })`)
+    scenarios++
+    if (!keyboardOpen || focus.popup || parseFloat(focus.outline) < 1) fail({ action: 'keyboard' }, 'Keyboard focus or selection failed', focus)
+    else interactions.push('Keyboard -> Space opens font selector, Escape closes, Tab moves to visible focus')
+    window.webContents.debugger.detach()
+    for (const language of ['zh-TW', 'zh-HK', 'en', 'ja', 'ko']) {
+      await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({ uiLanguage: ${JSON.stringify(language)} })`)
+      await settle(window)
+      current = await state()
+      scenarios++
+      if (current.overflow || current.invalidText.length || current.invalidButtons.length) fail({ language }, 'Localized appearance layout failed', current)
+    }
+    if (consoleErrors.length) fail({ action: 'console' }, 'Renderer console errors', { consoleErrors })
+    await writeFile(resolve(output, 'design-system-results.json'), JSON.stringify({ scenarios, pages: suite.map(page => page.name), interactions, fonts, contrast, consoleErrors, failures }, null, 2))
+    console.log(JSON.stringify({ scenarios, interactions, failures: failures.length, examples: failures.slice(0, 3) }, null, 2))
+    app.exit(failures.length ? 1 : 0)
+    return
+  }
 
   /**
    * Counts and sideways overflow for a group of containers, collected in one
@@ -539,29 +812,30 @@ async function main() {
       ['games', '#/game-translation', 'game-translation'],
       ['game', `#/game-translation/${suiteId}`, 'game-translation'],
       ['bookshelf', '#/comic-translation', 'comic-translation'],
-      ['editor', `#/comic-translation/${suiteId}`, 'comic-translation'],
+      ['editor', `#/comic-translation/${suiteId}/${suitePageId}`, 'comic-translation'],
       ['reader', `#/comic-translation/${suiteId}/reader`, 'comic-translation'],
       ['glossary', '#/settings/glossary', 'settings'],
       ['terms', `#/settings/glossary/${suiteId}`, 'settings'],
     ].filter(([name]) => !process.argv.includes('--comic-editor') || name === 'editor')
-    for (const language of ['zh-CN', 'en', 'ja', 'ko', 'zh-TW', 'zh-HK']) for (const theme of ['light', 'dark']) for (const width of [1180, 760]) {
+    for (const language of ['zh-CN', 'en', 'ja', 'ko', 'zh-TW', 'zh-HK']) for (const theme of ['light', 'dark']) for (const width of [1180, 760]) for (const zoom of (process.argv.includes('--comic-editor') ? [1, 2] : [1])) {
+      window.webContents.setZoomFactor(zoom)
       window.setContentSize(width, 900)
       await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings(${JSON.stringify({ uiLanguage: language, theme, appearance: { reduceMotion: true } })})`)
       for (const [name, hash, page] of pages) {
         await goto(window, hash, page)
         await delay(180)
-        const required = { screen: '.screen-page', games: '.game-library', game: '#game-name', bookshelf: '.comic-bookshelf', editor: '.comic-inspector', reader: '.comic-editor--reader', glossary: '.settings-panels', terms: '.settings-panels table' }[name]
+        const required = { screen: '.screen-page', games: '.game-library', game: '#game-name', bookshelf: '.comic-bookshelf', editor: '.comic-workflow__inspector', reader: '.comic-editor--reader', glossary: '.settings-panels', terms: '.settings-panels table' }[name]
         const state = await window.webContents.executeJavaScript(`(() => {
           const main = document.querySelector('.nola-main');
           return { text: main?.innerText, overflow: document.documentElement.scrollWidth > innerWidth + 2,
             crashed: !!main?.querySelector('pre'), heading: main?.querySelector('h1')?.innerText,
             required: !!document.querySelector(${JSON.stringify(required)}),
-            imagesReady: [...document.querySelectorAll('.comic-canvas img')].every(img => img.complete && img.naturalWidth > 0),
-            contentOverflow: [...document.querySelectorAll('.game-page, .comic-page, .screen-page, .settings-panels, .comic-inspector, .comic-canvas__tools')].some(el => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2) };
+            imagesReady: [...document.querySelectorAll('.comic-bubble-canvas img')].every(img => img.complete && img.naturalWidth > 0),
+            contentOverflow: [...document.querySelectorAll('.game-page, .comic-page, .screen-page, .settings-panels, .comic-workflow__inspector')].some(el => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2) };
         })()`)
         scenarios++
-        if (!state.text || !state.required || !state.imagesReady || state.crashed || state.overflow || state.contentOverflow || /数据仅留|不捕获屏幕/.test(state.text)) fail({ language, theme, width, page: name }, 'Translation suite layout failed', { state })
-        if (language === 'zh-CN') await writeFile(resolve(output, `suite-${name}-${theme}-${width}.png`), (await window.webContents.capturePage()).toPNG())
+        if (!state.text || !state.required || !state.imagesReady || state.crashed || state.overflow || state.contentOverflow || /数据仅留|不捕获屏幕/.test(state.text)) fail({ language, theme, width, zoom, page: name }, 'Translation suite layout failed', { state })
+        if (language === 'zh-CN') await writeFile(resolve(output, `suite-${name}-${theme}-${width}-${zoom}.png`), (await window.webContents.capturePage()).toPNG())
       }
     }
     await writeFile(resolve(output, process.argv.includes('--comic-editor') ? 'translation-suite-editor-results.json' : 'translation-suite-results.json'), JSON.stringify({ scenarios, failures }, null, 2))
@@ -604,7 +878,7 @@ async function main() {
             icons: tabs.map(el => el.querySelector('svg')?.getAttribute('class')),
             crashed: !!document.querySelector('.nola-main pre'),
             sourceLanguageGroup: !!panel.querySelector('[data-onboarding="recognition-service"]'),
-            groups: panel.querySelectorAll('.settings-group, [data-slot="card"], .shortcuts-page__table, .browser-settings__list').length,
+            groups: panel.querySelectorAll('.settings-group, [data-slot="card"], [data-slot="empty"], .shortcuts-page__table, .browser-settings__list').length,
             overflow: [...document.querySelectorAll('.settings-page, .settings-panels, .settings-group, .settings-row__label, .settings-control-field, .settings-page button')].filter(el => el.clientWidth > 0 && !el.matches('input, [role="switch"]') && !el.classList.contains('sr-only') && getComputedStyle(el).overflowX !== 'auto' && el.scrollWidth > el.clientWidth + 2).map(el => ({ className: String(el.className), text: el.textContent.slice(0, 80) })),
             collapsed: panel.querySelectorAll('[data-slot="accordion-trigger"]').length,
             sections: [...panel.querySelectorAll('.settings-group')].map(el => {
@@ -623,7 +897,7 @@ async function main() {
         layout ??= state.layout
         if (state.layout.some((value, index) => Math.abs(value - layout[index]) >= 1)) fail(context, 'Settings title or content shifted between categories', { expected: layout, actual: state.layout })
         if (tab === 'appearance' && (!state.preview?.flat || !state.preview.aligned)) fail(context, 'Caption preview must sit directly on a full-width stage', { preview: state.preview })
-        if (state.lang !== language || state.selected !== `settings-${tab}` || state.count !== SETTINGS_TABS.length || JSON.stringify(state.order) !== JSON.stringify(SETTINGS_TABS) || new Set(state.icons).size !== SETTINGS_TABS.length || state.crashed || !state.groups || state.overflow.length || state.collapsed || (tab === 'audio' && state.sourceLanguageGroup) || state.sections.some(section => !section.flat || !section.headingAbove || Math.abs(section.left - section.headingLeft) > 2 || Math.abs(section.width - state.sections[0].width) > 2)) fail(context, 'Settings categories or layout failed', { state })
+        if (state.lang !== language || state.selected !== `settings-${tab}` || state.count !== SETTINGS_TABS.length || JSON.stringify(state.order) !== JSON.stringify(SETTINGS_TABS) || state.icons.some(icon => !icon) || state.crashed || !state.groups || state.overflow.length || state.collapsed || (tab === 'audio' && state.sourceLanguageGroup) || state.sections.some(section => !section.flat || !section.headingAbove || Math.abs(section.left - section.headingLeft) > 2 || Math.abs(section.width - state.sections[0].width) > 2)) fail(context, 'Settings categories or layout failed', { state })
         if (language === 'zh-CN' && ((theme === 'light' && width === 1180) || (theme === 'dark' && width === 760))) {
           await window.webContents.executeJavaScript(`document.querySelector('.nola-main').scrollTop = 0`)
           await settle(window)

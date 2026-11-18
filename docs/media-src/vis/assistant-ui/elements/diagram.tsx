@@ -45,7 +45,7 @@ export function Diagram({
       {...props}
     >
       <div className="flex items-center gap-1 px-3 py-2">
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+        <span className="min-w-0 flex-1 truncate type-body font-medium">
           {title}
         </span>
         <span

@@ -63,18 +63,18 @@ export function AgentCard({
         </span>
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-baseline gap-2">
-            <span className="truncate text-[13.5px] font-medium">{name}</span>
+            <span className="truncate type-body font-medium">{name}</span>
             <span className={cn(mono, "text-muted-foreground shrink-0")}>
               v{version}
             </span>
           </span>
-          <span className="text-muted-foreground truncate text-xs">
+          <span className="text-muted-foreground truncate type-muted">
             {provider}
           </span>
         </div>
       </div>
 
-      <p className="text-foreground/60 text-xs leading-relaxed">
+      <p className="text-foreground/60 type-small">
         {description}
       </p>
 
@@ -90,7 +90,7 @@ export function AgentCard({
             >
               {skill.name}
             </span>
-            <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+            <span className="text-muted-foreground min-w-0 flex-1 truncate type-muted">
               {skill.description}
             </span>
           </div>
@@ -116,7 +116,7 @@ export function AgentCard({
       >
         {connected ? (
           <>
-            <CheckIcon className="size-3.5 text-chart-2" />
+            <CheckIcon className="size-3.5 text-success-soft-foreground" />
             已连接
           </>
         ) : (

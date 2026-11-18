@@ -39,7 +39,7 @@ export function LatencyWindow() {
   return <main className="min-h-0 flex-1 overflow-hidden">
     <div className="mx-auto flex h-full w-full max-w-screen-lg flex-col gap-[var(--space-2)] p-[var(--space-2)]">
       <header className="flex flex-wrap items-center justify-between gap-[var(--space-1)]">
-        <h1 className="nola-title">{t('latency.title')}</h1>
+        <h1 className="type-h3">{t('latency.title')}</h1>
         {snapshot && snapshot.available !== false && <Badge variant={snapshot.active ? 'accent' : 'secondary'}>{t(snapshot.active ? 'latency.active' : 'latency.ended')}</Badge>}
       </header>
       {snapshot ? <>
@@ -73,8 +73,8 @@ function LatencyTrend({ snapshot }: { snapshot: LatencySnapshot }) {
       <CardTitle role="heading" aria-level={2}>{t('latency.trend')}</CardTitle>
       <CardAction>
         <dl className="flex gap-[var(--space-2)] tabular-nums">
-          <div><dt className="nola-caption">{t('latency.current')}</dt><dd className="nola-body-strong">{formatLatency(current)}</dd></div>
-          <div><dt className="nola-caption">{t('latency.average')}</dt><dd className="nola-body-strong">{formatLatency(average)}</dd></div>
+          <div><dt className="type-muted">{t('latency.current')}</dt><dd className="type-body font-semibold">{formatLatency(current)}</dd></div>
+          <div><dt className="type-muted">{t('latency.average')}</dt><dd className="type-body font-semibold">{formatLatency(average)}</dd></div>
         </dl>
       </CardAction>
     </CardHeader>
@@ -86,7 +86,7 @@ function LatencyTrend({ snapshot }: { snapshot: LatencySnapshot }) {
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="at" tickFormatter={value => clock.format(value)} minTickGap={24} tick={axisTick} tickLine={false} axisLine={false} />
               <YAxis width="auto" unit=" ms" tick={axisTick} tickLine={false} axisLine={false} />
-              <ChartLegend verticalAlign="top" itemSorter={null} content={<ChartLegendContent className="nola-caption flex-wrap justify-start gap-x-[var(--space-2)] gap-y-[var(--space-1)] pb-[var(--space-1)]" />} />
+              <ChartLegend verticalAlign="top" itemSorter={null} content={<ChartLegendContent className="type-muted flex-wrap justify-start gap-x-[var(--space-2)] gap-y-[var(--space-1)] pb-[var(--space-1)]" />} />
               <ChartTooltip cursor={{ stroke: 'var(--nola-ui-muted-foreground)' }} content={<ChartTooltipContent labelFormatter={value =>
                 typeof value === 'number' ? clock.format(value) : value} />} />
               <Area type="linear" dataKey="total" stroke="var(--color-total)" strokeWidth={2.5}
@@ -136,8 +136,8 @@ function AudioLane({ label, points, now, active }: {
   const hasData = rows.some(row => row.range !== null)
   return <section aria-label={title} className={output ? 'border-t border-border' : undefined}>
     <div className="flex flex-wrap items-center justify-between gap-[var(--space-1)] px-[var(--space-2)] pt-[var(--space-1)]">
-      <h3 className="nola-caption">{title}</h3>
-      {!hasData && <span className="nola-micro text-muted-foreground">{t('latency.noAudio')}</span>}
+      <h3 className="type-muted">{title}</h3>
+      {!hasData && <span className="type-muted text-muted-foreground">{t('latency.noAudio')}</span>}
     </div>
     <ChartContainer className={output ? 'h-18 w-full' : 'h-12 w-full'}
       config={{ range: { label: title, color: output ? colors.tts : colors.total } }}>

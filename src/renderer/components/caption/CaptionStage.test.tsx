@@ -24,10 +24,11 @@ it('shows the unconfirmed tail of a translation in the muted colour', () => {
   }]} />)
   const line = screen.getByTestId('caption-target-tail')
   expect(line).toHaveTextContent('你好世界')
+  expect(line).toHaveStyle({ letterSpacing: 'normal' })
   expect(line.querySelector('.nola-caption-confirmed')?.textContent).toBe('你好')
   const tail = line.querySelector('.nola-caption-tail') as HTMLElement
   expect(tail.textContent).toBe('世界')
-  expect(tail.style.color).toBe('var(--muted)')
+  expect(tail.style.color).toBe('var(--nola-ui-muted-foreground)')
 })
 
 it('shows a translation the engine did not layer as plain foreground text', () => {
@@ -54,7 +55,7 @@ it('shows a translation with nothing confirmed yet as one unconfirmed tail', () 
   expect(line.querySelector('.nola-caption-confirmed')).toBeNull()
   const tail = line.querySelector('.nola-caption-tail') as HTMLElement
   expect(tail.textContent).toBe('你好世界')
-  expect(tail.style.color).toBe('var(--muted)')
+  expect(tail.style.color).toBe('var(--nola-ui-muted-foreground)')
 })
 
 it('draws a segment that is both final and interim on one line', () => {

@@ -40,7 +40,7 @@ function QuoteBlockText({ className, ...props }: ComponentProps<"p">) {
     <p
       data-slot="quote-block-text"
       className={cn(
-        "text-muted-foreground/80 line-clamp-2 min-w-0 text-sm italic",
+        "text-muted-foreground/80 line-clamp-2 min-w-0 type-muted italic",
         className,
       )}
       {...props}
@@ -107,7 +107,7 @@ function SelectionToolbarQuote({
     <SelectionToolbarPrimitive.Quote
       data-slot="selection-toolbar-quote"
       className={cn(
-        "text-popover-foreground hover:bg-accent flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm transition-colors",
+        "text-popover-foreground hover:bg-accent flex items-center gap-1.5 rounded-md px-2.5 py-1 type-body transition-colors",
         className,
       )}
       {...props}
@@ -197,7 +197,7 @@ function ComposerQuotePreviewText({
     <ComposerPrimitive.QuoteText
       data-slot="composer-quote-text"
       className={cn(
-        "text-muted-foreground line-clamp-2 min-w-0 flex-1 text-sm",
+        "text-muted-foreground line-clamp-2 min-w-0 flex-1 type-muted",
         className,
       )}
       {...props}

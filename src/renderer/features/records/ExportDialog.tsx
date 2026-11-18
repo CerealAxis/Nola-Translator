@@ -73,15 +73,10 @@ export function ExportDialog({
         <div className="flex flex-col gap-[var(--space-2)]">
           <TabsRoot value={format} onValueChange={value => { if (FORMATS.includes(value as ExportFormat)) setFormat(value as ExportFormat) }}>
             <TabsList className="nola-segmented" aria-label={t('records.export')}>
-              {FORMATS.map(value => <TabsTrigger key={value} value={value} disabled={exporting} className="leading-[1.5] uppercase">{value}</TabsTrigger>)}
+              {FORMATS.map(value => <TabsTrigger key={value} value={value} disabled={exporting} className="uppercase">{value}</TabsTrigger>)}
             </TabsList>
           </TabsRoot>
 
-          {/*
-           * The file holds model-generated translation, so the AI notice has to
-           * travel with the file and is repeated here.
-          */}
-          <p className="nola-caption text-muted">{t('legal.aiGeneratedExport')}</p>
         </div>
 
         <DialogFooter>
