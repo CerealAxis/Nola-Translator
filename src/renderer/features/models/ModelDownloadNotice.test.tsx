@@ -35,7 +35,7 @@ it('notifies on completion, failure with a reason, and cancellation', () => {
     type: 'error',
   }))
   const failurePayload = failureCalls()[0]?.[0]
-  const retry = failurePayload && 'actionProps' in failurePayload ? failurePayload.actionProps.onClick : undefined
+  const retry = failurePayload?.actionProps?.onClick
   const manageResource = vi.spyOn(actions.models, 'manageResource').mockResolvedValue(record)
   act(() => retry?.())
   expect(manageResource).toHaveBeenCalledWith(record.resourceId, 'install')
@@ -71,9 +71,9 @@ it.each(['diskSpaceInsufficient', 'resourceDiskSpaceInsufficient'])('routes %s d
   const failure = showToast.mock.calls.find(([payload]) => payload.type === 'error')?.[0]
   expect(failure).toEqual(expect.objectContaining({
     title: '磁盘空间不足',
-    description: '请清理存储空间后重新下载模型。',
+    description: '请清理存储空间后重新下载模型。 (STO-022)',
   }))
-  if (!failure || !('actionProps' in failure)) throw new Error('Expected a storage settings action')
-  act(() => failure.actionProps.onClick())
+  expect(failure?.actionProps).toBeDefined()
+  act(() => failure?.actionProps?.onClick())
   expect(window.location.hash).toBe('#/settings/storage')
 })

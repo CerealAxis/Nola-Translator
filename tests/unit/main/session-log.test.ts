@@ -1,8 +1,11 @@
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { PassThrough } from 'node:stream'
+import { once } from 'node:events'
 import { afterEach, expect, it } from 'vitest'
-import { initializeSessionLog, logDiagnostic, processFailure, registerLogSecret, sessionLogPath } from '../../../src/main/session-log'
+import { backendFailure, readBackendFailure } from '../../../src/main/backend-error'
+import { initializeSessionLog, logDiagnostic, logPythonStderr, processFailure, registerLogSecret, sessionLogPath } from '../../../src/main/session-log'
 
 const directories: string[] = []
 async function directory(): Promise<string> {
@@ -12,6 +15,43 @@ async function directory(): Promise<string> {
 }
 afterEach(async () => { for (const path of directories.splice(0)) await rm(path, { recursive: true, force: true }) })
 
+it('records the classified v2 failure and its safe Python metadata in the same log entry', async () => {
+  await initializeSessionLog(await directory(), {})
+  const error = await readBackendFailure(Response.json({ error: {
+    code: 'MODEL_NOT_READY', message_key: 'gateway.LOAD_FAILED', stage: 'vad',
+    scope: 'session', correlation_id: 'request-id', retryable: false, fatal: false,
+    safe_details: { exception: 'GatewayError', cause_exception: 'Fail', errno: -9999, transcript: 'private speech' },
+  } }))
+  expect(error).toBeDefined()
+  logDiagnostic('session.start.failed', { error: backendFailure(error!) })
+  const contents = await readFile(sessionLogPath(), 'utf8')
+  expect(JSON.parse(contents.trim().split('\n').at(-1)!).data.error).toMatchObject({
+    engineCode: 'vadUnavailable', supportCode: 'ASR-009', backendCode: 'MODEL_NOT_READY', stage: 'vad',
+    messageKey: 'gateway.LOAD_FAILED', correlationId: 'request-id',
+    safeDetails: { exception: 'GatewayError', cause_exception: 'Fail', errno: -9999 },
+  })
+  expect(contents).not.toContain('private speech')
+})
+
+it('parses split UTF-8 Python stderr records and omits private payloads from broken records', async () => {
+  await initializeSessionLog(await directory(), {})
+  const stream = new PassThrough()
+  logPythonStderr(stream, 'backend')
+  const prefix = 'NOLA_DIAGNOSTIC '
+  const line = Buffer.from(prefix + JSON.stringify({
+    layer: 'engine', event: 'audio.capture.failed', data: { message: '设备不可用', transcript: 'private speech' },
+  }) + '\n')
+  const split = line.indexOf(Buffer.from('设')) + 1
+  stream.write(line.subarray(0, split))
+  const ended = once(stream, 'end')
+  stream.end(Buffer.concat([line.subarray(split), Buffer.from(prefix + '{ "text":"broken private input"')]))
+  await ended
+  const contents = await readFile(sessionLogPath(), 'utf8')
+  expect(contents).toContain('pipeline.engine.audio.capture.failed')
+  expect(contents).toContain('设备不可用')
+  expect(contents).toContain('backend.stderr.diagnostic-invalid')
+  expect(contents).not.toMatch(/private speech|broken private input/)
+})
 it('creates independent launch logs and preserves Windows crash details without credentials', async () => {
   const path = await directory()
   await initializeSessionLog(path, { version: 'test' })

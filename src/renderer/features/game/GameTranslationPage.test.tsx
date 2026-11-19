@@ -7,6 +7,13 @@ import { GameTranslationPage, gameIssueKey } from './GameTranslationPage'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 const snapshot: GameSnapshot = { version: 1, revision: 9, profiles: [{ id: 'game', name: 'Visual novel', sourceLanguage: 'ja', targetLanguage: 'zh', source: 'clipboard', strategy: 'auto', glossarySelection: { mode: 'auto' } }], status: 'idle', lines: [], hookAvailable: false }
+it('explains the desktop requirement when game translation is unavailable', () => {
+  vi.spyOn(store, 'getBridge').mockReturnValue({} as NolaBridge)
+  render(<GameTranslationPage />)
+  expect(screen.getByRole('heading', { name: '游戏翻译' })).toBeInTheDocument()
+  expect(screen.getByText('游戏取字和翻译需要桌面版。')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
+})
 it('keeps typed profile edits through unrelated snapshots and advances their save revision', async () => {
   let changed!: (value: GameSnapshot) => void
   const command = vi.fn(async () => ({ ...snapshot, revision: 11 }))

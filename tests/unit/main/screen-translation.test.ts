@@ -6,6 +6,7 @@ import { readFile as readConfig, writeFile as writeConfig } from 'node:fs/promis
 import { BrowserWindow, globalShortcut, screen } from 'electron'
 import { EventEmitter } from 'node:events'
 import { FeatureActivity } from '../../../src/main/feature-activity'
+import * as sessionLog from '../../../src/main/session-log'
 
 const fixture = vi.hoisted(() => ({ sources: vi.fn(async (): Promise<Array<{ id: string; name: string; display_id?: string; thumbnail: { toDataURL(): string } }>> => [{ id: 'screen:1:0', name: 'Display', display_id: '1', thumbnail: { toDataURL: () => '' } }]), handlers: new Map<string, (...args: unknown[]) => unknown>() }))
 vi.mock('electron', () => ({
@@ -187,7 +188,7 @@ it('releases the feature reservation after a fatal backend startup error and ret
   const { service, activity } = create(async () => { throw new Error('Backend exited') })
   await service.start()
   await vi.waitFor(() => expect(activity.has('screen-translation')).toBe(false))
-  expect(service.snapshot()).toMatchObject({ status: 'error', error: 'ocrNotReady' })
+  expect(service.snapshot()).toMatchObject({ status: 'error', error: 'startFailed', failure: { supportCode: 'SES-004', retryable: true } })
   expect(activity.has('screen-translation')).toBe(false)
 })
 
@@ -198,7 +199,8 @@ it('checks OCR readiness before missing regions or translation configuration', a
   fixture.sources.mockClear()
   await service.start()
   expect(prepare).toHaveBeenCalledOnce()
-  expect(service.snapshot()).toMatchObject({ status: 'error', error: 'ocrNotReady' })
+  expect(service.snapshot()).toMatchObject({ status: 'error', error: 'ocrNotReady', failure: { supportCode: 'MDL-025' } })
+  expect(service.showToolbar).not.toHaveBeenCalled()
   expect(fixture.sources).not.toHaveBeenCalled()
   await vi.waitFor(() => expect(activity.has('screen-translation')).toBe(false))
 })
@@ -206,22 +208,59 @@ it('checks OCR readiness before missing regions or translation configuration', a
 it.each(['stopped', 'starting', 'stopping', 'failed'] as const)('reports the %s gateway before checking models or regions', async state => {
   const prepare = vi.fn(async () => { throw new Error('ocrNotReady') })
   const { service, gateway, activity } = create(prepare)
+  const log = vi.spyOn(sessionLog, 'logDiagnostic')
   gateway.state = state
   await service.configure(screenConfigSchema.parse({ regions: [], model: '' }))
   await service.start()
-  expect(service.snapshot()).toMatchObject({ status: 'error', error: 'gatewayNotReady', errorId: expect.any(String) })
+  const failure = service.snapshot()
+  expect(failure).toMatchObject({ status: 'error', error: 'gatewayNotReady', errorId: expect.any(String),
+    failure: { supportCode: 'GTW-001', gatewayState: state, correlationId: failure.errorId } })
+  expect(log).toHaveBeenCalledExactlyOnceWith('screen.failed', expect.objectContaining({
+    operation: 'start', reason: 'gatewayNotReady', classification: failure.failure,
+  }))
+  expect(service.showToolbar).not.toHaveBeenCalled()
+  expect(BrowserWindow).not.toHaveBeenCalled()
   expect(prepare).not.toHaveBeenCalled()
   expect(activity.has('screen-translation')).toBe(false)
 })
 
 it.each([
-  ['', 'translationModelMissing'],
-  ['resource:unloaded', 'translationModelNotReady'],
-] as const)('reports translation model %s before missing regions', async (model, error) => {
+  ['', 'translationModelMissing', 'MDL-003'],
+  ['resource:unloaded', 'translationModelNotReady', 'MDL-025'],
+] as const)('reports translation model %s before missing regions', async (model, error, supportCode) => {
   const { service } = create()
   await service.configure(screenConfigSchema.parse({ processingMode: 'cascade', regions: [], model }))
   await service.start()
-  expect(service.snapshot()).toMatchObject({ status: 'error', error })
+  expect(service.snapshot()).toMatchObject({ status: 'error', error, failure: { supportCode, modelBinding: model } })
+  expect(service.showToolbar).not.toHaveBeenCalled()
+})
+
+it('closes the existing floating toolbar when resume is rejected', async () => {
+  const { service, gateway } = create()
+  mockOverlay(service)
+  await service.start()
+  await service.pause()
+  const toolbar = { destroy: vi.fn() }
+  Object.assign(service, { toolbar })
+
+  gateway.state = 'stopped'
+  await service.resume()
+
+  expect(toolbar.destroy).toHaveBeenCalledOnce()
+  expect(service.snapshot()).toMatchObject({ status: 'error', failure: { supportCode: 'GTW-001' } })
+})
+
+it('logs a rejected IPC start without including screen command payloads', async () => {
+  const { service, gateway } = create()
+  gateway.state = 'stopped'
+  const log = vi.spyOn(sessionLog, 'logDiagnostic')
+  const frame = { url: 'file:///D:/Nola/out/renderer/index.html' }
+  const result = await fixture.handlers.get('screen:command')!({ sender: { id: 1, mainFrame: frame }, senderFrame: frame }, { action: 'start' })
+
+  expect(log).toHaveBeenCalledWith('ipc.request', expect.objectContaining({ channel: 'screen:command', arguments: { count: 1, contents: '[omitted]' } }))
+  expect(log).toHaveBeenCalledWith('screen.failed', expect.objectContaining({ classification: service.snapshot().failure }))
+  expect(log).toHaveBeenCalledWith('ipc.complete', expect.objectContaining({ channel: 'screen:command', result: '[omitted]' }))
+  expect(result).toMatchObject({ error: 'gatewayNotReady' })
 })
 
 it('reports equal languages separately after models and regions are ready', async () => {

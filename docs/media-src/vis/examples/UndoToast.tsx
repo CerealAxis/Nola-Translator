@@ -13,7 +13,7 @@ export default function UndoToast() {
     setItems(previous => previous.filter(item => item !== name));
     showToast({
       type: 'info',
-      title: `已移除${name}`,
+      description: `已移除${name}`,
       actionProps: {
         children: '撤销',
         onClick: () => setItems(previous => initial.filter(item => item === name || previous.includes(item))),

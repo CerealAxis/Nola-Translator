@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Fieldset } from '@base-ui/react/fieldset'
 import { LoaderCircle } from 'lucide-react'
@@ -14,7 +14,7 @@ import { DEFAULT_SETTINGS_TAB, useRoute } from '@/routes'
 import { actions, isEngineConnected, stores, useStore } from '@/store'
 import { GeneralTab } from './tabs/GeneralTab'
 import { AudioTab } from './tabs/AudioTab'
-import { AppearanceTab } from './tabs/AppearanceTab'
+import { AppearanceTab, ResetCaptionAppearanceButton } from './tabs/AppearanceTab'
 import { StorageTab } from './tabs/StorageTab'
 import { EngineDiagnostics } from './tabs/AdvancedTab'
 import { MoreTab } from './tabs/MoreTab'
@@ -37,6 +37,7 @@ export function SettingsPage() {
   const error = useStore(stores.settings, (state) => state.error)
   const active = tab ?? DEFAULT_SETTINGS_TAB
   const page = useRef<HTMLElement>(null)
+  const [shortcutHeadingAction, setShortcutHeadingAction] = useState<HTMLDivElement | null>(null)
 
   useLayoutEffect(() => {
     const scroller = page.current?.closest('.nola-main')
@@ -48,7 +49,7 @@ export function SettingsPage() {
 
   const panels = settings ? {
     general: <GeneralTab settings={settings} />,
-    shortcuts: <ShortcutsTab settings={settings} />,
+    shortcuts: <ShortcutsTab settings={settings} headingActionTarget={shortcutHeadingAction} />,
     audio: <AudioTab settings={settings} />,
     engine: <div className="settings-panel">
       <ComputeTab settings={settings} />
@@ -67,7 +68,11 @@ export function SettingsPage() {
 
   return (
     <section className="settings-page" ref={page} aria-labelledby="settings-heading">
-      <h1 id="settings-heading" className="settings-page__heading">{t(SETTINGS_NAVIGATION[active].label)}</h1>
+      <header className="flex min-h-8 flex-wrap items-center justify-between gap-x-[var(--space-2)] gap-y-[var(--space-1)]">
+        <h1 id="settings-heading" className="settings-page__heading">{t(SETTINGS_NAVIGATION[active].label)}</h1>
+        {active === 'appearance' && settings ? <ResetCaptionAppearanceButton /> : null}
+        {active === 'shortcuts' && settings ? <div className="ms-auto" ref={setShortcutHeadingAction} /> : null}
+      </header>
       <div className="settings-panels">
         {panels ? panels[active] : loadError ? (
           <Card size="sm">
@@ -89,15 +94,24 @@ export function SettingsPage() {
   )
 }
 
-export interface SettingGroupProps { legend: string; legendHint?: ReactNode; actions?: ReactNode; children: ReactNode; onboardingTarget?: string; id?: string }
+export interface SettingGroupProps {
+  legend: string
+  legendHint?: ReactNode
+  headingAction?: ReactNode
+  actions?: ReactNode
+  children: ReactNode
+  onboardingTarget?: string
+  id?: string
+}
 
-export function SettingGroup({ legend, legendHint, actions, children, onboardingTarget, id }: SettingGroupProps) {
+export function SettingGroup({ legend, legendHint, headingAction, actions, children, onboardingTarget, id }: SettingGroupProps) {
   const headingId = useId()
   return (
     <section id={id} className="settings-group" data-onboarding={onboardingTarget}>
       <div className="settings-group__heading">
         <h2 id={headingId}>{legend}</h2>
         {legendHint ? <span className="settings-group__hint">{legendHint}</span> : null}
+        {headingAction ? <div className="ms-auto">{headingAction}</div> : null}
       </div>
       <Fieldset.Root className="settings-group__fields" aria-labelledby={headingId}>
         <FieldGroup className="gap-0">{children}</FieldGroup>

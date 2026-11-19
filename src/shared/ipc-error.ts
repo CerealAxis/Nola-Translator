@@ -15,6 +15,8 @@ type ErrorLike = {
   errno?: unknown
   message?: unknown
   correlationId?: unknown
+  requestId?: unknown
+  supportCode?: unknown
   commandType?: unknown
   action?: unknown
 }
@@ -104,6 +106,7 @@ export function normalizeThrownError(
    */
   const transportName = [transportCode, errno].find(name => name !== undefined && Object.hasOwn(KNOWN_ERROR_CODES, name))
   const code = engineCode
+    ?? (featureConflictOwner(error) ? 'sessionAlreadyRunning' : undefined)
     ?? (transportName ? KNOWN_ERROR_CODES[transportName] : transportCode ?? errno)
     ?? (runtime ? `RUNTIME_${runtime[1].toUpperCase()}` : undefined)
     ?? knownIdentifier
@@ -115,12 +118,47 @@ export function normalizeThrownError(
   // The support catalog is indexed by canonical token, so the classified code is what has to be
   // looked up; the raw sentence only serves a failure that stayed unclassified.
   const supportCause = code === 'UNKNOWN_ERROR' ? message : code
-  const supportCode = supportErrorCodeForCause(supportCause, operationOf(source, context))
+  const explicitCode = source?.supportCode
+  const supportCode = typeof explicitCode === 'string' && isSupportCode(explicitCode)
+    ? explicitCode : supportErrorCodeForCause(supportCause, operationOf(source, context))
+  const correlationId = [source?.correlationId, source?.requestId, context.correlationId]
+    .find((value): value is string => typeof value === 'string' && value.length > 0)
   return {
     code,
     supportCode,
     retryable: SUPPORT_ERROR_CATALOG[supportCode].retryable,
-    ...(context.correlationId ? { correlationId: context.correlationId } : {}),
+    ...(correlationId ? { correlationId } : {}),
+  }
+}
+
+function isSupportCode(value: string): value is keyof typeof SUPPORT_ERROR_CATALOG {
+  return Object.hasOwn(SUPPORT_ERROR_CATALOG, value)
+}
+
+const IPC_ERROR_MARKER = '\nNOLA_IPC_ERROR '
+
+// Electron carries the message across IPC and contextBridge. Keep the public fields in that message
+// until the renderer can reconstruct the error.
+export function encodeIpcError(message: string, failure: AppErrorShape): string {
+  return message + IPC_ERROR_MARKER + JSON.stringify(failure)
+}
+
+export function restoreIpcError(error: unknown): unknown {
+  if (!(error instanceof Error)) return error
+  const message = stripIpcErrorMessage(error.message)
+  const index = message.lastIndexOf(IPC_ERROR_MARKER)
+  if (index < 0) return error
+  try {
+    const failure = JSON.parse(message.slice(index + IPC_ERROR_MARKER.length))
+    if (!failure || typeof failure.code !== 'string' || typeof failure.supportCode !== 'string'
+      || !isSupportCode(failure.supportCode) || typeof failure.retryable !== 'boolean'
+      || typeof failure.correlationId !== 'string') return error
+    return Object.assign(new Error(message.slice(0, index)), {
+      code: failure.code, supportCode: failure.supportCode,
+      retryable: failure.retryable, correlationId: failure.correlationId,
+    })
+  } catch {
+    return error
   }
 }
 

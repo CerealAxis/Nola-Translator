@@ -1,15 +1,15 @@
-import { useState } from 'react'
 import type { CSSProperties } from 'react'
 
 import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 import { Button } from '@/components/ui/button'
 import { ColorPicker } from '@/components/ui/color-picker'
 import { StyleSliderRow } from './BrowserTab'
-import { CheckSquare, ChevronDown, CircleAlert, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Square, X } from 'lucide-react'
+import { ChevronDown, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Square, X } from 'lucide-react'
 
 import { useModelOptions } from '@/model-options'
 import { DEFAULT_SETTINGS, LANGUAGE_LABELS, languageName } from '@/bridge'
 import { CAPTION_SCHEMES } from '@/features/overlay'
+import { captionScrimColor } from '@/features/overlay/scrimColor'
 import { useI18n } from '@/i18n'
 import { sessionStore, stores, updateSettings, useStore } from '@/store'
 import { reportSettingsFailure } from '../settingsErrorChannel'
@@ -19,41 +19,35 @@ import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
 const PRESET_COLORS = ['#F7F7F7', '#D7DEE8', '#87D5FF', '#0D0E10', '#FFFFFF', '#4C9AFF']
 
+export function ResetCaptionAppearanceButton() {
+  const { t } = useI18n()
+  const pending = useStore(stores.settings, (state) => state.pending)
+  const restore = () => {
+    // Only appearance preferences are reset; the window pin is an independent control.
+    const { alwaysOnTop, ...appearance } = DEFAULT_SETTINGS.overlay
+    void alwaysOnTop
+    void updateSettings({ overlay: appearance })
+      .catch((error: unknown) => reportSettingsFailure(t('settings.resetAppearanceFailed'), error))
+  }
+
+  return <Button variant="outline" size="sm" disabled={pending} onClick={restore}>{t('modelsSettingsUi.resetAppearance')}</Button>
+}
+
 export function AppearanceTab({ settings }: SettingsPanelProps) {
   const { t, language } = useI18n()
   const overlay = settings.overlay
   const modelOptions = useModelOptions()
   const session = useStore(sessionStore, (state) => state)
   const sessionActive = !['idle', 'error'].includes(session.status)
-  const pending = useStore(stores.settings, (state) => state.pending)
-  /*
-   * The store keeps one error field for every command it runs, so a failure from another
-   * page (a storage read, a caption session) would light this tab's save indicator even
-   * though nothing written here failed. The indicator follows this tab's own writes.
-   */
-  const [saveError, setSaveError] = useState(false)
   const write = (patch: Partial<typeof overlay>) => {
     void updateSettings({ overlay: patch })
-      .then(() => setSaveError(false))
-      .catch(() => setSaveError(true))
+      .catch((error: unknown) => reportSettingsFailure(t('modelsSettingsUi.saveError'), error))
   }
   const label = (code: string) => {
     const entry = LANGUAGE_LABELS[code]
     return entry ? languageName(code, language) : code
   }
   const display = overlay.showSource && overlay.showTranslation ? 'both' : overlay.showSource ? 'source' : 'translation'
-
-  const restore = () => {
-    // Only appearance preferences are reset; the window pin is an independent control.
-    const { alwaysOnTop, ...appearance } = DEFAULT_SETTINGS.overlay
-    void alwaysOnTop
-    void updateSettings({ overlay: appearance })
-      .then(() => setSaveError(false))
-      .catch((error: unknown) => {
-        setSaveError(true)
-        reportSettingsFailure(t('settings.resetAppearanceFailed'), error)
-      })
-  }
 
   return (
     <div className="settings-panel">
@@ -65,6 +59,7 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
           style={{
             '--preview-background-color': overlay.backgroundColor,
             '--preview-background-alpha': `${Math.round(overlay.backgroundOpacity * 100)}%`,
+            '--preview-scrim-color': captionScrimColor(overlay.backgroundColor, overlay.backgroundOpacity, overlay.colorScheme === 'light' ? 'light' : 'dark'),
             '--preview-source-color': overlay.sourceColor,
             '--preview-translation-color': overlay.translationColor,
             '--preview-font-size': `${overlay.fontSize}px`,
@@ -132,14 +127,6 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
           <ColorControl label={t('settings.backgroundColor')} value={overlay.backgroundColor} onChange={(backgroundColor) => write({ backgroundColor })} />
         </div>
       </SettingGroup>
-
-      <div className="settings-save">
-        <span className="settings-save__state" role="status" data-error={saveError}>
-          {saveError ? <CircleAlert aria-hidden="true" /> : <CheckSquare aria-hidden="true" />}
-          {saveError ? t('modelsSettingsUi.saveError') : pending ? t('modelsSettingsUi.saving') : t('modelsSettingsUi.automaticSave')}
-        </span>
-        <Button variant="outline" size="sm" disabled={pending} onClick={restore}>{t('modelsSettingsUi.resetAppearance')}</Button>
-      </div>
     </div>
   )
 }

@@ -162,7 +162,11 @@ export default withMermaid(defineConfig({
       md.use(groupIconMdPlugin)
     },
   },
-  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}nola-logo.svg` }], ['meta', { name: 'theme-color', content: '#f6f9ff' }]],
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}nola-logo.svg` }],
+    ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: `${base}apple-touch-icon.png` }],
+    ['meta', { name: 'theme-color', content: '#f6f9ff' }],
+  ],
   locales,
   vite: {
     plugins: [shadcnDemoEntry(), react({ exclude: /node_modules|\.vitepress\/cache/ }), tailwindcss(), groupIconVitePlugin()],

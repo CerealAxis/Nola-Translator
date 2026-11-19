@@ -1,7 +1,4 @@
 import asyncio
-import base64
-import io
-import wave
 from dataclasses import replace
 
 import numpy as np
@@ -16,65 +13,6 @@ from nola_translator_engine.audio.capture import (
 )
 from nola_translator_engine.audio.devices import AudioDeviceRecord, _stable_device_id
 from nola_translator_engine.audio.resample import FRAME_DURATION_MS
-
-
-def test_audio_preview_records_two_seconds_and_preserves_level():
-    from nola_translator_engine.audio.capture import capture_audio_test
-    from nola_translator_engine.audio.resample import AudioFrame
-
-    class PreviewCapture:
-        request_id = None
-        stopped = False
-
-        def start(self):
-            pass
-
-        def stop(self):
-            self.stopped = True
-
-        async def frames(self):
-            for index in range(100):
-                yield AudioFrame(np.full(320, 0.125, dtype=np.float32), index * 20)
-
-    capture = PreviewCapture()
-    result = asyncio.run(capture_audio_test(capture))
-    assert capture.stopped
-    assert result["durationMs"] == 2000
-    assert result["hasSignal"]
-    with wave.open(io.BytesIO(base64.b64decode(result["audioBase64"])), "rb") as audio:
-        assert audio.getframerate() == 16000
-        assert audio.getnchannels() == 1
-        assert audio.getnframes() == 32000
-        assert np.max(np.abs(np.frombuffer(audio.readframes(32000), dtype="<i2"))) == 4096
-
-
-def test_audio_preview_marks_silence_and_releases_capture_on_failure():
-    from nola_translator_engine.audio.capture import capture_audio_test
-    from nola_translator_engine.audio.resample import AudioFrame
-
-    class PreviewCapture:
-        request_id = None
-        stopped = False
-        fail = False
-
-        def start(self):
-            if self.fail:
-                raise OSError("preview device unavailable")
-
-        def stop(self):
-            self.stopped = True
-
-        async def frames(self):
-            yield AudioFrame(np.zeros(32000, dtype=np.float32), 0)
-
-    capture = PreviewCapture()
-    assert not asyncio.run(capture_audio_test(capture))["hasSignal"]
-    assert capture.stopped
-    capture = PreviewCapture()
-    capture.fail = True
-    with pytest.raises(OSError):
-        asyncio.run(capture_audio_test(capture))
-    assert capture.stopped
 
 
 def test_bounded_callback_queue_drops_oldest_chunk_without_blocking() -> None:

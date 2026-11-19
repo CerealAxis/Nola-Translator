@@ -1,8 +1,7 @@
 import type { ModelConfiguration } from './model-capabilities'
 import type {
   AudioDevice,
-  AudioTestSource,
-  AudioTestResult,
+  AudioPreviewSource,
   CaptionSegment,
   EngineEvent,
   EngineProcessState,
@@ -118,7 +117,9 @@ export type NolaTranslatorApi = {
   openRuntimeSettings(component: 'engine' | 'llama' | 'crisp'): Promise<void>
   browserConnection?(action: BrowserConnectionAction, enabled?: boolean, browser?: BrowserKind): Promise<BrowserConnectionStatus>
   listDevices(): Promise<AudioDevice[]>
-  testAudio(source: AudioTestSource): Promise<AudioTestResult>
+  previewAudioInput(source: AudioPreviewSource, id: string): Promise<void>
+  stopAudioInputPreview(id: string): Promise<void>
+  onAudioInputLevel(callback: (id: string, level: number) => void): () => void
   listComputeDevices(): Promise<ComputeSnapshot>
   getRuntimes(): Promise<RuntimeSnapshot>
   prepareRuntimes(components?: readonly ('engine' | 'llama' | 'crisp')[]): Promise<RuntimeSnapshot>

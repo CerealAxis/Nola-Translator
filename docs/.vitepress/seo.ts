@@ -1,19 +1,13 @@
 import type { DefaultTheme, HeadConfig, PageData, TransformContext } from 'vitepress'
-import { copy, docsNav, localeNames, siteUrl, type Locale } from './theme/content'
+import { author } from '../../package.json'
+import { copy, docsNav, downloadUrl, localeNames, repositoryUrl, siteUrl, type Locale } from './theme/content'
+import { screenshotAlt } from './theme/landing-content'
 import { defaultLocale, homePath, localeOfPath } from './theme/siteLocale'
 import { visSidebar } from './vis-sidebar'
 
 const languages = Object.keys(localeNames) as Locale[]
 const socialLocales: Record<Locale, string> = {
   'zh-CN': 'zh_CN', 'zh-TW': 'zh_TW', 'zh-HK': 'zh_HK', en: 'en_US', ja: 'ja_JP', ko: 'ko_KR',
-}
-const screenshotAlt: Record<Locale, string> = {
-  'zh-CN': 'Nola Translator 桌面应用首页截图',
-  'zh-TW': 'Nola Translator 桌面應用程式首頁截圖',
-  'zh-HK': 'Nola Translator 桌面應用程式首頁截圖',
-  en: 'Screenshot of the Nola Translator desktop home screen',
-  ja: 'Nola Translator デスクトップ版ホーム画面のスクリーンショット',
-  ko: 'Nola Translator 데스크톱 앱 홈 화면 스크린샷',
 }
 const helpSections = {
   'getting-started': 'gettingStarted',
@@ -110,17 +104,27 @@ export function siteSeo(base: string) {
         ['meta', { property: 'og:description', content: description }],
         ['meta', { property: 'og:url', content: canonical }],
         ['meta', { property: 'og:image', content: image }],
-        ['meta', { property: 'og:image:alt', content: screenshotAlt[locale] }],
+        ['meta', { property: 'og:image:alt', content: screenshotAlt[locale].desktop }],
         ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
         ['meta', { name: 'twitter:title', content: title }],
         ['meta', { name: 'twitter:description', content: description }],
         ['meta', { name: 'twitter:image', content: image }],
-        ['meta', { name: 'twitter:image:alt', content: screenshotAlt[locale] }],
+        ['meta', { name: 'twitter:image:alt', content: screenshotAlt[locale].desktop }],
       ]
       for (const { lang, url } of alternates(path, indexable)) {
         tags.push(['link', { rel: 'alternate', hreflang: lang, href: absolute(url) }])
       }
-      if (path === '/') tags.push(jsonLd('WebSite', { name: 'Nola Translator', url: canonical }))
+      if (path === '/') {
+        tags.push(
+          ['meta', { name: 'author', content: author }],
+          jsonLd('WebSite', { name: 'Nola Translator', url: canonical }),
+          jsonLd('SoftwareApplication', {
+            name: 'Nola Translator', url: canonical, description, image,
+            applicationCategory: 'UtilitiesApplication', operatingSystem: 'Windows',
+            downloadUrl, license: `${repositoryUrl}/blob/main/LICENSE`,
+          }),
+        )
+      }
       const trail = breadcrumbs(pageData)
       if (trail.length > 1) {
         tags.push(jsonLd('BreadcrumbList', {

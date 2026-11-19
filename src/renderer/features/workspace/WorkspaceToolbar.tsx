@@ -113,7 +113,7 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
           </div>
           <div className="nola-workspace-field nola-language-pair-field">
             <ModelAvailabilityLabel label={t('workspaceUi.languages')} hint={t('shellUi.languageDirectionHint')} />
-            <LanguageDirectionSelect source={props.sourceLanguage} target={props.targetLanguage} sourceCodes={sourceLanguages} targetCodes={targetLanguages} disabled={locked}
+            <LanguageDirectionSelect source={props.sourceLanguage} target={props.targetLanguage} sourceCodes={sourceLanguages} targetCodes={targetLanguages} unavailable={s2sModel ? undefined : modelOptions.languageUnavailable} requiredModels={modelOptions.requiredModels} disabled={locked}
               onSourceChange={props.onSourceLanguageChange} onTargetChange={props.onTargetLanguageChange}
               onSwap={swappedLanguages ? () => props.onLanguagePairChange(swappedLanguages.sourceLanguage, swappedLanguages.targetLanguage) : undefined} />
           </div>

@@ -12,28 +12,24 @@ import type { AppSettingsPatch } from '@/bridge'
  * plays through when the session starts, so it follows the user after they switch output, while
  * a device id pins the choice. The enumerated devices also list the live default under its own
  * entry.
- *
- * There is no level meter: the bridge exposes no channel that starts a capture and reports
- * volume, so a moving `Meter` could only invent its numbers.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
-import { LoaderCircle } from 'lucide-react'
+import { LoaderCircle, RefreshCw } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { SettingsRow } from '../SettingsRow'
-import { notifyError, notifySuccess, notifyWarning } from '@/components/primitives/notify'
+import { notifyError, notifyInfo, notifySuccess } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
-import { errorCopyOf } from '@/features/workspace/error-copy'
-import { actions, getBridge, stores, updateSettings, useStore } from '@/store'
+import { getBridge, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect } from '../SettingsPage'
 import type { SettingsPanelProps } from '../SettingsPage'
 import { DEFAULT_SETTINGS, ALIYUN_ASR_MODELS, MINIMAX_RECOGNITION_MODELS, type MinimaxRecognitionModel, type RecognitionSettings } from '../../../../shared/settings'
 import { ApiKeyRow, TextRow, TranslationTab } from './TranslationTab'
 import { speechOutputOptions, useAudioSourceOptions } from '@/audio-source-options'
-import { useSpeechOutputDevices } from '@/features/workspace/SessionSetupDialog'
+import { audioSourceFrom, useSpeechOutputDevices } from '@/features/workspace/SessionSetupDialog'
 import { probeAudioDevices } from '@/store/modelStore'
 import { vbCablePair } from '../../../../shared/virtual-audio'
 
@@ -79,61 +75,42 @@ export function AudioTab({ settings }: SettingsPanelProps) {
   const cableRenderEnds = new Set(speechOutputs.map(device => vbCablePair(device.label, 'Input')))
   const standardCablePresent = cableCaptureEnds.has('standard') || cableRenderEnds.has('standard')
     || devices.some(device => device.kind === 'systemOutput' && vbCablePair(device.name, 'Input') === 'standard')
-  const selectedOutput = settings.realtime?.speechOutputDeviceId
+  const selectedOutput = settings.realtime?.speechOutputDeviceId || 'default'
   const realtimeActive = useStore(stores.session, state => !['idle', 'error'].includes(state.status))
-  const [testingOutput, setTestingOutput] = useState(false)
-  const testSpeechOutput = async () => {
-    if (!selectedOutput || testingOutput || realtimeActive) return
-    setTestingOutput(true)
-    let context: (AudioContext & { setSinkId?: (id: string) => Promise<void> }) | undefined
-    try {
-      context = new AudioContext()
-      if (!context.setSinkId) throw new Error('Output selection is unavailable')
-      await context.setSinkId(selectedOutput)
-      await context.resume()
-      const signal = context.createOscillator()
-      const volume = context.createGain()
-      volume.gain.value = 0.05
-      signal.connect(volume).connect(context.destination)
-      const ended = new Promise<void>(resolve => { signal.onended = () => resolve() })
-      signal.start()
-      signal.stop(context.currentTime + 0.15)
-      await ended
-    } catch (cause) {
-      notifyError(t('errors.audioDeviceDisconnected'), { cause })
-    } finally {
-      await context?.close().catch(() => undefined)
-      setTestingOutput(false)
-    }
-  }
+  const source = audioSourceFrom(devices.find(device => device.deviceId === selectedSource), selectedSource)
+  const preview = useAudioDevicePreview(selectedSource, selectedOutput, realtimeActive)
 
   return (
     <div className="settings-panel" data-onboarding="recognition-settings">
       <SettingGroup legend={t('settings.audioDevicesGroup')}>
-        <SettingsRow onboardingTarget="audio-source" label={t('settings.inputDevice')}
-          desc={selectedSource.startsWith('process:') ? t('session.applicationAudioHint') : t('settings.audioTestHint')} descriptionTooltip>
-          <div className="flex w-full min-w-0 items-center gap-2">
-            <SettingSelect className="min-w-0 flex-1" value={selectedSource} options={deviceOptions}
-              ariaLabel={t('settings.inputDevice')}
-              onChange={(value) => {
-                void updateSettings({ recognition: { audioSource: value }, realtime: { virtualInputDeviceId: '' } }).catch(() => undefined)
-              }} />
-            {!selectedSource.startsWith('process:') ? <DeviceTest expect={selectedSource} /> : null}
-          </div>
-        </SettingsRow>
         <SettingsRow label={t('session.speechOutputDevice')}>
-          <div className="flex w-full min-w-0 items-center gap-2">
-            <SettingSelect className="min-w-0 flex-1" value={selectedOutput || 'default'} ariaLabel={t('session.speechOutputDevice')}
-              options={speechOutputOptions(speechOutputs, selectedOutput || 'default', t)}
-              onChange={value => { void updateSettings({ realtime: { speechOutputDeviceId: value === 'default' ? '' : value } }).catch(() => undefined) }} />
-            <Button variant="tertiary" size="sm" disabled={realtimeActive || testingOutput || !speechOutputs.some(device => device.deviceId === selectedOutput)} onClick={() => void testSpeechOutput()}>{t('settings.testAudio')}</Button>
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-[var(--label-gap)]">
+            <SettingSelect className="max-w-full grow basis-48" value={selectedOutput} ariaLabel={t('session.speechOutputDevice')} isDisabled={!!preview.active}
+              options={speechOutputOptions(speechOutputs, selectedOutput, t)}
+              onChange={value => { preview.cancel(); void updateSettings({ realtime: { speechOutputDeviceId: value === 'default' ? '' : value } }).catch(() => undefined) }} />
+            <Button variant={preview.active === 'output' ? 'destructive' : 'secondary'} size="sm" disabled={realtimeActive || preview.active === 'input' ||
+              (selectedOutput !== 'default' && !speechOutputs.some(device => device.deviceId === selectedOutput))}
+              aria-label={t(preview.active === 'output' ? 'settings.stopAudioTest' : 'settings.testSpeaker')}
+              onClick={preview.testOutput}>{t(preview.active === 'output' ? 'settings.stopAudioTest' : 'settings.test')}</Button>
           </div>
         </SettingsRow>
+        <AudioLevelRow label={t('settings.outputLevel')} level={preview.outputLevel} />
+        <SettingsRow onboardingTarget="audio-source" label={t('settings.inputDevice')}
+          desc={source.kind === 'processAudio' ? t('session.applicationAudioHint') : undefined} descriptionTooltip>
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-[var(--label-gap)]">
+            <SettingSelect className="max-w-full grow basis-48" value={selectedSource} options={deviceOptions} isDisabled={!!preview.active}
+              ariaLabel={t('settings.inputDevice')}
+              onChange={value => { preview.cancel(); void updateSettings({ recognition: { audioSource: value }, realtime: { virtualInputDeviceId: '' } }).catch(() => undefined) }} />
+            {source.kind !== 'browserTab' && (source.kind !== 'defaultOutput' || selectedSource === DEFAULT_OUTPUT)
+              ? <Button variant={preview.active === 'input' ? 'destructive' : 'secondary'} size="sm" disabled={realtimeActive || preview.active === 'output'}
+                  aria-label={t(preview.active === 'input' ? 'settings.stopAudioTest' : 'settings.testInput')}
+                  onClick={() => preview.testInput(source)}>{t(preview.active === 'input' ? 'settings.stopAudioTest' : 'settings.test')}</Button> : null}
+          </div>
+        </SettingsRow>
+        <AudioLevelRow label={t('settings.inputLevel')} level={preview.inputLevel} />
       </SettingGroup>
 
-      <SettingGroup legend={t('session.virtualCable')} actions={
-        <Button variant="secondary" size="sm" onClick={() => { void refreshCableStatus() }}>{t('gateway.refresh')}</Button>
-      }>
+      <SettingGroup legend={t('session.virtualCable')}>
         {installCable && !standardCablePresent ? <SettingsRow label={t('session.virtualCableInstall')} desc={t('session.virtualCableInstallHint')} descriptionTooltip>
           <Button size="sm" disabled={installingCable || realtimeActive} onClick={() => void runCableInstaller()}>
             {installingCable ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
@@ -147,13 +124,20 @@ export function AudioTab({ settings }: SettingsPanelProps) {
           </Button>
         </SettingsRow>
         <SettingsRow label={t('session.virtualCableDriverVersion')}>
-          <span className="type-body text-muted">{checkingCableDriver ? t('gateway.loading') : cableDriverVersion || t('session.virtualCableMissing')}</span>
+          <div className="flex flex-wrap items-center justify-end gap-[var(--label-gap)]">
+            <span className="type-body text-muted">{checkingCableDriver ? t('gateway.loading') : cableDriverVersion || t('session.virtualCableMissing')}</span>
+            <Tooltip>
+              <TooltipTrigger render={<Button variant="bare" size="icon-sm" aria-label={t('runtime.recheck')}
+                disabled={checkingCableDriver} onClick={() => void refreshCableStatus()}><RefreshCw aria-hidden="true" /></Button>} />
+              <TooltipContent>{t('runtime.recheck')}</TooltipContent>
+            </Tooltip>
+          </div>
         </SettingsRow>
       </SettingGroup>
 
       <TranslationTab settings={settings} />
 
-      {provider !== 'aliyun' ? <SettingGroup legend={t('settings.vadGroup')} actions={
+      {provider !== 'aliyun' ? <SettingGroup legend={t('settings.vadGroup')} headingAction={
         <Button variant="secondary" size="sm" onClick={() => {
           void updateSettings({ recognition: {
             max_segment_ms: DEFAULT_SETTINGS.recognition.max_segment_ms,
@@ -182,8 +166,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
                   </SliderTrack>
                 </SliderControl>
               </SliderRoot>
-              <output className="type-muted tabular text-right">{(settings.recognition[field] ?? fallback).toLocaleString(language)}</output>
-              <span className="settings-slider__unit" aria-hidden="true" />
+              <output className="col-span-2 type-muted tabular text-end">{(settings.recognition[field] ?? fallback).toLocaleString(language)}</output>
             </div>
           </SettingsRow>
         ))}
@@ -247,37 +230,96 @@ export function MiniMaxConnection({ recognition, stored, onUpdate = updateSettin
   </>
 }
 
-/** Preview the selected ASR input through the same capture path as a caption session. */
-function DeviceTest({ expect }: { expect: string }) {
-  const { t } = useI18n()
-  const [result, setResult] = useState<'pending' | 'signal' | 'silent' | 'failed' | null>(null)
-  const state = useStore(stores.settings, value => value.audioTestState)
-  const busy = state === 'capturing' || state === 'playing'
-  useEffect(() => { setResult(null) }, [expect])
-  useEffect(() => () => actions.settings.cancelAudioTest(), [expect])
-  const runTest = async () => {
-    setResult('pending')
-    try {
-      const hasSignal = await actions.settings.testAudio(expect)
-      setResult(hasSignal ? 'signal' : 'silent')
-      if (hasSignal) notifySuccess(t('settings.audioTestSuccess'), { description: t('settings.audioTestReady') })
-      else notifyWarning(t('settings.audioTestSilent'))
-    } catch (error) {
-      setResult('failed')
-      const code = typeof error === 'object' && error !== null && 'engineCode' in error && typeof error.engineCode === 'string'
-        ? error.engineCode
-        : error instanceof Error ? /([a-zA-Z_]+)[:：]/.exec(error.message)?.[1] ?? error.message : null
-      notifyError(t('settings.audioTestFailed'), {
-        description: t(errorCopyOf(code, 'stop').message),
-      })
-    }
-  }
-  return (
-    <Button variant="tertiary" size="sm" disabled={busy}
-      onClick={() => { void runTest() }}>
-      {state === 'capturing' ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
-      {t('settings.testAudio')}
-    </Button>
-  )
+function AudioLevelRow({ label, level }: { label: string; level: number }) {
+  return <SettingsRow label={label}>
+    <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={level}
+      className="grid w-full min-w-0 grid-cols-10 gap-1">
+      {Array.from({ length: 10 }, (_, index) => (
+        <span key={index} className={`h-2 rounded-xs ${index * 10 < level ? 'bg-primary' : 'bg-surface-tertiary'}`} />
+      ))}
+    </div>
+  </SettingsRow>
 }
 
+function useAudioDevicePreview(sourceId: string, outputId: string, realtimeActive: boolean) {
+  const { t } = useI18n()
+  const [active, setActive] = useState<'input' | 'output' | null>(null)
+  const [inputLevel, setInputLevel] = useState(0)
+  const [outputLevel, setOutputLevel] = useState(0)
+  const current = useRef<AbortController | null>(null)
+  const cancel = useCallback(() => current.current?.abort(), [])
+
+  useEffect(() => cancel, [sourceId, outputId, realtimeActive, cancel])
+
+  const run = (device: 'input' | 'output', message: string, preview: (signal: AbortSignal) => Promise<void>) => {
+    if (current.current) { cancel(); return }
+    if (realtimeActive) return
+    const controller = new AbortController()
+    current.current = controller
+    setActive(device)
+    notifyInfo(message)
+    void preview(controller.signal).catch(cause => {
+      if (!controller.signal.aborted) notifyError(t('settings.audioTestFailed'), { cause })
+    }).finally(() => {
+      current.current = null
+      setInputLevel(0)
+      setOutputLevel(0)
+      setActive(null)
+    })
+  }
+
+  return {
+    active, inputLevel, outputLevel, cancel,
+    testInput: (source: import('@/bridge').AudioPreviewSource) => run('input',
+      t(source.kind === 'microphone' ? 'settings.microphoneTestRunning' : 'settings.playAudioTestPrompt'), async signal => {
+        const bridge = getBridge()
+        if (!bridge) throw new Error('engineNotReady')
+        await bridge.engine.previewAudioInput(source, setInputLevel, signal)
+      }),
+    testOutput: () => run('output', t('settings.playAudioTestPrompt'), signal => playSpeakerPreview(outputId, setOutputLevel, signal)),
+  }
+}
+
+async function playSpeakerPreview(outputId: string, onLevel: (value: number) => void, signal: AbortSignal) {
+  const context: AudioContext & { setSinkId?: (device: string) => Promise<void> } = new AudioContext()
+  const close = () => { if (context.state !== 'closed') void context.close().catch(() => undefined) }
+  signal.addEventListener('abort', close, { once: true })
+  let animation = 0
+  try {
+    if (outputId !== 'default') {
+      if (!context.setSinkId) throw new Error('audioDeviceUnavailable')
+      await context.setSinkId(outputId)
+    }
+    await context.resume()
+    signal.throwIfAborted()
+    const tone = context.createBufferSource()
+    const buffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate)
+    const waveform = buffer.getChannelData(0)
+    for (let index = 0; index < context.sampleRate; index++) {
+      const time = index / context.sampleRate
+      const envelope = Math.min(1, time / 0.05, (1 - time) / 0.05)
+      waveform[index] = 0.12 * envelope * Math.sin(2 * Math.PI * 440 * time)
+    }
+    tone.buffer = buffer
+    tone.loop = true
+    const analyser = context.createAnalyser()
+    tone.connect(analyser).connect(context.destination)
+    const samples = new Float32Array(analyser.fftSize)
+    const measure = () => {
+      analyser.getFloatTimeDomainData(samples)
+      onLevel(Math.round(samples.reduce((peak, value) => Math.max(peak, Math.abs(value)), 0) * 100))
+      animation = requestAnimationFrame(measure)
+    }
+    const ended = new Promise<void>(resolve => {
+      signal.addEventListener('abort', () => resolve(), { once: true })
+      tone.onended = () => resolve()
+    })
+    tone.start()
+    measure()
+    await ended
+  } finally {
+    signal.removeEventListener('abort', close)
+    cancelAnimationFrame(animation)
+    close()
+  }
+}

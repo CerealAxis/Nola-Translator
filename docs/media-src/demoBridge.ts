@@ -3,6 +3,7 @@ import { initStores, stores } from '@/store'
 import { mergeSettings } from '@/store/settingsStore'
 import type { ModelGatewaySnapshot } from '../../src/shared/model-gateway'
 import type { BrowserConnectionStatus } from '../../src/shared/browser'
+import type { MeetingModeSnapshot } from '../../src/shared/meeting-mode'
 import { CRISP_RUNTIME_ID } from '../../src/shared/compute'
 import { createDemoRuntime, DEMO_COMPUTE } from './demoRuntime'
 
@@ -17,7 +18,8 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
     services: {
       asr: { state: 'ready', model: `resource:${settings.recognition.modelId}`, name: 'Demo ASR' },
       mt: { state: 'ready', model: `resource:${settings.translation.localModelId}`, name: 'Demo MT' },
-      tts: { state: 'stopped', model: '', name: '' }, llm: { state: 'stopped', model: '', name: '' },
+      tts: { state: 'ready', model: `resource:${settings.synthesis.modelId}`, name: 'Demo TTS' },
+      llm: { state: 'stopped', model: '', name: '' },
     },
   })
   const credentials = new Set<CredentialProvider>()
@@ -26,6 +28,14 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
   const engineListeners = new Set<(event: EngineChannelEvent) => void>()
   const lockListeners = new Set<(locked: boolean) => void>()
   const overlayVisibilityListeners = new Set<(visible: boolean) => void>()
+  const meetingModeListeners = new Set<(snapshot: MeetingModeSnapshot) => void>()
+  const idleMeetingMode: MeetingModeSnapshot = { state: 'idle', passthroughActive: false }
+  let meetingMode = idleMeetingMode
+  const setMeetingMode = (snapshot: MeetingModeSnapshot) => {
+    meetingMode = snapshot
+    meetingModeListeners.forEach(listener => listener(snapshot))
+    return snapshot
+  }
   let overlayLock = false
   let overlayVisible = false
   const publish = (event: EngineChannelEvent) => {
@@ -70,7 +80,7 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
     engine: {
       listComputeDevices: async () => ({ ...DEMO_COMPUTE, torchVersion: runtimes.local.engine.version }),
       listDevices: async () => stores.models.getState().devices,
-      testAudio: async () => { throw new Error('Audio capture is not part of the website demo') },
+      previewAudioInput: async () => { throw new Error('Audio capture is not part of the website demo') },
       listResources: async () => ({ storagePath: '', resources: stores.models.getState().resources }),
       manageResource: async (id, action) => {
         const existing = stores.models.getState().resources.find(item => item.resourceId === id)
@@ -106,6 +116,13 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
         if (changed) lockListeners.forEach(listener => listener(locked))
         return overlayLock
       },
+    },
+    meetingMode: {
+      snapshot: async () => meetingMode,
+      start: async () => setMeetingMode({ state: 'running', passthroughActive: false }),
+      stop: async () => setMeetingMode(idleMeetingMode),
+      setPaused: async paused => meetingMode.state === 'running' ? setMeetingMode({ ...meetingMode, paused }) : meetingMode,
+      onChanged: listener => subscribe(meetingModeListeners, listener),
     },
     runtimes: {
       list: async () => runtimes, prepare: async () => runtimes,

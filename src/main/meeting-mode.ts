@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { meetingAudioTestRequestSchema, type MeetingAudioTestRequest, type MeetingAudioTestResult, type MeetingModeSettings, type MeetingModeSnapshot } from '../shared/meeting-mode'
+import { type MeetingModeSettings, type MeetingModeSnapshot } from '../shared/meeting-mode'
 import type { MappedBackendSession } from './backend-session'
 import type { BackendSupervisor } from './backend-supervisor'
 import type { FeatureActivity, FeatureLease } from './feature-activity'
-import { backendError, backendErrorCode } from './backend-error'
+import { backendError, backendFailure } from './backend-error'
+import { logActivity, logDiagnostic } from './session-log'
 
 type MeetingError = NonNullable<MeetingModeSnapshot['error']>
 type MeetingBackend = Pick<BackendSupervisor, 'baseUrl' | 'authorizationHeader'> & {
@@ -18,14 +19,15 @@ type PreparedMeeting = {
   downlink?: MappedBackendSession
 }
 
-const meetingError = backendError.extend({
-  safe_details: z.object({ direction: z.enum(['uplink', 'downlink']).optional() }).optional(),
-}).transform(error => ({
-  key: error.message_key,
-  code: backendErrorCode(error),
-  direction: error.safe_details?.direction,
-  correlationId: error.correlation_id || undefined,
-}))
+function meetingFailure(error: z.infer<typeof backendError>, meetingId: string, method: string): MeetingError {
+  const failure = backendFailure(error, meetingId)
+  const record = method === 'GET' ? logActivity : logDiagnostic
+  record('backend.meeting.error', { meetingId, method, direction: error.safe_details?.direction, error: failure })
+  return {
+    key: error.message_key, code: failure.engineCode, direction: error.safe_details?.direction,
+    correlationId: failure.correlationId,
+  }
+}
 const routeTelemetry = z.object({
   input_peak: z.number().finite().min(0).max(1),
   input_age_ms: z.number().finite().nonnegative().nullable(),
@@ -41,7 +43,7 @@ const backendSnapshot = z.object({
   state: z.enum(['preparing', 'running', 'failed', 'closed']),
   passthrough_active: z.boolean(),
   paused: z.boolean().optional(),
-  last_error: meetingError.nullish(),
+  last_error: backendError.nullish(),
   telemetry: z.object({ uplink: routeTelemetry.optional(), downlink: routeTelemetry.optional() }).optional(),
   segments: z.array(z.object({
     segmentId: z.string(), direction: z.enum(['uplink', 'downlink']), revision: z.number().int().nonnegative(),
@@ -50,14 +52,6 @@ const backendSnapshot = z.object({
     translations: z.array(z.object({ targetLanguage: z.string(), text: z.string().optional(), provider: z.string(), state: z.enum(['pending', 'complete', 'failed']) })),
   })).optional(),
 })
-const audioTestResult = z.object({
-  kind: z.enum(['microphone', 'headphones', 'cable', 'application']),
-  has_signal: z.boolean(),
-  peak: z.number().finite().min(0).max(1),
-  playback_sent: z.boolean(),
-  correlation: z.number().finite().min(-1).max(1).optional(),
-})
-
 export class MeetingModeError extends Error {
   constructor(readonly detail: MeetingError) {
     super(detail.key)
@@ -72,21 +66,17 @@ export class MeetingMode {
   private abortStart?: AbortController
   private stopping?: Promise<MeetingModeSnapshot>
   private poll?: NodeJS.Timeout
-  private testing?: Promise<MeetingAudioTestResult>
-  private abortTest?: AbortController
 
   constructor(
     private readonly activity: FeatureActivity,
     private readonly prepare: (settings: MeetingModeSettings) => Promise<PreparedMeeting>,
     private readonly changed: (snapshot: MeetingModeSnapshot) => void,
-    private readonly prepareAudioTest?: () => Promise<MeetingBackend>,
   ) {}
 
   snapshot(): MeetingModeSnapshot { return this.current }
   usesResource(id: string): boolean { return this.active?.resources.has(id) ?? false }
 
   start(settings: MeetingModeSettings): Promise<MeetingModeSnapshot> {
-    if (this.testing) return Promise.resolve({ ...this.current, error: { key: 'meeting.busy' } })
     if (this.starting || this.active || this.stopping) return Promise.resolve(this.current)
     this.lease = this.activity.acquire('meeting', async () => {
       const result = await this.stop()
@@ -99,7 +89,6 @@ export class MeetingMode {
   }
 
   stop(): Promise<MeetingModeSnapshot> {
-    if (this.testing) return this.cancelAudioTest().then(() => this.current)
     if (this.stopping) return this.stopping
     const operation = this.stopGroup().finally(() => { this.stopping = undefined })
     this.stopping = operation
@@ -114,46 +103,6 @@ export class MeetingMode {
     } catch (error) {
       return this.publish({ ...this.current, error: this.detail(error, 'meeting.pipelineFailed') })
     }
-  }
-
-  async cancelAudioTest(): Promise<void> {
-    this.abortTest?.abort()
-    await this.testing
-  }
-
-  testAudio(value: MeetingAudioTestRequest): Promise<MeetingAudioTestResult> {
-    const request = meetingAudioTestRequestSchema.parse(value)
-    const failed = (error: MeetingError): MeetingAudioTestResult => ({ kind: request.kind, hasSignal: false, peak: 0, playbackSent: false, error })
-    if (this.testing || this.starting || this.active || this.stopping) return Promise.resolve(failed({ key: 'meeting.busy' }))
-    let lease: FeatureLease
-    try { lease = this.activity.acquire('meeting', async () => { await this.cancelAudioTest() }) }
-    catch { return Promise.resolve(failed({ key: 'meeting.busy' })) }
-    const abort = new AbortController()
-    this.abortTest = abort
-    const operation = (async (): Promise<MeetingAudioTestResult> => {
-      try {
-        const backend = await this.prepareAudioTest?.()
-        abort.signal.throwIfAborted()
-        if (!backend?.ready) throw new MeetingModeError({ key: 'meeting.backendUnavailable' })
-        lease.running()
-        const response = await fetch(new URL('/api/v2/meetings/audio-test', backend.baseUrl), {
-          method: 'POST', headers: { ...backend.authorizationHeader(), 'content-type': 'application/json' },
-          body: JSON.stringify({ kind: request.kind, device_id: request.deviceId, playback_device_id: request.playbackDeviceId, recording_device_id: request.recordingDeviceId }), signal: AbortSignal.any([AbortSignal.timeout(15_000), abort.signal]),
-        })
-        const json: unknown = await response.json()
-        if (!response.ok) throw new MeetingModeError(z.object({ error: meetingError }).safeParse(json).data?.error ?? { key: 'meeting.audioTestFailed' })
-        const result = audioTestResult.parse(json)
-        if (result.kind !== request.kind) throw new MeetingModeError({ key: 'meeting.audioTestFailed' })
-        return { kind: result.kind, hasSignal: result.has_signal, peak: result.peak, playbackSent: result.playback_sent, correlation: result.correlation }
-      } catch (error) {
-        return failed(this.detail(error, 'meeting.audioTestFailed'))
-      } finally {
-        if (this.abortTest === abort) this.abortTest = undefined
-        lease.release()
-      }
-    })().finally(() => { this.testing = undefined })
-    this.testing = operation
-    return operation
   }
 
   private async startGroup(settings: MeetingModeSettings): Promise<MeetingModeSnapshot> {
@@ -303,9 +252,12 @@ export class MeetingMode {
     })
     const json: unknown = await response.json()
     if (!response.ok) {
-      const detail = z.object({ error: meetingError }).safeParse(json).data?.error
-      throw new MeetingModeError(detail ?? { key: method === 'DELETE' ? 'meeting.stopFailed' : 'meeting.startFailed' })
+      const error = z.object({ error: backendError }).safeParse(json).data?.error
+      const detail = error ? meetingFailure(error, active.id, method)
+        : { key: method === 'DELETE' ? 'meeting.stopFailed' : 'meeting.startFailed' }
+      throw new MeetingModeError(detail)
     }
-    return backendSnapshot.parse(json)
+    const { last_error, ...snapshot } = backendSnapshot.parse(json)
+    return { ...snapshot, last_error: last_error ? meetingFailure(last_error, active.id, method) : last_error }
   }
 }

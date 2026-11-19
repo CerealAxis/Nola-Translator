@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { AlertDialog } from '@base-ui/react/alert-dialog'
-import { TabsRoot, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem } from '@/components/ui'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { AlertDialogContent, DialogHeader, DialogFooter } from '@/components/ui/dialog'
-import { Check, CircleHelp, LoaderCircle } from 'lucide-react'
+import { Check, CircleHelp } from 'lucide-react'
 import { notifyError, notifyRetryableFailure, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
@@ -55,7 +55,6 @@ export function RuntimeComponents() {
   const [active, setActive] = useState<RuntimeKind>('engine')
   const [selected, setSelected] = useState({ engine: '', llama: '', crisp: '' })
   const [force, setForce] = useState({ engine: false, llama: false, crisp: false })
-  const [repairs, setRepairs] = useState({ engine: false, llama: false, crisp: false })
   const [confirmKind, setConfirmKind] = useState<RuntimeKind | null>(null)
   const busy = state.runtimeBusy || !!runtimes?.operation || state.runtimeChecking || sessionBusy
   const local = runtimes?.local
@@ -89,7 +88,6 @@ export function RuntimeComponents() {
       llama: local.llama.status === 'ready' ? local.llama.id ?? 'current' : '',
       crisp: local.crisp?.status === 'ready' ? local.crisp.id ?? 'current' : '' })
     setForce({ engine: false, llama: false, crisp: false })
-    setRepairs({ engine: !!local.engine.managed && local.engine.status !== 'ready', llama: !!local.llama.managed && local.llama.status !== 'ready', crisp: !!local.crisp?.managed && local.crisp.status !== 'ready' })
   }, [local?.engine.path, local?.engine.id, local?.engine.status, local?.llama.path, local?.llama.id, local?.llama.status, local?.crisp?.path, local?.crisp?.id, local?.crisp?.status])
   const brand = (kind: RuntimeKind) => kind === 'engine' ? 'PyTorch' : kind === 'llama' ? 'llama.cpp' : 'CrispASR'
   const status = (component: LocalRuntime) => isExternalRuntime(component)
@@ -114,12 +112,6 @@ export function RuntimeComponents() {
       })
     } finally {
       releaseRuntimeFailure()
-    }
-  }
-  const install = async (ids: string[]) => {
-    for (const id of ids) {
-      await installOne(id, true)
-      if (stores.settings.getState().runtimeError) break
     }
   }
   const uninstall = async (kind: RuntimeKind) => {
@@ -163,8 +155,8 @@ export function RuntimeComponents() {
   const speed = operation?.phase === 'download' ? downloadSpeed(operation.bytes, operation.startedAt) : ''
   const versions = runtimeVersionRows(local)
   return <>
-    <SettingGroup legend={t('runtime.components')} actions={<Button variant="secondary" size="sm" disabled={busy}
-      onClick={() => void recheck()}>{state.runtimeChecking ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}{t('runtime.recheck')}</Button>}>
+    <SettingGroup legend={t('runtime.components')} headingAction={<Button variant="secondary" size="sm" disabled={busy}
+      aria-busy={state.runtimeChecking} onClick={() => void recheck()}>{t('runtime.recheck')}</Button>}>
       <SettingsRow label={t('runtime.python')} desc={runtimes?.python?.reason || undefined}><span>{t('runtime.builtInPython')}</span></SettingsRow>
       {versions.map(({ kind, version }) => <SettingsRow key={kind}
         label={t(kind === 'engine' ? 'runtime.pytorch' : kind === 'llama' ? 'runtime.llama' : 'runtime.crisp')}
@@ -230,13 +222,6 @@ export function RuntimeComponents() {
           </AlertDialogContent>
       </AlertDialog.Portal>
     </AlertDialog.Root>
-    {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" size="sm" disabled={busy || !Object.values(repairs).some(Boolean)} onClick={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>
-      <ToggleGroup multiple disabled={busy} aria-label={t('runtime.repair')} className="runtime-repair runtime-repair__list"
-        value={KINDS.filter(kind => repairs[kind])}
-        onValueChange={values => setRepairs({ engine: values.includes('engine'), llama: values.includes('llama'), crisp: values.includes('crisp') })}>
-        {KINDS.filter(kind => local[kind]?.managed).map(kind => <ToggleGroupItem key={kind} value={kind}>{brand(kind)}</ToggleGroupItem>)}
-      </ToggleGroup>
-    </SettingGroup> : null}
     {operation ? <div role="status" className="runtime-progress">
       <div className="runtime-progress-copy">
         <strong>{operation.id === CRISP_RUNTIME_ID ? 'CrispASR 0.8.43 · Vulkan + CPU' : [...runtimes.recipes, ...runtimes.packages].find(component => component.id === operation.id)?.name}</strong>

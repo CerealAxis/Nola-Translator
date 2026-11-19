@@ -11,8 +11,7 @@ import type { AudioDevice, ResourceRecord, ResourceSnapshot } from '../../shared
 
 export type {
   AudioDevice,
-  AudioTestSource,
-  AudioTestResult,
+  AudioPreviewSource,
   AudioSource,
   CaptionSegment,
   EngineCommand,

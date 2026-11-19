@@ -6,6 +6,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { createServer, type Server, type Socket } from 'node:net'
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { logActivity, logDiagnostic } from './session-log'
+import { supportErrorCodeForCause } from '../shared/error-catalog'
 import { mkdir, writeFile, access, rm, copyFile, rename } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
@@ -77,7 +78,8 @@ const PUBLIC_ERRORS = new Set<BrowserWireErrorCode>([
   'invalidCredential', 'translationTimeout', 'translationNetworkUnavailable', 's2sConfigurationMissing', 's2sConnectionLost',
   'torchUnavailable', 'llamaUnavailable',
   'modelOutOfMemory', 'modelDependencyMissing', 'modelWeightsInvalid',
-  'invalidMessage', 'unsupportedProtocol', 'invalidConfiguration', 'audioDeviceUnavailable',
+  'invalidMessage', 'unsupportedProtocol', 'invalidConfiguration', 'audioDeviceUnavailable', 'audioCaptureStartFailed',
+  'vadUnavailable', 'sessionError', 'modelLoadFailed',
   'modelUnavailable', 'modelMissing', 'resourceUnavailable', 'resourceBusy', 'engineTransportUnavailable', 'lineTooLarge',
 ])
 
@@ -90,7 +92,6 @@ function publicErrorCode(error: unknown): BrowserWireErrorCode {
   if (message.startsWith('RUNTIME_TORCH:')) return 'torchUnavailable'
   if (message.startsWith('RUNTIME_LLAMA:')) return 'llamaUnavailable'
   if (PUBLIC_ERRORS.has(message as BrowserWireErrorCode)) return message as BrowserWireErrorCode
-  console.error('browser request failed with an unmapped error', error)
   return 'internalError'
 }
 interface Client { socket: Socket; browser: BrowserKind; extensionVersion?: string; protocolVersion?: number; helloReceived: boolean; authenticated: boolean; sessionId: string | null; starting: boolean; closed: boolean; pending: number; pendingAudioMs: number; epoch: number; paused: boolean; audioGeneration: number; audioRequestPrefix: string; audioWindow: AudioWindow; translations: Map<string, AbortController> }
@@ -750,6 +751,10 @@ export class BrowserConnection {
         return
       }
       const code = publicErrorCode(error)
+      logDiagnostic('browser.request.failed', {
+        requestId: request.id, operation: request.type, sessionId: client.sessionId,
+        code, supportCode: supportErrorCodeForCause(code), error,
+      })
       this.send(client, { type: 'error', id: request.id, code, message: code })
       if (request.type === 'audio' && client.sessionId) { const id = client.sessionId; client.sessionId = null; await this.options.sessions.stop(id).catch(() => undefined) }
     }

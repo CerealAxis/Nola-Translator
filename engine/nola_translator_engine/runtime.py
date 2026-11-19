@@ -15,7 +15,7 @@ from time import monotonic
 from typing import TypeVar
 from uuid import uuid4
 
-from .audio.capture import AudioDeviceDisconnectedError, BrowserAudioCapture, PortAudioCapture, capture_audio_test
+from .audio.capture import AudioDeviceDisconnectedError, BrowserAudioCapture, PortAudioCapture
 from . import debug_log
 from .debug_log import exception_fields, write as write_debug
 from .compute import ComputeDevice, choose_devices, model_memory_mb, probe_devices, resource_failure, cpu_threads, release_failed_load
@@ -33,8 +33,6 @@ from .model_capabilities import normalize, supports_translation
 from .models.manager import ModelManager
 from .models.registry import CustomFile
 from .protocol import (
-    TestAudioCommand,
-    AudioTestedEvent,
     CaptionEvent,
     AudioAcceptedEvent,
     BrowserTimeline,
@@ -343,24 +341,6 @@ class EngineRuntime:
 
 
     async def handle(self, command: EngineCommand) -> list[EngineEvent]:
-        if isinstance(command, TestAudioCommand):
-            if self.service.session_id is not None:
-                return [self._resource_error(command.requestId, "sessionAlreadyRunning")]
-            source = command.audioSource
-            try:
-                device = self.service.device_registry.resolve(
-                    "systemOutput" if source.kind == "defaultOutput" else source.kind,
-                    None if source.kind == "defaultOutput" else source.deviceId,
-                    request_id=command.requestId,
-                )
-                result = await capture_audio_test(PortAudioCapture(device, request_id=command.requestId))
-                return [AudioTestedEvent(protocolVersion=1, type="audioTested", requestId=command.requestId, **result)]
-            except AudioDeviceDisconnectedError:
-                write_debug("engine", "audio.test.failed", {"requestId": command.requestId, "reason": "disconnected"})
-                return [self._resource_error(command.requestId, "audioDeviceDisconnected", {"reason": "disconnected"})]
-            except Exception as error:
-                write_debug("engine", "audio.test.failed", {"requestId": command.requestId, **exception_fields(error)})
-                return [self._resource_error(command.requestId, "audioDeviceUnavailable", {"reason": str(error)})]
         if isinstance(command, HelloCommand):
             # FunASR discovers many adapters on its first import. Do that once after the
             # handshake, while the UI is usable, without loading weights or running inference.

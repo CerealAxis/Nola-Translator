@@ -2,7 +2,6 @@ import { installVirtualCable, readVirtualCableDriverVersion } from './virtual-ca
 import { loggedHandle } from './logged-ipc'
 import { sceneModelBinding } from '../shared/model-policy'
 import { modelConfigurationSchema } from '../shared/model-capabilities'
-import { audioTestSourceSchema } from '../shared/schemas'
 import { randomUUID } from 'node:crypto'
 
 import { BrowserWindow, ipcMain, net, screen } from 'electron'
@@ -25,7 +24,6 @@ export const IPC_CHANNELS = {
   listDevices: 'engine:list-devices',
   installVirtualCable: 'app:install-virtual-cable',
   getVirtualCableDriverVersion: 'app:get-virtual-cable-driver-version',
-  testAudio: 'engine:test-audio',
   listResources: 'engine:list-resources',
   manageResource: 'engine:manage-resource',
   searchHuggingFace: 'hub:search',
@@ -135,9 +133,6 @@ export function registerEngineIpc(
     return snapshot
   })
 
-  loggedHandle(IPC_CHANNELS.testAudio, async (_event, audioSource: unknown) => {
-    return controller.testAudio(audioTestSourceSchema.parse(audioSource))
-  })
 
   loggedHandle(IPC_CHANNELS.listResources, async () => {
     await ensureReady()

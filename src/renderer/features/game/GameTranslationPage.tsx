@@ -19,7 +19,7 @@ import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { LANGUAGE_CODES } from '../../../shared/languages'
+import { useScreenLanguageModels } from '@/model-options'
 import type { ScreenSource } from '../../../shared/screen-translation'
 import type { GameCommand, GameProfile, GameSnapshot } from '../../../shared/game-translation'
 import type { MeetingMeta } from '../../../shared/contracts'
@@ -55,6 +55,7 @@ export function GameTranslationPage({ gameId }: { gameId?: string }) {
   const api = getBridge()?.gameTranslation
   const [snapshot, setSnapshot] = useState<GameSnapshot>()
   const [draft, setDraft] = useState<GameProfile>()
+  const languages = useScreenLanguageModels({ source: draft?.sourceLanguage ?? 'auto', needsOcr: draft?.source === 'ocr' || draft?.source === 'auto' && !snapshot?.hookAvailable })
   const [draftRevision, setDraftRevision] = useState(0)
   const draftChanged = useRef(false)
   const draftBase = useRef<GameProfile | undefined>(undefined)
@@ -81,7 +82,7 @@ export function GameTranslationPage({ gameId }: { gameId?: string }) {
   const pending = useRef(false)
   const accept = (value: GameSnapshot) => setSnapshot(value)
   const load = async () => {
-    if (!api) { setFailed(true); return }
+    if (!api) return
     try { accept(await api.snapshot()); setFailed(false) }
     catch { setFailed(true) }
   }
@@ -117,6 +118,9 @@ export function GameTranslationPage({ gameId }: { gameId?: string }) {
     finally { pending.current = false; setBusy(false) }
   }
   const active = snapshot?.activeGameId === gameId && snapshot?.status !== 'idle' && snapshot?.status !== 'error'
+  if (!api) return <div className="game-page">
+    <PageHeader title={t('suite.gameTitle')} subtitle={t('suite.gameDesktopOnly')} />
+  </div>
   if (!snapshot) return <div className="game-page"><PageHeader warning={t('suite.experimentalInDevelopment')} title={t('suite.gameTitle')} /><Card><CardContent>{failed ? <div className="flex flex-col items-start gap-3"><p>{t('suite.actionFailed')}</p><Button variant="outline" onClick={() => void load()}>{t('suite.retry')}</Button></div> : <Spinner />}</CardContent></Card></div>
   if (!gameId) return <div className="game-page"><PageHeader warning={t('suite.experimentalInDevelopment')} title={t('suite.gameTitle')} actions={<Button disabled={busy || !api} onClick={() => void run({ action: 'add' })}><Plus data-icon="inline-start" />{t('suite.addGame')}</Button>} />
     {!snapshot.profiles.length && <Empty><EmptyHeader><EmptyTitle>{t('suite.libraryEmpty')}</EmptyTitle></EmptyHeader><Button disabled={busy || !api} onClick={() => void run({ action: 'add' })}>{t('suite.addGame')}</Button></Empty>}
@@ -138,7 +142,10 @@ export function GameTranslationPage({ gameId }: { gameId?: string }) {
       <Field className="nola-settings-field"><FieldLabel htmlFor="game-source">{t('suite.textSource')}</FieldLabel><Select value={draft.source} disabled={active || busy} onValueChange={value => { if (value) patch({ source: value as GameProfile['source'] }) }}><SelectTrigger id="game-source"><SelectValue>{draft.source === 'ocr' ? 'OCR' : t(`suite.${draft.source}`)}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{(['auto', 'ocr', 'clipboard', 'hook'] as const).map(source => <SelectItem key={source} value={source} disabled={source === 'hook' && !snapshot.hookAvailable}>{source === 'ocr' ? 'OCR' : t(`suite.${source}`)}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
       {draft.source !== 'clipboard' && <Field className="nola-settings-field"><FieldLabel htmlFor="game-window">{t('suite.selectWindow')}</FieldLabel><Select value={sourceId || null} disabled={active || busy || !sources.length} onValueChange={value => { if (value) setSourceId(value) }}><SelectTrigger id="game-window"><SelectValue placeholder={t('suite.selectWindow')}>{sources.find(source => source.id === sourceId)?.name}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{sources.map(source => <SelectItem key={source.id} value={source.id}>{source.name}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>}
       <Field className="nola-settings-field"><FieldLabel htmlFor="game-strategy">{t('suite.strategy')}</FieldLabel><Select value={draft.strategy} disabled={active || busy} onValueChange={value => { if (value) patch({ strategy: value as GameProfile['strategy'] }) }}><SelectTrigger id="game-strategy"><SelectValue>{t(`suite.${draft.strategy}`)}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{(['auto', 'speed', 'quality'] as const).map(strategy => <SelectItem key={strategy} value={strategy}>{t(`suite.${strategy}`)}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
-      <Field className="nola-settings-field"><FieldLabel>{t('shellUi.languageDirection')}</FieldLabel><LanguageDirectionSelect source={draft.sourceLanguage} target={draft.targetLanguage} sourceCodes={['auto', ...LANGUAGE_CODES]} targetCodes={[...LANGUAGE_CODES]} sourceLabel={t('screen.sourceLanguage')} targetLabel={t('screen.targetLanguage')} disabled={active || busy} onSourceChange={sourceLanguage => patch({ sourceLanguage })} onTargetChange={targetLanguage => patch({ targetLanguage })} /></Field>
+      <Field className="nola-settings-field"><FieldLabel>{t('shellUi.languageDirection')}</FieldLabel><LanguageDirectionSelect source={draft.sourceLanguage} target={draft.targetLanguage} sourceCodes={languages.sourceLanguages} targetCodes={languages.targetLanguages} unavailable={languages.unavailable} requiredModels={languages.requiredModels} sourceLabel={t('screen.sourceLanguage')} targetLabel={t('screen.targetLanguage')} disabled={active || busy} onSourceChange={sourceLanguage => {
+        const targets = languages.targetsFor(sourceLanguage)
+        patch({ sourceLanguage, targetLanguage: targets.includes(draft.targetLanguage) ? draft.targetLanguage : targets[0] ?? draft.targetLanguage })
+      }} onTargetChange={targetLanguage => patch({ targetLanguage })} /></Field>
       {(draft.source === 'auto' || draft.source === 'hook') && <details><summary>{t('suite.embedStyle')}</summary><FieldGroup className="nola-settings-fields">
         <Field><FieldLabel htmlFor="embed-mode">{t('suite.embedText')}</FieldLabel><Select value={embedStyle.mode ?? 'translation'} disabled={active || busy} onValueChange={mode => { if (mode) patchStyle({ mode: mode as keyof typeof modes }) }}><SelectTrigger id="embed-mode"><SelectValue>{modes[embedStyle.mode ?? 'translation']}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{Object.entries(modes).map(([id, label]) => <SelectItem key={id} value={id}>{label}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
         <Field><FieldLabel htmlFor="embed-wait">{t('suite.embedWait')}</FieldLabel><Input id="embed-wait" type="number" min={0} max={3000} value={draft.embedWaitMs ?? 500} disabled={active || busy} onChange={event => patch({ embedWaitMs: Number(event.target.value) })} /></Field>

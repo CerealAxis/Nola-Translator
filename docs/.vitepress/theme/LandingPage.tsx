@@ -11,7 +11,7 @@ import { copy, downloadSources, downloadUrl, license, localeNames, localePath, r
 import type { LandingCopy, Locale } from './content'
 import { autoLocaleNames, detectSiteLocale, homePath, languagePrompt, readLocalePreference, saveLocalePreference } from './siteLocale'
 import { LandingFeatureSections } from './LandingFeatureSections'
-import { landingContent } from './landing-content'
+import { landingContent, screenshotAlt } from './landing-content'
 import type { LocalePreference } from './siteLocale'
 import chromeIcon from '../../../src/renderer/assets/browsers/chrome.png'
 import edgeIcon from '../../../src/renderer/assets/browsers/edge.png'
@@ -68,7 +68,7 @@ export function LandingPage({ locale, base, dark, languageNoticeReady, onToggleT
     if (path !== location.pathname) location.href = `${path}${location.search}${location.hash}`
   }
   const docUrl = `${base}${localePath(locale).slice(1)}docs`
-  const image = (name: string) => `${base}screenshots/${locale}/${name}${dark ? '-dark' : ''}.png`
+  const image = (name: string) => `${base}screenshots/${locale}/${name}${dark ? '-dark' : ''}`
   useEffect(() => {
     const sync = () => setScrolled(window.scrollY > 40)
     sync()
@@ -86,7 +86,7 @@ export function LandingPage({ locale, base, dark, languageNoticeReady, onToggleT
   return <div ref={site} className="nola-site" lang={locale}>
     <a className="site-skip z-overlay" href="#main">{t.nav.skip}</a>
     <header className={['site-nav', 'z-sticky', scrolled && 'site-nav--scrolled'].filter(Boolean).join(' ')}>
-      <a className="site-brand" href={homePath(locale, base)}><img src={`${base}nola-logo.svg`} alt="" /><span>Nola Translator</span></a>
+      <a className="site-brand" href={homePath(locale, base)}><img src={`${base}nola-logo.svg`} width={256} height={256} alt="" /><span>Nola Translator</span></a>
       <nav className="site-nav-links" aria-label={t.nav.menu}><a href="#product">{t.nav.product}</a><a href="#features">{t.nav.scenarios}</a><a href="#download">{t.nav.download}</a><a href={docUrl}>{t.nav.docs}</a><a href={`${base}vis/`}>{t.nav.designDocs}</a></nav>
       <div className="site-nav-end">
         <Menu.Root>
@@ -159,7 +159,7 @@ export function LandingPage({ locale, base, dark, languageNoticeReady, onToggleT
         </div>
         <div className="site-hero-copy site-hero-copy--preview">
           <h1 className="site-hero-wordmark">
-            <span className="site-hero-mark"><img src={`${base}nola-logo.svg`} alt="" /></span>
+            <span className="site-hero-mark"><img src={`${base}nola-logo.svg`} width={256} height={256} alt="" /></span>
             <span className="site-hero-title">
               Nola Translator
               <span className="site-hero-title-sparkles" aria-hidden="true">
@@ -184,14 +184,14 @@ export function LandingPage({ locale, base, dark, languageNoticeReady, onToggleT
         <div className="site-heading" data-reveal="section"><p className="site-kicker">{landing.downloadKicker}</p><h2>{t.platforms.title}</h2><p>{t.platforms.intro}</p></div>
         <div className="site-download-grid" data-reveal="section">
           <DownloadCard icon={<Monitor aria-hidden="true" />} title={t.platforms.desktop} description={t.platforms.desktopBody}>
-            <div className="site-download-art site-download-art--desktop"><img src={image('home')} loading="lazy" alt="" /></div>
+            <div className="site-download-art site-download-art--desktop"><LandingScreenshot src={image('home')} alt={screenshotAlt[locale].desktop} lazy /></div>
             <DownloadSourceButton locale={locale} label={t.nav.download} className="site-download-link"><WindowsIcon />Windows<ArrowDown aria-hidden="true" /></DownloadSourceButton>
             <Button className="site-coming" variant="secondary" disabled><AppleLogo /><span>macOS</span><small>{t.platforms.soonLabel}</small></Button>
           </DownloadCard>
           <DownloadCard icon={<Globe2 aria-hidden="true" />} title={t.platforms.browser} description={t.platforms.browserBody}>
-            <div className="site-download-art site-download-art--browser"><img src={image('browser-scene')} loading="lazy" alt="" /></div>
-            <DownloadSourceButton locale={locale} label={t.nav.download} className="site-download-link"><img src={chromeIcon} alt="" />Chrome<ArrowDown aria-hidden="true" /></DownloadSourceButton>
-            <DownloadSourceButton locale={locale} label={t.nav.download} className="site-download-link site-download-link--secondary"><img src={edgeIcon} alt="" />Microsoft Edge<ArrowDown aria-hidden="true" /></DownloadSourceButton>
+            <div className="site-download-art site-download-art--browser"><LandingScreenshot src={image('browser-scene')} alt={screenshotAlt[locale].browser} lazy /></div>
+            <DownloadSourceButton locale={locale} label={t.nav.download} className="site-download-link"><img src={chromeIcon} width={32} height={32} alt="" />Chrome<ArrowDown aria-hidden="true" /></DownloadSourceButton>
+            <DownloadSourceButton locale={locale} label={t.nav.download} className="site-download-link site-download-link--secondary"><img src={edgeIcon} width={32} height={32} alt="" />Microsoft Edge<ArrowDown aria-hidden="true" /></DownloadSourceButton>
           </DownloadCard>
           <DownloadCard icon={<Terminal aria-hidden="true" />} title={t.platforms.terminal} description={t.platforms.terminalBody}>
             <div className="site-download-art site-download-art--terminal" aria-hidden="true"><div><i /><i /><i /></div><p><span>❯</span> nola<span className="site-terminal-cursor">▏</span></p><small>Nola Translator</small></div>
@@ -201,16 +201,16 @@ export function LandingPage({ locale, base, dark, languageNoticeReady, onToggleT
         </div>
       </section>
 
-      <section className="site-faq site-shell site-section" data-reveal>
-        <div className="site-heading"><h2>{t.faq.title}</h2></div>
+      <section id="faq" className="site-faq site-shell site-section" aria-labelledby="faq-title" data-reveal>
+        <div className="site-heading"><h2 id="faq-title">{t.faq.title}</h2></div>
         <Accordion.Root className="site-faq-list">{t.faq.items.map((item, i) => <Accordion.Item className="accordion__item" value={String(i)} key={i}>
           <Accordion.Header><Accordion.Trigger className="accordion__trigger">{item.question}<ChevronDown className="accordion__indicator" aria-hidden="true" /></Accordion.Trigger></Accordion.Header><Accordion.Panel><div className="accordion__body">{item.answer}</div></Accordion.Panel>
         </Accordion.Item>)}</Accordion.Root>
       </section>
 
-      <section className="site-final" data-reveal><div className="site-final-orb" aria-hidden="true" /><p className="site-kicker">NOLA TRANSLATOR</p><h2>{t.final.title}</h2><p>{t.final.body}</p><DownloadSourceButton locale={locale} label={t.nav.download} className="site-final-link"><WindowsIcon />{t.final.cta}<ArrowDown aria-hidden="true" /></DownloadSourceButton></section>
+      <section id="get-started" className="site-final" aria-labelledby="get-started-title" data-reveal><div className="site-final-orb" aria-hidden="true" /><p className="site-kicker">NOLA TRANSLATOR</p><h2 id="get-started-title">{t.final.title}</h2><p>{t.final.body}</p><DownloadSourceButton locale={locale} label={t.nav.download} className="site-final-link"><WindowsIcon />{t.final.cta}<ArrowDown aria-hidden="true" /></DownloadSourceButton></section>
     </main>
-    <footer className="site-footer site-shell"><div><a className="site-brand" href={homePath(locale, base)}><img src={`${base}nola-logo.svg`} alt="" />Nola Translator</a><p>{t.footer.tagline}</p></div><nav aria-label={t.nav.menu}><a href={docUrl}>{t.nav.docs}</a><a href={downloadUrl}>{t.footer.releases}</a><a href={repositoryUrl}><Github aria-hidden="true" />GitHub</a></nav><div className="site-footer-bottom"><span>{t.footer.copyright}</span><a href={`${repositoryUrl}/blob/main/LICENSE`}>{license}</a></div></footer>
+    <footer className="site-footer site-shell"><div><a className="site-brand" href={homePath(locale, base)}><img src={`${base}nola-logo.svg`} width={256} height={256} alt="" />Nola Translator</a><p>{t.footer.tagline}</p></div><nav aria-label={t.nav.menu}><a href={docUrl}>{t.nav.docs}</a><a href={downloadUrl}>{t.footer.releases}</a><a href={repositoryUrl}><Github aria-hidden="true" />GitHub</a></nav><div className="site-footer-bottom"><span>{t.footer.copyright}</span><a href={`${repositoryUrl}/blob/main/LICENSE`}>{license}</a></div></footer>
   </div>
 }
 
@@ -358,6 +358,14 @@ function DownloadButton({ locale, text, menuLabel, soon, compact }: DownloadButt
   </div>
 }
 
+function LandingScreenshot({ src, alt, lazy = false }: { src: string; alt: string; lazy?: boolean }) {
+  return <picture>
+    <source srcSet={`${src}.webp`} type="image/webp" />
+    <img src={`${src}.png`} width={1440} height={1000} alt={alt} loading={lazy ? 'lazy' : undefined}
+      decoding={lazy ? 'async' : undefined} fetchPriority={lazy ? undefined : 'high'} />
+  </picture>
+}
+
 export function DemoFrame({ locale, base, dark, text, page = 'home' }: DemoFrameProps) {
   const viewport = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
@@ -382,7 +390,7 @@ export function DemoFrame({ locale, base, dark, text, page = 'home' }: DemoFrame
   return <div className="site-demo-window" data-nosnippet>
     <div ref={viewport} className="site-demo-viewport" style={{ '--demo-scale': scale } as CSSProperties}>
       <iframe ref={frame} key={locale} src={`${base}demo/index.html?locale=${locale}&page=${page}&theme=${initialTheme}#/`} title={`Nola Translator — ${text.hint}`} style={{ visibility: ready ? 'visible' : 'hidden' }} />
-      {!ready ? <div className="site-demo-loading"><img src={`${base}screenshots/${locale}/home${dark ? '-dark' : ''}.png`} alt="" /><span>{text.loading}</span></div> : null}
+      {!ready ? <div className="site-demo-loading"><LandingScreenshot src={`${base}screenshots/${locale}/home${dark ? '-dark' : ''}`} alt="" /><span>{text.loading}</span></div> : null}
     </div>
   </div>
 }

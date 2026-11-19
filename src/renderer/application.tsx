@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, ROUTE_TITLES, Routes, settingsPath
 import { HomePage } from './features/home'
 import { ComicBooksLoading, ComicProjectLoading } from './features/comic/ComicLoading'
 import { SETTINGS_NAVIGATION } from './features/settings/settingsNavigation'
+import { ScreenTranslationNotice } from './features/screen/ScreenTranslationNotice'
 import type { RoutesProps } from './routes'
 import type { AppShellNavigationItem } from './components/primitives/AppShell'
 
@@ -24,7 +25,7 @@ const ModelsPage = lazy(() => import('./features/models').then(module => ({ defa
 const SettingsPage = lazy(() => import('./features/settings').then(module => ({ default: module.SettingsPage })))
 
 /** Keep the Assistant-ui runtime outside the route element that is keyed by path. */
-export function ApplicationShell({ children }: { children?: ReactNode }) {
+export function ApplicationShell({ children, pages = APPLICATION_PAGES }: { children?: ReactNode; pages?: RoutesProps['pages'] }) {
   const navigation = useApplicationNavigation()
   const { route } = useRoute()
   const { t } = useI18n()
@@ -39,8 +40,9 @@ export function ApplicationShell({ children }: { children?: ReactNode }) {
     sidebarContent={active ? <div ref={setSidebar} className="nola-workbench-sidebar-slot" /> : undefined}
     heading={active ? <div ref={setHeading} /> : undefined}
     actions={active ? <div ref={setActions} className="nola-no-drag" /> : undefined}>
+    <ScreenTranslationNotice />
     {children}
-    {!active && <Routes pages={APPLICATION_PAGES} />}
+    {!active && <Routes pages={pages} />}
     {(active || opened) && <div className="nola-workbench-page" hidden={!active} data-page="workbench">
       <ErrorBoundary><Suspense fallback={<div className="flex h-full items-center justify-center" role="status" aria-label={t('common.loading')}><Spinner /></div>}>
         <WorkbenchPage active={active} sidebar={sidebar} heading={heading} actions={actions}

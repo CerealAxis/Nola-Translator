@@ -171,11 +171,6 @@ class ListDevicesCommand(Envelope):
     type: Literal["listDevices"]
 
 
-class TestAudioCommand(Envelope):
-    type: Literal["testAudio"]
-    audioSource: Annotated[Union[DefaultOutputSource, DeviceSource], Field(discriminator="kind")]
-
-
 class ListComputeDevicesCommand(Envelope):
     type: Literal["listComputeDevices"]
 
@@ -342,7 +337,6 @@ EngineCommand = Annotated[
     Union[
         HelloCommand,
         ListDevicesCommand,
-        TestAudioCommand,
         StartSessionCommand,
         StopSessionCommand,
         SetSessionPausedCommand,
@@ -641,13 +635,6 @@ ErrorCode = Literal[
 ]
 
 
-class AudioTestedEvent(Envelope):
-    type: Literal["audioTested"]
-    audioBase64: str = Field(min_length=4, max_length=100_000)
-    durationMs: Literal[2000] = 2000
-    hasSignal: bool
-
-
 class ErrorEvent(Envelope):
     type: Literal["error"]
     code: ErrorCode
@@ -663,7 +650,6 @@ EngineEvent = Annotated[
     Union[
         ReadyEvent,
         DevicesEvent,
-        AudioTestedEvent,
         ComputeDevicesEvent,
         SessionStartedEvent,
         SessionStoppedEvent,

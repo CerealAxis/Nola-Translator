@@ -37,7 +37,7 @@ export function LatencyWindow() {
   }, [t, language])
 
   return <main className="min-h-0 flex-1 overflow-hidden">
-    <div className="mx-auto flex h-full w-full max-w-screen-lg flex-col gap-[var(--space-2)] p-[var(--space-2)]">
+    <div className="flex h-full w-full flex-col gap-[var(--space-2)] p-[var(--space-2)]">
       <header className="flex flex-wrap items-center justify-between gap-[var(--space-1)]">
         <h1 className="type-h3">{t('latency.title')}</h1>
         {snapshot && snapshot.available !== false && <Badge variant={snapshot.active ? 'accent' : 'secondary'}>{t(snapshot.active ? 'latency.active' : 'latency.ended')}</Badge>}

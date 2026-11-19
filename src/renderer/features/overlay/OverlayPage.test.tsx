@@ -160,7 +160,7 @@ it('shows an app toast when the model gateway is stopped', async () => {
   render(<OverlayPage />)
   fireEvent.click(screen.getByRole('button', { name: '打开悬浮字幕' }))
 
-  await waitFor(() => expect(notice).toHaveBeenCalledWith(expect.objectContaining({ title: '模型网关未启动', description: '请先前往模型网关启动服务，然后重试。' })))
+  await waitFor(() => expect(notice).toHaveBeenCalledWith(expect.objectContaining({ title: '模型网关未启动', description: '在模型网关点「启动服务」后重试。 (GTW-001)' })))
   expect(showOverlay).not.toHaveBeenCalled()
 })
 

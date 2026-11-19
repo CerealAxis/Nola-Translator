@@ -2,7 +2,9 @@ import { DEFAULT_SETTINGS } from '@/bridge'
 import type { AppSettings, CaptionSegment, ResourceRecord } from '@/bridge'
 import type { UiLanguage } from '@/i18n'
 import { RECOMMENDED_CONFIGURATIONS } from '../../src/shared/model-capabilities'
+import { DEFAULT_MEETING_MODE } from '../../src/shared/meeting-mode'
 import { stores } from '@/store'
+import catalog from './demo-catalog.json'
 
 export const demoCopy: Record<UiLanguage, { title: string; notes: string; translations: string[] }> = {
   'zh-CN': {
@@ -47,19 +49,7 @@ const sceneTranslations: Record<UiLanguage, string> = {
   ja: 'トム、あなたって最低。',
   ko: '톰, 정말 나쁜 사람이야.',
 }
-const models = [
-  ['qwen3-asr-1.7b-hf', 'Qwen3-ASR 1.7B', 'qwen3-asr', 4087646324],
-  ['qwen3-asr-0.6b-hf', 'Qwen3-ASR 0.6B', 'qwen3-asr', 1576381331],
-  ['sensevoice-small', 'SenseVoiceSmall', 'sensevoice', 936694116],
-  ['hy-mt2-1.8b-q4-k-m', 'Hy-MT2 1.8B Q4_K_M', 'hymt2', 1133080448],
-  ['hy-mt2-1.8b-q3-k-m', 'Hy-MT2 1.8B Q3_K_M', 'hymt2', 951022560],
-  ['hy-mt2-1.8b-iq2-m', 'Hy-MT2 1.8B UD-IQ2_M', 'hymt2', 722666176],
-  ['hy-mt2-7b-q4-k-m', 'Hy-MT2 7B Q4_K_M', 'hymt2', 4624648896],
-  ['m2m100-418m', 'M2M100 418M', 'm2m100', 1941936305],
-  ['index-translate-2b-q4-k-m', 'Index-Translate 2B Q4_K_M', 'index-translate', 1312164352],
-  ['index-translate-9b-q4-k-m', 'Index-Translate 9B Q4_K_M', 'index-translate', 5780090304],
-  ['index-translate-35b-a3b-q4-k-m', 'Index-Translate 35B-A3B preview Q4_K_M', 'index-translate', 21713462400],
-] as const
+const models = catalog as Pick<ResourceRecord, 'resourceId' | 'kind' | 'provider' | 'name' | 'description' | 'languages' | 'downloadBytes'>[]
 
 export function prepareDemo(locale: UiLanguage, page: string, snapshot = false, theme?: 'light' | 'dark'): AppSettings {
   const copy = demoCopy[locale]
@@ -74,6 +64,13 @@ export function prepareDemo(locale: UiLanguage, page: string, snapshot = false, 
   settings.recording.keepAudio = false
   settings.recognition = { ...settings.recognition, provider: 'local', sourceLanguage, modelId: 'qwen3-asr-1.7b-hf' }
   settings.translation = { ...settings.translation, provider: 'local', targetLanguage, localModelId: 'hy-mt2-1.8b-q4-k-m' }
+  settings.synthesis = { ...settings.synthesis, modelId: 'tts-qwen3-tts-crisp-0.6b-base-q4-k' }
+  settings.meetingMode = {
+    ...DEFAULT_MEETING_MODE,
+    pipeline: 'cascade', downlinkSource: 'application', applicationId: 'demo-call',
+    microphoneId: 'demo-microphone', uplinkOutputId: 'demo-cable', headphonesId: 'demo-output',
+  }
+  const installedModels = new Set([settings.recognition.modelId, settings.translation.localModelId, settings.synthesis.modelId])
   if (page === 'llm-configuration') {
     settings.translation = {
       ...settings.translation,
@@ -85,19 +82,18 @@ export function prepareDemo(locale: UiLanguage, page: string, snapshot = false, 
     }
   }
   stores.settings.setState({ settings, loaded: true, loading: false, captionService: snapshot ? 'ready' : 'idle' })
-  const resources: ResourceRecord[] = models.map(([resourceId, name, provider, downloadBytes]) => {
-    const configuration = RECOMMENDED_CONFIGURATIONS[resourceId]
-    const installed = resourceId === settings.recognition.modelId || resourceId === settings.translation.localModelId
+  const resources: ResourceRecord[] = models.map(model => {
+    const installed = installedModels.has(model.resourceId)
     return {
-      resourceId, name, provider, downloadBytes, configuration,
-      kind: configuration.slot === 'recognition' ? 'recognitionModel' : 'translationModel',
-      description: '', languages: configuration.slot === 'recognition' ? configuration.languages : configuration.targetLanguages,
-      installed, installedBytes: installed ? downloadBytes : 0, state: 'idle', cancellable: false,
+      ...model, configuration: RECOMMENDED_CONFIGURATIONS[model.resourceId],
+      installed, installedBytes: installed ? model.downloadBytes ?? 0 : 0, state: 'idle', cancellable: false,
     }
   })
   stores.models.setState({ resources, loaded: true, loading: false, devices: [
     { deviceId: 'demo-output', name: 'Speakers', kind: 'systemOutput', isDefault: true },
     { deviceId: 'demo-microphone', name: 'Microphone', kind: 'microphone', isDefault: true },
+    { deviceId: 'demo-cable', name: 'CABLE Input (VB-Audio Virtual Cable)', kind: 'systemOutput', isDefault: false },
+    { deviceId: 'demo-call', name: 'Demo call', kind: 'processAudio', isDefault: false },
   ] })
   const startedAtMs = Date.UTC(2026, 8, 16, 9, 0)
   stores.meetings.setState({ loaded: true, meetings: [{

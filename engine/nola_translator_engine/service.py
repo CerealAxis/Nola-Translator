@@ -56,7 +56,7 @@ class EngineService:
                     engineVersion=__version__,
                     capabilities=[
                         "devices", "captions", "translation", "resources", "pause", "hubInspect", "browserAudio",
-                        "prewarmModels", "audioTest",
+                        "prewarmModels",
                         "releaseModels",
                     ],
                 )

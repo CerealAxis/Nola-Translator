@@ -17,7 +17,7 @@ from time import monotonic
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from .contracts import (
@@ -29,6 +29,7 @@ from .contracts import (
     CreateSessionResponse,
     ErrorPayload,
     EventEnvelope,
+    InputConfig,
     SCHEMA_VERSION,
     SessionCommand,
     SubscriptionRequest,
@@ -54,7 +55,7 @@ from .glossary import RealtimeGlossaryUpdate
 from .gateway.adapters import MIMO_TTS_MODEL
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
 from .gateway.gateway import MatchRequest
-from .meeting import Meeting, MeetingRequest, MeetingAudioTestRequest, MeetingPauseRequest, _error as meeting_error, _key_reader, validate_route
+from .meeting import Meeting, MeetingRequest, MeetingPauseRequest, _error as meeting_error, _key_reader, validate_route
 
 #: WsClientFrame is an Annotated union alias, not a model class.
 _CLIENT_FRAME = TypeAdapter(WsClientFrame)
@@ -260,19 +261,6 @@ def build_router() -> APIRouter:
         if ctx.realtime_enabled and ack.result_state in ("closed", "failed"):
             ctx.pipeline_registry.provider_connections.pop(session_id, None)
         return JSONResponse(status_code=202, content=ack.model_dump(mode="json"))
-
-    @router.post("/meetings/audio-test")
-    async def meeting_audio_test(request: Request, body: MeetingAudioTestRequest):
-        from .meeting_audio import test_meeting_audio
-
-        ctx = backend(request)
-        if not ctx.accepting_sessions:
-            return _error_response(503, meeting_error("RESOURCE_BUSY", "session", "backendUnavailable"), ctx.server_instance_id)
-        try:
-            async with ctx.meeting_lock, ctx.session_manager.audio_test_slot():
-                return await _run_while_connected(request, test_meeting_audio(body))
-        except SessionError as error:
-            return _error_response(error.status, error.payload, ctx.server_instance_id)
 
     @router.post("/meetings", status_code=201)
     async def create_meeting(request: Request, body: MeetingRequest):
@@ -560,6 +548,51 @@ def build_router() -> APIRouter:
         from .process_sources import list_process_sources
 
         return await asyncio.to_thread(list_process_sources)
+
+    @router.post("/audio/input-levels", response_class=StreamingResponse,
+                 responses={200: {"content": {"text/plain": {"schema": {"type": "string"}}}}})
+    async def input_levels(request: Request, config: InputConfig):
+        from anyio import CancelScope
+        from numpy import abs as absolute
+        from .desktop_capture import _desktop_backend
+        from .routing import DeviceCaptureBackend
+
+        ctx = backend(request)
+        if not ctx.accepting_sessions:
+            return _error_response(503, meeting_error("RESOURCE_BUSY", "session", "backendUnavailable"), ctx.server_instance_id)
+        backends = {"system_audio": "device", "microphone": "device", "virtual_input": "virtual_input",
+                    "process_audio": "windows_process_include"}
+        if config.kind not in backends or config.capture_backend != backends[config.kind]:
+            return _error_response(400, meeting_error("INVALID_CONFIG", "capture", "invalidRoute"), ctx.server_instance_id)
+
+        async def samples():
+            try:
+                async with ctx.session_manager.input_preview_slot():
+                    capture = _desktop_backend(config)
+                    if capture is None:
+                        raise ValueError("Missing capture device")
+                    try:
+                        with CancelScope(shield=True):
+                            await capture.start()
+                        yield "0\n"
+                        peak = 0.0
+                        next_update = monotonic()
+                        async for frame in capture.frames():
+                            peak = max(peak, float(absolute(frame.samples).max(initial=0)))
+                            if monotonic() >= next_update:
+                                yield f"{round(min(peak, 1) * 100)}\n"
+                                peak = 0.0
+                                next_update = monotonic() + 0.08
+                    finally:
+                        with CancelScope(shield=True):
+                            if isinstance(capture, DeviceCaptureBackend):
+                                await asyncio.to_thread(capture.stop)
+                            else:
+                                capture.stop()
+            except (SessionError, OSError, RuntimeError, ValueError):
+                yield "error\n"
+
+        return StreamingResponse(samples(), media_type="text/plain")
 
     @router.post("/audio/preflight")
     async def audio_preflight(request: Request, body: AudioPreflightRequest):

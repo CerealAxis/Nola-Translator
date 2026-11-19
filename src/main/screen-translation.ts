@@ -18,10 +18,24 @@ import { observeScreenWindow } from './screen-target'
 import type { ScreenRegion } from '../shared/screen-translation'
 import { emptyGlossary, type GlossaryDocument } from '../shared/glossary'
 import { resolveGlossaryTerms } from '../shared/glossary-match'
+import { defaultModelBinding } from '../shared/model-policy'
+import { normalizeThrownError } from '../shared/ipc-error'
+import { featureConflictOwner } from '../shared/feature-activity'
+import { loggedHandle } from './logged-ipc'
+import { logDiagnostic } from './session-log'
+
+type GatewaySnapshot = Pick<ModelGatewaySnapshot, 'state' | 'availableModels'> & Partial<Pick<ModelGatewaySnapshot, 'services'>>
+type ScreenOperation = 'start' | 'resume' | 'capture' | 'ocr' | 'translate' | 'window' | 'shortcut'
+const ocrErrors = ['ocrMissing', 'ocrNotReady', 'ocrCorrupt', 'ocrRuntimeUnavailable', 'backendUnavailable', 'invalidConfig'] as const
+const translationCauses = new Map([
+  ['rate_limited', 'translationRateLimited'],
+  ['request_timeout', 'translationTimeout'],
+  ['network_unavailable', 'translationNetworkUnavailable'],
+])
 
 interface ScreenTranslationOptions {
-  mainDir: string; configPath: string; prepareOcr(): Promise<() => void>
-  gatewaySnapshot(): Pick<ModelGatewaySnapshot, 'state' | 'availableModels'>
+  mainDir: string; configPath: string; prepareOcr(language: string): Promise<() => void>
+  gatewaySnapshot(): GatewaySnapshot
   captureScreen(request: ScreenCaptureRequest, signal: AbortSignal): Promise<ScreenCaptureResult>
   releaseScreenCapture?(sessionId: string): Promise<void>
   getMainWindow?(): BrowserWindow | null
@@ -95,13 +109,14 @@ export class ScreenTranslation {
       this.presets = stored.version === 2 ? (stored.presets ?? []).map((item: unknown) => screenPresetSchema.parse(item)) : []
       this.draft = stored.draft ? screenRegionSetSchema.parse(stored.draft) : undefined
     }).catch(() => {}).then(() => { if (!this.disposed) { this.registerShortcuts(); this.publish() } })
-    const handle = (channel: string, handler: (event: IpcMainInvokeEvent, raw?: unknown) => unknown) => {
-      ipcMain.handle(channel, (event, raw) => { this.assertTrusted(event); return handler(event, raw) })
-    }
+    const handle = (channel: string, handler: (event: IpcMainInvokeEvent, raw?: unknown) => unknown) =>
+      loggedHandle(channel, handler, event => this.assertTrusted(event))
     handle('screen:snapshot', async () => { await this.ready; return this.snapshot() })
     handle('screen:sources', () => this.sources())
     handle('screen:command', async (event, raw) => {
-      const command = screenCommandSchema.parse(raw)
+      const parsed = screenCommandSchema.safeParse(raw)
+      if (!parsed.success) throw new Error('invalidConfig')
+      const command = parsed.data
       if (command.action === 'regions' || command.action === 'cancelEdit') {
         if (event.sender !== this.editor?.webContents) throw new Error('Access denied')
       } else if (event.sender === this.overlay?.webContents || event.sender === this.highlights?.webContents) throw new Error('Access denied')
@@ -172,12 +187,13 @@ export class ScreenTranslation {
 
   async showToolbar(): Promise<void> {
     await this.ready
-    if (this.disposed) return
+    if (this.disposed || !this.overlay && !this.editor || !['running', 'waiting', 'paused', 'editing'].includes(this.state.status)) return
     if (!this.toolbar || this.toolbar.isDestroyed()) {
       const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).bounds
-      this.toolbar = this.openWindow('toolbar', { x: area.x + Math.max(0, area.width - 640), y: area.y, width: Math.min(640, area.width), height: 64 })
-      this.toolbar.once('ready-to-show', () => this.toolbar?.showInactive())
-      this.toolbar.once('closed', () => { this.toolbar = undefined })
+      const toolbar = this.openWindow('toolbar', { x: area.x + Math.max(0, area.width - 640), y: area.y, width: Math.min(640, area.width), height: 64 })
+      this.toolbar = toolbar
+      toolbar.once('ready-to-show', () => { if (this.toolbar === toolbar && !toolbar.isDestroyed()) toolbar.showInactive() })
+      toolbar.once('closed', () => { if (this.toolbar === toolbar) this.toolbar = undefined })
     } else this.toolbar.showInactive()
   }
 
@@ -186,6 +202,7 @@ export class ScreenTranslation {
   async readOnce(): Promise<void> {
     const continuous = this.state.status === 'running' && !this.singleRead
     if (this.state.status !== 'running') await this.start()
+    if (this.state.status !== 'running' && this.state.status !== 'waiting') return
     this.singleRead = !continuous
     this.requestedRegions.clear()
     for (const region of this.captureRegions) this.requestedRegions.add(region.id)
@@ -259,8 +276,8 @@ export class ScreenTranslation {
       this.resetPipeline()
       this.state.status = this.canRun() ? 'running' : 'waiting'
       this.publish()
-    } catch {
-      if (lifecycle === this.lifecycle && !this.disposed) this.fail('targetUnavailable')
+    } catch (error) {
+      if (lifecycle === this.lifecycle && !this.disposed) this.fail('targetUnavailable', 'capture', error)
     } finally { this.switchingDisplay = false }
   }
 
@@ -374,7 +391,7 @@ export class ScreenTranslation {
             resolve()
             return
           }
-          if (target.identity !== this.state.config.windowIdentity) { this.fail('targetChanged'); return }
+          if (target.identity !== this.state.config.windowIdentity) { this.fail('targetChanged', 'capture'); return }
           const wasAvailable = this.sourceAvailable
           this.sourceAvailable = target.available; this.targetForeground = target.foreground
           const resized = this.bounds && (bounds.width !== this.bounds.width || bounds.height !== this.bounds.height)
@@ -385,7 +402,7 @@ export class ScreenTranslation {
           if (!this.canRun() && this.state.status === 'running') { this.invalidate(); this.state.status = 'waiting'; this.publish() }
           else if (!wasAvailable && this.canRun() && this.state.status === 'waiting') { this.resetPipeline(); this.state.status = 'running'; this.publish() }
           else this.updateOverlayVisibility()
-        }, () => { clearTimeout(timeout); if (!initialized) reject(new Error('targetUnavailable')); else this.fail('targetUnavailable') })
+        }, () => { clearTimeout(timeout); if (!initialized) reject(new Error('targetUnavailable')); else this.fail('targetUnavailable', 'capture') })
       })
       return false
     }
@@ -441,37 +458,51 @@ export class ScreenTranslation {
     this.publish()
   }
 
+  private checkGateway(operation: 'start' | 'resume', gateway: GatewaySnapshot): boolean {
+    if (gateway.state !== 'running') { this.fail('gatewayNotReady', operation, undefined, gateway); return false }
+    if (screenProcessingMode(this.state.config) === 'default' && defaultRealtimeS2s(this.options.settings())) {
+      this.fail('s2sUnsupported', operation)
+      return false
+    }
+    return true
+  }
+
+  private checkTranslationModel(operation: 'start' | 'resume', gateway: GatewaySnapshot): boolean {
+    const model = screenTranslationModel(this.state.config, this.options.settings())
+    if (!model) { this.fail('translationModelMissing', operation, undefined, gateway); return false }
+    if (model === 'cloud:recognition' || !gateway.availableModels?.mt?.some(candidate => candidate.binding === model)) {
+      this.fail('translationModelNotReady', operation, undefined, gateway)
+      return false
+    }
+    return true
+  }
+
   async start(): Promise<void> {
     await this.ready
     await this.stopping
-    await this.showToolbar()
-    if (this.state.status === 'starting' || this.state.status === 'running' || this.editor) return
-    if (this.overlay && this.releaseOcr) { await this.resume(); return }
-    if (this.disposed) return
-    if (this.options.gatewaySnapshot().state !== 'running') { this.fail('gatewayNotReady'); return }
-    if (screenProcessingMode(this.state.config) === 'default' && defaultRealtimeS2s(this.options.settings())) {
-      this.fail('s2sUnsupported'); return
-    }
+    if (this.disposed || this.state.status === 'starting' || this.state.status === 'running' || this.editor) return
+    if (this.overlay && this.releaseOcr) { await this.resume(); await this.showToolbar(); return }
+    if (!this.checkGateway('start', this.options.gatewaySnapshot())) return
     const lifecycle = ++this.lifecycle
-    this.state.status = 'starting'; this.state.error = undefined; this.publish()
-    let stage: 'backend' | 'capture' = 'backend'
+    this.state.status = 'starting'; this.clearFailure(); this.publish()
+    let stage: 'start' | 'ocr' | 'capture' = 'start'
     try {
       this.lease = this.options.activity?.acquire('screen-translation', () => this.stop())
-      const release = await this.options.prepareOcr()
+      stage = 'ocr'
+      const release = await this.options.prepareOcr(this.ocrLanguage())
       if (lifecycle !== this.lifecycle || this.disposed) { release(); return }
       this.releaseOcr = release
-      const model = screenTranslationModel(this.state.config, this.options.settings())
-      if (!model) { this.fail('translationModelMissing'); return }
-      if (!this.options.gatewaySnapshot().availableModels?.mt?.some(candidate => candidate.binding === model && model !== 'cloud:recognition')) {
-        this.fail('translationModelNotReady'); return
-      }
+      const gateway = this.options.gatewaySnapshot()
+      if (!this.checkGateway('start', gateway) || !this.checkTranslationModel('start', gateway)) return
       stage = 'capture'
       const changed = await this.desktopSource()
       if (lifecycle !== this.lifecycle || this.disposed) return
+      const currentGateway = this.options.gatewaySnapshot()
+      if (!this.checkGateway('start', currentGateway) || !this.checkTranslationModel('start', currentGateway)) return
       if (changed) { await this.edit(); this.editReturn = 'running'; return }
       const config = this.state.config
       if (config.captureMode === 'regions' && !config.regions.length) { await this.edit(); this.editReturn = 'running'; return }
-      if (config.sourceLanguage === config.targetLanguage) { this.fail('sameLanguage'); return }
+      if (config.sourceLanguage === config.targetLanguage) { this.fail('sameLanguage', 'start'); return }
       this.state.sessionId = randomUUID()
       this.state.frames = 0
       this.userPaused = false
@@ -481,15 +512,21 @@ export class ScreenTranslation {
       if (config.captureMode === 'cursor') this.updateCursorRegion()
       await this.openCapture(lifecycle)
       if (lifecycle !== this.lifecycle || this.disposed) return
+      const readyGateway = this.options.gatewaySnapshot()
+      if (!this.checkGateway('start', readyGateway) || !this.checkTranslationModel('start', readyGateway)) return
       this.resetPipeline()
       if (config.captureMode === 'cursor') this.cursorTimer = setInterval(() => this.updateCursorRegion(), 100)
       this.state.status = this.canRun() ? 'running' : 'waiting'
       this.lease?.running()
       this.publish()
+      await this.showToolbar()
     } catch (error) {
       if (lifecycle !== this.lifecycle || this.disposed) return
-      if (this.options.gatewaySnapshot().state !== 'running') { this.fail('gatewayNotReady'); return }
-      this.fail(error instanceof Error && error.message === 'targetChanged' ? 'targetChanged' : error instanceof Error && error.message === 'targetUnavailable' ? 'targetUnavailable' : stage === 'backend' ? 'ocrNotReady' : 'captureFailed')
+      const gateway = this.options.gatewaySnapshot()
+      const reason = error instanceof Error ? error.message : ''
+      if (gateway.state !== 'running') { this.fail('gatewayNotReady', 'start', error, gateway); return }
+      const known = [...ocrErrors, 'targetChanged', 'targetUnavailable'] as const
+      this.fail(known.find(code => code === reason) ?? (stage === 'capture' ? 'captureFailed' : 'startFailed'), stage, error, gateway)
     }
   }
 
@@ -499,25 +536,29 @@ export class ScreenTranslation {
     this.userPaused = true
     this.invalidate()
     this.state.status = 'paused'
-    this.state.error = undefined
+    this.clearFailure()
     this.publish()
   }
 
   async resume(): Promise<void> {
     await this.ready
-    if (this.options.gatewaySnapshot().state !== 'running') { this.fail('gatewayNotReady'); return }
-    if (screenProcessingMode(this.state.config) === 'default' && defaultRealtimeS2s(this.options.settings())) {
-      this.fail('s2sUnsupported'); return
-    }
+    await this.stopping
+    if (this.disposed || this.editor || this.state.status === 'starting') return
+    const gateway = this.options.gatewaySnapshot()
+    if (!this.checkGateway('resume', gateway)) return
     if (!this.overlay || !this.lease && this.options.activity) { await this.stop(); await this.start(); return }
-    if (this.editor) return
+    if (gateway.services?.ocr && gateway.services.ocr.state !== 'ready') {
+      this.fail('ocrNotReady', 'resume', undefined, gateway)
+      return
+    }
+    if (!this.checkTranslationModel('resume', gateway)) return
     this.userPaused = false
     this.singleRead = false
     this.requestedRegions.clear()
     if (this.state.config.captureMode !== 'cursor' && this.state.config.regions.length) {
       this.captureRegions = this.state.config.regions
     }
-    this.state.error = undefined
+    this.clearFailure()
     this.resetPipeline()
     this.state.status = this.canRun() ? 'running' : 'waiting'
     this.publish()
@@ -540,7 +581,7 @@ export class ScreenTranslation {
       await this.closeCapture()
       this.releaseOcr?.(); this.releaseOcr = undefined
       this.userPaused = false
-      if (this.state.status !== 'error') this.state.error = undefined
+      if (this.state.status !== 'error') this.clearFailure()
       this.lease?.release(); this.lease = undefined
       this.publish()
     })().finally(() => { if (this.stopping === task) this.stopping = undefined })
@@ -568,7 +609,7 @@ export class ScreenTranslation {
       this.hiddenMainWindow = mainWindow
       mainWindow.hide()
     }
-    window.once('closed', () => { if (this.editor === window) { this.editor = undefined; void this.finishEdit().catch(() => this.fail('captureFailed')) } })
+    window.once('closed', () => { if (this.editor === window) { this.editor = undefined; void this.finishEdit().catch(error => this.fail('captureFailed', 'window', error)) } })
     this.publish()
   }
 
@@ -623,7 +664,7 @@ export class ScreenTranslation {
       if (signal.aborted || readRevision !== this.readRevision
           || this.bounds?.x !== bounds.x || this.bounds?.y !== bounds.y) return
       if (captured.unavailable) {
-        if (config.captureMode !== 'window') this.fail('captureFailed')
+        if (config.captureMode !== 'window') this.fail('captureFailed', 'capture')
         return
       }
       if (!captured.frames.length) return
@@ -635,8 +676,7 @@ export class ScreenTranslation {
         const region = regions.find(region => region.id === frame.id)
         if (!region) continue
         const started = Date.now()
-        const result = await this.options.inferOcr({ image: frame.image, overlay: true,
-          language: config.sourceLanguage === 'zh-Hant' ? 'zh' : config.sourceLanguage }, signal)
+        const result = await this.options.inferOcr({ image: frame.image, overlay: true, language: this.ocrLanguage() }, signal)
         if (signal.aborted || readRevision !== this.readRevision) break
         this.lastOcr.set(region.id, Date.now())
         this.state.ocrMs = Date.now() - started
@@ -647,8 +687,7 @@ export class ScreenTranslation {
       if (signal.aborted || readRevision !== this.readRevision) return
       const reason = error instanceof Error ? error.message : ''
       if (reason !== 'resourceBusy') {
-        const known = ['ocrMissing', 'ocrNotReady', 'ocrCorrupt', 'ocrRuntimeUnavailable', 'backendUnavailable'] as const
-        this.fail(known.find(code => code === reason) ?? errorStage)
+        this.fail(ocrErrors.find(code => code === reason) ?? errorStage, errorStage === 'ocrFailed' ? 'ocr' : 'capture', error)
       }
     } finally {
       this.sampling = false
@@ -691,8 +730,16 @@ export class ScreenTranslation {
         text: protection.text, source: this.state.config.sourceLanguage, target: this.state.config.targetLanguage, glossary: this.glossaryMatch(text).terms }, AbortSignal.any([signal, AbortSignal.timeout(25000)]))
       if (epoch === this.state.epoch) this.state.translationMs = Date.now() - started
       return protection.restore(result.text)
-    }, () => { if (epoch === this.state.epoch) { this.state.blocks = this.pipeline?.blocks() ?? []; this.publish() } },
-    () => { if (epoch === this.state.epoch) { if (this.state.error !== 'translationFailed') this.state.errorId = randomUUID(); this.state.error = 'translationFailed'; this.publish() } }, text => this.glossaryMatch(text).signature + resolveWordRules(this.wordRulesDocument, { kind: 'preserve', text, language: this.state.config.sourceLanguage, context: this.state.gameId ? { scenario: 'game', projectId: this.state.gameId } : { scenario: 'screen' }, selection: this.state.config.excludedSelection }).signature)
+    }, () => {
+      if (epoch !== this.state.epoch) return
+      this.state.blocks = this.pipeline?.blocks() ?? []
+      if (this.state.error === 'translationFailed' && this.state.blocks.length && this.state.blocks.every(block => block.status === 'ready')) this.clearFailure()
+      this.publish()
+    }, error => {
+      if (epoch !== this.state.epoch) return
+      this.recordFailure('translationFailed', 'translate', error)
+      this.publish()
+    }, text => this.glossaryMatch(text).signature + resolveWordRules(this.wordRulesDocument, { kind: 'preserve', text, language: this.state.config.sourceLanguage, context: this.state.gameId ? { scenario: 'game', projectId: this.state.gameId } : { scenario: 'screen' }, selection: this.state.config.excludedSelection }).signature)
   }
 
   private invalidate(): void {
@@ -707,16 +754,53 @@ export class ScreenTranslation {
   }
 
   private canRun(): boolean { return this.sourceAvailable && !this.userPaused }
-  private fail(error: ScreenSnapshot['error']): void {
-    const toolbar = this.toolbar; this.toolbar = undefined
-    const cleanup = this.stop()
-    this.toolbar = toolbar
-    const lifecycle = this.lifecycle
-    this.state.status = 'error'; this.state.error = error; this.state.errorId = randomUUID(); this.publish()
-    void cleanup.then(() => {
-      if (this.disposed || lifecycle !== this.lifecycle) return
-      this.state.status = 'error'; this.state.error = error; this.publish()
-    })
+
+  private ocrLanguage(): string {
+    return this.state.config.sourceLanguage === 'zh-Hant' ? 'zh' : this.state.config.sourceLanguage
+  }
+
+  private clearFailure(): void {
+    this.state.error = undefined
+    this.state.errorId = undefined
+    this.state.failure = undefined
+  }
+
+  private recordFailure(error: NonNullable<ScreenSnapshot['error']>, operation: ScreenOperation, cause?: unknown,
+    gateway = this.options.gatewaySnapshot()): void {
+    const settings = this.options.settings()
+    const capability = error === 'ocrNotReady' ? 'ocr'
+      : error === 'translationModelNotReady' || error === 'translationModelMissing' ? 'mt' : undefined
+    const modelBinding = capability === 'ocr' ? settings.modelGateway.ocrModel || defaultModelBinding(settings, 'ocr')
+      : capability === 'mt' ? screenTranslationModel(this.state.config, settings) : undefined
+    const service = capability && gateway.services?.[capability]
+    const serviceFailed = !!service && service.state === 'failed' && (!modelBinding || service.model === modelBinding)
+    const upstream = normalizeThrownError(cause)
+    const translationCode = operation === 'translate' ? translationCauses.get(upstream.code) : undefined
+    const causeClassification = translationCode ? normalizeThrownError({ code: translationCode }) : upstream
+    const serviceError = serviceFailed ? normalizeThrownError({ code: service.errorCode, message: service.error }) : undefined
+    const classification = error === 'gatewayNotReady' ? normalizeThrownError({ code: error })
+      : featureConflictOwner(cause) ? normalizeThrownError({ code: 'sessionAlreadyRunning' })
+        : serviceError && serviceError.supportCode !== 'ERR-999' ? serviceError
+          : causeClassification.supportCode !== 'ERR-999' ? causeClassification : normalizeThrownError({ code: error })
+    if (operation === 'translate' && this.state.error === error && this.state.failure?.supportCode === classification.supportCode) return
+    const correlationId = randomUUID()
+    const failure = { ...classification, correlationId, gatewayState: gateway.state, modelBinding, serviceFailed, gameId: this.state.gameId }
+    this.state.error = error
+    this.state.errorId = correlationId
+    this.state.failure = failure
+    const upstreamError = cause instanceof Error ? cause as Error & { status?: number; backendCode?: string; correlationId?: string } : undefined
+    logDiagnostic('screen.failed', { operation, reason: error, status: this.state.status, sessionId: this.state.sessionId, epoch: this.state.epoch,
+      captureMode: this.state.config.captureMode, classification: failure,
+      cause: upstreamError && { name: upstreamError.name, ...upstream, status: upstreamError.status,
+        backendCode: upstreamError.backendCode, correlationId: upstreamError.correlationId } })
+  }
+
+  private fail(error: NonNullable<ScreenSnapshot['error']>, operation: ScreenOperation, cause?: unknown, gateway?: GatewaySnapshot): void {
+    if (this.disposed) return
+    this.recordFailure(error, operation, cause, gateway)
+    void this.stop()
+    this.state.status = 'error'
+    this.publish()
   }
 
   private async openCapture(lifecycle: number): Promise<void> {
@@ -731,7 +815,7 @@ export class ScreenTranslation {
       const update = () => {
         const display = screen.getAllDisplays().find(item => String(item.id) === original.id)
         if (!display || display.bounds.width !== original.width || display.bounds.height !== original.height
-            || display.scaleFactor !== original.scale) this.fail('targetChanged')
+            || display.scaleFactor !== original.scale) this.fail('targetChanged', 'capture')
         else { this.bounds = display.bounds; this.updateBounds() }
       }
       screen.on('display-removed', update)
@@ -754,7 +838,9 @@ export class ScreenTranslation {
     this.overlay = undefined
     this.targetPixels = undefined
     this.bounds = undefined
-    if (active) await this.options.releaseScreenCapture?.(sessionId).catch(() => {})
+    if (active) await this.options.releaseScreenCapture?.(sessionId).catch(error => {
+      logDiagnostic('screen.release.failed', { sessionId, classification: normalizeThrownError(error), error })
+    })
   }
 
   private openWindow(role: 'editor' | 'overlay' | 'regions' | 'toolbar', bounds: Rectangle): BrowserWindow {
@@ -777,7 +863,7 @@ export class ScreenTranslation {
     const rendererUrl = process.env.ELECTRON_RENDERER_URL
     const load = rendererUrl ? window.loadURL(new URL(`screen.html?${new URLSearchParams(query)}`, rendererUrl).href)
       : window.loadFile(join(this.options.mainDir, '../renderer/screen.html'), { query })
-    void load.catch(() => this.fail('captureFailed'))
+    void load.catch(error => { if (!window.isDestroyed()) this.fail('captureFailed', 'window', error) })
     return window
   }
 
@@ -804,6 +890,13 @@ export class ScreenTranslation {
 
   private publish(): void {
     if (this.disposed) return
+    if (!this.state.shortcutError) this.state.shortcutErrorId = undefined
+    else if (!this.state.shortcutErrorId) {
+      const correlationId = randomUUID()
+      this.state.shortcutErrorId = correlationId
+      logDiagnostic('screen.failed', { operation: 'shortcut', reason: 'shortcutConflict', sessionId: this.state.sessionId,
+        classification: normalizeThrownError({ code: 'shortcutConflict' }, { correlationId }) })
+    }
     const value = this.snapshot()
     this.options.publish(value)
     for (const listener of this.listeners) listener(value)
@@ -836,7 +929,7 @@ export class ScreenTranslation {
       if (!binding) continue
       const accelerator = electronShortcut(binding)
       try {
-        if (!globalShortcut.register(accelerator, () => { void action().catch(() => this.fail('captureFailed')) })) this.state.shortcutError = true
+        if (!globalShortcut.register(accelerator, () => { void action().catch(error => this.fail('captureFailed', 'shortcut', error)) })) this.state.shortcutError = true
         else this.registeredShortcuts.push(accelerator)
       } catch { this.state.shortcutError = true }
     }

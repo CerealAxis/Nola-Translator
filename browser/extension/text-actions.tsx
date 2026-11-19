@@ -4,7 +4,7 @@ import { Button } from '../../src/renderer/components/ui/button'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../src/renderer/components/ui/popover'
 import { Spinner } from '../../src/renderer/components/ui/spinner'
 import { showToast } from '../../src/renderer/components/ui/toast'
-import { browserText, errorKey } from './i18n'
+import { browserErrorDescription, browserText } from './i18n'
 import { DISABLED_PROVIDER, siteEnabled, type Preferences } from './preferences'
 import { synthesize, translate as translateText } from './provider-client'
 
@@ -115,7 +115,7 @@ export function TextActions({ selection, preferences, dismiss }: { selection: Te
       stopWatching()
       if (target && replaceEditable(target, translated)) setRestorable(editableText(target))
       setResult(translated)
-    } catch (error) { if (!signal.aborted) setError(t(errorKey(error instanceof Error ? error.message : 'internalError'))) }
+    } catch (error) { if (!signal.aborted) setError(browserErrorDescription(t, error instanceof Error ? error.message : '', 'internalError')) }
     finally { stopWatching(); setBusy(false) }
   }
   useEffect(() => { if (selection.autoTranslate) void translate() }, [])
@@ -136,10 +136,10 @@ export function TextActions({ selection, preferences, dismiss }: { selection: Te
       const release = () => URL.revokeObjectURL(url)
       player.addEventListener('ended', release, { once: true }); player.addEventListener('error', release, { once: true })
       try { await player.play() } catch (error) { release(); throw error }
-    } catch (error) { if (!controller.current.signal.aborted) setError(t(errorKey(error instanceof Error ? error.message : 'internalError'))) } finally { setBusy(false) }
+    } catch (error) { if (!controller.current.signal.aborted) setError(browserErrorDescription(t, error instanceof Error ? error.message : '', 'internalError')) } finally { setBusy(false) }
   }
   useEffect(() => { if (selection.autoSpeak) void speak() }, [])
-  const copy = async () => { try { await navigator.clipboard.writeText(result || selection.text); showToast({ type: 'success', description: t('copied') }) } catch { setError(t(errorKey('internalError'))) } }
+  const copy = async () => { try { await navigator.clipboard.writeText(result || selection.text); showToast({ type: 'success', description: t('copied') }) } catch { setError(t('internalError')) } }
   const restore = () => {
     if (selection.target && editableText(selection.target) === restorable) {
       if (originalNodes.current) { selection.target.replaceChildren(...originalNodes.current); selection.target.dispatchEvent(new Event('input', { bubbles: true })) }

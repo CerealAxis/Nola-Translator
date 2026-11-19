@@ -162,6 +162,7 @@ class SessionManager:
         #: The single realtime slot: held from create (preparing counts) until
         #: closed/failed release.
         self._slot_session_id: UUID | None = None
+        self._input_preview_active = False
         self._meeting_sessions: tuple[Session, ...] | None = None
         self._slot_lock = asyncio.Lock()
         self._background: set[asyncio.Task] = set()
@@ -201,8 +202,8 @@ class SessionManager:
         return session
 
     def _require_free_slot(self) -> None:
-        if self._slot_session_id is not None:
-            owner = self._sessions[self._slot_session_id].owner
+        if self._slot_session_id is not None or self._input_preview_active:
+            owner = "input_preview" if self._slot_session_id is None else self._sessions[self._slot_session_id].owner
             raise SessionError(ErrorPayload(
                 code="SESSION_SLOT_BUSY", stage="session", message_key="session.slotBusy",
                 message_args={"owner": owner}, safe_details={"current_owner": owner},
@@ -239,10 +240,14 @@ class SessionManager:
             return self._meeting_sessions
 
     @asynccontextmanager
-    async def audio_test_slot(self):
+    async def input_preview_slot(self):
         async with self._slot_lock:
             self._require_free_slot()
+            self._input_preview_active = True
+        try:
             yield
+        finally:
+            self._input_preview_active = False
 
     async def release_meeting(self, session_id: UUID) -> None:
         async with self._slot_lock:

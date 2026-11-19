@@ -31,7 +31,7 @@ export function UndoExample() {
     setVisible(current => current.filter(item => item !== id));
     const toastId: string = showToast({
       type: 'info',
-      title: `已移除${record.name}`,
+      description: `已移除${record.name}`,
       actionProps: {
         children: '撤销',
         onClick: () => {

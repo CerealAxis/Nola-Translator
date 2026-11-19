@@ -7,6 +7,8 @@ import { closeAllDirectModelWorkers, closeDirectModelWorker, runDirectModel, typ
 import type { AgentWorkspace } from './agent-workspace'
 import type { GatewayLanguageModel } from './gateway-language-model'
 import type { ComicReaderService } from './comic-reader'
+import { normalizeThrownError } from '../shared/ipc-error'
+import { logDiagnostic } from './session-log'
 
 export interface LanguageModelServices extends DirectModelServices {
   getSettings: () => AppSettings
@@ -60,6 +62,12 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
     track(id)
     event.sender.once('destroyed', stop)
     try { return await runDirectModel(services, request, controller.signal, inspect === true, event.sender.id) }
+    catch (error) {
+      if (!controller.signal.aborted) logDiagnostic('agent.inference.failed', {
+        requestId: request.id, classification: normalizeThrownError(error, { correlationId: request.id }), error,
+      })
+      throw error
+    }
     finally { finish(id); if (!event.sender.isDestroyed()) event.sender.removeListener('destroyed', stop) }
   })
   ipcMain.handle('app:language-model:cancel', (event, id: unknown) => {
@@ -85,7 +93,12 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
       // A tool run can include long media conversion or model loading; cancellation is scoped to the whole workflow.
       await streamSavedLanguageModel(services, event.sender, request, controller.signal)
     } catch (error) {
-      if (!controller.signal.aborted) throw error
+      if (!controller.signal.aborted) {
+        logDiagnostic('agent.stream.failed', {
+          requestId: request.id, classification: normalizeThrownError(error, { correlationId: request.id }), error,
+        })
+        throw error
+      }
     } finally {
       finish(id)
       if (!event.sender.isDestroyed()) event.sender.removeListener('destroyed', stop)

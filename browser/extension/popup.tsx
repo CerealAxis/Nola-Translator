@@ -66,7 +66,7 @@ export function Popup({ store }: PopupProps) {
     return true
   })
   const restricted = (!state.origin || state.availability === 'restricted') && state.availability !== 'loading'
-  useErrorToasts(t, localError, state.error, state.pageError, state.subtitleError, state.liveError, restricted ? 'restrictedPage' : undefined)
+  useErrorToasts('popup', t, localError, state.error, state.pageError, state.subtitleError, state.liveError, restricted ? 'restrictedPage' : undefined)
   const autoSite = Boolean(state.url && matchesSitePatterns(settings.autoSites, state.url))
   const languages = languageOptions(locale)
   const openSettings = (section: string) => { window.open(chrome.runtime.getURL(`options.html#${section}`), '_blank') }

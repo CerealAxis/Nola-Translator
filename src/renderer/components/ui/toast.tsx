@@ -9,11 +9,13 @@ import { useI18n } from '@/i18n'
 
 export type ToastType = 'success' | 'info' | 'warning' | 'error' | 'loading'
 export interface ToastAction { children: string; onClick: () => void }
-export type ToastPayload =
-  | { type: ToastType; description: string; title?: never; duration?: number }
-  | { type: ToastType; title: string; description: string; duration?: number }
-  | { type: ToastType; title: string; actionProps: ToastAction; description?: never; duration?: number }
-  | { type: ToastType; title: string; description: string; actionProps: ToastAction; duration?: number }
+export interface ToastPayload {
+  type: ToastType
+  description: string
+  title?: string
+  actionProps?: ToastAction
+  duration?: number
+}
 
 export interface ToastData {}
 
@@ -41,7 +43,7 @@ export function showToast(payload: ToastPayload): string {
 
 export function updateToast(id: string, payload: ToastPayload): string {
   const { duration: _duration, ...content } = payload
-  manager.update(id, { ...content, timeout: toastTimeoutFor(payload), data: {}, priority: payload.type === 'error' ? 'high' : 'low' })
+  manager.update(id, { ...content, title: payload.title, actionProps: payload.actionProps, timeout: toastTimeoutFor(payload), data: {}, priority: payload.type === 'error' ? 'high' : 'low' })
   return id
 }
 
@@ -80,7 +82,7 @@ function ToastViewport({ onEmpty, container, closeLabel }: ToastProviderProps) {
           {toast.type === 'loading' ? <LoaderCircle className="nola-toast-icon nola-toast-icon-loading" aria-hidden="true" /> : null}
           <div className="nola-toast-copy">
             {toast.title ? <BaseToast.Title className="nola-toast-title" /> : null}
-            {toast.description ? <BaseToast.Description className="nola-toast-description" /> : null}
+            {toast.description ? <BaseToast.Description className="nola-toast-description whitespace-pre-line" /> : null}
           </div>
           {/* Base UI can hide a high-priority toast from assistive technology during pointer interaction. */}
           {toast.actionProps ? <BaseToast.Action className="nola-toast-action" onMouseDown={event => event.preventDefault()} render={<Button variant="outline" />} /> : null}

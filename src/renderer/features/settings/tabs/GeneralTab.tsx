@@ -74,8 +74,8 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
 
   return (
     <div className="settings-panel">
-      <SettingGroup legend={t('settings.groupAppearance')} actions={
-        <Button variant="secondary" disabled={fontBusy} onClick={() => void saveAppearance({ ...DEFAULT_SETTINGS.appearance })}>
+      <SettingGroup legend={t('settings.groupAppearance')} headingAction={
+        <Button variant="secondary" size="sm" disabled={fontBusy} onClick={() => void saveAppearance({ ...DEFAULT_SETTINGS.appearance })}>
           {t('modelsSettingsUi.resetAppearance')}
         </Button>
       }>

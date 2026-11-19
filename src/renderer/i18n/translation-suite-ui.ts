@@ -46,6 +46,7 @@ const copy = {
   inpaintDescription: ['安装后可在漫画工程中选择神经修复。', '安裝後可在漫畫專案中選擇神經修復。', '安裝後可在漫畫工程中選擇神經修復。', 'Install a model to use neural inpainting in comic projects.', 'インストールすると漫画プロジェクトでニューラル修復を選べます。', '모델을 설치하면 만화 프로젝트에서 신경망 복원을 선택할 수 있습니다.'],
 
   gameTitle: ['游戏翻译', '遊戲翻譯', '遊戲翻譯', 'Game translation', 'ゲーム翻訳', '게임 번역'],
+  gameDesktopOnly: ['游戏取字和翻译需要桌面版。', '擷取與翻譯遊戲文字需使用桌面版。', '擷取及翻譯遊戲文字需使用桌面版。', 'Use the desktop app to capture and translate game text.', 'ゲーム内のテキストを取得して翻訳するには、デスクトップ版を使用してください。', '게임 텍스트를 가져오고 번역하려면 데스크톱 앱을 사용하세요.'],
   comicTitle: ['漫画翻译', '漫畫翻譯', '漫畫翻譯', 'Comic translation', '漫画翻訳', '만화 번역'],
   glossaryTitle: ['术语表', '術語表', '術語表', 'Glossary', '用語集', '용어집'],
   captureMode: ['捕获范围', '擷取範圍', '擷取範圍', 'Capture area', 'キャプチャ範囲', '캡처 범위'],

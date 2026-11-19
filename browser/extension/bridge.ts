@@ -1,4 +1,5 @@
 import { requestId } from './id'
+import { recordDiagnostic, type DiagnosticContext } from './diagnostics'
 import { BROWSER_EXTENSION_VERSION, BROWSER_PROTOCOL_VERSION, type BrowserRequest, type BrowserResponse, type BrowserWireErrorCode } from '../../src/shared/browser'
 
 export type RequestInput = BrowserRequest extends infer T ? T extends BrowserRequest ? Omit<T, 'id'> : never : never
@@ -18,7 +19,8 @@ const LEGACY_ERROR_CODES: Readonly<Record<string, BrowserWireErrorCode>> = {
 function browserErrorCode(code: string): BrowserWireErrorCode {
   return LEGACY_ERROR_CODES[code] ?? code as BrowserWireErrorCode
 }
-export function createBridge(name = 'nola-captions', openPort = () => chrome.runtime.connect({ name })): ExtensionBridge {
+export function createBridge(name = 'nola-captions', openPort = () => chrome.runtime.connect({ name }),
+  context: DiagnosticContext = 'content'): ExtensionBridge {
   let port: ChromePort | null = null
   const pending = new Map<string, { resolve: (value: Extract<BrowserResponse, { type: 'result' }>['value']) => void; reject: (reason: Error) => void; timer: ReturnType<typeof setTimeout> }>()
   const listeners = new Set<(response: BrowserResponse) => void>()
@@ -39,8 +41,11 @@ export function createBridge(name = 'nola-captions', openPort = () => chrome.run
         const request = pending.get(response.id)
         if (request) {
           clearTimeout(request.timer); pending.delete(response.id)
-          if (response.type === 'error') request.reject(new BrowserFailure(browserErrorCode(response.code)))
-          else request.resolve(response.value)
+          if (response.type === 'error') {
+            const error = new BrowserFailure(browserErrorCode(response.code))
+            recordDiagnostic(context, error, 'operation', response.id)
+            request.reject(error)
+          } else request.resolve(response.value)
         }
       }
       for (const listener of listeners) listener(response)

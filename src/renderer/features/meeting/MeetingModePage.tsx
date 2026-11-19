@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Captions, CircleHelp, MessagesSquare, RefreshCw, Keyboard } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Captions, CircleHelp, MessagesSquare, RefreshCw, Keyboard } from 'lucide-react'
 import { ALIYUN_LANGUAGES, ALIYUN_S2S_SPEECH_LANGUAGES } from '../../../shared/cloud-config'
-import { SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
+import { appendSupportCode, SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
 import { normalizeLanguage } from '../../../shared/languages'
-import { useModelOptions } from '@/model-options'
+import { intersectLanguages, useModelOptions } from '@/model-options'
 import { resolveModelBinding, useAvailableModels } from '@/available-models'
 import { sceneModelBinding } from '../../../shared/model-policy'
 import { LanguageDirectionSelect } from '@/components/primitives/LanguageDirectionSelect'
-import { DEFAULT_MEETING_MODE, type MeetingAudioTestResult, type MeetingModeSettings, type MeetingModeSnapshot } from '../../../shared/meeting-mode'
+import { DEFAULT_MEETING_MODE, type MeetingModeSettings, type MeetingModeSnapshot } from '../../../shared/meeting-mode'
 import { vbCablePair } from '../../../shared/virtual-audio'
 import { DEFAULT_SETTINGS, defaultRealtimeS2s } from '../../../shared/settings'
 import { PageHeader } from '@/components/primitives'
@@ -15,9 +15,7 @@ import { notifyError } from '@/components/primitives/notify'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dialog, DialogCloseButton, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { Separator } from '@/components/ui/separator'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { RealtimeProcessingField } from '../workspace/RealtimePipelineSelect'
 import { SliderControl, SliderIndicator, SliderRoot, SliderThumb, SliderTrack } from '@/components/ui/slider'
 import { Spinner } from '@/components/ui/spinner'
@@ -59,23 +57,13 @@ export function MeetingModePage() {
   const [draft, setDraft] = useState<MeetingModeSettings>()
   const [snapshot, setSnapshot] = useState(IDLE)
   const [statusLoading, setStatusLoading] = useState(true)
-  const [testOpen, setTestOpen] = useState(false)
-  const [testRecordingId, setTestRecordingId] = useState('')
-  const [testPlaybackId, setTestPlaybackId] = useState('')
-  const [trialStarted, setTrialStarted] = useState(false)
   const [deviceState, setDeviceState] = useState<'loading' | 'loaded' | 'failed'>('loading')
-  const [testing, setTesting] = useState<DeviceField>()
-  const [results, setResults] = useState<Partial<Record<DeviceField, MeetingAudioTestResult>>>({})
-  const [heard, setHeard] = useState(false)
-  const generation = useRef(0)
   const mode = draft ?? saved ?? DEFAULT_MEETING_MODE
   const pending = statusLoading || snapshot.state === 'starting' || snapshot.state === 'stopping'
   const running = snapshot.state === 'running'
   const canStop = running || snapshot.state === 'unknown'
-  const locked = pending || canStop || !!testing || !api
+  const locked = pending || canStop || !api
   const refresh = useCallback(async () => {
-    generation.current++
-    setResults({}); setHeard(false)
     setDeviceState('loading')
     try { await actions.models.probeAudioDevices(); setDeviceState('loaded') }
     catch (error) { console.error('meeting device list failed', error); setDeviceState('failed') }
@@ -95,16 +83,8 @@ export function MeetingModePage() {
         if (alive && !changed) setSnapshot({ state: 'unknown', passthroughActive: false, error: { key: 'meeting.statusFailed' } })
       }).finally(() => { if (alive) setStatusLoading(false) })
     void refresh()
-    return () => { alive = false; generation.current++; off(); void api.cancelAudioTest?.().catch(error => console.error('meeting audio cancellation failed', error)) }
+    return () => { alive = false; off() }
   }, [api, refresh])
-  // A changed device catalog or configuration invalidates earlier physical checks.
-  const deviceFingerprint = devices.map(device => `${device.deviceId}:${device.name}`).sort().join('|')
-  const routeFingerprint = JSON.stringify(mode)
-  useEffect(() => {
-    generation.current++
-    setResults({}); setHeard(false)
-  }, [deviceFingerprint, routeFingerprint])
-
   const virtualInputs = devices.filter(device => device.kind === 'microphone')
   const virtualOutputs = devices.filter(device => device.kind === 'systemOutput')
   const routes = {
@@ -115,15 +95,13 @@ export function MeetingModePage() {
   }
   const uplink = vbCablePair(virtualOutputs.find(device => device.deviceId === mode.uplinkOutputId)?.name ?? '', 'Input')
   const downlink = vbCablePair(virtualInputs.find(device => device.deviceId === mode.downlinkInputId)?.name ?? '', 'Output')
-  const pairedInput = virtualInputs.find(device => uplink && vbCablePair(device.name, 'Output') === uplink)
-  const pairedOutput = virtualOutputs.find(device => downlink && vbCablePair(device.name, 'Input') === downlink)
   const applications = devices.filter(device => device.kind === 'processAudio')
   const hasDevice = (field: DeviceField) => routes[field].some(device => device.deviceId === mode[field])
   const directSpeech = mode.pipeline === 's2s' || mode.pipeline === 'auto' && !!defaultRealtimeS2s(settings)
   const recognitionSources = modelOptions.recognitionSourceLanguages.length === 1 && modelOptions.recognitionSourceLanguages[0] === 'auto' && modelOptions.recognitionProvider === 'aliyun'
     ? ALIYUN_LANGUAGES : modelOptions.recognitionSourceLanguages
-  const sources = recognitionSources.filter(code => !modelOptions.translationSourceLanguages.length || modelOptions.translationSourceLanguages.map(normalizeLanguage).includes(normalizeLanguage(code)))
-  const targets = modelOptions.translationTargetLanguages.filter(code => speechLanguages.includes(code))
+  const sources = intersectLanguages(recognitionSources, modelOptions.translationSourceLanguages.length ? modelOptions.translationSourceLanguages : undefined)
+  const targets = intersectLanguages(modelOptions.translationTargetLanguages, speechLanguages)
   const codes = directSpeech ? ALIYUN_S2S_SPEECH_LANGUAGES : [...new Set([...sources, ...targets].map(normalizeLanguage))].filter(code => code !== 'auto' && code !== 'none')
   const localCodes = codes.filter(code => directSpeech || (!mode.uplinkEnabled || sources.includes(code) && modelOptions.supportsTranslation(code, mode.remoteLanguage)) && (!mode.downlinkEnabled || targets.includes(code) && modelOptions.supportsTranslation(mode.remoteLanguage, code)))
   const remoteCodes = codes.filter(code => directSpeech || (!mode.downlinkEnabled || sources.includes(code) && modelOptions.supportsTranslation(code, mode.localLanguage)) && (!mode.uplinkEnabled || targets.includes(code) && modelOptions.supportsTranslation(mode.localLanguage, code)))
@@ -173,56 +151,7 @@ export function MeetingModePage() {
     }))
   }
 
-  const testDevice = async (field: DeviceField) => {
-    if (!api || locked) return
-    const version = generation.current
-    setTesting(field)
-    setResults(current => ({ ...current, [field]: undefined }))
-    if (field === 'headphonesId') setHeard(false)
-    try {
-      const result = await api.testAudio({
-        kind: field === 'microphoneId' ? 'microphone' : field === 'headphonesId' ? 'headphones' : field === 'downlinkInputId' && mode.downlinkSource === 'application' ? 'application' : 'cable',
-        deviceId: field === 'downlinkInputId' ? mode.downlinkSource === 'application' ? mode.applicationId : testPlaybackId || pairedOutput!.deviceId : mode[field],
-        ...(field === 'microphoneId' && mode.headphonesId && { playbackDeviceId: mode.headphonesId }),
-        ...(field === 'uplinkOutputId' && { recordingDeviceId: testRecordingId || pairedInput?.deviceId }),
-        ...(field === 'downlinkInputId' && mode.downlinkSource === 'cable' && { recordingDeviceId: mode.downlinkInputId }),
-      })
-      if (generation.current === version) setResults(current => ({ ...current, [field]: result }))
-    } catch (error) {
-      console.error('meeting audio test failed', error)
-      if (generation.current === version) setResults(current => ({ ...current, [field]: { kind: 'microphone', hasSignal: false, peak: 0, playbackSent: false, error: { key: 'meeting.audioTestFailed' } } }))
-    } finally { setTesting(undefined) }
-  }
-  const testControls = (field: DeviceField) => {
-    const result = results[field]
-    const headphones = field === 'headphonesId'
-    const application = field === 'downlinkInputId' && mode.downlinkSource === 'application'
-    const microphone = field === 'microphoneId' || application
-    const passed = !!result && !result.error && (headphones ? heard : result.hasSignal)
-    const unavailable = application ? !mode.applicationId : !mode[field]
-      || field === 'uplinkOutputId' && !pairedInput && !testRecordingId
-      || field === 'downlinkInputId' && !pairedOutput && !testPlaybackId
-    const unavailableKey = unavailable ? 'meeting.selectDeviceForTest' : undefined
-    const resultKey = result?.error ? errorCopy(result.error) : result
-      ? headphones ? heard ? 'meeting.heardConfirmed' : 'meeting.toneSent'
-        : result.hasSignal ? microphone ? 'meeting.detected' : 'meeting.loopPassed' : microphone ? 'meeting.silent' : 'meeting.loopFailed'
-      : undefined
-    return <div className="flex flex-col gap-2" aria-live="polite">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="outline" disabled={locked || !!unavailable} onClick={() => void testDevice(field)}>
-          {testing === field ? <Spinner data-icon="inline-start" /> : null}
-          {t(application ? 'meeting.testAudio' : microphone ? 'meeting.microphoneTest' : headphones ? 'meeting.headphonesTest' : 'meeting.cableTest')}
-        </Button>
-        {passed ? <Check aria-label={t('meeting.detected')} /> : null}
-        {headphones && result && !result.error && !heard ? <Button size="sm" variant="secondary" onClick={() => setHeard(true)}>{t('meeting.heard')}</Button> : null}
-      </div>
-      {testing === field ? <p className="type-muted text-muted">{t(microphone ? 'meeting.speakNow' : 'meeting.testing')}</p> : null}
-      {unavailableKey ? <p className="type-muted text-muted">{t(unavailableKey)}</p> : null}
-      {resultKey ? <Alert variant={result?.error ? 'danger' : passed ? 'success' : 'warning'}><AlertDescription>{t(resultKey)}</AlertDescription></Alert> : null}
-    </div>
-  }
-  const run = async (testTrial = false) => {
-    const version = generation.current
+  const run = async () => {
     if (!api) return
     if (!canStop && !valid) {
       setSnapshot({ state: 'failed', passthroughActive: false, error: { key: 'meeting.invalidRoute' } })
@@ -232,7 +161,6 @@ export function MeetingModePage() {
       setSnapshot({ state: 'starting', passthroughActive: false })
       try {
         await actions.settings.updateSettings({ meetingMode: mode })
-        if (testTrial && generation.current !== version) { setSnapshot(IDLE); return }
         setSnapshot(await api.start(mode))
       } catch (error) {
         console.error('meeting start failed', error)
@@ -247,26 +175,11 @@ export function MeetingModePage() {
     }
   }
   const localizedError = errorCopy(snapshot.error)
-  const closeTests = (open: boolean) => {
-    setTestOpen(open)
-    if (!open) {
-      generation.current++
-      void api?.cancelAudioTest?.().catch(error => notifyError(t('meeting.audioTestFailed'), { cause: error }))
-      if (trialStarted) {
-        setTrialStarted(false)
-        void api?.stop().then(setSnapshot).catch(error => {
-          console.error('meeting trial stop failed', error)
-          setSnapshot(current => ({ ...current, error: { key: 'meeting.stopFailed' } }))
-        })
-      }
-    }
-  }
-  const activeFields = deviceFields.filter(field => field === 'microphoneId' || field === 'uplinkOutputId' ? mode.uplinkEnabled : mode.downlinkEnabled)
   const originalVolume = new Intl.NumberFormat(language, { style: 'percent' }).format(mode.duckVolume / 100)
   const preferences = <FieldGroup className="nola-settings-fields">
       <div className="col-span-full flex flex-wrap items-center justify-between gap-2">
         <h2 className="nola-settings-heading">{t('meeting.translation')}</h2>
-        <Button data-testid="meeting-audio-test" variant="outline" size="sm" disabled={!api || pending || !!testing} onClick={() => setTestOpen(true)}>{t('meeting.testAudio')}</Button>
+        <Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/audio" />}>{t('settings.audioDevicesGroup')}</Button>
       </div>
       {mode.downlinkSource === 'cable' && mode.downlinkEnabled ? <Field className="nola-settings-field">
         <div className="nola-meeting-preference-label"><FieldLabel id="meeting-duck-volume">{t('meeting.duckVolume')}</FieldLabel><Tooltip>
@@ -283,12 +196,12 @@ export function MeetingModePage() {
     <PageHeader title={t('meeting.title')} warning={t('suite.experimentalInDevelopment')} subtitle={t('meeting.singlePageHint')} actions={<>
       <Button variant="outline" onClick={() => void actions.settings.showWorkspace().catch(error => notifyError(t('workspaceUi.windowFailed'), { cause: error }))}><MessagesSquare data-icon="inline-start" />{t('meeting.conversation')}</Button>
       <Button variant="outline" onClick={() => void actions.settings.showOverlay('workspace').then(opened => { if (opened === false) notifyError(t('workspaceUi.overlayFailed')) }).catch(error => notifyError(t('workspaceUi.overlayFailed'), { cause: error }))}><Captions data-icon="inline-start" />{t('workspaceUi.openOverlay')}</Button>
-      <Button disabled={!api || pending || !!testing} onClick={() => void run()}>
+      <Button disabled={!api || pending} onClick={() => void run()}>
         {pending ? <Spinner data-icon="inline-start" /> : null}{t(snapshot.state === 'starting' ? 'gateway.starting' : snapshot.state === 'stopping' ? 'gateway.stopping' : canStop ? 'meeting.stop' : 'meeting.start')}
       </Button>
     </>} />
-    {localizedError ? <Alert variant="danger"><AlertDescription>{snapshot.error?.direction ? <strong>{t(`meeting.${snapshot.error.direction}`)} · </strong> : null}{t(localizedError)}</AlertDescription></Alert> : null}
-    <MeetingStage mode={mode} snapshot={snapshot} checks={results} heard={heard} />
+    {localizedError ? <Alert variant="danger"><AlertDescription>{snapshot.error?.direction ? <strong>{t(`meeting.${snapshot.error.direction}`)} · </strong> : null}{appendSupportCode(t(localizedError), snapshot.error?.code ? supportErrorCodeForCause(snapshot.error.code) : undefined)}</AlertDescription></Alert> : null}
+    <MeetingStage mode={mode} snapshot={snapshot} />
     <Card data-slot="meeting-settings" className="nola-section-card nola-settings-card nola-meeting-settings">
       <CardContent className="nola-settings-content">
         <FieldGroup className="nola-settings-fields">
@@ -302,7 +215,8 @@ export function MeetingModePage() {
           <RealtimeProcessingField id="meeting-pipeline" className="nola-settings-field" disabled={locked} value={mode.pipeline === 'auto' ? 'default' : mode.pipeline} onChange={value => change('pipeline', value === 'default' ? 'auto' : value)} />
           <Field className="nola-settings-field nola-language-pair-field">
             <ModelAvailabilityLabel label={t('shellUi.languageDirection')} hint={t('meeting.languageDirectionHint')} />
-            <LanguageDirectionSelect source={mode.localLanguage} target={mode.remoteLanguage} sourceCodes={localCodes} targetCodes={remoteCodes} disabled={locked}
+            <LanguageDirectionSelect source={mode.localLanguage} target={mode.remoteLanguage} sourceCodes={localCodes} targetCodes={remoteCodes}
+              unavailable={directSpeech ? undefined : modelOptions.languageUnavailable ?? (!speechLanguages.length ? 'models' : !localCodes.length && !remoteCodes.length ? 'pair' : undefined)} requiredModels={[...modelOptions.requiredModels, ...(!speechLanguages.length ? ['TTS'] : [])]} disabled={locked}
               sourceLabel={t('meeting.localLanguage')} targetLabel={t('meeting.remoteLanguage')}
               onSourceChange={value => change('localLanguage', value)} onTargetChange={value => change('remoteLanguage', value)}
               onSwap={localCodes.includes(mode.remoteLanguage) && remoteCodes.includes(mode.localLanguage) ? () => setDraft(previous => ({ ...(previous ?? mode), localLanguage: mode.remoteLanguage, remoteLanguage: mode.localLanguage })) : undefined} />
@@ -328,17 +242,5 @@ export function MeetingModePage() {
         {preferences}
       </CardContent>
     </Card>
-    <Dialog open={testOpen} onOpenChange={closeTests}><DialogContent className="max-h-full overflow-y-auto"><DialogHeader><DialogTitle>{t('meeting.testAudio')}</DialogTitle><DialogDescription>{t('meeting.localTestOnly')}</DialogDescription></DialogHeader><DialogCloseButton />
-      <FieldGroup>
-        {activeFields.map(field => <Field key={field}><FieldLabel>{t(field === 'microphoneId' || field === 'uplinkOutputId' ? 'meeting.sendDirection' : 'meeting.receiveDirection')} · {t(deviceLabels[field])}</FieldLabel>
-          {field === 'uplinkOutputId' ? <SettingSelect id="meeting-test-recording" value={testRecordingId || pairedInput?.deviceId || ''} ariaLabel={t('meeting.recordingEndpoint')} options={[{value:'',label:t('meeting.select'),isDisabled:true},...virtualInputs.map(device => ({value:device.deviceId,label:device.name}))]} onChange={setTestRecordingId} isDisabled={!!testing} /> : null}
-          {field === 'downlinkInputId' && mode.downlinkSource === 'cable' ? <SettingSelect id="meeting-test-output" value={testPlaybackId || pairedOutput?.deviceId || ''} ariaLabel={t('meeting.meetingSpeaker')} options={[{value:'',label:t('meeting.select'),isDisabled:true},...virtualOutputs.map(device => ({value:device.deviceId,label:device.name}))]} onChange={setTestPlaybackId} isDisabled={!!testing} /> : null}
-          {field === 'downlinkInputId' && mode.downlinkSource === 'application' ? <FieldDescription>{t('meeting.applicationTestHint')}</FieldDescription> : null}
-          {testControls(field)}
-        </Field>)}
-        <Separator /><FieldDescription>{t('meeting.trialHint')}</FieldDescription>
-        <Button disabled={!api || pending || !!testing} onClick={() => { if(!canStop && valid) setTrialStarted(true); void run(true) }}>{t(canStop ? 'meeting.stop' : 'meeting.start')}</Button>
-      </FieldGroup>
-    </DialogContent></Dialog>
   </section>
 }

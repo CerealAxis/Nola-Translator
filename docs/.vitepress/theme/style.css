@@ -191,6 +191,18 @@ html.nola-scrollbar-near:has(.VPDoc),
 .site-loading-fallback p { max-width: 62ch; }
 .site-loading-links { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--panel-gap, 1rem); }
 .site-loading-fallback a { color: var(--vp-c-brand-1); text-decoration: underline; text-underline-offset: .2em; }
+.site-loading-features { text-align: start; }
+.site-loading-features h2 {
+  font-size: var(--text-h2, 1.875rem);
+  line-height: var(--leading-h2, 2.25rem);
+  font-weight: var(--font-weight-semibold, 600);
+}
+.site-loading-features h3 {
+  font-size: var(--text-h3, 1.5rem);
+  line-height: var(--leading-h3, 2rem);
+  font-weight: var(--font-weight-semibold, 600);
+}
+.site-loading-features li { margin-block-start: var(--panel-gap, 1rem); }
 @media (scripting: enabled) {
   .site-home-loading > .site-loading { display: flex; }
   .site-home-loading > .site-loading-fallback { display: none; }

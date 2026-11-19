@@ -1,5 +1,7 @@
 import type { ComicModelInput } from './comic-model'
 import type { ComicTask } from '../shared/comic'
+import { normalizeThrownError } from '../shared/ipc-error'
+import { logDiagnostic } from './session-log'
 
 export type ComicRequest = <T>(path: string, body?: unknown, signal?: AbortSignal) => Promise<T>
 interface Claim { jobId: string; pageId: string; attemptId: string }
@@ -38,6 +40,10 @@ export class ComicTaskRunner {
           ? await this.model(prepared, controller.signal) : []
         await this.request<ComicTask>(`/jobs/${claim.jobId}/complete`, { ...token, translations }, controller.signal)
       } catch (error) {
+        if (!controller.signal.aborted) {
+          logDiagnostic('comic.job.failed', { jobId: claim.jobId, attemptId: claim.attemptId,
+            classification: normalizeThrownError(error), error })
+        }
         await this.request(`/jobs/${claim.jobId}/complete`, { ...token, error: controller.signal.aborted ? 'cancelled' : error instanceof Error ? error.message.slice(0, 500) : 'comicFailed' }, AbortSignal.timeout(5000)).catch(() => {})
       } finally { this.current = undefined; this.changed() }
     }

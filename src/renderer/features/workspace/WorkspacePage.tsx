@@ -185,7 +185,7 @@ function QuickWorkspacePage() {
       } else if (unsupportedRecognitionLanguageOf(error)) {
         notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
       } else if (sessionStore.getState().errorCode === 'AUDIODEVICEUNAVAILABLE') {
-        notifyError(t('overlay.audioDeviceOpenFailed', { device: audioDeviceNameOf(config.audioSource, devices, t('overlay.selectedAudioDevice')) }))
+        notifyError(t('overlay.audioDeviceOpenFailed', { device: audioDeviceNameOf(config.audioSource, devices, t('overlay.selectedAudioDevice')) }), { supportCode: 'AUD-002' })
       } else if (sessionStore.getState().status !== 'error') {
         /*
          * The store leaves the status at 'idle' for the failures it does not own,
@@ -417,7 +417,7 @@ function IdleGuide({
     if (failureToastShown.current) return
     failureToastShown.current = true
     notifyError(t('errors.engineNotReady'), {
-      description: t('shellUi.actionHint'),
+      supportCode: 'ENG-001',
       action: { label: t('errors.engineNotReadyAction'), onPress: onStart },
     })
   }, [engineStatus, onStart, t])

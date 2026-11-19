@@ -22,12 +22,7 @@ export type AudioSource =
   | { kind: 'processAudio'; deviceId: string }
   | { kind: 'browserTab'; streamId: string }
 
-export type AudioTestSource = Exclude<AudioSource, { kind: 'browserTab' | 'virtualInput' | 'processAudio' }>
-export interface AudioTestResult {
-  audioBase64: string
-  durationMs: 2000
-  hasSignal: boolean
-}
+export type AudioPreviewSource = Exclude<AudioSource, { kind: 'browserTab' }>
 
 export type SessionConfig = {
   outputMode?: 'source' | 'translation' | 'speech'
@@ -218,7 +213,6 @@ type Envelope<TType extends string> = {
 export type EngineCommand =
   | (Envelope<'hello'> & { clientVersion: string })
   | Envelope<'listDevices'>
-  | (Envelope<'testAudio'> & { audioSource: AudioTestSource })
   | Envelope<'listComputeDevices'>
   | Envelope<'listResources'>
   | (Envelope<'manageResource'> & {
@@ -344,6 +338,7 @@ export type ResourceSnapshot = {
 
 export type EngineErrorCode =
   | 'invalidMessage'
+  | 'sessionError'
   | 'unsupportedProtocol'
   | 'invalidConfiguration'
   | 'invalidCredential'
@@ -356,6 +351,7 @@ export type EngineErrorCode =
   | 'audioDeviceEnumerationFailed'
   | 'audioDeviceUnavailable'
   | 'audioDeviceDisconnected'
+  | 'audioCaptureStartFailed'
   | 'audioBufferOverflow'
   | 'audioPlaybackUnavailable'
   | 'gatewayNotRunning'
@@ -374,7 +370,10 @@ export type EngineErrorCode =
   | 'recognitionInvalidResponse'
   | 'recognitionClosed'
   | 'recognitionBufferOverflow'
+  | 'vadUnavailable'
   | 'translationProviderUnavailable'
+  | 'translationFailed'
+  | 'translationRateLimited'
   | 'translationNetworkUnavailable'
   | 'translationTimeout'
   | 'glossaryUnsupported'
@@ -402,7 +401,6 @@ export type EngineErrorCode =
 export type EngineEvent =
   | (Envelope<'ready'> & { engineVersion: string; capabilities: string[] })
   | (Envelope<'devices'> & { devices: AudioDevice[] })
-  | (Envelope<'audioTested'> & AudioTestResult)
   | (Envelope<'computeDevices'> & ComputeSnapshot)
   | (Envelope<'resources'> & ResourceSnapshot)
   | (Envelope<'resourceActionResult'> & { resource: ResourceRecord })

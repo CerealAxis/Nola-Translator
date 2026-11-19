@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import io
 import math
-import wave
 from dataclasses import dataclass, replace
 from collections import deque
 from queue import Empty, Full, Queue
@@ -82,42 +79,6 @@ class RawAudioSink(Protocol):
 
 class AudioDeviceDisconnectedError(RuntimeError):
     """The active stream stopped because the device disconnected."""
-
-
-async def capture_audio_test(capture: PortAudioCapture) -> dict[str, object]:
-    """Preview the same 16 kHz mono input ASR receives, without gain or noise processing."""
-    target_samples = TARGET_SAMPLE_RATE * 2
-    chunks: list[NDArray[np.float32]] = []
-    samples = 0
-    try:
-        capture.start()
-        try:
-            async with asyncio.timeout(2.0):
-                async for frame in capture.frames():
-                    chunk = frame.samples[:target_samples - samples]
-                    chunks.append(chunk)
-                    samples += chunk.size
-                    if samples >= target_samples:
-                        break
-        except TimeoutError:
-            pass
-    finally:
-        capture.stop()
-    values = np.concatenate(chunks) if chunks else np.empty(0, dtype=np.float32)
-    has_signal = bool(np.any(values != 0))
-    write_debug("engine", "audio.test.complete", {"requestId": capture.request_id,
-        "capturedSamples": samples, "durationMs": 2000, "hasSignal": has_signal})
-    # PCM16 WAV requires integer full-scale encoding; this is conversion, not volume normalization.
-    pcm = np.rint(np.clip(values, -1.0, 32767 / 32768) * 32768).astype("<i2")
-    pcm = np.pad(pcm, (0, target_samples - pcm.size))
-    output = io.BytesIO()
-    with wave.open(output, "wb") as audio:
-        audio.setnchannels(1)
-        audio.setsampwidth(2)
-        audio.setframerate(TARGET_SAMPLE_RATE)
-        audio.writeframes(pcm.tobytes())
-    return {"audioBase64": base64.b64encode(output.getvalue()).decode("ascii"),
-            "durationMs": 2000, "hasSignal": has_signal}
 
 
 class BrowserAudioCapture:

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Keyboard, Pencil, RotateCcw, Search, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +21,7 @@ type Row = { id: string; label: string; scope: 'global' | 'meeting' | 'editor'; 
 const DEFAULTS = screenConfigSchema.parse({})
 const mac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
 
-export function ShortcutsTab({ settings }: SettingsPanelProps) {
+export function ShortcutsTab({ settings, headingActionTarget }: SettingsPanelProps & { headingActionTarget?: HTMLElement | null }) {
   const { t } = useI18n()
   const api = getBridge()?.screenTranslation
   const [snapshot, setSnapshot] = useState<ScreenSnapshot>()
@@ -137,10 +138,12 @@ export function ShortcutsTab({ settings }: SettingsPanelProps) {
     <TooltipTrigger render={<Button variant="bare" size="icon-sm" disabled={disabled} aria-label={label} onClick={onClick}>{content}</Button>} />
     <TooltipContent>{label}</TooltipContent>
   </Tooltip>
+  const restoreDefaults = <Button variant="outline" size="sm" disabled={busy || !snapshot || !changed}
+    onClick={() => void restoreAll()}>{t('shortcuts.restoreAll')}</Button>
   return <div className="settings-panel shortcuts-page">
     <div className="shortcuts-page__toolbar">
       <InputGroup className="shortcuts-page__search"><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('shortcuts.search')} aria-label={t('shortcuts.search')} /></InputGroup>
-      <Button variant="outline" size="sm" disabled={busy || !snapshot || !changed} onClick={() => void restoreAll()}><RotateCcw data-icon="inline-start" />{t('shortcuts.restoreAll')}</Button>
+      {headingActionTarget ? createPortal(restoreDefaults, headingActionTarget) : restoreDefaults}
     </div>
     {error && !editing && <Alert variant="danger"><AlertDescription>{error}</AlertDescription></Alert>}
     <div className="shortcuts-page__table">

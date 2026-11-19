@@ -11,6 +11,8 @@ import type { ComicModelInput } from './comic-model'
 import type { GlossaryDocument } from '../shared/glossary'
 import type { WordRulesDocument } from '../shared/word-rules'
 import type { FeatureActivity, FeatureLease } from './feature-activity'
+import { normalizeThrownError } from '../shared/ipc-error'
+import { logDiagnostic } from './session-log'
 
 interface Connection { baseUrl: string; authorizationHeader(): Record<string, string> }
 export interface ComicTranslationOptions {
@@ -37,10 +39,17 @@ export class ComicTranslation {
     })
     const handle = (channel: string, action: (raw: unknown) => unknown) => {
       this.channels.push(channel)
+      const recordFailure = (error: unknown): never => {
+        logDiagnostic('comic.request.failed', { channel, classification: normalizeThrownError(error), error })
+        throw error
+      }
       ipcMain.handle(channel, (event: IpcMainInvokeEvent, raw: unknown) => {
         const main = options.getMainWindow()
         if (this.closed || !main || event.sender !== main.webContents || event.senderFrame !== event.sender.mainFrame || !isTrustedRendererUrl(event.senderFrame.url, options.mainDir)) throw new Error('Access denied')
-        return action(raw)
+        try {
+          const result = action(raw)
+          return result instanceof Promise ? result.catch(recordFailure) : result
+        } catch (error) { return recordFailure(error) }
       })
     }
     handle('comic:list', () => this.listProjects())

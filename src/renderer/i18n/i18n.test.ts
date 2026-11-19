@@ -108,7 +108,7 @@ describe('中英 key 树完全对齐', () => {
     //   1. 品牌名 / 产品名
     //   2. 母语自称（简体中文这种语言名）
     //   3. overlay.preview* 是**故意用中文演示字幕渲染效果的样例文本**
-    const allowed = new Set(['app.name', 'legal.license'])
+    const allowed = new Set(['app.name', 'legal.license', 'screen.sceneHarbor', 'screen.sceneTerminal', 'screen.sceneDeparture'])
     const allowedPrefix = ['language.', 'overlay.preview', 'modelsSettingsUi.previewTranslation']
     // 纯占位符/单位串（'{percent}%'、'{speed} MB/s'）本来就该完全一致
     const isFormatOnly = (s: string) => !/[\u4e00-\u9fff]/.test(s)
@@ -162,9 +162,10 @@ describe('文案纪律（§1.5）', () => {
 
   it('英文界面里的中文只允许出现在母语名与字幕样例里', () => {
     const allowedPrefix = ['language.', 'overlay.preview', 'modelsSettingsUi.previewTranslation']
+    const sceneTranslation = new Set(['screen.sceneHarbor', 'screen.sceneTerminal', 'screen.sceneDeparture'])
     const hits = Object.entries(enFlat)
       .filter(([, v]) => /[\u4e00-\u9fff]/.test(v))
-      .filter(([k]) => !allowedPrefix.some((p) => k.startsWith(p)))
+      .filter(([k]) => !sceneTranslation.has(k) && !allowedPrefix.some((p) => k.startsWith(p)))
       .map(([k]) => k)
     expect(hits).toEqual([])
   })

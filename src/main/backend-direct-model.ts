@@ -9,6 +9,7 @@ import type { BackendSupervisor } from './backend-supervisor'
 import { GatewayWorkerError } from './model-gateway-worker'
 import type { GatewayWorkerResult } from './model-gateway-worker'
 import { backendError, backendFailure, readBackendFailure } from './backend-error'
+import { logDiagnostic } from './session-log'
 import { resourceSchema } from '../shared/schemas'
 import type { AppSettings } from '../shared/settings'
 import { screenBlurPatchSchema, screenCaptureResultSchema, type ScreenCaptureRequest,
@@ -32,6 +33,8 @@ async function rejectBackendModel(response: Response): Promise<never> {
 }
 
 function backendModelFailure(status: number, failure?: z.infer<typeof backendError>): Error {
+  const diagnostic = failure ? backendFailure(failure) : undefined
+  logDiagnostic('backend.inference.failed', { status, error: diagnostic })
   const provider = failure?.provider_code
   if (provider === 'authentication_failed') return new GatewayWorkerError(provider, 'The model provider rejected its credentials')
   if (provider === 'rate_limited') return new GatewayWorkerError(provider, 'The model provider rate limit was reached')
@@ -40,7 +43,9 @@ function backendModelFailure(status: number, failure?: z.infer<typeof backendErr
     return new GatewayWorkerError('request_timeout', 'The model request timed out')
   }
   if (status === 400) return new GatewayWorkerError('invalid_request', 'Invalid inference input')
-  if (failure) return new BackendModelError(status, backendFailure(failure).message, failure.correlation_id)
+  if (diagnostic) return Object.assign(
+    new BackendModelError(status, diagnostic.message, diagnostic.correlationId), diagnostic,
+  )
   return new BackendModelError(status, 'engineTransportUnavailable')
 }
 
@@ -249,16 +254,23 @@ export class BackendScreenOcr {
       body: JSON.stringify(request),
       signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
     })
-    if (!response.ok) throw new Error('captureFailed')
+    if (!response.ok) {
+      const failure = await readBackendFailure(response)
+      const error = failure?.message_key === 'backend.shuttingDown' ? 'backendUnavailable' : 'captureFailed'
+      throw Object.assign(new Error(error), failure ? backendFailure(failure) : {}, {
+        status: response.status, engineCode: error,
+      })
+    }
     return screenCaptureResultSchema.parse(await response.json())
   }
 
   async releaseCapture(sessionId: string): Promise<void> {
     const backend = this.options.backend()
     if (!backend?.ready) return
-    await fetch(new URL(`/api/v2/screen/capture/${sessionId}`, backend.baseUrl), {
+    const response = await fetch(new URL(`/api/v2/screen/capture/${sessionId}`, backend.baseUrl), {
       method: 'DELETE', headers: backend.authorizationHeader(), signal: AbortSignal.timeout(2000),
     })
+    if (!response.ok) throw Object.assign(new Error('captureFailed'), { code: 'captureFailed', status: response.status })
   }
 
   private async request(path = '', method = 'GET', body?: unknown, signal?: AbortSignal, resourceId = 'pp-ocrv5-mobile-onnx'): Promise<unknown> {
@@ -275,7 +287,7 @@ export class BackendScreenOcr {
       const detail = failure?.detail
       const errors: Record<string, string> = { resourceBusy: 'resourceBusy', modelMissing: 'ocrMissing',
         modelCorrupt: 'ocrCorrupt', runtimeUnavailable: 'ocrRuntimeUnavailable', modelNotLoaded: 'ocrNotReady' }
-      throw new Error(typeof detail === 'string' ? errors[detail] ?? 'ocrFailed' : 'ocrFailed')
+      throw Object.assign(new Error(typeof detail === 'string' ? errors[detail] ?? 'ocrFailed' : 'ocrFailed'), { status: response.status })
     }
     return response.json()
   }

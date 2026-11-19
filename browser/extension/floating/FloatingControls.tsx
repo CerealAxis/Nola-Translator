@@ -38,7 +38,7 @@ export function FloatingControls({ preferences, active, error, onTranslate, onRe
   const suppressClick = useRef(false)
   const t = browserText(preferences.uiLanguage)
   const translationDisabled = !active && preferences.pageProvider === DISABLED_PROVIDER
-  useErrorToasts(t, error, panelError)
+  useErrorToasts('content', t, error, panelError)
   const down = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
     drag.current = { x: event.clientX, y: event.clientY, moved: false, original: { floatingSide: preferences.floatingSide, floatingPosition: preferences.floatingPosition } }

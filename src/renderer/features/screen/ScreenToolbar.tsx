@@ -20,9 +20,6 @@ export function ScreenToolbar({ api, snapshot }: { api: ScreenTranslationBridge;
   const { config, status } = snapshot
   const paused = status === 'paused'
   const reading = status === 'running' || status === 'waiting'
-  const issue = snapshot.error
-  const issueText = issue === 'gatewayNotReady' || issue === 'ocrNotReady' || issue === 'translationModelMissing' || issue === 'translationModelNotReady'
-    ? t('suite.modelsNeeded') : issue ? t(`screen.errors.${issue}`) : undefined
   useLayoutEffect(() => {
     const element = surface.current
     if (!element) return
@@ -40,7 +37,7 @@ export function ScreenToolbar({ api, snapshot }: { api: ScreenTranslationBridge;
     const observer = new ResizeObserver(resize)
     observer.observe(element)
     return () => observer.disconnect()
-  }, [api, expanded, failed, issueText, config.captureMode, sources, paused, reading, t])
+  }, [api, expanded, failed, config.captureMode, sources, paused, reading, t])
   const run = async (command: ScreenCommand) => {
     if (pending.current) return
     pending.current = true; setBusy(true); setFailed(false)
@@ -72,7 +69,7 @@ export function ScreenToolbar({ api, snapshot }: { api: ScreenTranslationBridge;
       <Button variant="outline" size="icon-sm" aria-label={t('suite.display')} aria-expanded={expanded} onClick={() => void toggleSettings()}><Settings2 /></Button>
       <Button variant="outline" size="icon-sm" aria-label={t('suite.hideToolbar')} onClick={() => void run({ action: 'hideToolbar' })}><X /></Button>
     </div>
-    {(failed || issueText) && <div className="screen-toolbar__status" role="alert">{busy && <Spinner />}{failed ? t('suite.actionFailed') : issueText}</div>}
+    {failed && <div className="screen-toolbar__status" role="alert">{busy && <Spinner />}{t('suite.actionFailed')}</div>}
     {expanded && <div className="screen-toolbar__settings">
       <Field><FieldLabel htmlFor="toolbar-capture-mode">{t('suite.captureMode')}</FieldLabel>
         <Select value={config.captureMode} disabled={busy} onValueChange={value => { if (value) void configure({ ...config, captureMode: value as ScreenConfig['captureMode'] }) }}>

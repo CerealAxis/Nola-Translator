@@ -71,6 +71,19 @@ def make_scheduler(gateway: FakeGateway, events: list[tuple[str, dict]], **kwarg
     )
 
 
+def test_translation_failure_preserves_public_provider_code_and_exception_type():
+    scheduler = make_scheduler(FakeGateway(), [])
+    error = GatewayError(
+        GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="private provider response",
+        provider_code="rate_limited",
+    )
+    payload = scheduler._error_event_payload("segment-1", error, "translation-1")["error"]
+    assert payload["provider_code"] == "rate_limited"
+    assert payload["correlation_id"] == "translation-1"
+    assert payload["safe_details"] == {"exception": "GatewayError"}
+    assert "private provider response" not in str(payload)
+
+
 async def test_configured_preview_interval_delays_queued_snapshot(monkeypatch):
     clock = [10.0]
     monkeypatch.setattr('nola_translator_engine.backend.translation_pipeline.time.monotonic', lambda: clock[0])

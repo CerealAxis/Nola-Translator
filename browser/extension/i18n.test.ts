@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { browserText, errorKey } from './i18n'
+import { browserErrorDescription, browserText, errorKey } from './i18n'
 import { browserEn, browserZh } from './locale-base'
 import { browserJa, browserKo, browserZhHK, browserZhTW } from './locale-regions'
 import { extensionCopy } from './extension-copy'
@@ -27,11 +27,18 @@ describe('browser failure guidance', () => {
     expect(t(errorKey('browserExtensionVersionMismatch'))).toContain('重装当前版本扩展')
   })
 
-  it('explains an Index-Translate service rejection in every locale', () => {
+  it('shows the Index Translate status alongside the rejection message in every locale', () => {
     for (const locale of ['en', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja'] as const) {
-      const message = browserText(locale)(errorKey('indexTranslateBrowserBlocked'))
-      expect(message).toContain('412')
+      const text = browserText(locale)
+      const message = text('indexTranslateBrowserBlocked')
+      expect(message).not.toContain('412')
+      expect(browserErrorDescription(text, 'indexTranslateBrowserBlocked')).toBe(`${message} (412)`)
     }
+  })
+
+  it('shows the same catalog code in the extension as the desktop for a known issue', () => {
+    expect(browserErrorDescription(t, 'audioCaptureStartFailed')).toBe(`${t('audioCaptureStartFailed')} (AUD-009)`)
+    expect(browserErrorDescription(t, 'providerAuthentication')).toBe(`${t('providerAuthentication')} (ARG-004)`)
   })
 
   it('keeps an unknown diagnostic code out of the user-facing message', () => {

@@ -924,6 +924,15 @@ async function main() {
     if (zoomed.path !== '#/settings/general' || !zoomed.collapsed || !zoomed.singleColumn || !zoomed.fits) fail({ width: 760, zoom: 2 }, 'Zoomed settings layout failed', { zoomed })
     await window.webContents.executeJavaScript(`document.querySelector('[data-onboarding="settings-audio"]').click()`)
     await settle(window)
+    const audioRows = await window.webContents.executeJavaScript(`(() => {
+      const meters = [...document.querySelectorAll('.settings-page [role="meter"]')];
+      return meters.length === 2 && meters.every(meter => {
+        const row = meter.closest('.settings-row');
+        return row && !row.querySelector('[role="combobox"], [role="status"], button') && row.scrollWidth <= row.clientWidth + 2;
+      });
+    })()`)
+    scenarios++
+    if (!audioRows) fail({ width: 760, zoom: 2 }, 'Audio levels do not fit their own settings rows')
     await window.webContents.executeJavaScript(`document.querySelector('[data-onboarding="nav-settings-back"]').click()`)
     await settle(window)
     const returnPath = await window.webContents.executeJavaScript('location.hash')
@@ -948,33 +957,55 @@ async function main() {
   if (process.argv.includes('--screen-page')) {
     await goto(window, '#/screen-translation', 'screen-translation')
     const regions = Array.from({ length: 12 }, (_, index) => ({ id: crypto.randomUUID(), x: index % 4 / 4, y: Math.floor(index / 4) / 4, width: .2, height: .15 }))
-    const config = screenConfigSchema.parse({ sourceId: 'screen:1:0', regions, presetId: '8ddba01d-f7dd-4ea2-b24e-0a3220212420' })
+    const config = screenConfigSchema.parse({ captureMode: 'regions', processingMode: 'cascade',
+      sourceId: 'screen:1:0', sourceLanguage: 'ja', targetLanguage: 'zh', opacity: 0.92,
+      regions, presetId: '8ddba01d-f7dd-4ea2-b24e-0a3220212420' })
     const presets = [{ id: config.presetId, name: 'Reading', sourceId: config.sourceId, sourceName: '', regions }]
-    await window.webContents.executeJavaScript(`window.layoutFixture.screen(${JSON.stringify({ config, presets })})`)
+    const blocks = [{ id: 'sample', regionId: regions[0].id, text: 'Fixture OCR source', translation: 'Fixture translated text',
+      revision: 0, x: 0, y: 0, width: 0.1, height: 0.1, angle: 0, status: 'ready' }]
+    await window.webContents.executeJavaScript(`window.layoutFixture.screen(${JSON.stringify({ config, presets, blocks })})`)
     const resource = { resourceId: 'pp-ocrv5-mobile-onnx', kind: 'ocrModel', provider: 'pp-ocrv5', name: 'PP-OCRv5 mobile', description: '', languages: ['zh', 'en', 'ja'], installed: true, installedBytes: 1, state: 'idle', cancellable: false }
     await window.webContents.executeJavaScript(`window.layoutFixture.emit(${JSON.stringify({ type: 'resourceChanged', resource })})`)
     await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings(${JSON.stringify({ modelPolicy: { enabled: { 'ocr:resource:pp-ocrv5-mobile-onnx': true }, defaults: { ocr: 'resource:pp-ocrv5-mobile-onnx' }, selections: {} } })})`)
-    for (const language of ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko']) for (const theme of ['light', 'dark']) for (const [width, height] of [[760, 560], [1180, 780], [1920, 1140]]) {
+    for (const language of ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko']) for (const theme of ['light', 'dark']) for (const [width, height, zoom = 1] of [[620, 560], [1180, 780], [1920, 1140], [1240, 900, 2]]) {
       window.setContentSize(width, height)
+      window.webContents.setZoomFactor(zoom)
       await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings(${JSON.stringify({ uiLanguage: language, theme })})`)
       for (const status of ['ready', 'running']) {
         await window.webContents.executeJavaScript(`window.layoutFixture.screen({status:${JSON.stringify(status)}})`)
         await window.webContents.executeJavaScript('document.querySelector(".nola-route-content").scrollTop = 0')
         await settle(window); scenarios++
-        const context = { language, theme, width, height, status }
+        const context = { language, theme, width, height, status, zoom }
         const state = await window.webContents.executeJavaScript(`(() => {
-          const page = document.querySelector('[data-slot="screen-page"]'), header = page.querySelector('header'), button = header.querySelector('button');
-          return { lang: document.documentElement.lang, title: !!header.querySelector('h1.nola-display'), card: !!header.closest('.card'),
-            buttons: header.querySelectorAll('button').length, variant: button?.dataset.variant,
+          const page = document.querySelector('[data-slot="screen-page"]'), header = page.querySelector('header');
+          const buttons = [...header.querySelectorAll('button')];
+          const settings = page.querySelector('[data-slot="screen-settings"].nola-settings-card');
+          const groups = [...settings.querySelectorAll('.nola-settings-content > .nola-settings-fields[role="region"]')];
+          const stage = page.querySelector('[data-slot="screen-stage"]');
+          return { lang: document.documentElement.lang, title: !!header.querySelector('h1.type-h3'), card: !!header.closest('.card'),
+            buttons: buttons.length, variant: buttons.at(-1)?.dataset.variant,
+            groups: groups.length, dividers: groups.filter(group => parseFloat(getComputedStyle(group).borderTopWidth) > 0).length,
+            columns: getComputedStyle(groups[0]).gridTemplateColumns.split(' ').length,
+            stage: stage?.querySelectorAll('svg.screen-scene-game').length === 1
+              && stage.querySelectorAll('.screen-scan-frame').length === 2,
             ocr: !!page.querySelector('#screen-ocr-model'), old: !!page.querySelector('.screen-ocr, .screen-session, .screen-source-preview, #screen-source'),
-            selectionLabel: page.querySelector('.screen-region-controls > button')?.textContent,
-            hint: !!page.querySelector('#screen-translation-heading + p'),
-            overflow: [...page.querySelectorAll('div,header,button,[data-slot="field-label"]')].filter(el => el.clientWidth > 0 && !el.classList.contains('sr-only') && el.scrollWidth > el.clientWidth + 2).map(el => ({className:String(el.className),text:el.textContent.slice(0,80)})) };
+            selectionLabel: page.querySelector('.screen-region-controls .lucide-crop')?.closest('button').getAttribute('aria-label'),
+            result: !!page.querySelector('[data-slot="screen-results"]') || page.textContent.includes('Fixture translated text'),
+            overflow: [...page.querySelectorAll('div,header,button,[data-slot="field-label"]')].filter(el => el.clientWidth > 0 && !el.matches('.sr-only, .slider__thumb') && el.scrollWidth > el.clientWidth + 2).map(el => ({className:String(el.className),text:el.textContent.slice(0,80)})) };
         })()`)
-        if (state.lang !== language || !state.title || state.card || state.buttons !== 1 || state.variant !== (status === 'ready' ? 'default' : 'destructive') || !state.ocr || state.old || /[0-9]/.test(state.selectionLabel ?? '') || state.hint || state.overflow.length) fail(context, 'screen header, controls or layout failed', { state })
+        const ready = status === 'ready'
+        if (state.lang !== language || !state.title || state.card || state.buttons !== (ready ? 1 : 2)
+          || state.variant !== (ready ? 'default' : 'destructive') || !state.stage || state.groups !== 3 || state.dividers !== 2
+          || !state.ocr || state.old || state.result
+          || state.columns !== (width === 620 || zoom === 2 ? 1 : 2)
+          || !state.selectionLabel || /[0-9]/.test(state.selectionLabel) || state.overflow.length) {
+          fail(context, 'screen header, controls or layout failed', { state })
+        }
         await writeFile(resolve(output, `screen-page-${language}-${theme}-${width}-${status}.png`), (await window.webContents.capturePage()).toPNG())
         if (status === 'ready') {
-          await window.webContents.executeJavaScript('document.querySelector(".screen-region-controls .lucide-save").closest("button").click()')
+          await window.webContents.executeJavaScript('document.querySelector(".screen-region-controls button[aria-haspopup=menu]").click()')
+          await settle(window)
+          await window.webContents.executeJavaScript('document.querySelector("[role=menuitem] .lucide-save")?.closest("[role=menuitem]").click()')
           await settle(window)
           const dialog = await window.webContents.executeJavaScript(`!!document.querySelector('[role="dialog"] #screen-preset-name')`)
           if (!dialog) fail(context, 'preset save dialog did not open')
@@ -986,7 +1017,7 @@ async function main() {
       }
     }
     await writeFile(resolve(output, 'screen-page-results.json'), JSON.stringify({ scenarios, failures }, null, 2))
-    console.log(JSON.stringify({ scenarios, failures }, null, 2))
+    console.log(JSON.stringify({ scenarios, failures: failures.length, examples: failures.slice(0, 2) }, null, 2))
     app.exit(failures.length ? 1 : 0)
     return
   }
@@ -1203,16 +1234,6 @@ async function main() {
             const state = await window.webContents.executeJavaScript(`({ lang: document.documentElement.lang, crash: !!document.querySelector('.nola-main pre'), overflow: document.documentElement.scrollWidth > innerWidth + 2 })`)
             if (state.lang !== language || state.crash || state.overflow) fail(context, 'document failed', { state })
             await writeFile(resolve(output, `${language}-${theme}-${width}-${target.name}.png`), (await window.webContents.capturePage()).toPNG())
-            if (target.name === 'meeting') {
-              const opened = await window.webContents.executeJavaScript(`(() => { const button = document.querySelector('[data-testid="meeting-audio-test"]'); if (!button || button.disabled) return false; button.click(); return true })()`)
-              await settle(window)
-              const dialog = await window.webContents.executeJavaScript(`!!document.querySelector('[role="dialog"]')`)
-              if (!opened || !dialog) fail(context, 'audio test dialog did not open')
-              await writeFile(resolve(output, `${language}-${theme}-${width}-meeting-audio-test.png`), (await window.webContents.capturePage()).toPNG())
-              window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
-              window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
-              await settle(window)
-            }
           }
         }
       }

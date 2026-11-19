@@ -113,7 +113,6 @@ const channels = {
   getHuggingFaceModelCard: 'hub:model-card',
   installHuggingFaceModel: 'hub:install', configureModel: 'model:configure',
   startSession: 'engine:start-session',
-  testAudio: 'engine:test-audio',
   prewarmModels: 'engine:prewarm-models',
   ensureEngineReady: 'engine:ensure-ready',
   stopSession: 'engine:stop-session',
@@ -271,8 +270,6 @@ const api: NolaTranslatorApi = {
     start: settings => invoke('meeting-mode:start', settings),
     stop: () => invoke('meeting-mode:stop'),
     setPaused: paused => invoke('meeting-mode:set-paused', paused),
-    testAudio: request => invoke('meeting-mode:test-audio', request),
-    cancelAudioTest: () => invoke('meeting-mode:cancel-test'),
     onChanged: callback => {
       const listener = (_event: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value)
       ipcRenderer.on('meeting-mode:changed', listener)
@@ -357,7 +354,13 @@ const api: NolaTranslatorApi = {
   importRuntime: () => invoke(channels.importRuntime),
   cancelRuntimeInstall: () => invoke(channels.cancelRuntimeInstall),
   listDevices: () => invoke(channels.listDevices),
-  testAudio: source => invoke(channels.testAudio, source),
+  previewAudioInput: (source, id) => invoke('audio:preview-input', source, id),
+  stopAudioInputPreview: id => invoke('audio:stop-input-preview', id),
+  onAudioInputLevel: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, id: string, level: number) => callback(id, level)
+    ipcRenderer.on('audio:input-level', listener)
+    return () => ipcRenderer.off('audio:input-level', listener)
+  },
   listResources: () => invoke(channels.listResources),
   manageResource: (resourceId, action, source) => invoke(channels.manageResource, resourceId, action, source),
   searchHuggingFace: (query, kind, cursor): Promise<HubSearchResult> =>

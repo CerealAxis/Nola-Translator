@@ -12,7 +12,7 @@ import type { DiagnosticCopyContext } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { pathOf, settingsPath, useRoute } from '@/routes'
 import { notifyError } from '@/components/primitives/notify'
-import { supportErrorCodeForCause, supportErrorCodeForMessage } from '../../../shared/error-catalog'
+import { appendSupportCode, supportErrorCodeForCause, supportErrorCodeForMessage } from '../../../shared/error-catalog'
 
 import { errorCopyOf } from './error-copy'
 
@@ -84,7 +84,7 @@ export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRe
     <Dialog open={isOpen} onOpenChange={open => { if (!open) onReset() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{t(handle.message)}</DialogTitle>
+          <DialogTitle>{appendSupportCode(t(handle.message), supportCode)}</DialogTitle>
         </DialogHeader>
         {handle.detail ? <p className="type-body mb-4 text-muted">{t(handle.detail)}</p> : null}
         <DialogFooter>

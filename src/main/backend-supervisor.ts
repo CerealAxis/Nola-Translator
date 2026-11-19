@@ -5,7 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 
 import { createEngineLaunchSpec, type EngineLaunchSpec } from './engine-process'
-import { logActivity, logDiagnostic } from './session-log'
+import { logActivity, logDiagnostic, logPythonStderr, registerLogSecret } from './session-log'
 
 /**
  * Supervisor for the FastAPI realtime backend (schema_version 2).
@@ -80,6 +80,7 @@ export class BackendSupervisor extends EventEmitter {
     if (this.state === 'starting') throw new Error('Backend is already starting')
     this.state = 'starting'
     this.token = randomBytes(32).toString('base64url')
+    registerLogSecret(this.token)
     const instanceId = this.bootId = randomUUID()
 
     const { spec } = this.options
@@ -106,7 +107,9 @@ export class BackendSupervisor extends EventEmitter {
         detachStartup()
         this.state = 'failed'
         child.kill('SIGKILL')
-        reject(new Error(`Backend did not report ready within ${this.options.readyTimeoutMs ?? READY_FRAME_TIMEOUT_MS}ms`))
+        const error = new Error(`Backend did not report ready within ${this.options.readyTimeoutMs ?? READY_FRAME_TIMEOUT_MS}ms`)
+        logDiagnostic('backend.start.failed', { instanceId, error })
+        reject(error)
       }, this.options.readyTimeoutMs ?? READY_FRAME_TIMEOUT_MS)
 
       let stdoutBuffer = ''
@@ -147,6 +150,7 @@ export class BackendSupervisor extends EventEmitter {
         clearTimeout(timer)
         child.stdout.off('data', onData)
         this.state = 'failed'
+        logDiagnostic('backend.start.failed', { instanceId, error })
         reject(error)
       }
 
@@ -158,6 +162,7 @@ export class BackendSupervisor extends EventEmitter {
           clearTimeout(timer)
           child.stdout.off('data', onData)
           this.state = 'failed'
+          logDiagnostic('backend.start.failed', { instanceId, code, signal })
           reject(new Error(`Backend exited during startup (code=${code} signal=${signal})`))
           return
         }
@@ -174,11 +179,7 @@ export class BackendSupervisor extends EventEmitter {
       }
 
       child.stdout.on('data', onData)
-      child.stderr.on('data', (chunk: Buffer) => {
-        const text = chunk.toString('utf8')
-        // uvicorn logs; keep the diagnostic stream, never the control token.
-        logDiagnostic('backend.stderr', { text: text.slice(0, 1024) })
-      })
+      logPythonStderr(child.stderr, 'backend')
       child.once('error', onError)
       child.once('exit', onExit)
     })

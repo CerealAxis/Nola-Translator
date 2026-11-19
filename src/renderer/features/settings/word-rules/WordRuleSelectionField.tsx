@@ -1,4 +1,5 @@
 import { useI18n } from '@/i18n'
+import { Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import {
@@ -11,6 +12,7 @@ import {
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Switch, SwitchThumb } from '@/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { GlossarySelection } from '../../../../shared/glossary'
 import type { WordRuleKind } from '../../../../shared/word-rules'
 import { useWordRules } from './useWordRules'
@@ -22,21 +24,26 @@ export function WordRuleSelectionField({
   disabled,
   kind = 'preserve',
   showSettings = true,
+  className,
+  compact = false,
 }: {
   value: GlossarySelection
   onChange: (value: GlossarySelection) => void
   disabled?: boolean
   kind?: WordRuleKind
   showSettings?: boolean
+  className?: string
+  compact?: boolean
 }) {
   const { t } = useI18n(),
     p = useWordRuleText(),
     { document, failed } = useWordRules()
   const libraries = document.libraries.filter((library) => library.kind === kind)
+  const settingsHref = `#/settings/${kind === 'preserve' ? 'preserve-words' : 'subtitle-words'}`
   return (
-    <Field>
+    <Field className={className}>
       <FieldLabel>{p(kind)}</FieldLabel>
-      <div className="flex min-w-0 flex-wrap gap-2">
+      <div className={compact ? 'nola-inline-field-controls' : 'flex min-w-0 flex-wrap gap-2'}>
         <Select
           value={value.mode}
           disabled={disabled}
@@ -67,7 +74,7 @@ export function WordRuleSelectionField({
         </Select>
         {value.mode === 'selected' && (
           <Popover>
-            <PopoverTrigger render={<Button variant="outline" size="sm" disabled={disabled} />}>
+            <PopoverTrigger render={<Button variant="outline" size={compact ? 'icon-sm' : 'sm'} disabled={disabled} aria-label={compact ? t('suite.selectedLibraries', { count: value.libraryIds.length }) : undefined} />}>
               {value.libraryIds.length}
             </PopoverTrigger>
             <PopoverContent>
@@ -94,16 +101,18 @@ export function WordRuleSelectionField({
             </PopoverContent>
           </Popover>
         )}
-        {showSettings && <Button
+        {showSettings && (compact
+          ? <Tooltip><TooltipTrigger render={<Button variant="bare" size="icon-sm" nativeButton={false} aria-label={p('settings')} render={<a role="link" href={settingsHref} />}><Settings2 /></Button>} /><TooltipContent>{p('settings')}</TooltipContent></Tooltip>
+          : <Button
           variant="outline"
           size="sm"
           nativeButton={false}
           render={
-            <a href={`#/settings/${kind === 'preserve' ? 'preserve-words' : 'subtitle-words'}`} />
+            <a href={settingsHref} />
           }
         >
           {p('settings')}
-        </Button>}
+        </Button>)}
         {failed && <span role="status">{t('suite.actionFailed')}</span>}
       </div>
     </Field>

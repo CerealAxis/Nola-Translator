@@ -489,6 +489,24 @@ html[data-overlay-toast="true"] #splash {
   min-width: 0;
 }
 
+.nola-inline-field-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.nola-inline-field-controls > [data-slot="select-trigger"] {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
+.nola-inline-field-controls > [role="status"] {
+  flex-basis: 100%;
+}
+
 .nola-settings-field .nola-segmented {
   width: 100%;
 }
@@ -4772,16 +4790,86 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
   container-type: inline-size;
 }
 
-.screen-page > .card:not(.nola-settings-card) {
-  --card-spacing: calc(var(--space-2) + var(--space-1) / 2);
-}
-
 .screen-page__actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-1);
 }
+
+.screen-scene-window {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.screen-scene-titlebar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: calc(var(--space-1) / 2) var(--space-2);
+  @apply type-small;
+}
+
+.screen-scene-titlebar > svg {
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+}
+
+.screen-scene-titlebar span {
+  flex: 1;
+}
+
+.screen-scene-game {
+  display: block;
+  width: 100%;
+  height: clamp(var(--space-8), 42cqw, calc(var(--space-7) * 4));
+}
+
+.screen-scan-blur {
+  filter: blur(2px);
+  opacity: .35;
+}
+
+.screen-scan-reveal {
+  transform-origin: 0 0;
+  animation: screen-sign-reveal 8s linear infinite;
+}
+
+.screen-scan-line {
+  animation: screen-sign-sweep 8s linear infinite;
+}
+
+.screen-scan-frame {
+  animation: screen-sign-frame 8s linear infinite;
+}
+
+@keyframes screen-sign-reveal {
+  0%, 37.5% { transform: scaleY(0); }
+  55%, 100% { transform: scaleY(1); }
+}
+
+@keyframes screen-sign-sweep {
+  0%, 37.5% { transform: translateY(0); opacity: 0; }
+  38.5%, 54% { opacity: 1; }
+  55%, 100% { transform: translateY(var(--scan-distance)); opacity: 0; }
+}
+
+@keyframes screen-sign-frame {
+  0%, 34% { opacity: 0; }
+  37.5%, 100% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-scan-reveal,
+  .screen-scan-frame { animation: none; }
+  .screen-scan-line { display: none; }
+}
+
+:root[data-reduce-motion="true"] :is(.screen-scan-reveal, .screen-scan-frame) { animation: none; }
+:root[data-reduce-motion="true"] .screen-scan-line { display: none; }
 
 .screen-toolbar {
   display: flex;
@@ -4861,10 +4949,6 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
   .screen-toolbar__main [data-icon] {
     display: none;
   }
-}
-
-.screen-page [data-slot="screen-results"] .nola-dual__scroll {
-  max-height: calc(var(--space-8) * 5);
 }
 
 .screen-settings__footer {
@@ -4984,26 +5068,16 @@ html[data-screen-window] body, html[data-screen-window] #root {
   white-space: pre-wrap;
 }
 
-.screen-region-controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  min-width: 0;
+.screen-page .nola-settings-content {
+  gap: var(--space-2);
 }
 
-.screen-region-controls > [data-slot="select-trigger"] {
-  flex: 1;
-  width: auto;
-  min-width: var(--space-8);
-  max-width: calc(var(--space-8) * 5);
+.screen-page .nola-settings-content > [data-slot="field-group"] + [data-slot="field-group"] {
+  padding-top: var(--space-2);
 }
 
-.screen-preset-menu {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  width: auto;
+.screen-page .nola-settings-fields {
+  row-gap: var(--space-1);
 }
 
 .screen-preset-dialog {
@@ -5385,6 +5459,7 @@ html[data-screen-window] body, html[data-screen-window] #root {
 
 .settings-group__heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
   margin-block-end: var(--section-heading-gap);
@@ -5681,37 +5756,6 @@ html[data-screen-window] body, html[data-screen-window] #root {
   background: var(--surface);
 }
 
-.settings-save {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 4px;
-}
-
-.settings-save__state {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--nola-ui-muted-foreground);
-  @apply type-small;
-}
-
-.settings-save__state svg {
-  width: 18px;
-  height: 18px;
-  color: var(--primary);
-}
-
-.settings-save__state[data-error="true"] {
-  color: var(--danger-soft-foreground);
-}
-
-.settings-save__state[data-error="true"] svg {
-  color: var(--danger);
-}
-
 .settings-code {
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -5864,12 +5908,6 @@ html[data-screen-window] body, html[data-screen-window] #root {
 
 .settings-group#runtime-engines-section {
   scroll-margin-top: var(--space-3);
-}
-
-/* Repair targets share the segmented control selected-state styling. */
-
-.runtime-repair__list {
-  gap: var(--space-1);
 }
 
 .runtime-progress {

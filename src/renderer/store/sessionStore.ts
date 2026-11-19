@@ -160,6 +160,9 @@ function errorCodeOf(error: unknown): string {
 }
 
 function errorRequestIdOf(error: unknown): string | null {
+  if (typeof error === 'object' && error !== null && 'correlationId' in error && typeof error.correlationId === 'string') {
+    return error.correlationId
+  }
   return typeof error === 'object' && error !== null && 'requestId' in error && typeof error.requestId === 'string'
     ? error.requestId
     : null

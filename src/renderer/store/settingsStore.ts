@@ -41,7 +41,6 @@ export interface SettingsState {
   onboardingWelcome: boolean
   onboardingRun: number
   onboardingAutoAttempted: boolean
-  audioTestState: 'idle' | 'capturing' | 'playing'
   settings: AppSettings | null
   loaded: boolean
   loading: boolean
@@ -83,7 +82,6 @@ const initialState: SettingsState = {
   onboardingWelcome: false,
   onboardingRun: 0,
   onboardingAutoAttempted: false,
-  audioTestState: 'idle',
   settings: null,
   loaded: false,
   loading: false,
@@ -135,67 +133,6 @@ export async function saveOnboardingStep(step: string): Promise<void> {
 export async function completeOnboarding(): Promise<void> {
   if (settingsStore.getState().onboardingRequired) await updateSettings({ onboardingSeen: true, onboardingVersion: 2, onboardingStep: 'Z0', onboardingCompletedVersion: 2 })
   settingsStore.setState({ onboardingActive: false, onboardingWelcome: false, onboardingRequired: false })
-}
-
-let audioTestGeneration = 0
-let audioTestPlayback: HTMLAudioElement | null = null
-let audioTestUrl: string | null = null
-let finishAudioPlayback: (() => void) | null = null
-
-export function cancelAudioTest(): void {
-  audioTestGeneration++
-  if (audioTestPlayback) {
-    audioTestPlayback.onended = null
-    audioTestPlayback.onerror = null
-    audioTestPlayback.pause()
-    audioTestPlayback.src = ''
-    audioTestPlayback = null
-  }
-  finishAudioPlayback?.()
-  finishAudioPlayback = null
-  if (audioTestUrl) URL.revokeObjectURL(audioTestUrl)
-  audioTestUrl = null
-  settingsStore.setState({ audioTestState: 'idle' })
-}
-
-export async function testAudio(source: string): Promise<boolean> {
-  cancelAudioTest()
-  const generation = audioTestGeneration
-  settingsStore.setState({ audioTestState: 'capturing' })
-  try {
-    if (!bridge) throw new Error('engineNotReady')
-    const selected = modelsStore.getState().devices.find(device => device.deviceId === source)
-    if (selected?.kind === 'processAudio') throw new Error('audioDeviceUnavailable')
-    const legacyKind = source.startsWith('wasapi:systemOutput:') ? 'systemOutput'
-      : source.startsWith('wasapi:microphone:') ? 'microphone' : undefined
-    if (source !== 'defaultOutput' && !selected && !legacyKind) throw new Error('audioDeviceUnavailable')
-    const result = await bridge.engine.testAudio(source === 'defaultOutput' ? { kind: 'defaultOutput' }
-      : { kind: selected?.kind ?? legacyKind!, deviceId: selected?.deviceId ?? source })
-    if (generation !== audioTestGeneration) return false
-    const decoded = atob(result.audioBase64)
-    const bytes = new Uint8Array(decoded.length)
-    for (let index = 0; index < decoded.length; index++) bytes[index] = decoded.charCodeAt(index)
-    audioTestUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }))
-    audioTestPlayback = new Audio(audioTestUrl)
-    settingsStore.setState({ audioTestState: 'playing' })
-    await new Promise<void>((resolve, reject) => {
-      finishAudioPlayback = resolve
-      const playback = audioTestPlayback!
-      playback.onended = () => resolve()
-      playback.onerror = () => reject(new Error('audioPlaybackFailed'))
-      void playback.play().catch(reject)
-    })
-    if (generation === audioTestGeneration) {
-      cancelAudioTest()
-      settingsStore.setState({ audioTestState: 'idle' })
-    }
-    return result.hasSignal
-  } catch (error) {
-    if (generation !== audioTestGeneration) return false
-    cancelAudioTest()
-    settingsStore.setState({ audioTestState: 'idle' })
-    throw error
-  }
 }
 
 export async function loadRuntimeComponents(recheck = false, components?: readonly ('engine' | 'llama' | 'crisp')[]): Promise<RuntimeSnapshot> {
@@ -834,11 +771,6 @@ export function attachSettingsStore(next: NolaBridge, watchComputeChanges = true
   })
 }
 
-export async function readDiagnostics(): Promise<Record<string, string | number>> {
-  if (!bridge) throw new Error('diagnosticsUnavailable')
-  return bridge.diagnostics.get()
-}
-
 export async function copyDiagnostics(): Promise<void> {
   if (!bridge) throw new Error('diagnosticsUnavailable')
   await bridge.diagnostics.copy()
@@ -854,7 +786,6 @@ export async function openLogs(): Promise<void> {
 
 export function detachSettingsStore(): void {
   overlayMenuRequest++
-  cancelAudioTest()
   unsubscribe?.()
   unsubscribe = null
   unsubscribeCaptionService?.()

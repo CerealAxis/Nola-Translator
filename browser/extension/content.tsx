@@ -6,7 +6,7 @@ import { showToast, ToastProvider } from '../../src/renderer/components/ui/toast
 import { createBridge } from './bridge'
 import { createExtensionStore } from './store'
 import { alignPlayerTrigger, detectVideos, playerAdapter, playerIsInteractive } from './adapters'
-import { browserText, errorKey } from './i18n'
+import { browserErrorDescription, browserText } from './i18n'
 import { resolveUiLanguage } from '../../src/shared/languages'
 import { Panel } from './components'
 import { NolaLogo } from './logo'
@@ -53,7 +53,7 @@ function install(): void {
   let preferences = DEFAULT_PREFERENCES
   const notifyError = (code: string) => {
     recordDiagnostic('content', code)
-    showToast({ type: 'error', description: browserText(preferences.uiLanguage)(errorKey(code)) })
+    showToast({ type: 'error', description: browserErrorDescription(browserText(preferences.uiLanguage), code) })
   }
   const save = (patch: Parameters<typeof savePreferences>[0]) => { void savePreferences(patch).catch(() => notifyError('internalError')) }
   let webConcurrency = 1

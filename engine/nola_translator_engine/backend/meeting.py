@@ -8,7 +8,6 @@ import re
 from contextlib import suppress
 from time import monotonic, time
 from traceback import extract_tb
-from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -46,13 +45,6 @@ class MeetingRequest(BaseModel):
 
 class MeetingPauseRequest(BaseModel):
     paused: bool
-
-
-class MeetingAudioTestRequest(BaseModel):
-    kind: Literal["microphone", "headphones", "cable", "application"]
-    device_id: str = Field(min_length=1, max_length=512)
-    playback_device_id: str | None = Field(default=None, min_length=1, max_length=512)
-    recording_device_id: str | None = Field(default=None, min_length=1, max_length=512)
 
 
 def _error(code, stage, key, direction=None):

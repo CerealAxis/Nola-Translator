@@ -1,4 +1,12 @@
 export const gatewayZh = {
+  vadUnavailable: '语音检测组件无法加载。请重启 Nola 后重试。若仍失败，请附上本次日志反馈。',
+  audioCaptureStartFailed: '无法开始采集所选音源。请在音频设置中重新选择音源，再试一次。',
+  languageStartHint: '启动模型网关后选择语言。',
+  languageRequiredModelsHint: '请先启动模型网关的 {models} 模型',
+  languageModelJoin: ' 和 ',
+  languageModelsHint: '先加载此功能需要的模型。',
+  languagePairHint: '当前模型没有共同支持的语言。请换一个模型。',
+  ocrLoadHint: '在模型网关选择并加载已安装的 OCR 模型。',
   concurrency: '并发上限', concurrencyFor: '{name}并发上限', concurrencySharedMt: '与 MT 共用',
   concurrencyHint: '实时翻译串行处理。非实时任务：非 CrispASR 本地模型并发上限为 {local}，API 接口为 {api}；CrispASR 模型因能力限制固定为 1，不支持修改。',
   ocr: 'OCR 模型', ocrHint: '选择 OCR 模型，识别屏幕文字；在模型管理下载，在模型网关启动。',
@@ -25,7 +33,7 @@ export const gatewayZh = {
   modelSwitchedCloud: '已改用一个配置好的云端接口。', modelNoneShort: '请选择模型',
   modelNone: '没有可用的 {name}', modelNoneHint: '请配置可用的云端接口，或启用本地模型后在模型网关加载。',
   modelGatewayStartHint: '请先去模型网关启动服务并加载本地模型。',
-  notStarted: '模型网关未启动', notStartedHint: '请先前往模型网关启动服务，然后重试。',
+  notStarted: '模型网关未启动', notStartedHint: '在模型网关点「启动服务」后重试。',
   capabilityColumn: '能力', modelColumn: '所选模型', stateColumn: '状态',
   fallbackModel: '备用 MT 模型', fallbackNone: '不启用', proxyDisabled: '不启用',
   fallbackHint: '主翻译失败时使用的备用模型；选择“不启用”可关闭。',
@@ -73,6 +81,14 @@ export const gatewayZh = {
 }
 
 export const gatewayEn: Record<keyof typeof gatewayZh, string> = {
+  vadUnavailable: 'Could not load the speech detection component. Restart Nola and try again. If it still fails, include the current log when reporting the issue.',
+  audioCaptureStartFailed: 'Could not start capturing the selected audio source. Choose an input in Audio settings and try again.',
+  languageStartHint: 'Start Model Gateway to choose languages.',
+  languageRequiredModelsHint: 'Start {models} in Model Gateway first.',
+  languageModelJoin: ' and ',
+  languageModelsHint: 'Load the models this feature needs.',
+  languagePairHint: 'These models have no languages in common. Choose another model.',
+  ocrLoadHint: 'Select and load an installed OCR model in Model Gateway.',
   concurrency: 'Concurrency limit', concurrencyFor: '{name} concurrency limit', concurrencySharedMt: 'Shared with MT',
   concurrencyHint: 'Realtime translation runs serially. For offline tasks, non-CrispASR local models allow up to {local} concurrent requests and APIs up to {api}. CrispASR models are fixed at 1 due to runtime limitations and cannot be changed.',
   ocr: 'OCR models', ocrHint: 'Select an OCR model for screen text. Download in Model Management and load here.',
@@ -98,7 +114,7 @@ export const gatewayEn: Record<keyof typeof gatewayZh, string> = {
   modelSwitchedCloud: 'A configured cloud interface was used instead.', modelNoneShort: 'Select a model',
   modelNone: 'No available {name}', modelNoneHint: 'Configure a usable cloud interface, or enable a local model and load it in Model Gateway.',
   modelGatewayStartHint: 'Start the service in Model Gateway to load the local model first.',
-  notStarted: 'Model Gateway is not running', notStartedHint: 'Start the service in Model Gateway, then try again.',
+  notStarted: 'Model Gateway is stopped', notStartedHint: 'Select Start service in Model Gateway, then try again.',
   capabilityColumn: 'Capability', modelColumn: 'Selected model', stateColumn: 'Status',
   fallbackModel: 'Backup MT model', fallbackNone: 'Disabled', proxyDisabled: 'Disabled',
   fallbackHint: 'Use this model when primary translation fails. Select “Disabled” to turn it off.',
@@ -146,6 +162,14 @@ export const gatewayEn: Record<keyof typeof gatewayZh, string> = {
 }
 
 export const gatewayTw: typeof gatewayEn = {
+  vadUnavailable: '無法載入語音偵測元件。請重新啟動 Nola 後再試。若仍失敗，請附上本次日誌回報。',
+  audioCaptureStartFailed: '無法開始擷取所選音源。請在音訊設定中重新選擇音源，再試一次。',
+  languageStartHint: '啟動模型閘道後再選擇語言。',
+  languageRequiredModelsHint: '請先啟動模型閘道的 {models} 模型',
+  languageModelJoin: ' 和 ',
+  languageModelsHint: '先載入此功能所需的模型。',
+  languagePairHint: '目前的模型沒有共同支援的語言。請換一個模型。',
+  ocrLoadHint: '在模型閘道選擇並載入已安裝的 OCR 模型。',
   concurrency: '並行上限', concurrencyFor: '{name}並行上限', concurrencySharedMt: '與 MT 共用',
   concurrencyHint: '即時翻譯循序處理。非即時工作：非 CrispASR 本機模型並行上限為 {local}，API 介面為 {api}；CrispASR 模型因能力限制固定為 1，不支援修改。',
   ocr: 'OCR 模型', ocrHint: '選擇 OCR 模型辨識螢幕文字；在模型管理下載，在模型閘道啟動。',
@@ -171,7 +195,7 @@ export const gatewayTw: typeof gatewayEn = {
   modelSwitchedCloud: '已改用一個設定完成的雲端介面。', modelNoneShort: '請選擇模型',
   modelNone: '沒有可用的 {name}', modelNoneHint: '請設定可用的雲端介面，或啟用本機模型後於模型閘道載入。',
   modelGatewayStartHint: '請先前往模型閘道啟動服務並載入本機模型。',
-  notStarted: '模型閘道尚未啟動', notStartedHint: '請先前往模型閘道啟動服務，然後重試。',
+  notStarted: '模型閘道未啟動', notStartedHint: '在模型閘道按「啟動服務」後再試。',
   capabilityColumn: '能力', modelColumn: '所選模型', stateColumn: '狀態',
   fallbackModel: '備用 MT 模型', fallbackNone: '不啟用', proxyDisabled: '不啟用',
   fallbackHint: '主要翻譯失敗時使用的備用模型；選擇「不啟用」可關閉。',
@@ -208,6 +232,14 @@ export const gatewayTw: typeof gatewayEn = {
 }
 export const gatewayHk: typeof gatewayEn = { ...gatewayTw, closeTray: '保留在系統匣', interpretation: '即時傳譯', lan: '本地網絡', actionFailed: '操作失敗，請檢查本機服務和記錄後重試。' }
 export const gatewayJa: typeof gatewayEn = {
+  vadUnavailable: '音声検出コンポーネントを読み込めませんでした。Nola を再起動して、もう一度お試しください。解決しない場合は、今回のログを添えて報告してください。',
+  audioCaptureStartFailed: '選んだ音声入力の取り込みを開始できませんでした。オーディオ設定で入力を選び直して、もう一度お試しください。',
+  languageStartHint: 'モデルゲートウェイを起動してから言語を選んでください。',
+  languageRequiredModelsHint: '先にモデルゲートウェイの {models} モデルを起動してください。',
+  languageModelJoin: ' と ',
+  languageModelsHint: 'この機能に必要なモデルを読み込んでください。',
+  languagePairHint: 'モデル間で共通の対応言語がありません。別のモデルを選んでください。',
+  ocrLoadHint: 'モデルゲートウェイでインストール済みの OCR モデルを読み込んでください。',
   concurrency: '同時リクエスト上限', concurrencyFor: '{name}の同時リクエスト上限', concurrencySharedMt: 'MT と共有',
   concurrencyHint: 'リアルタイム翻訳は逐次処理します。非リアルタイムタスクの同時実行上限は、CrispASR以外のローカルモデルが {local}、APIが {api} です。CrispASRモデルは機能上の制限により1に固定され、変更できません。',
   ocr: 'OCR モデル', ocrHint: '画面の文字を認識するOCRモデルを選択します。モデル管理でダウンロードし、ここで起動します。',
@@ -266,6 +298,14 @@ export const gatewayJa: typeof gatewayEn = {
   examples: '接続例', examplesHint: 'YOUR_API_KEY を上のキーに置き換えてください。モデル ID は GET /v2/models で取得できます。', network: '接続範囲', loopback: 'このコンピューターのみ', lan: 'ローカルネットワーク', lanHint: '他の端末はこのコンピューターの実際の IP アドレスとファイアウォールの許可が必要です。信頼できるアプリとのみキーを共有してください。', port: 'ポート', targetLanguage: '既定の翻訳先言語', synthesisDefault: '既定の TTS モデル', change: '変更', voice: '既定の音声', voiceHint: 'TTS を起動するとモデルで利用可能な音声を表示します。', closeBehavior: '終了時の動作', closeHint: 'メインウィンドウを閉じた後、Nola をシステムトレイに残してローカルサービスを続けるか、アプリを終了するか選びます。', closeTray: 'システムトレイに常駐', closeQuit: 'アプリを終了', workbench: 'ワークベンチ', interpretation: '同時通訳', 'browser-captions': 'ブラウザー字幕', 'model-gateway': 'モデルゲートウェイ', requestFailed: 'リクエスト失敗', duration: '{value} ミリ秒', refresh: '状態を更新',
 }
 export const gatewayKo: typeof gatewayEn = {
+  vadUnavailable: '음성 감지 구성 요소를 불러오지 못했습니다. Nola를 다시 시작한 후 시도하세요. 문제가 계속되면 현재 로그를 첨부해 신고해 주세요.',
+  audioCaptureStartFailed: '선택한 오디오 소스의 캡처를 시작하지 못했습니다. 오디오 설정에서 입력을 다시 선택한 후 시도하세요.',
+  languageStartHint: '모델 게이트웨이를 시작한 뒤 언어를 선택하세요.',
+  languageRequiredModelsHint: '먼저 모델 게이트웨이의 {models} 모델을 시작하세요.',
+  languageModelJoin: ' 및 ',
+  languageModelsHint: '이 기능에 필요한 모델을 불러오세요.',
+  languagePairHint: '두 모델이 공통으로 지원하는 언어가 없습니다. 다른 모델을 선택하세요.',
+  ocrLoadHint: '모델 게이트웨이에서 설치된 OCR 모델을 불러오세요.',
   concurrency: '동시 요청 한도', concurrencyFor: '{name} 동시 요청 한도', concurrencySharedMt: 'MT와 공유',
   concurrencyHint: '실시간 번역은 순차 처리합니다. 비실시간 작업의 동시 요청 한도는 CrispASR 이외의 로컬 모델은 {local}, API는 {api}입니다. CrispASR 모델은 런타임 제한으로 1로 고정되며 변경할 수 없습니다.',
   ocr: 'OCR 모델', ocrHint: '화면 문자를 인식할 OCR 모델을 선택하세요. 모델 관리에서 다운로드하고 여기에서 시작하세요.',

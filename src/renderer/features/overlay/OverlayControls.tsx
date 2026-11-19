@@ -307,7 +307,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
         } else if (unsupportedRecognitionLanguageOf(error)) {
           notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
         } else if (sessionStore.getState().errorCode === 'AUDIODEVICEUNAVAILABLE') {
-          notifyError(t('overlay.audioDeviceOpenFailed', { device: audioDeviceNameOf(config.audioSource, devices, t('overlay.selectedAudioDevice')) }))
+          notifyError(t('overlay.audioDeviceOpenFailed', { device: audioDeviceNameOf(config.audioSource, devices, t('overlay.selectedAudioDevice')) }), { supportCode: 'AUD-002' })
         } else if (sessionStore.getState().errorCode === null) {
           /*
            * This failure happens before the session store records it, so report

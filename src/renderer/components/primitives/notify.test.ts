@@ -13,11 +13,11 @@ it('describes known IPC failures in the current interface language without expos
   document.documentElement.lang = 'ja'
   const showToast = vi.spyOn(toast, 'showToast')
   notifyError('Export failed', { cause: new Error("Error invoking remote method 'comic:export': Error: modelOutOfMemory") })
-  expect(showToast).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Export failed', description: translate('errors.modelOutOfMemory', 'ja') }))
+  expect(showToast).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Export failed', description: `${translate('errors.modelOutOfMemory', 'ja')} (MDL-020)` }))
   notifyError('Export failed', { cause: new Error('secret path or provider response') })
-  expect(showToast).toHaveBeenLastCalledWith({ type: 'error', description: 'Export failed', duration: 10000 })
+  expect(showToast).toHaveBeenLastCalledWith({ type: 'error', description: 'Export failed (ERR-999)', duration: 10000 })
   notifyError('Export failed', { cause: { code: 'ENOSPC', supportCode: 'STO-022' }, description: 'Choose another disk.' })
-  expect(showToast).toHaveBeenLastCalledWith(expect.objectContaining({ description: 'Choose another disk.' }))
+  expect(showToast).toHaveBeenLastCalledWith(expect.objectContaining({ description: 'Choose another disk. (STO-022)' }))
 })
 
 it('routes caption-window errors to the dedicated overlay notification', () => {
@@ -31,9 +31,19 @@ it('routes caption-window errors to the dedicated overlay notification', () => {
   expect(showToast).not.toHaveBeenCalled()
   expect(notifyMainError).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
     type: 'error',
-    message: 'Audio device unavailable',
+    message: 'Audio device unavailable (ERR-999)',
     duration: 10000,
   }))
+})
+
+it('shows the audio device code once alongside the localized body', () => {
+  const showToast = vi.spyOn(toast, 'showToast')
+  for (const locale of ['en', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja'] as const) {
+    const message = translate('overlay.audioDeviceOpenFailed', locale, { device: 'USB Mic' })
+    expect(message).not.toContain('AUD-002')
+    notifyError(message, { supportCode: 'AUD-002' })
+    expect(showToast).toHaveBeenLastCalledWith({ type: 'error', description: `${message} (AUD-002)`, duration: 10000 })
+  }
 })
 
 it('gives loading notices a finite automatic duration', () => {
@@ -63,7 +73,7 @@ it('shows a local-model availability toast in the app with a gateway action', ()
     actionProps: { children: '模型网关', onClick: expect.any(Function) },
   }))
   const notice = showToast.mock.calls[0][0]
-  if ('actionProps' in notice) notice.actionProps.onClick()
+  notice.actionProps?.onClick()
   expect(openMainPage).toHaveBeenCalledExactlyOnceWith('#/model-gateway')
 })
 
@@ -99,7 +109,7 @@ it('reports a failed model even while Model Gateway is running', async () => {
   await expect(notifyGatewayStartIssue(t, 'asr', model)).resolves.toBe(true)
   expect(showToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
     title: t('gateway.selectedModelUnavailable', { name: t('gateway.asr') }),
-    description: t('errors.modelOutOfMemory'),
+    description: `${t('errors.modelOutOfMemory')} (MDL-020)`,
   }))
 })
 

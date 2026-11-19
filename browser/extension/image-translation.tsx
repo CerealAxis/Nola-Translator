@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../src/renderer/components/ui/button'
 import { Card } from '../../src/renderer/components/ui/card'
 import { showToast } from '../../src/renderer/components/ui/toast'
-import { browserText, errorKey } from './i18n'
+import { browserErrorDescription, browserText } from './i18n'
 import { translateImage } from './provider-client'
 import type { Preferences } from './preferences'
 
@@ -58,7 +58,7 @@ export function ImageTranslation({ initialRect, preferences, container, capture,
   const [pending, setPending] = useState(false)
   const controller = useRef(new AbortController())
   const notifyError = (e: unknown, fallback: string) => {
-    if (!controller.current.signal.aborted) showToast({ type: 'error', description: t(errorKey(e instanceof Error ? e.message : fallback)) })
+    if (!controller.current.signal.aborted) showToast({ type: 'error', description: browserErrorDescription(t, e instanceof Error ? e.message : fallback) })
   }
   useEffect(() => () => controller.current.abort(), [])
   useEffect(() => { void capture(initialRect).then(setImage).catch(e => notifyError(e, 'imageCaptureFailed')) }, [])

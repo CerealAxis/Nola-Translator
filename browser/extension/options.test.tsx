@@ -296,7 +296,7 @@ describe('extension settings', () => {
     vi.mocked(testProvider).mockRejectedValueOnce(new Error('providerPermission'))
     await user.click(screen.getByRole('button', { name: 'Test connection' }))
     expect(testProvider).toHaveBeenCalledWith(expect.objectContaining({ preset: 'google-translate' }))
-    expect(showToast).toHaveBeenCalledWith({ type: 'error', title: 'Google Translate', description: browserText('en')('providerPermission') })
+    expect(showToast).toHaveBeenCalledWith({ type: 'error', description: browserText('en')('providerPermission') })
     expect(saveProviders).not.toHaveBeenCalled()
   })
   it('searches settings without hiding the matching controls', async () => {

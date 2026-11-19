@@ -39,7 +39,8 @@ import { defaultRealtimeS2s, MIMO_TTS_BINDING, NO_TRANSLATION_LANGUAGE, REALTIME
 import { z } from 'zod'
 import { isModelEnabled, sceneModelBinding } from '../shared/model-policy'
 import { gatewayConcurrency, bindingIsLocal, resolveSessionModelBindings } from '../shared/model-gateway'
-import { meetingAudioTestRequestSchema, meetingModeSettingsSchema } from '../shared/meeting-mode'
+import { meetingModeSettingsSchema } from '../shared/meeting-mode'
+import { audioSourceSchema } from '../shared/schemas'
 import type { SessionConfig } from '../shared/contracts'
 import type { MainErrorNotification } from '../shared/bridge'
 import { randomUUID, createHash } from 'node:crypto'
@@ -914,7 +915,7 @@ if (!hasSingleInstanceLock) {
 
     }
     const sessions: SessionController = new SessionController({
-      engine: desktopEngine, audioTestEngine: engine, meetings, activity, useGateway: true,
+      engine: desktopEngine, meetings, activity, useGateway: true,
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
       prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady,
       startingChanged: starting => { sessionStarting = starting },
@@ -1102,12 +1103,66 @@ if (!hasSingleInstanceLock) {
       for (const window of [mainWindow, workspaceWindow, overlayWindow]) {
         if (window && !window.isDestroyed()) window.webContents.send('meeting-mode:changed', snapshot)
       }
-    }, async () => {
-      if (process.platform !== 'win32') throw new MeetingModeError({ key: 'meeting.windowsRequired' })
-      if (sessions.busy || browserSessions.busy || componentInstalling) throw new MeetingModeError({ key: 'meeting.busy' })
-      await ensureRealtimeBackend()
-      if (!backend?.ready) throw new MeetingModeError({ key: 'meeting.backendUnavailable' })
-      return backend
+    })
+    let inputPreview: { id: string; abort: AbortController; done: Promise<void> } | undefined
+    loggedHandle('audio:preview-input', (event, value: unknown, previewId: unknown) => {
+      assertFeatureSender(event, true)
+      const source = audioSourceSchema.parse(value)
+      if (source.kind === 'browserTab') throw new Error('invalidConfiguration')
+      const id = z.uuid().parse(previewId)
+      if (inputPreview || componentInstalling || sessions.busy || browserSessions.busy || activity.has('meeting')) throw new Error('sessionAlreadyRunning')
+      const abort = new AbortController()
+      const stop = () => abort.abort()
+      const lease = activity.acquire('interpretation', async () => { stop(); await inputPreview?.done.catch(() => undefined) })
+      const sender = event.sender
+      sender.once('destroyed', stop)
+      sender.once('render-process-gone', stop)
+      const onNavigation = (details: Electron.WebContentsDidStartNavigationEventParams) => {
+        if (details.isMainFrame && !details.isSameDocument) stop()
+      }
+      sender.on('did-start-navigation', onNavigation)
+      const done = (async () => {
+        await ensureRealtimeBackend()
+        if (abort.signal.aborted) return
+        if (!backend?.ready) throw new Error('realtimeBackendUnavailable')
+        const response = await fetch(new URL('/api/v2/audio/input-levels', backend.baseUrl), {
+          method: 'POST', headers: { ...backend.authorizationHeader(), 'content-type': 'application/json' },
+          body: JSON.stringify(source.kind === 'processAudio'
+            ? { kind: 'process_audio', capture_backend: 'windows_process_include', process_selection_id: source.deviceId.slice('process:'.length) }
+            : { kind: source.kind === 'microphone' ? 'microphone' : source.kind === 'virtualInput' ? 'virtual_input' : 'system_audio',
+              capture_backend: source.kind === 'virtualInput' ? 'virtual_input' : 'device', ...('deviceId' in source ? { device_id: source.deviceId } : {}) }),
+          signal: abort.signal,
+        })
+        if (!response.ok || !response.body) throw new Error('audioDeviceUnavailable')
+        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
+        let pending = ''
+        try {
+          while (!abort.signal.aborted) {
+            const chunk = await reader.read()
+            if (chunk.done) throw new Error('audioDeviceDisconnected')
+            const lines = (pending + chunk.value).split('\n')
+            pending = lines.pop() ?? ''
+            for (const line of lines) {
+              if (!/^\d{1,3}$/.test(line) || Number(line) > 100) throw new Error('audioDeviceUnavailable')
+              if (!sender.isDestroyed()) sender.send('audio:input-level', id, Number(line))
+            }
+          }
+        } finally { await reader.cancel().catch(() => undefined) }
+      })().catch(error => { if (!abort.signal.aborted) throw error }).finally(() => {
+        sender.removeListener('destroyed', stop)
+        sender.removeListener('render-process-gone', stop)
+        sender.removeListener('did-start-navigation', onNavigation)
+        inputPreview = undefined
+        lease.release()
+      })
+      inputPreview = { id, abort, done }
+      return done
+    })
+    loggedHandle('audio:stop-input-preview', async (event, previewId: unknown) => {
+      assertFeatureSender(event, true)
+      if (!inputPreview || inputPreview.id !== z.uuid().parse(previewId)) return
+      inputPreview.abort.abort()
+      await inputPreview.done.catch(() => undefined)
     })
     loggedHandle('meeting-mode:snapshot', event => { assertFeatureSender(event); return meetingMode.snapshot() })
     loggedHandle('meeting-mode:start', (event, value: unknown) => {
@@ -1116,12 +1171,8 @@ if (!hasSingleInstanceLock) {
     })
     loggedHandle('meeting-mode:stop', event => { assertFeatureSender(event); return meetingMode.stop() })
     loggedHandle('meeting-mode:set-paused', (event, value: unknown) => { assertFeatureSender(event); return meetingMode.setPaused(z.boolean().parse(value)) })
-    loggedHandle('meeting-mode:test-audio', (event, value: unknown) => {
-      assertFeatureSender(event, true)
-      return meetingMode.testAudio(meetingAudioTestRequestSchema.parse(value))
-    })
-    loggedHandle('meeting-mode:cancel-test', async event => { assertFeatureSender(event, true); await meetingMode.cancelAudioTest() })
     stopSessions = async () => {
+      inputPreview?.abort.abort()
       await Promise.all([sessions.stopCurrent(), browserSessions.stopCurrent(), meetingMode.stop()])
       await Promise.all([desktopEngine.stop(), browserEngine.stop()])
     }
@@ -1469,14 +1520,12 @@ if (!hasSingleInstanceLock) {
       mainDir: __dirname, configPath: join(dataRoot, 'screen-translation.json'),
       gatewaySnapshot: () => gateway!.snapshot(),
       getMainWindow: () => mainWindow,
-      prepareOcr: async () => gateway!.acquireOcr(), inferOcr: (request, signal) => gateway!.inferOcr(request, signal),
+      prepareOcr: async language => gateway!.acquireOcr(language), inferOcr: (request, signal) => gateway!.inferOcr(request, signal),
       captureScreen: (request, signal) => screenOcr!.capture(request, signal),
       releaseScreenCapture: sessionId => screenOcr!.releaseCapture(sessionId),
       settings: () => settings.current(), inferModel: (request, signal) => gateway!.infer(request, signal), activity,
       publish: snapshot => {
-        for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) {
-          window.webContents.send('screen:changed', snapshot)
-        }
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('screen:changed', snapshot)
         if (lastScreenStatus !== snapshot.status) { lastScreenStatus = snapshot.status; tray?.refresh() }
       },
     })

@@ -46,7 +46,7 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
     if (row && transcript.current) transcript.current.scrollTop = Math.max(0, row.offsetTop - transcript.current.offsetTop - transcript.current.clientHeight / 2)
   }, [currentTime, transcriptOpen, state.preferences?.subtitleFollow, subtitles?.transcript])
   const t = browserText(state.preferences?.uiLanguage)
-  useErrorToasts(t, state.liveAttempted ? state.error : undefined, subtitles?.error, saveError || exportError ? 'internalError' : undefined)
+  useErrorToasts('content', t, state.liveAttempted ? state.error : undefined, subtitles?.error, saveError || exportError ? 'internalError' : undefined)
   const preferences = state.preferences
   const liveEnabled = preferences ? liveTranslationEnabled(preferences) : false
   const summaryEnabled = preferences?.llmProvider !== DISABLED_PROVIDER

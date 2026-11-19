@@ -4,6 +4,7 @@ import { actions, stores } from '@/store'
 import { useI18n } from '@/i18n'
 import { notifyInfo, notifyRetryableFailure, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { settingsPath } from '@/routes'
+import { supportErrorCodeForCause } from '../../../shared/error-catalog'
 
 const suppressedStartNotices = new Set<string>()
 const reportedRemoveFailures = new Set<string>()
@@ -16,9 +17,10 @@ export function suppressNextDownloadStartNotice(resourceId: string) {
  * A download that stopped. The user can start it again from the page, so the notice only has
  * to say what went wrong and leaves on its own.
  */
-export function notifyModelDownloadFailure(title: string, description: string, actionLabel: string, retry: () => void) {
+export function notifyModelDownloadFailure(title: string, description: string, actionLabel: string, retry: () => void, supportCode?: string) {
   notifyRetryableFailure(title, {
     description,
+    supportCode,
     action: { label: actionLabel, onPress: retry },
   })
 }
@@ -27,6 +29,7 @@ export function notifyModelRemoveFailure(record: Pick<ResourceRecord, 'resourceI
   if (reportedRemoveFailures.has(record.resourceId)) return
   reportedRemoveFailures.add(record.resourceId)
   notifyRetryableFailure(t('modelsSettingsUi.removeFailed'), {
+    supportCode: 'MDL-021',
     cause,
     description: t('modelsSettingsUi.removeFailedDescription'),
     action: {
@@ -102,6 +105,7 @@ function notifyFailure(record: Pick<ResourceRecord, 'resourceId' | 'name' | 'err
   if (record.errorCode === 'diskSpaceInsufficient' || record.errorCode === 'resourceDiskSpaceInsufficient') {
     notifyRetryableFailure(t('models.downloadDiskSpaceTitle'), {
       description: t('models.downloadDiskSpaceDescription'),
+      supportCode: 'STO-022',
       action: { label: t('models.openStorageSettings'), onPress: () => { window.location.hash = settingsPath('storage') } },
     })
     return
@@ -125,5 +129,6 @@ function notifyFailure(record: Pick<ResourceRecord, 'resourceId' | 'name' | 'err
         })
       })
     },
+    record.errorCode ? supportErrorCodeForCause(record.errorCode) : 'NET-006',
   )
 }

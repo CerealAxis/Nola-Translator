@@ -7,6 +7,7 @@
 
 import type { NolaBridge, RouteId } from '../contract'
 import type { NolaTranslatorApi } from '../../../shared/bridge'
+import { restoreIpcError } from '../../../shared/ipc-error'
 import type {
   AppSettings,
   AppSettingsPatch,
@@ -77,10 +78,22 @@ function reportMissingIpcApi(method: string): void {
  * injection is not a hard failure. With no bridge, reject with the method name:
  * a bare "engine unavailable" says nothing when a dozen calls can fail.
  */
-function call<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTranslatorApi) => Promise<T>): Promise<T> {
+async function call<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTranslatorApi) => Promise<T>): Promise<T> {
   const injected = injectedApi()
-  if (!injected) return Promise.reject(new MissingIpcApiError(String(method)))
-  return run(injected)
+  if (!injected) throw new MissingIpcApiError(String(method))
+  try { return await run(injected) }
+  catch (error) { throw restoreIpcError(error) }
+}
+
+function adaptFeature<T extends object>(feature: T | undefined): T | undefined {
+  if (!feature) return undefined
+  return Object.fromEntries(Object.entries(feature).map(([key, method]) => [
+    key,
+    typeof method === 'function' ? (...args: unknown[]) => {
+      const result = Reflect.apply(method, feature, args)
+      return result instanceof Promise ? result.catch(error => { throw restoreIpcError(error) }) : result
+    } : method,
+  ])) as T
 }
 
 /**
@@ -98,13 +111,13 @@ function subscribe<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTrans
 
 export function createIpcBridge(): NolaBridge {
   return {
-    screenTranslation: injectedApi()?.screenTranslation,
-    desktopData: injectedApi()?.desktopData,
-    glossary: injectedApi()?.glossary,
-    comic: injectedApi()?.comic,
-    wordRules: injectedApi()?.wordRules,
-    gameTranslation: injectedApi()?.gameTranslation,
-    workspaceView: injectedApi()?.workspaceView,
+    screenTranslation: adaptFeature(injectedApi()?.screenTranslation),
+    desktopData: adaptFeature(injectedApi()?.desktopData),
+    glossary: adaptFeature(injectedApi()?.glossary),
+    comic: adaptFeature(injectedApi()?.comic),
+    wordRules: adaptFeature(injectedApi()?.wordRules),
+    gameTranslation: adaptFeature(injectedApi()?.gameTranslation),
+    workspaceView: adaptFeature(injectedApi()?.workspaceView),
     requestQuit: () => call('requestQuit', api => api.requestQuit?.() ?? Promise.reject(new MissingIpcApiError('requestQuit'))),
     confirmQuit: () => call('confirmQuit', api => api.confirmQuit?.() ?? Promise.reject(new MissingIpcApiError('confirmQuit'))),
     onQuitRequested: cb => injectedApi()?.onQuitRequested?.(cb) ?? (() => undefined),
@@ -126,8 +139,6 @@ export function createIpcBridge(): NolaBridge {
       start: settings => call('meetingMode', api => api.meetingMode!.start(settings)),
       stop: () => call('meetingMode', api => api.meetingMode!.stop()),
       setPaused: paused => call('meetingMode', api => api.meetingMode!.setPaused(paused)),
-      testAudio: request => call('meetingMode', api => api.meetingMode!.testAudio(request)),
-      cancelAudioTest: () => call('meetingMode', api => api.meetingMode!.cancelAudioTest()),
       onChanged: cb => subscribe('meetingMode', api => api.meetingMode?.onChanged ?? (() => () => undefined), cb),
     } : undefined,
     onboardingCard: {
@@ -165,7 +176,15 @@ export function createIpcBridge(): NolaBridge {
     engine: {
       listComputeDevices: () => call('listComputeDevices', (injected) => injected.listComputeDevices()),
       listDevices: () => call('listDevices', (injected) => injected.listDevices()),
-      testAudio: source => call('testAudio', injected => injected.testAudio(source)),
+      previewAudioInput: (source, onLevel, signal) => call('previewAudioInput', async injected => {
+        signal.throwIfAborted()
+        const id = crypto.randomUUID()
+        const off = injected.onAudioInputLevel((requestId, level) => { if (id === requestId && !signal.aborted) onLevel(level) })
+        const stop = () => { void injected.stopAudioInputPreview(id).catch(() => undefined) }
+        signal.addEventListener('abort', stop, { once: true })
+        try { await injected.previewAudioInput(source, id) }
+        finally { off(); signal.removeEventListener('abort', stop) }
+      }),
       listResources: () => call('listResources', (injected) => injected.listResources() as Promise<ResourceSnapshotWithRate>),
       manageResource: (resourceId, action, source) => call('manageResource', (injected) => injected.manageResource(resourceId, action, source)),
       startSession: (config) => call('startSession', (injected) => injected.startSession(config)) as Promise<SessionStartResult>,

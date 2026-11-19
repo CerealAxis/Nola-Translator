@@ -32,12 +32,14 @@ export function FeatureActivityNotice() {
         for (const kind of ['asr', 'mt', 'tts', 'llm'] as const) {
           const service = snapshot.services[kind]
           const before = previous.services[kind]
-          if (!stopping && service.state === 'failed' && (before.state !== 'failed' || before.error !== service.error)) {
+          if (!stopping && service?.state === 'failed' && (before?.state !== 'failed' || before.error !== service.error)) {
             console.error(`[gateway.${kind}]`, service.error)
             const code = supportErrorCodeForCause(service.errorCode)
+            const outOfMemory = code === 'ERR-999' && /out of memory|\boom\b|cuda.*alloc/i.test(service.error ?? '')
             notifyError(t('gateway.capabilityFailed', { name: t(`gateway.${kind}`) }), {
+              supportCode: outOfMemory ? 'MDL-020' : code,
               description: t(code !== 'ERR-999' ? SUPPORT_ERROR_CATALOG[code].messageKey
-                : /out of memory|\boom\b|cuda.*alloc/i.test(service.error ?? '') ? 'gateway.memoryFailed' : 'gateway.serviceFailed'),
+                : outOfMemory ? 'gateway.memoryFailed' : 'gateway.serviceFailed'),
             })
           }
         }

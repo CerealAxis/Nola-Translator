@@ -1,5 +1,5 @@
 import userEvent from '@testing-library/user-event'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { detachSettingsStore, settingsStore } from '@/store/settingsStore'
 import * as settingsActions from '@/store/settingsStore'
@@ -14,13 +14,27 @@ import { EngineDiagnostics, ResetSettingsGroup } from './tabs/AdvancedTab'
 import { parseRoute, SETTINGS_TABS } from '@/routes'
 import { StorageTab } from './tabs/StorageTab'
 import { AudioTab } from './tabs/AudioTab'
+import { AppearanceTab } from './tabs/AppearanceTab'
+import { OverlayCaptionPreview } from '@/features/overlay/OverlayCaptionPreview'
 import * as fontLoader from '@/theme/interface-font'
 import * as notifications from '@/components/primitives/notify'
+import * as store from '@/store'
+import { createIpcBridge } from '@/bridge/ipc/ipcBridge'
 
 beforeEach(() => {
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
 })
 afterEach(() => { cleanup(); detachSettingsStore(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
+
+it('uses the same caption preview scrim in settings and quick interpretation', () => {
+  for (const overlay of [DEFAULT_SETTINGS.overlay, { ...DEFAULT_SETTINGS.overlay, colorScheme: 'light' as const, backgroundColor: '#eeeeee', backgroundOpacity: 0.5 }]) {
+    const page = render(<><AppearanceTab settings={{ ...DEFAULT_SETTINGS, overlay }} /><OverlayCaptionPreview config={overlay} /></>)
+    const previews = page.container.querySelectorAll<HTMLElement>('.nola-caption-preview')
+    expect(previews[0].style.getPropertyValue('--preview-scrim-color')).toBeTruthy()
+    expect(previews[0].style.getPropertyValue('--preview-scrim-color')).toBe(previews[1].style.getPropertyValue('--preview-scrim-color'))
+    page.unmount()
+  }
+})
 
 it('shows proxy scope switches only when a proxy address is configured', () => {
   const labels = ['将代理应用到 Pip', '将代理应用到模型下载', '将代理应用到组件下载']
@@ -47,7 +61,11 @@ it('reuses device results when the compute tab is opened again', () => {
   render(<ComputeTab settings={DEFAULT_SETTINGS} />)
   expect(runtime).not.toHaveBeenCalled()
   expect(compute).not.toHaveBeenCalled()
-  expect(screen.getByRole('button', { name: '刷新设备' })).toBeInTheDocument()
+  const buttons = screen.getAllByRole('button', { name: '重新检查' })
+  expect(buttons.map(button => button.closest('.settings-group__heading')?.querySelector('h2')?.textContent))
+    .toEqual([screen.getByRole('heading', { name: /计算/ }).textContent, '运行组件'])
+  for (const button of buttons) expect(button.querySelector('svg')).toBeNull()
+  expect(screen.queryByRole('heading', { name: '环境修复' })).not.toBeInTheDocument()
 })
 
 it('scrolls the main settings viewport to the inference engine section', () => {
@@ -106,7 +124,9 @@ it('saves density and restores appearance defaults without resetting subtitle se
   await user.click(screen.getByRole('combobox', { name: '界面密度' }))
   await user.click(await screen.findByRole('option', { name: '宽松' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ appearance: { density: 'comfortable' } }))
-  await user.click(screen.getByRole('button', { name: '恢复默认' }))
+  const restore = screen.getByRole('button', { name: '恢复默认' })
+  expect(restore.closest('.settings-group__heading')).toContainElement(screen.getByRole('heading', { name: '外观' }))
+  await user.click(restore)
   expect(update).toHaveBeenLastCalledWith({ appearance: DEFAULT_SETTINGS.appearance })
 })
 
@@ -123,14 +143,14 @@ it('keeps the saved font when the selected font cannot load', async () => {
   expect(screen.getByRole('combobox', { name: '界面字体' })).toHaveTextContent('系统默认字体')
 })
 
-it('separates engine diagnostics, data reset and help content', async () => {
-  vi.spyOn(settingsActions, 'readDiagnostics').mockResolvedValue({ version: '1.0.7' })
+it('shows the engine summary and keeps diagnostic copying in Help and About', () => {
   settingsStore.setState({ settings: DEFAULT_SETTINGS, loaded: true })
   const advanced = render(<EngineDiagnostics />)
   expect(screen.queryByRole('button', { name: '恢复出厂设置' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '复制诊断信息' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '查看' })).not.toBeInTheDocument()
-  await waitFor(() => expect(screen.getByText('version')).toBeInTheDocument())
+  expect(screen.getByRole('heading', { name: '引擎' })).toBeVisible()
+  expect(screen.queryByRole('heading', { name: '诊断明细' })).not.toBeInTheDocument()
   advanced.unmount()
   const reset = render(<ResetSettingsGroup />)
   expect(screen.getByRole('button', { name: '恢复出厂设置' })).toBeInTheDocument()
@@ -174,6 +194,8 @@ it('lists user settings including glossary and removes retired routes', () => {
 it('keeps translation with audio and moves recording retention to data settings', async () => {
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
   const audio = render(<AudioTab settings={DEFAULT_SETTINGS} />)
+  expect(screen.getByRole('button', { name: '恢复默认' }).closest('.settings-group__heading'))
+    .toContainElement(screen.getByRole('heading', { name: '语音分段' }))
   expect(screen.getByRole('switch', { name: '翻译未定稿字幕' })).toBeInTheDocument()
   expect(screen.queryByRole('switch', { name: '保存录音' })).not.toBeInTheDocument()
   audio.unmount()
@@ -182,4 +204,92 @@ it('keeps translation with audio and moves recording retention to data settings'
   fireEvent.click(retention)
   await waitFor(() => expect(update).toHaveBeenCalledWith({ recording: { keepAudio: false } }))
   expect(screen.getByRole('button', { name: '恢复出厂设置' })).toBeInTheDocument()
+})
+
+it('rechecks the virtual sound card driver from the version row', async () => {
+  const bridge = createIpcBridge()
+  const version = vi.fn<() => Promise<string | null>>().mockResolvedValueOnce('3.3.1.7').mockResolvedValueOnce('3.3.1.8')
+  vi.spyOn(store, 'getBridge').mockReturnValue({ ...bridge, app: { ...bridge.app, getVirtualCableDriverVersion: version } })
+  render(<AudioTab settings={DEFAULT_SETTINGS} />)
+  const currentVersion = await screen.findByText('3.3.1.7')
+  const check = screen.getByRole('button', { name: '重新检查' })
+  expect(check.closest('.settings-row')).toContainElement(currentVersion)
+  expect(check.textContent).toBe('')
+  expect(check.querySelector('svg')).not.toBeNull()
+  fireEvent.click(check)
+  expect(await screen.findByText('3.3.1.8')).toBeVisible()
+  expect(version).toHaveBeenCalledTimes(2)
+})
+
+it('places the shortcut reset in the page heading', () => {
+  settingsStore.setState({ settings: DEFAULT_SETTINGS, loaded: true })
+  window.history.replaceState(null, '', '#/settings/shortcuts')
+  render(<SettingsPage />)
+  const heading = screen.getByRole('heading', { name: '快捷键', level: 1 })
+  expect(heading.closest('header')).toContainElement(screen.getByRole('button', { name: '全部恢复默认' }))
+})
+
+it('shows audio levels in separate rows and stops live input preview on request or navigation', async () => {
+  const notify = vi.spyOn(notifications, 'notifyInfo').mockReturnValue('preview')
+  const bridge = createIpcBridge()
+  let signal!: AbortSignal
+  let updateLevel!: (level: number) => void
+  const preview = vi.spyOn(bridge.engine, 'previewAudioInput').mockImplementation((_source, onLevel, abort) => {
+    signal = abort
+    updateLevel = onLevel
+    return new Promise(resolve => signal.addEventListener('abort', () => resolve(), { once: true }))
+  })
+  vi.spyOn(store, 'getBridge').mockReturnValue(bridge)
+  const view = render(<AudioTab settings={{ ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, audioSource: 'wasapi:microphone:mic' } }} />)
+  const input = screen.getByRole('meter', { name: '输入等级' })
+  const output = screen.getByRole('meter', { name: '输出等级' })
+  const test = screen.getByRole('button', { name: '测试输入' })
+  expect(test).toHaveTextContent(/^测试$/)
+  expect(screen.getByRole('button', { name: '测试扬声器' })).toHaveTextContent(/^测试$/)
+  expect(input.closest('.settings-row')).not.toBe(test.closest('.settings-row'))
+  expect(output.closest('.settings-row')).not.toBe(screen.getByRole('button', { name: '测试扬声器' }).closest('.settings-row'))
+  fireEvent.click(test)
+  expect(notify).toHaveBeenCalledWith('请对着麦克风说话')
+  expect(preview).toHaveBeenCalledWith({ kind: 'microphone', deviceId: 'wasapi:microphone:mic' }, expect.any(Function), expect.anything())
+  act(() => updateLevel(37))
+  expect(input).toHaveAttribute('aria-valuenow', '37')
+  const stop = screen.getByRole('button', { name: '停止' })
+  expect(stop).toHaveTextContent(/^停止$/)
+  expect(stop).toHaveAttribute('data-variant', 'destructive')
+  await act(async () => { fireEvent.click(stop) })
+  expect(signal.aborted).toBe(true)
+  expect(input).toHaveAttribute('aria-valuenow', '0')
+  view.rerender(<AudioTab settings={DEFAULT_SETTINGS} />)
+  fireEvent.click(screen.getByRole('button', { name: '测试输入' }))
+  expect(notify).toHaveBeenLastCalledWith('请播放声音')
+  await act(async () => view.unmount())
+  expect(signal.aborted).toBe(true)
+})
+
+it('loops the selected speaker test tone until the user stops it', async () => {
+  const notify = vi.spyOn(notifications, 'notifyInfo').mockReturnValue('preview')
+  const tone = { loop: false, start: vi.fn(), connect: vi.fn(node => node) }
+  const close = vi.fn(async () => undefined)
+  vi.stubGlobal('AudioContext', class {
+    sampleRate = 8000
+    destination = {}
+    resume = async () => undefined
+    close = close
+    createBuffer = () => ({ getChannelData: () => new Float32Array(16000) })
+    createBufferSource = () => tone
+    createAnalyser = () => ({ fftSize: 32, connect: vi.fn(), getFloatTimeDomainData: (samples: Float32Array) => { samples[0] = 0.12 } })
+  })
+  render(<AudioTab settings={DEFAULT_SETTINGS} />)
+  fireEvent.click(screen.getByRole('button', { name: '测试扬声器' }))
+  await waitFor(() => expect(tone.start).toHaveBeenCalledOnce())
+  expect(tone.loop).toBe(true)
+  expect(close).not.toHaveBeenCalled()
+  expect(notify).toHaveBeenCalledWith('请播放声音')
+  expect(screen.getByRole('meter', { name: '输出等级' })).toHaveAttribute('aria-valuenow', '12')
+  const stop = screen.getByRole('button', { name: '停止' })
+  expect(stop).toHaveTextContent(/^停止$/)
+  expect(stop).toHaveAttribute('data-variant', 'destructive')
+  fireEvent.click(stop)
+  await waitFor(() => expect(screen.getByRole('meter', { name: '输出等级' })).toHaveAttribute('aria-valuenow', '0'))
+  expect(close).toHaveBeenCalled()
 })

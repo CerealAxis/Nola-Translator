@@ -72,7 +72,7 @@ function OverlayToastWindow() {
         ? { type, title: notification.message, description: notification.description, actionProps: action, duration: notification.duration }
         : { type, title: notification.message, description: notification.description, duration: notification.duration }
       : action
-        ? { type, title: notification.message, actionProps: action, duration: notification.duration }
+        ? { type, description: notification.message, actionProps: action, duration: notification.duration }
         : { type, description: notification.message, duration: notification.duration }
     showToast(toast)
   }), [])

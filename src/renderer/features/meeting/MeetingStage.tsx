@@ -1,19 +1,15 @@
 import { useId } from 'react'
 import { AudioLines, Headphones, Mic, UserRound } from 'lucide-react'
-import type { MeetingAudioTestResult, MeetingModeSettings, MeetingModeSnapshot } from '../../../shared/meeting-mode'
+import type { MeetingModeSettings, MeetingModeSnapshot } from '../../../shared/meeting-mode'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent } from '@/components/ui/card'
 import { useI18n, type TranslationKey } from '@/i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 type WireState = 'idle' | 'connected' | 'active' | 'failed'
-type Checks = Partial<Record<'microphoneId' | 'uplinkOutputId' | 'downlinkInputId' | 'headphonesId', MeetingAudioTestResult>>
-
-export function MeetingStage({ mode, snapshot, checks, heard }: {
+export function MeetingStage({ mode, snapshot }: {
   mode: MeetingModeSettings
   snapshot: MeetingModeSnapshot
-  checks: Checks
-  heard: boolean
 }) {
   const { t } = useI18n()
   const arrowId = useId().replaceAll(':', '')
@@ -22,16 +18,12 @@ export function MeetingStage({ mode, snapshot, checks, heard }: {
     if (!enabled || snapshot.state === 'unknown' || snapshot.state === 'stopping') return ['idle', 'idle']
     const glossaryWarning = snapshot.state === 'running' && (snapshot.error?.code === 'glossaryUnsupported' || snapshot.error?.code === 'glossaryBudgetExceeded')
     if (snapshot.error && !glossaryWarning && (!snapshot.error.direction || snapshot.error.direction === direction)) return ['failed', 'failed']
-    const input = checks[direction === 'uplink' ? 'microphoneId' : 'downlinkInputId']
-    const output = checks[direction === 'uplink' ? 'uplinkOutputId' : 'headphonesId']
     const lane = snapshot.state === 'running' ? snapshot.telemetry?.[direction] : undefined
     const fresh = lane?.inputAgeMs != null && lane.inputAgeMs < 1500
     const receiving = fresh && lane.inputPeak > 0.01 && !snapshot.paused
     const playing = lane?.playback === 'playing' && !snapshot.paused
-    // An output write alone cannot verify that the selected headphones are audible.
-    return [receiving ? 'active' : fresh ? 'connected' : input?.error ? 'failed' : input?.hasSignal ? 'connected' : 'idle',
-      playing ? 'active' : lane?.playback === 'finished' ? 'connected' : output?.error ? 'failed'
-        : (direction === 'uplink' ? output?.hasSignal : heard) ? 'connected' : 'idle']
+    return [receiving ? 'active' : fresh ? 'connected' : 'idle',
+      playing ? 'active' : lane?.playback === 'finished' ? 'connected' : 'idle']
   }
   const [upInput, upOutput] = states('uplink')
   const [downInput, downOutput] = states('downlink')

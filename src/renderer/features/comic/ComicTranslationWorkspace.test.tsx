@@ -19,6 +19,7 @@ import { flushComicSaves } from './comic-data'
 import * as notices from '@/components/primitives/notify'
 
 vi.mock('@/available-models', () => ({
+  useGatewaySnapshot: () => ({ state: 'running' }),
   useAvailableModels: vi.fn(() => ({
     mt: [],
     llm: [],

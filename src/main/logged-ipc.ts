@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { normalizeThrownError } from '../shared/ipc-error'
+import { encodeIpcError, normalizeThrownError } from '../shared/ipc-error'
 import { featureConflictOwner } from '../shared/feature-activity'
 import { logDiagnostic } from './session-log'
 
@@ -24,30 +24,29 @@ export function configureIpcSenderValidation(validate: typeof assertSender): voi
 }
 
 /** Record IPC operations centrally without persisting credential or document payloads. */
-export function loggedHandle(channel: string, listener: Parameters<typeof ipcMain.handle>[1]): void {
+export function loggedHandle(channel: string, listener: Parameters<typeof ipcMain.handle>[1], validate?: typeof assertSender): void {
   ipcMain.handle(channel, async (event, ...args: unknown[]) => {
     const operationId = randomUUID()
     const started = performance.now()
-    const privatePayload = /^(glossary|word-rules|comic|game|meeting|desktop-data):/.test(channel)
+    const privatePayload = /^(glossary|word-rules|comic|game|meeting|desktop-data|screen):/.test(channel)
     const privateArguments = privatePayload || /credential|hub:(search|model-card)|app:(agent-workspace|update-settings)|offline:select-model/.test(channel)
     logDiagnostic('ipc.request', { operationId, channel, windowId: event.sender?.id,
       arguments: privateArguments ? { count: args.length, contents: '[omitted]' } : args })
     pendingInvocations++
     try {
-      assertSender(event)
+      const validateSender = validate ?? assertSender
+      validateSender(event)
       const result: unknown = await listener(event, ...args)
       logDiagnostic('ipc.complete', { operationId, channel, durationMs: Math.round(performance.now() - started),
         resultType: result === null ? 'null' : Array.isArray(result) ? 'array' : typeof result,
         resultCount: Array.isArray(result) ? result.length : undefined, result: privatePayload ? '[omitted]' : result })
       return result
     } catch (error) {
-      const correlationId = randomUUID()
-      const classification = normalizeThrownError(error, { correlationId, operation: channel })
-      logDiagnostic('ipc.failed', { operationId, channel, durationMs: Math.round(performance.now() - started), correlationId, classification, error })
+      const classification = normalizeThrownError(error, { correlationId: operationId, operation: channel })
+      logDiagnostic('ipc.failed', { operationId, channel, durationMs: Math.round(performance.now() - started),
+        correlationId: classification.correlationId, classification, error })
       const owner = featureConflictOwner(error)
-      const rendererError = new Error(owner ? `FEATURE_CONFLICT:${owner}` : classification.code)
-      Object.assign(rendererError, classification)
-      throw rendererError
+      throw new Error(encodeIpcError(owner ? `FEATURE_CONFLICT:${owner}` : classification.code, classification))
     } finally {
       pendingInvocations--
       if (!pendingInvocations) for (const resolve of [...idleWaiters]) resolve()

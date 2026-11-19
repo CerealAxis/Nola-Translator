@@ -56,6 +56,98 @@ def create_session(client: TestClient) -> str:
     return response.json()["session_id"]
 
 
+def test_settings_preview_streams_only_levels_and_releases_capture(monkeypatch):
+    import numpy as np
+    from nola_translator_engine.audio.resample import AudioFrame
+    from nola_translator_engine.backend import desktop_capture
+
+    class Capture:
+        async def start(self):
+            calls.append("start")
+
+        async def frames(self):
+            yield AudioFrame(np.array([-0.45, 0.1], dtype=np.float32), 0)
+
+        def stop(self):
+            calls.append("stop")
+
+    calls = []
+
+    def open_selected(config):
+        assert (config.kind, config.device_id) == ("microphone", "mic-1")
+        return Capture()
+
+    monkeypatch.setattr(desktop_capture, "_desktop_backend", open_selected)
+    with TestClient(make_app()) as client:
+        route = "/api/v2/audio/input-levels"
+        config = {"kind": "microphone", "device_id": "mic-1", "capture_backend": "device"}
+        assert client.post(route, json=config).status_code == 401
+        assert client.post(route, headers=auth(), json=config).text == "0\n45\n"
+        assert calls == ["start", "stop"]
+        create_session(client)
+        assert client.post(route, headers=auth(), json=config).text == "error\n"
+        assert calls == ["start", "stop"]
+
+
+@pytest.mark.parametrize("failure,stage,code,message_key,exception", [
+    ("vad", "vad", "MODEL_NOT_READY", "gateway.LOAD_FAILED", "GatewayError"),
+    ("missing_device", "capture", "AUDIO_SOURCE_UNAVAILABLE", "audio.deviceUnavailable", "AudioDeviceUnavailableError"),
+    ("host_error", "capture", "AUDIO_SOURCE_UNAVAILABLE", "audio.captureStartFailed", "OSError"),
+    ("unknown", "capture", "INTERNAL_ERROR", "pipeline.startFailed", "RuntimeError"),
+])
+def test_start_failure_reports_stage_and_allows_retry(monkeypatch, failure, stage, code, message_key, exception):
+    from nola_translator_engine.audio.devices import AudioDeviceRegistry, AudioDeviceUnavailableError
+    from nola_translator_engine.backend.asr_pipeline import AsrPipeline
+    from nola_translator_engine.recognition.volume_gate import SileroVadSegmenter
+    from onnxruntime.capi.onnxruntime_pybind11_state import Fail
+
+    async def acquire(_request):
+        return None, None, None, None
+
+    async def no_op(*_args):
+        pass
+
+    def load(_gate):
+        raise Fail("private ONNX error detail")
+
+    async def fail_cleanup(_pipeline):
+        raise RuntimeError("cleanup failed as well")
+
+    def resolve(_registry, _kind, _device_id):
+        if failure == "host_error":
+            raise OSError(-9999, "private device detail")
+        if failure == "unknown":
+            raise RuntimeError("private device detail")
+        raise AudioDeviceUnavailableError("Selected microphone is unavailable")
+
+    if failure == "vad":
+        monkeypatch.setattr(SileroVadSegmenter, "load", load)
+        monkeypatch.setattr(AsrPipeline, "close", fail_cleanup)
+    else:
+        monkeypatch.setattr(AsrPipeline, "prepare", no_op)
+    monkeypatch.setattr(AudioDeviceRegistry, "resolve", resolve)
+    gateway = SimpleNamespace(shutdown=no_op, acquire=acquire, release=no_op)
+    app = create_app(control_token=TOKEN, gateway=gateway, enable_gateway=True)
+    with TestClient(app) as client:
+        session_id = create_session(client)
+        response = client.post(f"/api/v2/sessions/{session_id}/commands", headers=auth(),
+                               json={"command_id": "start", "type": "start"})
+        assert response.status_code == 202
+        assert response.json()["result_state"] == "failed"
+        error = client.get(f"/api/v2/sessions/{session_id}", headers=auth()).json()["last_error"]
+        assert (error["code"], error["stage"], error["message_key"]) == (code, stage, message_key)
+        assert uuid.UUID(error["correlation_id"])
+        details = error["safe_details"]
+        assert details["exception"] == exception
+        if failure == "vad":
+            assert details["cause_exception"] == "Fail"
+            assert ".load:" in details["cause_origin"]
+        if failure == "host_error":
+            assert details["errno"] == -9999
+        assert "private" not in json.dumps(error)
+        assert create_session(client) != session_id
+
+
 def frame(handle: int, epoch: int, seq: int, sample_start: int, samples: bytes) -> bytes:
     count = len(samples) // 2
     return struct.pack(

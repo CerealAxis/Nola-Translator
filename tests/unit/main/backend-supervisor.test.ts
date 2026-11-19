@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const spawnMock = vi.hoisted(() => vi.fn())
@@ -13,7 +14,7 @@ import { BackendSupervisor } from '../../../src/main/backend-supervisor'
 function fakeChild(stdoutLines: string[], opts?: { exitCode?: number | null; exitSignal?: string | null }) {
   const child = Object.assign(new EventEmitter(), {
     stdout: new EventEmitter(),
-    stderr: new EventEmitter(),
+    stderr: new PassThrough(),
     stdin: null,
     kill: vi.fn(),
     exitCode: opts?.exitCode ?? null,

@@ -72,6 +72,7 @@ const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label
   'ASR-006': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.configureCloudRecognitionAction' },
   'ASR-007': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'ASR-008': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'ASR-009': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
 
   // Audio devices: the capture device is picked in the audio settings.
   'AUD-001': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
@@ -82,6 +83,7 @@ const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label
   'AUD-006': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
   'AUD-007': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
   'AUD-008': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'AUD-009': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
 
   // Engine: the runtime components live in the engine settings, a protocol mismatch needs the
   // matching engine version, and a lost engine leaves a record behind instead of a retry.
@@ -96,6 +98,12 @@ const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label
   'ERR-999': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'EXP-009': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'GTW-001': { target: { kind: 'gateway' }, label: 'gateway.title', detail: 'gateway.notStartedHint' },
+  'SCR-001': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'SCR-002': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'SCR-003': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'SCR-004': { target: { kind: 'gateway' }, label: 'gateway.title' },
+  'SCR-005': { target: { kind: 'settings', tab: 'shortcuts' }, label: 'screen.shortcuts' },
+  'SCR-006': { target: { kind: 'gateway' }, label: 'gateway.title' },
   'S2S-001': { target: { kind: 'models' }, label: 'nav.models' },
   'S2S-002': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'TTS-001': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },

@@ -143,20 +143,20 @@ it('blocks an inherited S2S mode when Alibaba Cloud is not configured', () => {
 })
 
 it.each([
-  ['stopped', '模型网关未启动', '请先前往模型网关启动服务，然后重试。'],
+  ['stopped', '模型网关未启动', '在模型网关点「启动服务」后重试。'],
   ['starting', '正在启动', '等待网关切换状态后重试。'],
   ['failed', '模型网关启动失败', '打开模型网关查看状态并重试。'],
   ['running', '没有可用的 ASR 模型', '请配置可用的云端接口，或启用本地模型后在模型网关加载。'],
 ])('uses the current gateway state (%s) to report an unavailable local model', async (stateName, title, description) => {
   state.catalog.asr = []
   const snapshot = vi.fn().mockResolvedValue({ state: stateName })
-  vi.spyOn(store, 'getBridge').mockReturnValue({ gateway: { snapshot } } as unknown as NolaBridge)
+  vi.spyOn(store, 'getBridge').mockReturnValue({ gateway: { snapshot, onChanged: () => () => {} } } as unknown as NolaBridge)
   const showToast = vi.spyOn(toast, 'showToast')
   const { onSubmit: submit } = renderDialog()
 
   expect(screen.queryByText('模型尚未配置，请前往模型管理完成配置。')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '开始' }))
 
-  await waitFor(() => expect(showToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ title, description })))
+  await waitFor(() => expect(showToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ title, description: stateName === 'stopped' ? `${description} (GTW-001)` : description })))
   expect(submit).not.toHaveBeenCalled()
 })

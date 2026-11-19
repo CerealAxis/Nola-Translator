@@ -11,7 +11,7 @@ import { BROWSER_PROTOCOL_VERSION } from '../../src/shared/browser'
 import { BrowserFailure, createBridge } from './bridge'
 import { ChoiceField } from './components/ChoiceField'
 import { usePortalContainer } from './components/usePortalContainer'
-import { browserText, errorKey } from './i18n'
+import { browserErrorDescription, browserText } from './i18n'
 import { DEFAULT_PREFERENCES, observePreferences, savePreferences, type Preferences } from './preferences'
 import { requestProviderAccess, type ProviderConnection } from './providers'
 
@@ -57,7 +57,7 @@ export function ConnectionStatus({ t, compact = false, onReconnect }: { t: Retur
     request.current?.abort()
     const controller = new AbortController()
     request.current = controller
-    const bridge = createBridge('nola-popup')
+    const bridge = createBridge('nola-popup', undefined, 'settings')
     setChecking(true)
     try {
       const summary = await bridge.request({ type: 'hello' }, controller.signal)
@@ -70,7 +70,7 @@ export function ConnectionStatus({ t, compact = false, onReconnect }: { t: Retur
       if (controller.signal.aborted) return
       const code = error instanceof BrowserFailure ? error.code : 'browserConnectionUnavailable'
       setStatus('disconnected')
-      if (compact || reconnect) showToast({ type: 'error', description: t(errorKey(code)) })
+      if (compact || reconnect) showToast({ type: 'error', description: browserErrorDescription(t, code) })
     }
     finally { bridge.close(); if (!controller.signal.aborted) setChecking(false) }
   }
@@ -96,7 +96,7 @@ export function TargetLanguageField({ value, onChange, locale, t }: { value: str
 }
 
 export function LiveServiceField({ settings, providers, t }: { settings: Preferences; providers: ProviderConnection[]; t: ReturnType<typeof browserText> }) {
-  const onError = (error: unknown) => showToast({ type: 'error', description: t(errorKey(error instanceof Error ? error.message : 'internalError')) })
+  const onError = (error: unknown) => showToast({ type: 'error', description: browserErrorDescription(t, error instanceof Error ? error.message : 'internalError') })
   const currentProvider = settings.pipeline === 's2s' ? settings.s2sProvider : settings.asrProvider
   const value = currentProvider === 'disabled' || currentProvider === 'desktop' ? currentProvider : `${settings.pipeline === 's2s' ? 's2s' : 'asr'}:${currentProvider}`
   const options = [{ value: 'disabled', label: t('providerNone') }, ...providers.flatMap(provider => {

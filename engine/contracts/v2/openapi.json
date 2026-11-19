@@ -203,42 +203,6 @@
         }
       }
     },
-    "/api/v2/meetings/audio-test": {
-      "post": {
-        "summary": "Meeting Audio Test",
-        "operationId": "meeting_audio_test_api_v2_meetings_audio_test_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MeetingAudioTestRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v2/meetings": {
       "post": {
         "summary": "Create Meeting",
@@ -742,6 +706,44 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AudioProcessesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/audio/input-levels": {
+      "post": {
+        "summary": "Input Levels",
+        "operationId": "input_levels_api_v2_audio_input_levels_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InputConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2699,58 +2701,6 @@
           "model"
         ],
         "title": "LanguageModelOpenRequest"
-      },
-      "MeetingAudioTestRequest": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "microphone",
-              "headphones",
-              "cable",
-              "application"
-            ],
-            "title": "Kind"
-          },
-          "device_id": {
-            "type": "string",
-            "maxLength": 512,
-            "minLength": 1,
-            "title": "Device Id"
-          },
-          "playback_device_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 512,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Playback Device Id"
-          },
-          "recording_device_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 512,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Recording Device Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind",
-          "device_id"
-        ],
-        "title": "MeetingAudioTestRequest"
       },
       "MeetingPauseRequest": {
         "properties": {

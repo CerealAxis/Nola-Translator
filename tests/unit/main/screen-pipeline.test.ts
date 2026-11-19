@@ -32,6 +32,17 @@ it('dispatches the first reading immediately and compares each reading to the pr
   expect(pipeline.blocks()).toEqual([])
 })
 
+it('accepts one-character changes when the persisted text threshold is zero', async () => {
+  const translate = vi.fn(async (text: string) => text.toUpperCase())
+  const pipeline = new ScreenPipeline({ ...config, textChangeThreshold: 0 }, translate, () => {}, () => {})
+  pipeline.update(region, [box('life 100')], 200, 100)
+  await vi.waitFor(() => expect(pipeline.blocks()[0].translation).toBe('LIFE 100'))
+  pipeline.update(region, [box('life 101')], 200, 100)
+  await vi.waitFor(() => expect(pipeline.blocks()[0].translation).toBe('LIFE 101'))
+  pipeline.update(region, [box('life 101')], 200, 100)
+  expect(translate).toHaveBeenCalledTimes(2)
+})
+
 it('keeps other regions valid and rejects a late translation from a superseded region revision', async () => {
   let complete!: (text: string) => void
   const translate = vi.fn((text: string) => text === 'first text'

@@ -2,6 +2,8 @@ import { browserEn, browserZh } from './locale-base'
 import { browserJa, browserKo, browserZhHK, browserZhTW } from './locale-regions'
 import { resolveUiLanguage } from '../../src/shared/languages'
 import type { UiLanguage, UiLanguagePreference } from '../../src/shared/languages'
+import { appendSupportCode } from '../../src/shared/error-catalog'
+import { browserSupportCode } from './diagnostics'
 import { extensionCopy, extensionLocales } from './extension-copy'
 import { suiteLocales } from '../../src/renderer/i18n/translation-suite-ui'
 type SharedBrowserKey = keyof typeof browserZh
@@ -29,6 +31,7 @@ const ERROR_ALIASES: Record<string, BrowserKey> = {
   invalidMessage: 'updateRequired',
   audioBufferOverflow: 'slowAudio',
   lineTooLarge: 'internalError',
+  sessionError: 'internalError',
   browserConnectionUnavailable: 'appUnavailable',
   browserConnectionLost: 'connectionLost',
   browserPermissionDenied: 'permissionFailed',
@@ -45,6 +48,8 @@ const ERROR_ALIASES: Record<string, BrowserKey> = {
   browserIntegrationDisabled: 'appUnavailable',
   s2sConfigurationMissing: 'browserS2sUnavailable',
   translationTimeout: 'browserTranslationTimeout',
+  translationRateLimited: 'browserTranslationRateLimited',
+  translationFailed: 'providerRequestFailed',
 }
 function isDictionaryKey(key: BrowserTextKey): key is BrowserKey {
   return !(key as string).startsWith(UNKNOWN_PREFIX)
@@ -80,4 +85,11 @@ export function errorKey(code: string): BrowserTextKey {
   const alias = Object.hasOwn(ERROR_ALIASES, code) ? ERROR_ALIASES[code] : undefined
   if (alias) return alias
   return Object.hasOwn(browserZh, code) || Object.hasOwn(extensionCopy, code) ? code as BrowserKey : `${UNKNOWN_PREFIX}${code}`
+}
+
+export function browserErrorDescription(t: ReturnType<typeof browserText>, cause: string, fallback?: BrowserTextKey): string {
+  const key = errorKey(cause)
+  const useFallback = fallback && !isDictionaryKey(key)
+  return appendSupportCode(t(useFallback ? fallback : key), browserSupportCode(cause)
+    ?? (useFallback ? browserSupportCode(fallback) : undefined))
 }

@@ -3,7 +3,10 @@ import { basename, dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { pipeline } from 'node:stream/promises'
 import { createGzip } from 'node:zlib'
+import { createInterface } from 'node:readline'
+import type { Readable } from 'node:stream'
 import { supportErrorCodeForCause } from '../shared/error-catalog'
+import type { backendFailure } from './backend-error'
 
 const KEEP_LAUNCHES = 5
 const MAX_ENTRY_BYTES = 256 * 1024
@@ -26,6 +29,36 @@ export function logActivity(event: string, data: unknown): void {
 
 export function logActivityTotals(): void {
   logDiagnostic('activity.totals', Object.fromEntries([...activity].map(([key, value]) => [key, value.count])))
+}
+
+export function logPythonStderr(input: Readable, source: 'backend' | 'engine',
+  onOutput?: (level: string, bytes: number) => void): void {
+  const prefix = 'NOLA_DIAGNOSTIC '
+  createInterface({ input, crlfDelay: Infinity }).on('line', (line: string) => {
+    if (!line) return
+    const bytes = Buffer.byteLength(line)
+    if (line.startsWith(prefix)) {
+      try {
+        const observation = JSON.parse(line.slice(prefix.length))
+        const { layer, event } = observation ?? {}
+        const identifier = /^[a-zA-Z0-9_.-]{1,64}$/
+        if (typeof layer === 'string' && identifier.test(layer)
+          && typeof event === 'string' && identifier.test(event)) {
+          const frequent = (layer === 'engine' && (event === 'engine.update' || event === 'engine.caption'))
+            || (layer === 'ext' && (event === 'ext.chunk' || event === 'ext.silent'))
+          const record = frequent ? logActivity : logDiagnostic
+          record(`pipeline.${layer}.${event}`, { ...observation, source })
+          return
+        }
+      } catch { /* A partial structured record can contain private payloads. */ }
+      logDiagnostic(`${source}.stderr.diagnostic-invalid`, { bytes })
+      return
+    }
+    const level = /\b(error|exception|failed|fatal)\b/i.test(line) ? 'error'
+      : /\b(warn|warning)\b/i.test(line) ? 'warning' : 'info'
+    logDiagnostic(`${source}.stderr.${level}`, { message: line, bytes })
+    onOutput?.(level, bytes)
+  })
 }
 
 function diagnosticText(value: string): string {
@@ -244,7 +277,10 @@ export function captureMainConsole(): void {
 }
 
 export function processFailure(error: unknown): Record<string, unknown> {
-  const failure = error as Error & { code?: number | string; engineCode?: string; requestId?: string; commandType?: string; action?: string; signal?: string; killed?: boolean; stdout?: string; stderr?: string }
+  const failure = error as Error & Partial<ReturnType<typeof backendFailure>> & {
+    code?: number | string; status?: number; requestId?: string; commandType?: string; action?: string
+    signal?: string; killed?: boolean; stdout?: string; stderr?: string
+  }
   const code = failure?.code
   const errorName = typeof failure?.name === 'string' && /^[A-Za-z][A-Za-z0-9_.]{0,63}$/.test(failure.name) ? failure.name : 'Error'
   const nativeMessage = typeof failure?.message === 'string' && failure.message.trim()
@@ -255,6 +291,17 @@ export function processFailure(error: unknown): Record<string, unknown> {
     category: failure?.killed ? 'process-terminated-or-timed-out' : typeof code === 'number' ? 'process-exit-failure' : 'operation-error', code, engineCode: failure?.engineCode,
     windowsStatus: typeof code === 'number' ? `0x${(code >>> 0).toString(16).toUpperCase().padStart(8, '0')}` : undefined,
     supportCode: failure?.engineCode ? supportErrorCodeForCause(failure.engineCode, { commandType: failure.commandType, action: failure.action }) : undefined,
+    backendCode: failure?.backendCode,
+    messageKey: failure?.messageKey,
+    stage: failure?.backendStage,
+    scope: failure?.backendScope,
+    providerCode: failure?.backendProviderCode,
+    retryable: failure?.backendRetryable,
+    fatal: failure?.backendFatal,
+    retryAfterMs: failure?.backendRetryAfterMs,
+    safeDetails: failure?.backendDetails,
+    correlationId: failure?.correlationId,
+    status: failure?.status,
     requestId: failure?.requestId,
     commandType: failure?.commandType,
     action: failure?.action,

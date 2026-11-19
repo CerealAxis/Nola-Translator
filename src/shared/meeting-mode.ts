@@ -31,29 +31,12 @@ export const DEFAULT_MEETING_MODE: MeetingModeSettings = {
   localLanguage: 'zh', remoteLanguage: 'en', pipeline: 'auto', duckVolume: 20, passthroughKey: 'F9',
 }
 
-export const meetingAudioTestRequestSchema = z.object({
-  kind: z.enum(['microphone', 'headphones', 'cable', 'application']),
-  deviceId: deviceId.min(1),
-  playbackDeviceId: deviceId.min(1).optional(),
-  recordingDeviceId: deviceId.min(1).optional(),
-}).strict()
-export type MeetingAudioTestRequest = z.infer<typeof meetingAudioTestRequestSchema>
-
 export interface MeetingRouteTelemetry {
   inputPeak: number
   inputAgeMs: number | null
   sourceText?: string
   translatedText?: string
   playback: 'idle' | 'playing' | 'finished'
-}
-
-export interface MeetingAudioTestResult {
-  kind: MeetingAudioTestRequest['kind']
-  hasSignal: boolean
-  peak: number
-  playbackSent: boolean
-  correlation?: number
-  error?: MeetingModeSnapshot['error']
 }
 
 export interface MeetingModeSnapshot {
@@ -70,8 +53,6 @@ export interface MeetingModeApi {
   snapshot(): Promise<MeetingModeSnapshot>
   start(settings: MeetingModeSettings): Promise<MeetingModeSnapshot>
   stop(): Promise<MeetingModeSnapshot>
-  testAudio(request: MeetingAudioTestRequest): Promise<MeetingAudioTestResult>
-  cancelAudioTest(): Promise<void>
   setPaused(paused: boolean): Promise<MeetingModeSnapshot>
   onChanged(callback: (snapshot: MeetingModeSnapshot) => void): () => void
 }

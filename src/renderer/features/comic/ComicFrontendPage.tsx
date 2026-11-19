@@ -4,7 +4,9 @@ import { CardContent } from '@/components/ui/card'
 import { Upload } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { notifyError } from '@/components/primitives/notify'
+import { PageHeader } from '@/components/primitives/PageHeader'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { getBridge } from '@/store'
 import { ComicTranslationPage } from './ComicTranslationPage'
 import { ComicTranslationWorkspace } from './ComicTranslationWorkspace'
 import {
@@ -29,6 +31,16 @@ export function ComicFrontendPage({
   const [quickOpen, setQuickOpen] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [importing, setImporting] = useState(false)
+  if (!getBridge()?.comic) {
+    return (
+      <section className="comic-page">
+        <PageHeader
+          title={t('suite.comicTitle')}
+          subtitle={t('offline.unavailable')}
+        />
+      </section>
+    )
+  }
   const importQuick = async (files: File[]) => {
     if (!files.length || importing) return
     setImporting(true)

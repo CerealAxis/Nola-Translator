@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { WebSocketServer, type WebSocket } from 'ws'
 
 import { BackendSession, mapBrowserSessionConfig, mapSessionConfig } from '../../../src/main/backend-session'
+import * as sessionLog from '../../../src/main/session-log'
 import type { SessionConfig } from '../../../src/shared/contracts'
 import { DEFAULT_SETTINGS, MIMO_TTS_BINDING, MIMO_TTS_MODEL, REALTIME_S2S_MODELS } from '../../../src/shared/settings'
 import { INDEX_TRANSLATE_ENDPOINT } from '../../../src/shared/index-translate'
@@ -17,6 +18,42 @@ const config: SessionConfig = {
 }
 
 describe('desktop backend session', () => {
+  it('preserves the backend stage and correlation ID on a failed start', async () => {
+    const sessionId = '826bd1ab-a20d-4dc4-b95c-1dcd1760e596'
+    const client = new BackendSession({
+      baseUrl: 'http://127.0.0.1:1234', instanceId: 'test-instance', authorizationHeader: () => ({}),
+    }, { onEvent: vi.fn() })
+    const connect = vi.spyOn(client as unknown as { connectEvents(id: string): Promise<void> }, 'connectEvents')
+      .mockResolvedValue(undefined)
+    const diagnostic = vi.spyOn(sessionLog, 'logDiagnostic')
+    vi.stubGlobal('fetch', vi.fn(async (url: URL, request: RequestInit) => {
+      if (url.pathname.endsWith('/commands')) {
+        const command = JSON.parse(String(request.body))
+        return Response.json({ accepted: true, session_id: sessionId, command_id: command.command_id,
+          result_state: command.type === 'start' ? 'failed' : 'closed' })
+      }
+      if (url.pathname.endsWith(sessionId)) return Response.json({ last_error: {
+        code: 'MODEL_NOT_READY', stage: 'vad', scope: 'session', retryable: false, fatal: false,
+        message_key: 'gateway.LOAD_FAILED', correlation_id: 'python-failure',
+        safe_details: { cause_exception: 'Fail', text: 'private content' },
+      } })
+      return Response.json({ session_id: sessionId })
+    }))
+    try {
+      await expect(client.start(mapSessionConfig(config, DEFAULT_SETTINGS, models)!)).rejects.toMatchObject({
+        engineCode: 'vadUnavailable', backendStage: 'vad', correlationId: 'python-failure',
+        backendDetails: { cause_exception: 'Fail' },
+      })
+      expect(diagnostic).toHaveBeenCalledWith('backend.session.command.failed', expect.objectContaining({
+        sessionId, command: 'start', error: expect.objectContaining({ correlationId: 'python-failure' }),
+      }))
+    } finally {
+      connect.mockRestore()
+      diagnostic.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('maps the interim translation interval to the backend session', () => {
     const mapped = mapSessionConfig({ ...config, intermediateTranslationIntervalMs: 1200 }, DEFAULT_SETTINGS, models)
     expect(mapped?.config.translation_preview_interval_ms).toBe(1200)
@@ -120,7 +157,7 @@ describe('desktop backend session', () => {
           result = { error: { ...unauthorized, code: 'RESOURCE_BUSY', stage: 'gateway', message_key: 'backend.gatewayDisabled' } }
         }
       } else if (mode === 'asr-unauthorized' && request.url?.endsWith(sessionId)) {
-        result = { last_error: unauthorized }
+        result = { last_error: { ...unauthorized, safe_details: { exception: 'TestError', provider_error: 'private-detail' } } }
       } else if (request.url?.endsWith('/audio/preflight')) {
         result = { safe: mode === 'system-speech', feedback_status: 'unknown', issues: [] }
       } else if (request.url?.endsWith('/input/end')) {
@@ -214,7 +251,19 @@ describe('desktop backend session', () => {
         DEFAULT_SETTINGS, available, { outputDeviceId: virtual ? 'chromium-sink' : undefined })
       if (!mapped) throw new Error('Expected compatible config')
       if (mode === 'asr-unauthorized') {
-        await expect(client.start(mapped)).rejects.toMatchObject({ engineCode: 'invalidCredential', correlationId: 'provider-failure' })
+        const diagnostic = vi.spyOn(sessionLog, 'logDiagnostic')
+        try {
+          await expect(client.start(mapped)).rejects.toMatchObject({ engineCode: 'invalidCredential', correlationId: 'provider-failure' })
+          expect(diagnostic).toHaveBeenCalledWith('backend.session.command.failed', expect.objectContaining({
+            sessionId, command: 'start', error: expect.objectContaining({
+              backendCode: 'MODEL_NOT_READY', backendStage: 'asr',
+              messageKey: 'pipeline.recognitionUnauthorized', correlationId: 'provider-failure',
+              backendDetails: { exception: 'TestError' },
+            }),
+          }))
+        } finally {
+          diagnostic.mockRestore()
+        }
         return
       }
       if (s2sAudio) {

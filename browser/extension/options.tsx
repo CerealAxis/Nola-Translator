@@ -30,7 +30,7 @@ import { extensionGlossary, migrateLegacyGlossary, restoreExtensionConfiguration
 import { emptyGlossary, glossaryDocumentSchema } from '../../src/shared/glossary'
 import { clearTranslationCache, synthesize, testProvider, translate, translateImage } from './provider-client'
 import { encodeClipboardImage } from './image-translation'
-import { browserText, errorKey, type BrowserKey } from './i18n'
+import { browserErrorDescription, browserText, type BrowserKey } from './i18n'
 import { captureDiagnostics, clearDiagnostics, readDiagnostics, type DiagnosticEntry } from './diagnostics'
 import './styles.css'
 
@@ -167,7 +167,7 @@ function ProviderEditor({ providers, settings, onChange, t }: { providers: Provi
     try {
       const result = await testProvider(provider)
       if (currentDraft.current === provider) showToast({ type: 'success', title: provider.name, description: result })
-    } catch (error) { if (currentDraft.current === provider) showToast({ type: 'error', title: provider.name, description: t(errorKey(error instanceof Error ? error.message : 'providerRequestFailed')) }) } finally { setPending(false) }
+    } catch (error) { if (currentDraft.current === provider) showToast({ type: 'error', description: browserErrorDescription(t, error instanceof Error ? error.message : '', 'providerRequestFailed') }) } finally { setPending(false) }
   }
   async function save() {
     if (!provider) return
@@ -181,7 +181,7 @@ function ProviderEditor({ providers, settings, onChange, t }: { providers: Provi
         return p
       }))
       dirty.current = false; drafts.current.delete(provider.id); showToast({ type: 'success', description: t('saved') })
-    } catch (error) { showToast({ type: 'error', description: t(errorKey(error instanceof Error ? error.message : 'providerInvalid')) }) } finally { setPending(false) }
+    } catch (error) { showToast({ type: 'error', description: browserErrorDescription(t, error instanceof Error ? error.message : '', 'providerInvalid') }) } finally { setPending(false) }
   }
   return <div className="nola-provider-layout">
     <aside className="nola-provider-rail" aria-label={t('apiProviders')}>
@@ -283,7 +283,7 @@ function TranslationCenter({ settings, providers, locale, t }: { settings: Prefe
         if (controller.signal.aborted) return
         const elapsed = started === undefined ? undefined : performance.now() - started
         setResults(current => ({ ...current, [providerId]: { elapsed } }))
-        showToast({ type: 'error', title: provider?.name ?? 'Index-Translate', description: t(errorKey(error instanceof Error ? error.message : 'providerRequestFailed')) })
+        showToast({ type: 'error', description: browserErrorDescription(t, error instanceof Error ? error.message : '', 'providerRequestFailed') })
       } finally { if (requests.current.get(providerId) === controller) requests.current.delete(providerId) }
     }))
   }
@@ -305,7 +305,7 @@ function TranslationCenter({ settings, providers, locale, t }: { settings: Prefe
       const release = () => { URL.revokeObjectURL(url); if (audioUrl.current === url) audioUrl.current = '' }
       player.addEventListener('ended', release, { once: true }); player.addEventListener('error', release, { once: true })
       try { await player.play() } catch (error) { release(); throw error }
-    } catch (error) { if (!controller.signal.aborted) showToast({ type: 'error', description: t(errorKey(error instanceof Error ? error.message : 'internalError')) }) } finally { if (speechRequest.current === controller) setSpeaking(false) }
+    } catch (error) { if (!controller.signal.aborted) showToast({ type: 'error', description: browserErrorDescription(t, error instanceof Error ? error.message : '', 'internalError') }) } finally { if (speechRequest.current === controller) setSpeaking(false) }
   }
   return <div className="nola-translation-center">
     <div className="nola-hub-source">

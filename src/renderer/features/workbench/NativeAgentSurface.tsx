@@ -38,7 +38,9 @@ import { useAttachmentSrc } from '@/hooks/use-attachment-src'
 import { ghostButton, iconSwap, iconSwapIn, iconSwapOut } from '@/components/assistant-ui/native/surfaces'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/components/primitives/notify'
-import { languageName, LANGUAGE_CODES } from '../../../shared/languages'
+import { languageName } from '../../../shared/languages'
+import { intersectLanguages, modelTranslationLanguages } from '@/model-options'
+import { stores, useStore } from '@/store'
 import type { CustomTranslationModel } from '../../../shared/settings'
 import type { AgentWorkspaceSnapshot, WorkspaceAction } from '../../../shared/agent-workspace'
 import type { PlaygroundConfig } from './demo-runtime'
@@ -423,9 +425,11 @@ function NativeAssistantMessage() {
   }
   const notifiedError = useRef('')
   useEffect(() => {
-    if (!browsing && errorText && notifiedError.current !== errorText) notifyError(t('workbench.actionFailed'), { description: errorText })
+    if (!browsing && errorText && !projectorDownloadStarted && notifiedError.current !== errorText) {
+      notifyError(errorTitle, { cause: error })
+    }
     notifiedError.current = errorText
-  }, [browsing, errorText, t])
+  }, [browsing, error, errorText, errorTitle, projectorDownloadStarted])
   return <div className="mb-8"><NativeDaySeparator /><MessagePrimitive.Root data-role="assistant" className="group/message flex w-full flex-col items-start gap-3">
     <NativeMediaWorkflow />
     {running && !hasContent && <ThinkingIndicator role="status" label={t(audioRequest ? 'workbench.transcribingMedia' : 'workbench.thinkingProcess')} />}
@@ -506,6 +510,7 @@ function NativeTool(props: ToolCallMessagePartProps) {
 }
 
 function NativeComposer(props: NativeAgentSurfaceProps) {
+  const resources = useStore(stores.models, state => state.resources)
   const { t, language } = useI18n()
   const aui = useAui()
   const text = useAuiState(s => s.composer.text)
@@ -571,8 +576,23 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
     })
     if (closeMenu) setMenu('')
   }
-  const sourceCodes = selected?.sourceLanguages?.length ? selected.sourceLanguages : ['auto', ...LANGUAGE_CODES]
-  const targetCodes = selected?.targetLanguages?.length ? selected.targetLanguages : LANGUAGE_CODES
+  const sourceCodes = intersectLanguages(selected?.sourceLanguages ?? [])
+  const translation = selected?.kind === 'mt' ? resources.find(resource => `resource:${resource.resourceId}` === selected.id) : undefined
+  const targetsFor = (source: string) => translation ? modelTranslationLanguages(undefined, translation, source) : intersectLanguages(selected?.targetLanguages ?? [])
+  const targetCodes = targetsFor(props.config.source)
+  const chooseSource = (source: string) => {
+    const targets = targetsFor(source)
+    pick({ source, target: targets.includes(props.config.target) ? props.config.target : targets[0] ?? props.config.target })
+  }
+  const languageMenuCodes = props.config.kind === 'mt' ? targetCodes : sourceCodes
+  const languageTrigger = (anchor: 'source' | 'language', label: string, codes: readonly string[]) => {
+    const trigger = <ComposerModelTrigger data-menu-anchor={anchor} model={label} disabled={!codes.length}
+      open={menu === anchor} onClick={() => setMenu(menu === anchor ? '' : anchor)} />
+    return codes.length ? trigger : <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex" tabIndex={0}>{trigger}</span>} />
+      <TooltipContent>{t('gateway.languageModelsHint')}</TooltipContent>
+    </Tooltip>
+  }
   const chooseVoices = () => {
     setMenu(menu === 'voice' ? '' : 'voice')
     if (!props.voices.length) void import('@/store').then(async ({ getBridge }) => {
@@ -588,8 +608,8 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
       return available ? <div key={model.id}>{item}</div> : <Tooltip key={model.id}><TooltipTrigger render={item} /><TooltipContent>{t('gateway.modelGatewayStartHint')}</TooltipContent></Tooltip>
     })}</div>)}</TooltipProvider><ComposerMenuItem className="nola-menu-item" onClick={props.onConfigure}><Settings2 className="size-4" aria-hidden="true" />{t('nav.modelGateway')}</ComposerMenuItem></ComposerMenu>}
     {menu === 'effort' && <ComposerMenu open anchor="effort" className="w-80 gap-3 p-3"><ReasoningEffort variant="slider" levels={(['auto', 'low', 'medium', 'high'] as const).map(key => ({ key, label: t(key === 'auto' ? 'modelsSettingsUi.default' : `workbench.${key}`) }))} selectedKey={props.config.effort} title={t('workbench.reasoningTokens')} onSelect={effort => pick({ effort }, false)} /></ComposerMenu>}
-    {menu === 'language' && <ComposerMenu open anchor="language">{(props.config.kind === 'mt' ? targetCodes : sourceCodes).map(code => <ComposerMenuItem key={code} active={code === (props.config.kind === 'mt' ? props.config.target : props.config.source)} onClick={() => pick(props.config.kind === 'mt' ? { target: code } : { source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
-    {menu === 'source' && <ComposerMenu open anchor="source">{sourceCodes.map(code => <ComposerMenuItem key={code} active={code === props.config.source} onClick={() => pick({ source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
+    {menu === 'language' && languageMenuCodes.length > 0 && <ComposerMenu open anchor="language">{languageMenuCodes.map(code => <ComposerMenuItem key={code} active={code === (props.config.kind === 'mt' ? props.config.target : props.config.source)} onClick={() => props.config.kind === 'mt' ? pick({ target: code }) : chooseSource(code)}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
+    {menu === 'source' && sourceCodes.length > 0 && <ComposerMenu open anchor="source">{sourceCodes.map(code => <ComposerMenuItem key={code} active={code === props.config.source} onClick={() => chooseSource(code)}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'voice' && <ComposerMenu open anchor="voice">{props.voices.map(voice => <ComposerMenuItem key={voice} active={voice === props.config.voice} onClick={() => pick({ voice })}>{voice}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'context' && <ComposerMenu open align="end"><ContextBreakdown limit={contextWindow} segments={[{ label: t('workbench.inputTokens'), tokens: usage?.inputTokens ?? 0, tint: 'bg-chart-2' }, { label: t('workbench.outputTokens'), tokens: usage?.outputTokens ?? 0, tint: 'bg-chart-1' }]} /></ComposerMenu>}
     <ComposerBar>
@@ -624,8 +644,8 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
         <ComposerModelTrigger data-menu-anchor="models" model={selected?.name ?? t('workbench.noModels')} open={menu === 'models'} onClick={() => setMenu(menu === 'models' ? '' : 'models')} />
         {props.config.kind === 'llm' && <ComposerModelTrigger data-menu-anchor="effort" model={t(props.config.effort === 'auto' ? 'modelsSettingsUi.default' : `workbench.${props.config.effort as 'low' | 'medium' | 'high'}`)} open={menu === 'effort'} onClick={() => setMenu(menu === 'effort' ? '' : 'effort')} />}
         {props.config.kind === 'llm' && <NativeComicSelector active={props.active} value={props.config.comicProjectId ?? null} disabled={preparing || running} onChange={comicProjectId => { cancelComicReads(); if (comicProjectId === null) props.onChange({ ...props.config, comicProjectId }); else pick({ comicProjectId }) }} />}
-        {props.config.kind === 'mt' && <ComposerModelTrigger data-menu-anchor="source" model={props.config.source === 'auto' ? t('workbench.auto') : languageName(props.config.source, language)} open={menu === 'source'} onClick={() => setMenu(menu === 'source' ? '' : 'source')} />}
-        {(props.config.kind === 'asr' || props.config.kind === 'mt') && <ComposerModelTrigger data-menu-anchor="language" model={languageName(props.config.kind === 'mt' ? props.config.target : props.config.source, language)} open={menu === 'language'} onClick={() => setMenu(menu === 'language' ? '' : 'language')} />}
+        {props.config.kind === 'mt' && languageTrigger('source', props.config.source === 'auto' ? t('workbench.auto') : languageName(props.config.source, language), sourceCodes)}
+        {(props.config.kind === 'asr' || props.config.kind === 'mt') && languageTrigger('language', languageName(props.config.kind === 'mt' ? props.config.target : props.config.source, language), languageMenuCodes)}
         {props.config.kind === 'tts' && <ComposerModelTrigger data-menu-anchor="voice" model={props.config.voice || t('workbench.voice')} open={menu === 'voice'} onClick={chooseVoices} />}
       </ComposerActions><ComposerActions className="ms-auto shrink-0">
         {props.config.kind === 'llm' && <div><ComposerContext labels={{ context: t('workbench.contextUsage'), system: t('workbench.contextSystem'), tools: t('workbench.contextTools'), messages: t('workbench.contextMessages'), total: t('workbench.contextTotal') }} usage={{ system: 0, tools: 0, messages: (usage?.totalTokens ?? 0) / 1000, total: contextWindow / 1000 }} /></div>}

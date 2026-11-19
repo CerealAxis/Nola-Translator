@@ -569,7 +569,8 @@ class TranslationScheduler:
 
     def _error_event_payload(self, segment_id: str, error: Exception, task_id: str | None = None) -> dict[str, Any]:
         code = "TRANSLATION_TIMEOUT" if getattr(error, "code", None) == GatewayErrorCode.TIMEOUT else "INTERNAL_ERROR"
-        reason = next((value for value in (getattr(error, "provider_code", None), str(error))
+        provider_code = error.provider_code if isinstance(error, GatewayError) else None
+        reason = next((value for value in (provider_code, str(error))
                        if value in ("glossaryUnsupported", "glossaryBudgetExceeded")), None)
         return {
             "error": {
@@ -580,8 +581,11 @@ class TranslationScheduler:
                 "fatal": False,
                 "message_key": reason or "translation.failed",
                 "correlation_id": task_id or str(uuid4()),
+                "provider_code": provider_code if provider_code in (
+                    "authentication_failed", "rate_limited", "request_timeout", "network_unavailable",
+                ) else None,
                 "segment_id": segment_id,
-                "safe_details": {},
+                "safe_details": {"exception": type(error).__name__},
             }
         }
 

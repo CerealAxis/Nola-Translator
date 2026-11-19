@@ -24,6 +24,13 @@ afterEach(() => {
   location.hash = ''
   vi.restoreAllMocks()
 })
+it('shows the demo limitation when the comic bridge is unavailable', () => {
+  vi.spyOn(store, 'getBridge').mockReturnValue({} as NolaBridge)
+  render(<ComicFrontendPage />)
+  expect(screen.getByRole('heading', { name: '漫画翻译' })).toBeInTheDocument()
+  expect(screen.getByText('此演示不提供本地文件操作。')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '快速翻译' })).not.toBeInTheDocument()
+})
 it('uploads chosen bytes through the bridge', async () => {
   const fixture = createComicTestBridge()
   vi.spyOn(store, 'getBridge').mockReturnValue({

@@ -12,7 +12,7 @@ import { ChoiceField } from './components/ChoiceField'
 import { languageOptions, usePreferences } from './settings-fields'
 import { DEFAULT_PROVIDERS, loadProviders, requestProviderAccess, visibleProviderConnections } from './providers'
 import { translate, translateImage } from './provider-client'
-import { browserText, errorKey } from './i18n'
+import { browserErrorDescription, browserText } from './i18n'
 import { glossaryChunks } from './glossary-translation'
 import { captureDiagnostics, recordDiagnostic } from './diagnostics'
 import { documentFormats, openDocument, type DocumentSection, type DocumentUnit, type DocumentValues, type OpenDocument } from './document-formats'
@@ -142,8 +142,7 @@ export function DocumentWorkbench() {
 
   const report = (error: unknown, fallback: Parameters<typeof t>[0]) => {
     recordDiagnostic('document', error ?? new Error(String(fallback)))
-    const key = errorKey(error instanceof Error ? error.message : '')
-    showToast({ type: 'error', description: t(key.startsWith('unknown:') ? fallback : key) })
+    showToast({ type: 'error', description: browserErrorDescription(t, error instanceof Error ? error.message : '', fallback) })
   }
   function applyLanguage(kind: 'source' | 'target', value: string) {
     request.current?.abort()

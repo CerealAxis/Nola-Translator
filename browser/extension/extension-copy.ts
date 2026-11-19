@@ -3,6 +3,22 @@ import { uiCopy } from './ui-copy'
 
 // English, Simplified Chinese, Taiwan, Hong Kong, Korean and Japanese.
 export const extensionCopy = {
+  vadUnavailable: [
+    'Could not load speech detection. Restart the Nola desktop app and enable captions again.',
+    '无法加载语音检测组件。请重启 Nola 桌面端，再重新开启字幕。',
+    '無法載入語音偵測元件。請重新啟動 Nola 桌面版，再重新開啟字幕。',
+    '無法載入語音偵測元件。請重新啟動 Nola 桌面版，再重新開啟字幕。',
+    '음성 감지 구성 요소를 불러오지 못했습니다. Nola 데스크톱 앱을 다시 시작한 후 자막을 켜세요.',
+    '音声検出を読み込めませんでした。Nola デスクトップアプリを再起動し、字幕を再度オンにしてください。',
+  ],
+  audioCaptureStartFailed: [
+    'Could not start capturing audio. Choose an input source and enable captions again.',
+    '无法开始采集音频。请选择输入声源，再重新开启字幕。',
+    '無法開始擷取音訊。請選擇輸入音源，再重新開啟字幕。',
+    '無法開始擷取音訊。請選擇輸入音源，再重新開啟字幕。',
+    '오디오 캡처를 시작하지 못했습니다. 입력 소스를 선택하고 자막을 다시 켜세요.',
+    '音声の取り込みを開始できませんでした。入力ソースを選び直し、字幕を再度オンにしてください。',
+  ],
   ...uiCopy,
   logTitle: ['Diagnostic logs', '诊断日志', '診斷日誌', '診斷日誌', '진단 로그', '診断ログ'],
   logHelp: ['The latest 200 errors are stored on this device without document text, URLs or credentials.', '仅在本机保留最近 200 条错误，不记录文档正文、网址或凭据。', '僅在本機保留最近 200 筆錯誤，不記錄文件內容、網址或憑證。', '只在本機保留最近 200 筆錯誤，不記錄文件內容、網址或憑證。', '최근 오류 200개를 기기에만 보관하며 문서 내용, URL 또는 인증 정보는 기록하지 않습니다.', '最新 200 件のエラーを端末に保存します。文書の内容、URL、認証情報は記録しません。'],
@@ -231,7 +247,7 @@ export const extensionCopy = {
   providerRateLimit: ["The provider is rate limited. Wait, reduce the request rate or check your quota.", "服务请求受限，请稍后重试、降低请求速率或检查额度。", "服務請求受限，請稍後重試、降低請求速率或檢查額度。", "服務請求受限，請稍後重試、降低請求速率或檢查額度。", "요청이 제한되었습니다. 잠시 기다리거나 요청 속도와 할당량을 확인하세요.", "リクエストが制限されています。時間を置くか、頻度と利用枠を確認してください。"],
   providerModel: ["The model is unavailable. Check the model name and access.", "模型不可用，请检查模型名称及访问权限。", "模型無法使用，請檢查模型名稱及存取權限。", "模型無法使用，請檢查模型名稱及存取權限。", "모델을 사용할 수 없습니다. 모델 이름과 접근 권한을 확인하세요.", "モデルが利用できません。モデル名とアクセス権を確認してください。"],
   providerRequestFailed: ["The request failed. Check the provider settings and try again.", "请求失败，请检查服务配置后重试。", "請求失敗，請檢查服務設定後重試。", "請求失敗，請檢查服務設定後重試。", "요청이 실패했습니다. 서비스 설정을 확인하고 다시 시도하세요.", "リクエストに失敗しました。サービス設定を確認して再試行してください。"],
-  indexTranslateBrowserBlocked: ['Index Translate rejected the request (HTTP 412). Check your network or try again later.', 'Index Translate 拒绝了请求（HTTP 412），请检查网络或稍后重试。', 'Index Translate 拒絕了請求（HTTP 412），請檢查網路或稍後重試。', 'Index Translate 拒絕了請求（HTTP 412），請檢查網絡或稍後重試。', 'Index Translate가 요청을 거부했습니다(HTTP 412). 네트워크를 확인하거나 나중에 다시 시도하세요.', 'Index Translate がリクエストを拒否しました（HTTP 412）。ネットワークを確認するか、後でもう一度お試しください。'],
+  indexTranslateBrowserBlocked: ['Index Translate rejected the request. Check your network or try again later.', 'Index Translate 拒绝了请求，请检查网络或稍后重试。', 'Index Translate 拒絕了請求，請檢查網路或稍後重試。', 'Index Translate 拒絕了請求，請檢查網絡或稍後重試。', 'Index Translate가 요청을 거부했습니다. 네트워크를 확인하거나 나중에 다시 시도하세요.', 'Index Translate がリクエストを拒否しました。ネットワークを確認するか、後でもう一度お試しください。'],
   providerResponseSize: ["The provider response is too large. Try a shorter input.", "服务响应过大，请缩短输入内容后重试。", "服務回應過大，請縮短輸入內容後重試。", "服務回應過大，請縮短輸入內容後重試。", "서비스 응답이 너무 큽니다. 입력을 줄여 다시 시도하세요.", "応答が大きすぎます。入力を短くして再試行してください。"],
   nativeReady: ["Nola is connected", "Nola 已连接", "Nola 已連線", "Nola 已連線", "Nola 연결됨", "Nola に接続済み"],
   nativeDisconnected: ['Nola is disconnected', 'Nola 未连接', 'Nola 未連線', 'Nola 未連線', 'Nola 연결 안 됨', 'Nola に未接続'],

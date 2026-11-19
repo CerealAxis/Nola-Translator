@@ -26,5 +26,5 @@ export function comicErrorMessage(
   for (const [code, label] of Object.entries(errorLabels)) {
     if (new RegExp(`\\b${code}\\b`).test(message)) return text(label)
   }
-  return message
+  return ''
 }

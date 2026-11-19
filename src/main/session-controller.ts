@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { logDiagnostic } from './session-log'
-import type { EngineEvent, PrewarmConfig, PrewarmResult, SessionConfig, AudioTestSource, AudioTestResult } from '../shared/contracts'
+import type { EngineEvent, PrewarmConfig, PrewarmResult, SessionConfig } from '../shared/contracts'
 import { sessionConfigSchema } from '../shared/schemas'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider, type RecognitionProvider } from '../shared/settings'
 import { supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
@@ -54,7 +54,6 @@ export interface SessionControllerOptions {
   isBrowserCaptionServiceActive?(): boolean
   isOverlayVisible?(): boolean
   useGateway?: boolean
-  audioTestEngine?: EngineProcess
   assertLegacyTranslationAllowed?(targetLanguages: readonly string[]): Promise<void>
   prepareBackend?(config: SessionConfig, settings: AppSettings): Promise<{ client: BackendSession; mapped: MappedBackendSession } | undefined>
 }
@@ -95,9 +94,7 @@ export class SessionController {
     return this.backendSession?.usesResource(resourceId) ?? false
   }
 
-  testAudio(audioSource: AudioTestSource): Promise<AudioTestResult> {
-    return this.withActivity('interpretation', false, () => this.testAudioInternal(audioSource))
-  }
+
   prewarm(config: PrewarmConfig): Promise<PrewarmResult> {
     return this.withActivity('browser-captions', false, () => this.prewarmInternal(config))
   }
@@ -149,23 +146,6 @@ export class SessionController {
   isBrowserEvent(event: EngineEvent): boolean {
     if ('sessionId' in event) return this.browserSessions.has(event.sessionId) || (this.starting && this.browserActive)
     return this.browserActive && (event.type === 'status' || event.type === 'error')
-  }
-  private async testAudioInternal(audioSource: AudioTestSource): Promise<AudioTestResult> {
-    if (this.busy) throw new Error('sessionAlreadyRunning')
-    this.starting = true
-    this.options.startingChanged(true)
-    try {
-      const engine = this.options.audioTestEngine ?? this.options.engine
-      await this.options.whenReady()
-      if (engine.currentState !== 'ready') await engine.start()
-      if (!engine.supports('audioTest')) throw new Error('engineUpdateRequired')
-      const result = await engine.request({ protocolVersion: 1, type: 'testAudio',
-        requestId: `audio-test-${randomUUID()}`, audioSource }, 'audioTested', 8000)
-      return { audioBase64: result.audioBase64, durationMs: result.durationMs, hasSignal: result.hasSignal }
-    } finally {
-      this.starting = false
-      this.options.startingChanged(false)
-    }
   }
   private async prewarmInternal(config: PrewarmConfig): Promise<PrewarmResult> {
     if (this.busy || (!this.options.useGateway && this.options.isOverlayVisible?.())) return { state: 'failed', code: 'sessionAlreadyRunning' }

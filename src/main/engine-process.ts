@@ -9,7 +9,7 @@ import type { EngineCommand, EngineEvent, EngineProcessState, PrewarmConfig, Pre
 import { engineCommandSchema, parseEventLine } from '../shared/schemas'
 import { supportErrorCodeForCause } from '../shared/error-catalog'
 import { pythonRuntimePaths } from './python-runtime-paths'
-import { logActivity, logDiagnostic } from './session-log'
+import { logActivity, logDiagnostic, logPythonStderr } from './session-log'
 
 /** Re-exported so a caller can read the state union without importing a main-process module. */
 export type { EngineProcessState }
@@ -355,36 +355,9 @@ export class EngineProcess extends EventEmitter {
     this.lines.on('line', (line) => {
       if (this.child === child) this.handleLine(line)
     })
-    let stderrPending = ''
-    const recordStderr = (line: string): void => {
-      if (!line) return
-      if (line.startsWith('NOLA_DIAGNOSTIC ')) {
-        try {
-          const observation = JSON.parse(line.slice('NOLA_DIAGNOSTIC '.length)) as Record<string, unknown>
-          const category = [observation.layer, observation.event].filter(value => typeof value === 'string').join('.').replace(/[^a-zA-Z0-9_.-]/g, '_')
-          // Caption revisions and successful audio observations can arrive for every chunk/token.
-          const frequent = observation.layer === 'engine'
-            && (observation.event === 'engine.update' || observation.event === 'engine.caption')
-            || observation.layer === 'ext'
-            && (observation.event === 'ext.chunk' || observation.event === 'ext.silent')
-          if (frequent) logActivity(`pipeline.${category}`, observation)
-          else logDiagnostic(`pipeline.${category}`, observation)
-          return
-        } catch { /* Unparseable diagnostics are reduced to safe output metadata below. */ }
-      }
-      const level = /\b(error|exception|failed|fatal)\b/i.test(line) ? 'error'
-        : /\b(warn|warning)\b/i.test(line) ? 'warning' : 'info'
-      logDiagnostic(`engine.stderr.${level}`, { message: line, bytes: Buffer.byteLength(line) })
-      this.emit('log', JSON.stringify({ kind: 'unstructured-stderr', level, bytes: Buffer.byteLength(line) }))
-    }
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderrPending += chunk.toString('utf8')
-      const lines = stderrPending.split(/\r?\n/)
-      stderrPending = lines.pop() ?? ''
-      for (const line of lines) recordStderr(line)
-      if (stderrPending.length > 32000) { recordStderr(stderrPending); stderrPending = '' }
+    logPythonStderr(child.stderr, 'engine', (level, bytes) => {
+      this.emit('log', JSON.stringify({ kind: 'unstructured-stderr', level, bytes }))
     })
-    child.stderr.once('end', () => recordStderr(stderrPending))
     child.once('error', (error) => {
       const processError = error as NodeJS.ErrnoException
       this.handleTermination(child, Object.assign(new Error('ENGINE_UNAVAILABLE'), {

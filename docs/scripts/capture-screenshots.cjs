@@ -47,6 +47,22 @@ async function writeFileWithRetry(file, data) {
   }
 }
 
+async function encodeWebp(win, screenshot) {
+  const encoded = await win.webContents.executeJavaScript(`(async () => {
+    const image = new Image()
+    image.src = ${JSON.stringify(screenshot.toDataURL())}
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = image.naturalWidth
+    canvas.height = image.naturalHeight
+    canvas.getContext('2d').drawImage(image, 0, 0)
+    return canvas.toDataURL('image/webp', 0.87)
+  })()`)
+  const prefix = 'data:image/webp;base64,'
+  if (!encoded.startsWith(prefix)) throw new Error('Chromium did not encode a WebP screenshot')
+  return Buffer.from(encoded.slice(prefix.length), 'base64')
+}
+
 const capturePath = (locale, page, theme) => {
   const name = guideOnly ? ({ 'compute-environment': 'compute', 'llm-configuration': 'translation' }[page] ?? page) : page
   const guideName = ({ 'compute-environment': 'compute', 'llm-configuration': 'translation', 'crisp-loader': 'crispasr-loader-settings', 'llama-cuda': 'llama-cpp-cuda-version-selection', 'llama-vulkan': 'llama-cpp-vulkan-version-selection' }[page] ?? page)
@@ -182,6 +198,9 @@ async function main() {
           const relativePath = capturePath(locale, page, theme)
           const file = path.join(root, 'docs/public', relativePath)
           await writeFileWithRetry(file, buffer)
+          if (!guideOnly && (page === 'home' || page === 'browser-scene')) {
+            await writeFileWithRetry(file.replace(/\.png$/, '.webp'), await encodeWebp(win, png))
+          }
           const demoDescription = ['overlay-scene', 'browser-scene'].includes(page)
             ? '真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。'
             : '真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。'

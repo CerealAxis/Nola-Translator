@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { createRequire } from 'node:module'
 import { app, BrowserWindow, desktopCapturer, ipcMain, nativeImage } from 'electron'
@@ -12,8 +12,8 @@ await mkdir(output, { recursive: true })
 app.setPath('userData', resolve(output, `cache-${process.pid}`))
 app.disableHardwareAcceleration()
 app.on('window-all-closed', () => {})
-await build({ stdin: { contents: `export { ScreenTranslation } from './src/main/screen-translation'; export { DEFAULT_SETTINGS } from './src/shared/settings'; export { screenConfigSchema } from './src/shared/screen-translation'`, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], outfile: resolve(output, 'service.cjs') })
-const { ScreenTranslation, DEFAULT_SETTINGS, screenConfigSchema } = createRequire(import.meta.url)(resolve(output, 'service.cjs'))
+await build({ stdin: { contents: `export { ScreenTranslation } from './src/main/screen-translation'; export { DEFAULT_SETTINGS } from './src/shared/settings'; export { screenConfigSchema } from './src/shared/screen-translation'; export { initializeSessionLog, sessionLogPath } from './src/main/session-log'`, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], outfile: resolve(output, 'service.cjs') })
+const { ScreenTranslation, DEFAULT_SETTINGS, screenConfigSchema, initializeSessionLog, sessionLogPath } = createRequire(import.meta.url)(resolve(output, 'service.cjs'))
 const wait = ms => new Promise(resolveWait => setTimeout(resolveWait, ms))
 const until = async (condition, label, timeout = 15000) => {
   const started = Date.now()
@@ -23,6 +23,7 @@ let service, target, captureBackend, released = 0, captures = 0
 const evidence = [], diagnostics = []
 void app.whenReady().then(async () => {
 try {
+  await initializeSessionLog(resolve(output, `logs-${process.pid}`), { fixture: 'screen-capture' })
   captureBackend = await startScreenCaptureBackend()
   ipcMain.handle('app:get-settings', () => DEFAULT_SETTINGS)
   app.on('web-contents-created', (_event, contents) => contents.on('console-message', details => { if (details.level >= 2) diagnostics.push(details.message) }))
@@ -32,9 +33,14 @@ try {
   target.focus()
   const source = (await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 } })).find(item => item.name === 'Nola Capture Fixture')
   assert(source)
+  let gatewayState = 'stopped', ocrReady = false, translationReady = false
   service = new ScreenTranslation({ mainDir: resolve('out/main'), configPath: resolve(output, `config-${process.pid}.json`), settings: () => DEFAULT_SETTINGS,
-    gatewaySnapshot: () => ({ state: 'running', availableModels: { mt: [{ binding: 'cloud:google', kind: 'mt', name: 'Test MT', origin: 'cloud', free: true }] } }),
-    prepareOcr: async () => () => { released++ },
+    gatewaySnapshot: () => ({ state: gatewayState, availableModels: { mt: translationReady
+      ? [{ binding: 'cloud:google', kind: 'mt', name: 'Test MT', origin: 'cloud', free: true }] : [] } }),
+    prepareOcr: async () => {
+      if (!ocrReady) throw new Error('ocrNotReady')
+      return () => { released++ }
+    },
     captureScreen: captureBackend.capture,
     inferOcr: async request => {
       const image = nativeImage.createFromDataURL(request.image), { width, height } = image.getSize(), pixels = image.toBitmap()
@@ -51,6 +57,29 @@ try {
     }, publish: () => {} })
   assert(!(await service.sources()).some(item => item.id === source.id), 'Nola-owned windows are excluded from the user picker')
   await service.configure(screenConfigSchema.parse({ captureMode: 'window', sourceId: source.id, processingMode: 'cascade', model: 'cloud:google', sourceLanguage: 'en', targetLanguage: 'zh', intervalMs: 250 }))
+  const startupFailures = []
+  for (const [state, ready, reason, supportCode] of [
+    ['stopped', false, 'gatewayNotReady', 'GTW-001'],
+    ['running', false, 'ocrNotReady', 'MDL-025'],
+    ['running', true, 'translationModelNotReady', 'MDL-025'],
+  ]) {
+    gatewayState = state; ocrReady = ready
+    await service.start()
+    const snapshot = service.snapshot()
+    assert.equal(snapshot.status, 'error')
+    assert.equal(snapshot.error, reason)
+    assert.equal(snapshot.failure.supportCode, supportCode)
+    assert.deepEqual(BrowserWindow.getAllWindows().map(window => window.id), [target.id])
+    startupFailures.push({ reason, supportCode, correlationId: snapshot.errorId })
+  }
+  const log = (await readFile(sessionLogPath(), 'utf8')).trim().split(/\r?\n/).map(line => JSON.parse(line))
+  for (const failure of startupFailures) {
+    assert.equal(log.filter(entry => entry.event === 'screen.failed' && entry.data.reason === failure.reason
+      && entry.data.classification.supportCode === failure.supportCode
+      && entry.data.classification.correlationId === failure.correlationId).length, 1)
+  }
+  evidence.push({ check: 'failed starts create no native window and record one classified diagnostic', passed: true, startupFailures })
+  translationReady = true
   await service.start(); target.focus()
   await until(() => service.snapshot().blocks.some(block => block.translation === 'translated-red' && !block.hidden), 'real capture and overlay')
   for (let sample = 0; sample < 20; sample++) {
@@ -90,7 +119,7 @@ try {
   target.destroy(); target = undefined
   await until(() => service.snapshot().status === 'error' && !service.overlay, 'target exit stops capture')
   await service.stop()
-  assert.equal(released, 1)
+  assert.equal(released, 2)
   assert.equal(service.overlay, undefined)
   evidence.push({ check: 'target exit and stop release capture and OCR reservation', passed: true })
   await writeFile(resolve(output, 'report.json'), JSON.stringify({ passed: true, evidence, diagnostics, modelInference: 'deterministic test fixture' }, null, 2))

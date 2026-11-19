@@ -43,7 +43,9 @@ import {
   X,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { useAvailableModels } from '@/available-models'
+import { useAvailableModels, useGatewaySnapshot } from '@/available-models'
+import { intersectLanguages, modelTranslationLanguages } from '@/model-options'
+import { bindingIsLocal } from '../../../shared/model-gateway'
 import {
   callableModels,
   installedPlaygroundModels,
@@ -190,6 +192,7 @@ export function ComicTranslationWorkspace({
     jobs = useComicTasks()
   const book = books.find((item) => item.id === projectId)
   const available = useAvailableModels()
+  const gateway = useGatewaySnapshot()
   const settings = useStore(stores.settings, (state) => state.settings)
   const resources = useStore(stores.models, (state) => state.resources)
   const credentials = useStore(stores.models, (state) => state.credentials)
@@ -1032,6 +1035,17 @@ export function ComicTranslationWorkspace({
       setExporting(false)
     }
   }
+  const usesLlm = workflow === 'visual' || workflow === 'proof'
+  const translationBinding = workflow === 'visual' ? book.config.visualModel : workflow === 'proof' ? book.config.proofModel : book.config.normalModel
+  const translator = (usesLlm ? available.llm : available.mt).find(model => model.binding === translationBinding)
+  const translationResource = translator?.origin === 'gateway' ? resources.find(resource => `resource:${resource.resourceId}` === translationBinding) : undefined
+  const ocrResources = resources.filter(resource => resource.installed && resource.kind === 'ocrModel'
+    && (resource.provider === 'pp-ocrv5' && book.config.ocr !== 'manga-ocr' || resource.provider === 'manga-ocr' && book.config.ocr !== 'ppocr'))
+  const sourceCodes = intersectLanguages(ocrResources.length ? ['auto', ...ocrResources.flatMap(resource => resource.languages)] : [], translator?.sourceLanguages)
+  const targetsFor = (source: string) => usesLlm && translator ? ['zh', 'zh-Hant', 'en', 'ja', 'ko']
+    : modelTranslationLanguages(translator, translationResource, source)
+  const languageUnavailable = translationBinding && bindingIsLocal(translationBinding) && gateway?.state !== 'running' ? 'gateway'
+    : !translator || !ocrResources.length ? 'models' : !sourceCodes.length ? 'pair' : undefined
   return (
     <div
       className="comic-workflow"
@@ -1435,14 +1449,18 @@ export function ComicTranslationWorkspace({
               <LanguageDirectionSelect
                 source={book.config.sourceLanguage}
                 target={book.config.targetLanguage}
-                sourceCodes={['auto', 'ja', 'en', 'ko', 'zh', 'zh-Hant']}
-                targetCodes={['zh', 'zh-Hant', 'en', 'ja', 'ko']}
-                onSourceChange={(sourceLanguage) =>
+                sourceCodes={sourceCodes}
+                targetCodes={targetsFor(book.config.sourceLanguage)}
+                unavailable={languageUnavailable}
+                requiredModels={[...(!translator && (!translationBinding || bindingIsLocal(translationBinding)) ? [usesLlm ? 'LLM' : 'MT'] : []), ...(!ocrResources.length ? ['OCR'] : [])]}
+                onSourceChange={(sourceLanguage) => {
+                  const targets = targetsFor(sourceLanguage)
+                  const targetLanguage = targets.includes(book.config.targetLanguage) ? book.config.targetLanguage : targets[0] ?? book.config.targetLanguage
                   saveComicBook({
                     ...book,
-                    config: { ...book.config, sourceLanguage },
+                    config: { ...book.config, sourceLanguage, targetLanguage },
                   })
-                }
+                }}
                 onTargetChange={(targetLanguage) =>
                   saveComicBook({
                     ...book,
@@ -2309,7 +2327,7 @@ export function ComicTranslationWorkspace({
                             <CardTitle>{modeTitle(job.kind)}</CardTitle>
                             <CardDescription>
                               {job.error
-                                ? `${taskStatus(job.status)} · ${comicErrorMessage(job.error, p)}`
+                                ? `${taskStatus(job.status)} · ${comicErrorMessage(job.error, p) || t('suite.actionFailed')}`
                                 : taskStatus(job.status)}
                               {job.status !== 'failed' &&
                                 ` · ${Math.round(job.progress)}%`}

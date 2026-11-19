@@ -7,6 +7,8 @@ const { handle } = vi.hoisted(() => ({ handle: vi.fn() }))
 vi.mock('electron', () => ({ ipcMain: { handle } }))
 import { configureIpcSenderValidation, drainLoggedIpc, loggedHandle } from '../../../src/main/logged-ipc'
 import { initializeSessionLog, sessionLogPath } from '../../../src/main/session-log'
+import { restoreIpcError } from '../../../src/shared/ipc-error'
+import { backendFailure } from '../../../src/main/backend-error'
 
 afterEach(() => { handle.mockClear() })
 
@@ -28,9 +30,31 @@ it.each(['realtimeGlossarySavedSyncFailed', 'REALTIMEGLOSSARYSAVEDSYNCFAILED'])(
   configureIpcSenderValidation(() => {})
   loggedHandle('glossary:command', async () => { throw new Error(reason) })
   const invoke = handle.mock.calls.at(-1)![1]
-  await expect(invoke({ sender: { id: 7 } }, {})).rejects.toMatchObject({
-    message: reason, code: reason, supportCode: 'MT-026', retryable: true, correlationId: expect.any(String),
-  })
+  const error = await invoke({ sender: { id: 7 } }, {}).catch((failure: Error) =>
+    restoreIpcError(new Error(`Error invoking remote method 'glossary:command': Error: ${failure.message}`)))
+  expect(error).toMatchObject({ message: reason, code: reason, supportCode: 'MT-026',
+    retryable: true, correlationId: expect.any(String) })
+})
+
+it('keeps the same backend correlation ID in the IPC failure and renderer error', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nola-ipc-correlation-'))
+  try {
+    await initializeSessionLog(directory, {})
+    configureIpcSenderValidation(() => {})
+    loggedHandle('test:start', () => {
+      throw backendFailure({ code: 'MODEL_NOT_READY', stage: 'vad', scope: 'session', retryable: false,
+        fatal: false, message_key: 'gateway.LOAD_FAILED', correlation_id: 'backend-correlation' })
+    })
+    const invoke = handle.mock.calls.at(-1)![1]
+    const failure = await invoke({ sender: { id: 7 } }).catch((error: Error) =>
+      restoreIpcError(Object.freeze(new Error(error.message))))
+    expect(failure).toMatchObject({ message: 'vadUnavailable', supportCode: 'ASR-009', correlationId: 'backend-correlation' })
+    const log = await readFile(sessionLogPath(), 'utf8')
+    expect(JSON.parse(log.trim().split('\n').at(-1)!).data).toMatchObject({
+      correlationId: 'backend-correlation',
+      error: { correlationId: 'backend-correlation', backendCode: 'MODEL_NOT_READY', stage: 'vad' },
+    })
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
 it('records glossary and game operations without persisting their source, translation or import payloads', async () => {

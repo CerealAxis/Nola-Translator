@@ -1,5 +1,14 @@
 import type { Locale } from './content'
 
+export const screenshotAlt: Record<Locale, { desktop: string; browser: string }> = {
+  'zh-CN': { desktop: 'Nola Translator 桌面应用首页', browser: '浏览器扩展在视频上叠加双语字幕' },
+  'zh-TW': { desktop: 'Nola Translator 桌面應用程式首頁', browser: '瀏覽器擴充功能在影片上疊加雙語字幕' },
+  'zh-HK': { desktop: 'Nola Translator 桌面應用程式首頁', browser: '瀏覽器擴充功能在影片上疊加雙語字幕' },
+  en: { desktop: 'Nola Translator desktop home screen', browser: 'The browser extension overlays bilingual captions on a video' },
+  ja: { desktop: 'Nola Translator デスクトップ版のホーム画面', browser: 'ブラウザー拡張機能が動画に二言語字幕を重ねて表示' },
+  ko: { desktop: 'Nola Translator 데스크톱 앱의 홈 화면', browser: '브라우저 확장 프로그램이 동영상 위에 이중 언어 자막을 표시하는 화면' },
+}
+
 type AudienceId = 'students' | 'researchers' | 'teams' | 'creators' | 'players' | 'readers'
 type FeatureId = 'web-translation' | 'live-captions' | 'game-translation' | 'comic-translation' | 'meeting-interpretation' | 'screen-translation'
 

@@ -167,7 +167,7 @@ export function OverlayPage() {
             </div>
             <div className="nola-settings-field nola-language-pair-field" data-onboarding="quick-language">
               <ModelAvailabilityLabel label={t('shellUi.languageDirection')} hint={t('shellUi.languageDirectionHint')} />
-              <LanguageDirectionSelect source={sourceLanguage} target={targetLanguage} sourceCodes={sourceLanguages} targetCodes={targetLanguages} disabled={sessionActive}
+              <LanguageDirectionSelect source={sourceLanguage} target={targetLanguage} sourceCodes={sourceLanguages} targetCodes={targetLanguages} unavailable={s2sModel ? undefined : modelOptions.languageUnavailable} requiredModels={modelOptions.requiredModels} disabled={sessionActive}
                 onSourceChange={sourceLanguage => patch({ recognition: { sourceLanguage } })} onTargetChange={value => patch(targetLanguagePatch(value, targetLanguage))}
                 onSwap={swappedLanguages ? () => patch({ recognition: { sourceLanguage: swappedLanguages.sourceLanguage }, translation: { targetLanguage: swappedLanguages.targetLanguage } }) : undefined} />
             </div>

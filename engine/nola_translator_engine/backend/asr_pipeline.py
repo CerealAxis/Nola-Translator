@@ -181,7 +181,13 @@ class AsrPipeline:
     async def prepare(self):
         instance, lease, _, _ = await self.gateway.acquire(self._request())
         try:
-            await asyncio.to_thread(self.gate.load)
+            try:
+                await asyncio.to_thread(self.gate.load)
+            except Exception as error:
+                raise GatewayError(
+                    GatewayErrorCode.LOAD_FAILED, stage="vad",
+                    message="Bundled voice activity detector could not be initialized",
+                ) from error
             from ..recognition.speaker import SpeakerEmbedder, SpeakerInstallationError
 
             try:

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useData, withBase } from 'vitepress'
-import { copy, downloadUrl, localeNames, localePath, type Locale } from './content'
+import { copy, docsNav, downloadUrl, localeNames, localePath, type Locale } from './content'
 import { landingContent } from './landing-content'
 import { languageNoticeReadyKey } from './cookieConsent'
 import { defaultLocale, homePath } from './siteLocale'
@@ -68,6 +68,8 @@ onBeforeUnmount(() => { disposed = true; root?.unmount() })
       <p>{{ landingContent[locale].heroSubtitle }}</p>
       <div class="site-loading-links">
         <a :href="withBase(`${localePath(locale)}docs`)">{{ copy[locale].nav.docs }}</a>
+        <a :href="withBase(`${localePath(locale)}features/`)">{{ docsNav[locale].features }}</a>
+        <a :href="withBase('/vis/')">{{ copy[locale].nav.designDocs }}</a>
         <a :href="downloadUrl">{{ copy[locale].nav.download }}</a>
       </div>
       <nav class="site-loading-links" :aria-label="copy[locale].nav.language">
@@ -80,6 +82,15 @@ onBeforeUnmount(() => { disposed = true; root?.unmount() })
           :aria-current="language === locale ? 'page' : undefined"
         >{{ localeNames[language] }}</a>
       </nav>
+      <section id="features" class="site-loading-features" aria-labelledby="site-loading-features-title">
+        <h2 id="site-loading-features-title">{{ landingContent[locale].featureHeading }}</h2>
+        <ul>
+          <li v-for="feature in landingContent[locale].features" :key="feature.id">
+            <h3>{{ feature.title }}</h3>
+            <p>{{ feature.description }}</p>
+          </li>
+        </ul>
+      </section>
     </main>
   </div>
 </template>

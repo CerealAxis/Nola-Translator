@@ -24,13 +24,13 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
             onChange={next => { void updateSettings({ translation: { translateIntermediate: next } }).catch(() => undefined) }} />
         </SettingsRow>
         {translation.translateIntermediate ? <SettingsRow label={t('settings.intermediateTranslationInterval')} desc={t('settings.intermediateTranslationIntervalHint')} descriptionTooltip>
-          <div className="flex w-full max-w-64 items-center gap-3">
-            <SliderRoot className="slider min-w-0 flex-1" min={0} max={2000} step={100} value={translation.intermediateTranslationIntervalMs} onValueChange={value => {
+          <div className="settings-slider">
+            <SliderRoot min={0} max={2000} step={100} value={translation.intermediateTranslationIntervalMs} onValueChange={value => {
               if (typeof value === 'number') void updateSettings({ translation: { intermediateTranslationIntervalMs: value } }).catch(() => undefined)
             }}>
               <SliderControl><SliderTrack><SliderIndicator /><SliderThumb aria-label={t('settings.intermediateTranslationInterval')} /></SliderTrack></SliderControl>
             </SliderRoot>
-            <span className="min-w-12 text-end tabular-nums">{(translation.intermediateTranslationIntervalMs / 1000).toFixed(1)}s</span>
+            <output className="col-span-2 type-muted tabular text-end">{(translation.intermediateTranslationIntervalMs / 1000).toFixed(1)}s</output>
           </div>
         </SettingsRow> : null}
       </SettingGroup>

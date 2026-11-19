@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { comicErrorMessage } from './comic-errors'
 
-it('explains known model errors and keeps unknown diagnostics visible', () => {
+it('explains known model errors and leaves unknown errors to the localized fallback', () => {
   expect(
     comicErrorMessage(
       new Error('Error invoking remote method: Error: comicInvalidModelResult'),
@@ -12,6 +12,6 @@ it('explains known model errors and keeps unknown diagnostics visible', () => {
     'errorOcrUnavailable',
   )
   expect(comicErrorMessage('diskFull: volume D', (key) => key)).toBe(
-    'diskFull: volume D',
+    '',
   )
 })

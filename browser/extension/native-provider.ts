@@ -4,7 +4,7 @@ import { BrowserFailure, createBridge, type RequestInput } from './bridge'
 let translationBridge: ReturnType<typeof openTranslationBridge> | undefined
 
 function openTranslationBridge() {
-  const bridge = createBridge('native-translation', () => chrome.runtime.connectNative(BROWSER_HOST_NAME))
+  const bridge = createBridge('native-translation', () => chrome.runtime.connectNative(BROWSER_HOST_NAME), 'background')
   let idle: ReturnType<typeof setTimeout>
   let active = 0
   const release = () => {

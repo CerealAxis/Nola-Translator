@@ -3,7 +3,8 @@ import type { ResourceRecord } from './contracts'
 import { isSupportedShortcut } from './keyboard-shortcuts'
 import type { AppSettings } from './settings'
 import { defaultModelBinding } from './model-policy'
-import { normalizeModelBinding } from './model-gateway'
+import { normalizeModelBinding, type ModelGatewaySnapshot } from './model-gateway'
+import type { AppErrorShape } from './ipc-error'
 import { glossarySelectionSchema } from './glossary'
 
 export const MAX_SCREEN_REGIONS = 64
@@ -36,6 +37,7 @@ export const screenConfigSchema = z.object({
   targetLanguage: z.string().min(1).max(32).default('zh'), model: z.string().max(512).default(''),
   processingMode: z.enum(['default', 'cascade']).optional(),
   intervalMs: z.number().int().min(100).max(100000).default(1500),
+  textChangeThreshold: z.number().int().min(0).max(100000).default(3),
   fontSize: z.union([z.literal(0), z.number().int().min(12).max(36)]).default(0), opacity: z.number().min(0.35).max(1).default(1),
   showSource: z.boolean().default(false),
   toggleShortcut: z.string().max(100).default('CommandOrControl+Shift+F8'),
@@ -68,7 +70,13 @@ export interface ScreenTextBlock {
   status: 'translating' | 'ready' | 'error'
 }
 export type ScreenStatus = 'ready' | 'starting' | 'running' | 'paused' | 'waiting' | 'editing' | 'error'
-export type ScreenError = 'captureFailed' | 'targetUnavailable' | 'targetChanged' | 'ocrFailed' | 'ocrMissing' | 'ocrNotReady' | 'ocrCorrupt' | 'ocrRuntimeUnavailable' | 'translationFailed' | 'shortcutConflict' | 'invalidConfig' | 'backendUnavailable' | 's2sUnsupported' | 'gatewayNotReady' | 'translationModelMissing' | 'translationModelNotReady' | 'regionsMissing' | 'sameLanguage'
+export type ScreenError = 'captureFailed' | 'targetUnavailable' | 'targetChanged' | 'ocrFailed' | 'ocrMissing' | 'ocrNotReady' | 'ocrCorrupt' | 'ocrRuntimeUnavailable' | 'translationFailed' | 'shortcutConflict' | 'invalidConfig' | 'backendUnavailable' | 's2sUnsupported' | 'gatewayNotReady' | 'translationModelMissing' | 'translationModelNotReady' | 'regionsMissing' | 'sameLanguage' | 'startFailed'
+export interface ScreenFailure extends AppErrorShape {
+  gatewayState?: ModelGatewaySnapshot['state']
+  modelBinding?: string
+  serviceFailed?: boolean
+  gameId?: string
+}
 export interface ScreenOcrStatus { installed: boolean; state: string; progress?: number; error?: string; languages?: string[]; resource?: ResourceRecord }
 export const screenBlurPatchSchema = z.object({
   image: z.string().startsWith('data:image/png;base64,').max(3 * 1024 * 1024),
@@ -83,7 +91,8 @@ export interface ScreenOcrResult {
 }
 export interface ScreenSnapshot {
   status: ScreenStatus; config: ScreenConfig; sessionId: string; epoch: number;
-  blocks: ScreenTextBlock[]; error?: ScreenError; errorId?: string; shortcutError: boolean;
+  blocks: ScreenTextBlock[]; error?: ScreenError; errorId?: string; failure?: ScreenFailure;
+  shortcutError: boolean; shortcutErrorId?: string;
   frames: number; ocrMs: number; translationMs: number;
   presets?: ScreenRegionPreset[]; regionsVisible?: boolean;
   captureRegions?: ScreenRegion[]; overlayVisible?: boolean;

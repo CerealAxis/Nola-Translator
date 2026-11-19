@@ -38,7 +38,7 @@ export function LandingBrandMarquee({ locale }: { locale: Locale }) {
   const action = paused ? content.brandResume : content.brandPause
 
   return (
-    <section className="site-brand-strip" aria-label={content.brandLabel} data-paused={paused} data-reveal="section">
+    <section id="translation-engines" className="site-brand-strip" aria-label={content.brandLabel} data-paused={paused} data-reveal="section">
       <div className="site-brand-strip-viewport">
         <div className="site-brand-strip-track">
           {[0, 1].map(copy => (

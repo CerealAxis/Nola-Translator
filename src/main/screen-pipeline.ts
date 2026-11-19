@@ -25,7 +25,7 @@ export class ScreenPipeline {
   constructor(private readonly config: ScreenConfig,
     private readonly translate: (text: string, signal: AbortSignal) => Promise<string>,
     private readonly changed: () => void,
-    private readonly failed: () => void,
+    private readonly failed: (error: unknown) => void,
     private readonly signature: (text: string) => string = () => '') {}
 
   blocks(): ScreenTextBlock[] {
@@ -41,7 +41,7 @@ export class ScreenPipeline {
     const merged = mergeScreenLines(entries, vertical, space)
     const text = sortLines(merged.map(bounds), vertical, space).map(line => line.text).join('\n')
     const previous = this.regions.get(region.id)
-    const unchanged = previous && !force && text && editDistanceBelow(previous.lastText, text, 3)
+    const unchanged = previous && !force && text && editDistanceBelow(previous.lastText, text, this.config.textChangeThreshold)
     if (!text && !previous?.blocks.length) return
     const blocks = merged.map((block, index): ScreenTextBlock => {
       const quad = block.quad.map(([x, y]) => [region.x + x / width * region.width, region.y + y / height * region.height])
@@ -131,8 +131,8 @@ export class ScreenPipeline {
               block.translation = result
               block.status = 'ready'
             }
-          } catch {
-            if (!signal.aborted) { block.status = 'error'; this.failed() }
+          } catch (error) {
+            if (!signal.aborted) { block.status = 'error'; this.failed(error) }
           }
           if (!signal.aborted) this.changed()
         }
@@ -148,6 +148,7 @@ export class ScreenPipeline {
 export function editDistanceBelow(left: string, right: string, limit: number): boolean {
   if (left === right) return true
   if (Math.abs(left.length - right.length) >= limit) return false
+  if (Math.max(left.length, right.length) < limit) return true
   let previous = Array.from({ length: right.length + 1 }, (_, i) => Math.min(i, limit))
   let current = previous.slice()
   for (let i = 1; i <= left.length; i++) {

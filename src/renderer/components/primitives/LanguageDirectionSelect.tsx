@@ -4,6 +4,7 @@ import { useI18n } from '@/i18n'
 import { languageName, normalizeLanguage, type UiLanguage } from '../../../shared/languages'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function languageOptionLabel(code: string, locale: UiLanguage, includeNative = true): string {
   const normalized = normalizeLanguage(code)
@@ -40,15 +41,26 @@ export function LanguageSelect({ value, codes, label, onChange, disabled }: {
   </Combobox.Root>
 }
 
-export function LanguageDirectionSelect({ source, target, sourceCodes, targetCodes, onSourceChange, onTargetChange, onSwap, disabled, sourceLabel, targetLabel }: {
+export function LanguageDirectionSelect({ source, target, sourceCodes, targetCodes, onSourceChange, onTargetChange, onSwap, disabled, sourceLabel, targetLabel, unavailable, requiredModels }: {
   source: string; target: string; sourceCodes: readonly string[]; targetCodes: readonly string[]
   onSourceChange(value: string): void; onTargetChange(value: string): void; onSwap?: () => void; disabled?: boolean
   sourceLabel?: string; targetLabel?: string
+  unavailable?: 'gateway' | 'models' | 'pair'
+  requiredModels?: readonly string[]
 }) {
   const { t } = useI18n()
-  return <div className="nola-language-direction" role="group" aria-label={t('shellUi.languageDirection')}>
-    <LanguageSelect value={source} codes={sourceCodes} label={sourceLabel ?? t('session.sourceLanguage')} disabled={disabled} onChange={onSourceChange} />
-    <Button variant="bare" size="icon-sm" disabled={disabled || !onSwap} aria-label={t('session.swapLanguages')} onClick={onSwap}><ArrowRightLeft aria-hidden="true" /></Button>
-    <LanguageSelect value={target} codes={targetCodes} label={targetLabel ?? t('session.targetLanguage')} disabled={disabled} onChange={onTargetChange} />
+  const blocked = disabled || !!unavailable
+  const hint = unavailable === 'gateway' ? 'gateway.languageStartHint'
+    : unavailable === 'models' ? 'gateway.languageModelsHint' : 'gateway.languagePairHint'
+  const controls = <div className="nola-language-direction" role="group" aria-label={t('shellUi.languageDirection')}>
+    <LanguageSelect value={source} codes={sourceCodes} label={sourceLabel ?? t('session.sourceLanguage')} disabled={blocked} onChange={onSourceChange} />
+    <Button variant="bare" size="icon-sm" disabled={blocked || !onSwap} aria-label={t('session.swapLanguages')} onClick={onSwap}><ArrowRightLeft aria-hidden="true" /></Button>
+    <LanguageSelect value={target} codes={targetCodes} label={targetLabel ?? t('session.targetLanguage')} disabled={blocked} onChange={onTargetChange} />
   </div>
+  return unavailable && !disabled ? <Tooltip>
+    <TooltipTrigger render={controls} tabIndex={0} delay={0} />
+    <TooltipContent>{unavailable !== 'pair' && requiredModels?.length
+      ? t('gateway.languageRequiredModelsHint', { models: requiredModels.join(t('gateway.languageModelJoin')) })
+      : t(hint)}</TooltipContent>
+  </Tooltip> : controls
 }

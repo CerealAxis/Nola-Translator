@@ -1,12 +1,5 @@
 import { SettingsRow } from '../SettingsRow'
-/**
- * Engine diagnostics and the separately composed factory reset group.
- *
- * Factory reset confirms through `AlertDialog`, which is the only destructive path in the app
- * that is not a single click.
- */
-
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { AlertDialog } from '@base-ui/react/alert-dialog'
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -17,7 +10,7 @@ import { StatusPill } from '@/components/primitives'
 import type { StatusPillTone } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
-import { actions, stores, updateSettings, useStore } from '@/store'
+import { stores, updateSettings, useStore } from '@/store'
 import type { EngineStatus } from '@/store'
 import { reportSettingsFailure } from '../settingsErrorChannel'
 import { SettingGroup } from '../SettingsPage'
@@ -33,25 +26,6 @@ const ENGINE_STATUS_ROW: Record<EngineStatus, { label: TranslationKey; tone: Sta
   ready: { label: 'titleBar.engineReady', tone: 'success' },
   recovering: { label: 'titleBar.engineRecovering', tone: 'warning' },
   failed: { label: 'titleBar.engineFailed', tone: 'danger' },
-}
-
-const DIAGNOSTIC_LABELS: Record<string, TranslationKey> = {
-  应用版本: 'settings.diagnosticAppVersion',
-  操作系统: 'settings.diagnosticOperatingSystem',
-  引擎状态: 'settings.diagnosticEngineStatus',
-  引擎重启次数: 'settings.diagnosticRestartCount',
-  语音识别: 'settings.diagnosticSpeechRecognition',
-  本地翻译: 'settings.diagnosticLocalTranslation',
-  数据目录: 'settings.diagnosticDataDirectory',
-  本次日志: 'settings.diagnosticCurrentLog',
-}
-
-const ENGINE_STATUS_LABELS: Record<string, TranslationKey> = {
-  idle: 'titleBar.engineIdle',
-  booting: 'titleBar.engineStarting',
-  ready: 'titleBar.engineReady',
-  recovering: 'titleBar.engineRecovering',
-  failed: 'titleBar.engineFailed',
 }
 
 export function EngineDiagnostics() {
@@ -71,16 +45,6 @@ export function EngineDiagnostics() {
         <CodeRow label={t('settings.enginePath')} value={storage?.activePath ?? '-'} />
         <CodeRow label={t('settings.protocolVersion')} value={String(PROTOCOL_VERSION)} />
       </SettingGroup>
-
-      {/*
-        The individual diagnostics rows. Copying alone hands the user JSON they have to open
-        somewhere else to read, while what they need during a failure is to be told now.
-        A failed load is reported as a notice and the row says the report is unavailable,
-        which an empty list would not.
-      */}
-      <SettingGroup legend={t('settings.groupDiagnostics')}>
-        <DiagnosticsReport />
-      </SettingGroup>
     </div>
   )
 }
@@ -91,64 +55,6 @@ export function ResetSettingsGroup() {
   return <SettingGroup legend={t('settings.resetAll')}>
     <SettingsRow label={t('settings.resetAll')}><ResetAll pending={pending} /></SettingsRow>
   </SettingGroup>
-}
-
-/**
- * Read-only list of what `getDiagnostics()` returns.
- *
- * Main-process diagnostic keys stay stable in copied reports; the renderer localizes their
- * labels for display without changing the underlying diagnostic payload.
- */
-function DiagnosticsReport() {
-  const { t } = useI18n()
-  const [rows, setRows] = useState<Array<[string, string]> | null>(null)
-  const [unavailable, setUnavailable] = useState(false)
-  const [attempt, setAttempt] = useState(0)
-
-  useEffect(() => {
-    let active = true
-    actions.settings.readDiagnostics()
-      .then((payload) => {
-        if (!active) return
-        setUnavailable(false)
-        setRows(Object.entries(payload).map(([key, value]) => [key, String(value)]))
-      })
-      .catch((cause: unknown) => {
-        if (!active) return
-        console.error('[settings] diagnostics', cause)
-        setUnavailable(true)
-      })
-    return () => { active = false }
-  }, [attempt])
-
-  if (unavailable) {
-    return <SettingsRow label={t('settings.diagnosticsUnavailable')}>
-      <Button variant="secondary" size="sm" onClick={() => {
-        setUnavailable(false)
-        setRows(null)
-        setAttempt(value => value + 1)
-      }}>{t('common.retry')}</Button>
-    </SettingsRow>
-  }
-  if (rows === null) {
-    return <SettingsRow label={t('settings.diagnosticsLoading')}><LoaderCircle className="animate-spin" aria-hidden="true" /></SettingsRow>
-  }
-  if (rows.length === 0) {
-    return <SettingsRow label={t('settings.diagnosticsEmpty')}><span className="type-muted text-muted">-</span></SettingsRow>
-  }
-  return (
-    <>
-      {rows.map(([key, value]) => {
-        const labelKey = DIAGNOSTIC_LABELS[key]
-        const statusKey = key === '引擎状态' ? ENGINE_STATUS_LABELS[value] : undefined
-        const displayValue = statusKey ? t(statusKey)
-          : value === '未运行' ? t('settings.diagnosticNotRunning')
-            : value === '日志不可用' ? t('settings.diagnosticLogUnavailable')
-              : value
-        return <CodeRow key={key} label={labelKey ? t(labelKey) : key} value={displayValue} />
-      })}
-    </>
-  )
 }
 
 function CodeValue({ value }: { value: string }) {

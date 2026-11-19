@@ -63,4 +63,7 @@ it('persists normalized compatibility codes only for extension senders', async (
   listener(message, { id: 'extension' }, vi.fn())
   await vi.waitFor(() => expect(add).toHaveBeenCalledOnce())
   expect(add).toHaveBeenCalledWith(expect.objectContaining({ code: 'Math.sumPrecise unavailable', version: '2.0.3' }))
+  listener({ ...message, code: 'audioCaptureStartFailed', supportCode: 'IGNORED' }, { id: 'extension' }, vi.fn())
+  await vi.waitFor(() => expect(add).toHaveBeenCalledTimes(2))
+  expect(add).toHaveBeenLastCalledWith(expect.objectContaining({ code: 'audioCaptureStartFailed', supportCode: 'AUD-009' }))
 })

@@ -13,6 +13,7 @@ import type { BackendSupervisor } from './backend-supervisor'
 import { vbCablePair } from '../shared/virtual-audio'
 import { backendAsrHeaders, backendMtHeaders } from './backend-direct-model'
 import { backendError, backendErrorCode, backendFailure, readBackendFailure } from './backend-error'
+import { logDiagnostic } from './session-log'
 
 export interface BackendSessionOptions {
   output?: 'source' | 'translation' | 'speech'
@@ -503,35 +504,52 @@ export class BackendSession {
   }
 
   private async request(path: string, body?: object, headers?: Record<string, string>): Promise<unknown> {
-    if (this.backend.instanceId !== this.serverInstance) throw new Error('Backend instance changed')
-    const response = await fetch(new URL('/api/v2' + path, this.backend.baseUrl), {
-      method: body ? 'POST' : 'GET',
-      redirect: 'error',
-      headers: { ...this.backend.authorizationHeader(), 'Content-Type': 'application/json', ...headers },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(body ? COMMAND_TIMEOUT_MS : 10_000),
-    })
+    if (this.backend.instanceId !== this.serverInstance) throw new Error('engineTransportUnavailable')
+    let response: Response
+    try {
+      response = await fetch(new URL('/api/v2' + path, this.backend.baseUrl), {
+        method: body ? 'POST' : 'GET',
+        redirect: 'error',
+        headers: { ...this.backend.authorizationHeader(), 'Content-Type': 'application/json', ...headers },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(body ? COMMAND_TIMEOUT_MS : 10_000),
+      })
+    } catch (cause) {
+      const code = cause instanceof Error && cause.name === 'TimeoutError' ? 'REQUEST_TIMEOUT' : 'engineTransportUnavailable'
+      throw Object.assign(new Error(code, { cause }), { engineCode: code })
+    }
     if (!response.ok) {
       const failure = await readBackendFailure(response)
-      if (failure) throw backendFailure(failure)
-      if (response.status === 422) throw new Error('invalidConfiguration')
-      throw new Error('engineTransportUnavailable')
+      const code = response.status === 422 ? 'invalidConfiguration' : 'engineTransportUnavailable'
+      throw Object.assign(failure ? backendFailure(failure) : new Error(code), { status: response.status })
     }
     return response.json()
   }
 
   private async command(type: 'start' | 'pause' | 'resume' | 'stop' | 'reset_stream', expected: string, headers?: Record<string, string>): Promise<void> {
-    if (!this.id) throw new Error('sessionNotRunning')
+    const sessionId = this.id
+    if (!sessionId) throw new Error('sessionNotRunning')
     const commandId = randomUUID()
-    const result = z.object({ accepted: z.literal(true), command_id: z.literal(commandId),
-      session_id: z.literal(this.id), result_state: z.string() }).parse(
-      await this.request(`/sessions/${this.id}/commands`, { command_id: commandId, type }, headers),
-    )
-    if (result.result_state === 'failed') {
-      const state = z.object({ last_error: backendError.nullish() }).safeParse(await this.request(`/sessions/${this.id}`))
-      if (state.success && state.data.last_error) throw backendFailure(state.data.last_error)
+    try {
+      const result = z.object({ accepted: z.literal(true), command_id: z.literal(commandId),
+        session_id: z.literal(sessionId), result_state: z.string() }).parse(
+        await this.request(`/sessions/${sessionId}/commands`, { command_id: commandId, type }, headers),
+      )
+      if (result.result_state === expected) return
+      if (result.result_state === 'failed') {
+        const state = z.object({ last_error: backendError.nullish() }).safeParse(await this.request(`/sessions/${sessionId}`))
+        if (state.data?.last_error) throw backendFailure(state.data.last_error, commandId)
+      }
+      const engineCode = type === 'start' ? 'sessionError' : 'internalError'
+      throw Object.assign(new Error(engineCode), { engineCode })
+    } catch (error) {
+      const failure = error instanceof z.ZodError
+        ? Object.assign(new Error('protocolValidationFailed', { cause: error }), { engineCode: 'protocolValidationFailed' })
+        : error instanceof Error ? error : new Error('internalError', { cause: error })
+      if (!('correlationId' in failure) || !failure.correlationId) Object.assign(failure, { correlationId: commandId })
+      logDiagnostic('backend.session.command.failed', { sessionId, command: type, commandId, error: failure })
+      throw failure
     }
-    if (result.result_state !== expected) throw new Error('sessionError')
   }
 
   private connectEvents(sessionId: string): Promise<void> {
@@ -676,10 +694,11 @@ export class BackendSession {
     if (kind === 'error') {
       const { error } = z.object({ error: backendError }).parse(payload)
       if (error.message_key === 's2sPlaybackFenced') return
+      logDiagnostic('backend.session.event.error', { sessionId, requestId: envelope.requestId, error: backendFailure(error, envelope.requestId) })
       this.emit({ ...envelope, type: 'error', code: backendErrorCode(error),
         recoverable: !error.fatal && (error.retryable || error.scope === 'task' || error.scope === 'consumer'),
         details: { backendCode: error.code, stage: error.stage, scope: error.scope,
-          messageKey: error.message_key, correlationId: error.correlation_id } })
+          messageKey: error.message_key, correlationId: error.correlation_id || envelope.requestId } })
       return
     }
     if (kind === 'speaker_changed') {

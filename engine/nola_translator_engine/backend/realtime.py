@@ -1,11 +1,13 @@
 """Owns realtime tasks for the production backend."""
 
 import asyncio
-from contextlib import suppress
+from contextlib import AsyncExitStack, suppress
 from pathlib import Path
 from uuid import uuid4
 
+from ..audio.devices import AudioDeviceUnavailableError
 from ..audio.recorder import Mp3Recorder
+from ..debug_log import write as write_debug
 from .asr_pipeline import AsrPipeline, CloudAsrPipeline
 from .contracts import ErrorPayload, SessionCommand
 from .desktop_capture import start_desktop_capture
@@ -20,6 +22,39 @@ from .s2s_pipeline import S2SPipeline
 from .s2s_provider import S2SProtocolError
 from .translation_pipeline import TranslationScheduler
 from .tts_pipeline import TtsPipeline
+
+
+def _exception_location(error):
+    trace = error.__traceback__
+    if trace is None:
+        return None
+    while trace.tb_next is not None:
+        trace = trace.tb_next
+    frame = trace.tb_frame
+    return f"{frame.f_globals.get('__name__', '')}.{frame.f_code.co_name}:{trace.tb_lineno}"
+
+
+def _safe_error_details(error):
+    details = {"exception": type(error).__name__}
+    location = _exception_location(error)
+    if location:
+        details["origin"] = location
+    cause = error.__cause__
+    if cause is not None:
+        details["cause_exception"] = type(cause).__name__
+        location = _exception_location(cause)
+        if location:
+            details["cause_origin"] = location
+    for candidate in (error, cause):
+        if isinstance(candidate, OSError):
+            for name in ("errno", "winerror"):
+                value = getattr(candidate, name, None)
+                if type(value) is int:
+                    details.setdefault(name, value)
+            native_code = next((value for value in candidate.args if type(value) is int), None)
+            if native_code is not None:
+                details.setdefault("native_code", native_code)
+    return details
 
 
 class RealtimePipelines:
@@ -144,19 +179,21 @@ class RealtimePipelines:
                     )
 
             connection = self.provider_connections.get(key, {})
-            if config.translation_model:
-                mt = TranslationScheduler(
-                    self.gateway, session_id=str(key), pipeline_id=str(session.pipeline_id),
-                    epoch=session.epoch, model_id=config.translation_model,
-                    target_languages=session.config.target_languages, event_sink=emit_translation,
-                    preview_interval_ms=session.config.translation_preview_interval_ms,
-                    provider_options=connection.get("mt_options"),
-                    fallback_model_id=config.fallback_translation_model,
-                    fallback_provider_options=connection.get("fallback_mt_options"),
-                    latency_detection=latency_detection,
-                    glossary=self.desktop_glossary if session.owner in ("quick_interpret", "meeting") else None,
-                )
+            stage = "mt"
             try:
+                if config.translation_model:
+                    mt = TranslationScheduler(
+                        self.gateway, session_id=str(key), pipeline_id=str(session.pipeline_id),
+                        epoch=session.epoch, model_id=config.translation_model,
+                        target_languages=session.config.target_languages, event_sink=emit_translation,
+                        preview_interval_ms=session.config.translation_preview_interval_ms,
+                        provider_options=connection.get("mt_options"),
+                        fallback_model_id=config.fallback_translation_model,
+                        fallback_provider_options=connection.get("fallback_mt_options"),
+                        latency_detection=latency_detection,
+                        glossary=self.desktop_glossary if session.owner in ("quick_interpret", "meeting") else None,
+                    )
+                stage = "asr"
                 if config.asr_model in ("aliyun", "minimax"):
                     request = MatchRequest(Operation.TRANSCRIBE, model_id=config.asr_model, source_language=session.config.source_language)
                     context = self.gateway.cloud_asr_session(request, connection.get("asr_options", {}))
@@ -170,13 +207,16 @@ class RealtimePipelines:
                     pipeline = AsrPipeline(session, self.gateway, emit, latency_detection=latency_detection)
                 await pipeline.prepare()
                 if config.translation_model and isinstance(self.gateway, ModelGateway):
+                    stage = "mt"
                     for target in session.config.target_languages:
                         request = MatchRequest(Operation.TRANSLATE, model_id=config.translation_model, target_language=target)
                         if not self.gateway.match(request).entry.configuration.is_cloud:
                             instance, lease, _, _ = await self.gateway.acquire(request)
                             await self.gateway.release(instance, lease)
+                stage = "recording"
                 self._prepare_recording(session)
                 if config.tts_model and playback is None:
+                    stage = "tts"
                     if not config.translation_model or speech_language not in session.config.target_languages:
                         raise ValueError("Speech output requires a matching translation target")
                     self.gateway.match(MatchRequest(
@@ -197,23 +237,28 @@ class RealtimePipelines:
                         latency_detection=latency_detection,
                     )
                     self.playbacks[key] = playback
+                stage = "capture"
                 capture = await self._start_capture(session, latency_detection)
-            except (asyncio.CancelledError, GatewayError, OSError, RuntimeError, ImportError, ValueError) as error:
+            except (Exception, asyncio.CancelledError) as error:
                 try:
-                    if pipeline is not None:
-                        await pipeline.close()
-                finally:
-                    if provider_context is not None:
-                        await provider_context.__aexit__(None, None, None)
-                if mt is not None:
-                    await mt.close()
-                await self._close_recording(key)
-                if playback is not None:
-                    self.playbacks.pop(key, None)
-                    await playback.close()
+                    async with AsyncExitStack() as cleanup:
+                        if playback is not None:
+                            self.playbacks.pop(key, None)
+                            cleanup.push_async_callback(playback.close)
+                        cleanup.push_async_callback(self._close_recording, key)
+                        if mt is not None:
+                            cleanup.push_async_callback(mt.close)
+                        if provider_context is not None:
+                            cleanup.push_async_exit(provider_context)
+                        if pipeline is not None:
+                            cleanup.push_async_callback(pipeline.close)
+                except Exception as cleanup_error:
+                    write_debug("backend", "realtime.cleanup.failed", {
+                        "sessionId": str(key), "stage": stage, **_safe_error_details(cleanup_error),
+                    })
                 if isinstance(error, asyncio.CancelledError):
                     raise
-                self._report(session, error)
+                self._report(session, error, stage=stage, preparing=True)
                 session._log.submit("error", {"error": session.last_error.model_dump(mode="json")})
                 return "failed"
             if capture is not None:
@@ -262,19 +307,32 @@ class RealtimePipelines:
             **connection, "source_language": config.source_language, "target_language": target,
             "outputs": provider_outputs,
         })
+        stage = "s2s"
         try:
             provider = await provider_context.__aenter__()
             try:
+                stage = "recording"
                 self._prepare_recording(session)
+                stage = "capture"
                 capture = await self._start_capture(session, latency_detection)
-            except BaseException:
-                await provider_context.__aexit__(None, None, None)
+            except (Exception, asyncio.CancelledError):
+                try:
+                    await provider_context.__aexit__(None, None, None)
+                except Exception as cleanup_error:
+                    write_debug("backend", "realtime.cleanup.failed", {
+                        "sessionId": str(key), "stage": stage, **_safe_error_details(cleanup_error),
+                    })
                 raise
-        except (asyncio.CancelledError, GatewayError, OSError, RuntimeError, ValueError) as error:
-            await self._close_recording(key)
+        except (Exception, asyncio.CancelledError) as error:
+            try:
+                await self._close_recording(key)
+            except Exception as cleanup_error:
+                write_debug("backend", "realtime.cleanup.failed", {
+                    "sessionId": str(key), "stage": stage, **_safe_error_details(cleanup_error),
+                })
             if isinstance(error, asyncio.CancelledError):
                 raise
-            self._report(session, error)
+            self._report(session, error, stage=stage, preparing=True)
             session._log.submit("error", {"error": session.last_error.model_dump(mode="json")})
             return "failed"
         playback = S2SAudioOutput(
@@ -415,24 +473,39 @@ class RealtimePipelines:
                 await asyncio.sleep(0.02)
 
     @staticmethod
-    def _report(session, error):
+    def _report(session, error, *, stage="pipeline", preparing=False):
         from ..recognition.aliyun import CloudRecognitionError
         from .capture_process_loopback import ProcessLoopbackError
         from .process_sources import ProcessSourceError
 
-        if isinstance(error, BaseExceptionGroup):
+        while isinstance(error, BaseExceptionGroup):
             error = error.exceptions[0]
+        details = _safe_error_details(error)
+        correlation_id = error.correlation_id if isinstance(error, GatewayError) else str(uuid4())
         if isinstance(error, ProcessSourceError) or (isinstance(error, ProcessLoopbackError) and session.config.input.kind == "process_audio"):
             reason = error.reason if isinstance(error, ProcessSourceError) else error.stage
             session.last_error = ErrorPayload(
                 code="AUDIO_SOURCE_UNAVAILABLE", stage="capture", message_key=f"audio.{reason}",
-                safe_details={"reason": reason},
+                safe_details={**details, "reason": reason}, correlation_id=correlation_id,
+            )
+            return
+        if stage == "capture" and isinstance(error, AudioDeviceUnavailableError):
+            session.last_error = ErrorPayload(
+                code="AUDIO_SOURCE_UNAVAILABLE", stage=stage, message_key="audio.deviceUnavailable",
+                safe_details=details, correlation_id=correlation_id,
+            )
+            return
+        if stage == "capture" and isinstance(error, (OSError, ProcessLoopbackError)):
+            session.last_error = ErrorPayload(
+                code="AUDIO_SOURCE_UNAVAILABLE", stage=stage, message_key="audio.captureStartFailed",
+                safe_details=details, correlation_id=correlation_id, retryable=True,
             )
             return
         if isinstance(error, S2SProtocolError):
             session.last_error = ErrorPayload(
                 code="PROVIDER_DISCONNECTED", stage="s2s", message_key="pipeline.s2sConnectionLost",
-                retryable=True, safe_details={"provider_error": str(error)[:128]},
+                retryable=True, safe_details={**details, "provider_error": str(error)[:128]},
+                correlation_id=correlation_id,
             )
             return
         if isinstance(error, CloudRecognitionError):
@@ -440,18 +513,20 @@ class RealtimePipelines:
             session.last_error = ErrorPayload(
                 code="PROVIDER_DISCONNECTED" if retryable else "MODEL_NOT_READY",
                 stage="asr", message_key=f"pipeline.{error.reason}", retryable=retryable,
-                safe_details={"provider_error": error.reason},
+                safe_details={**details, "provider_error": error.reason}, correlation_id=correlation_id,
             )
             return
         if isinstance(error, GatewayError) and error.stage == "speaker":
             session.last_error = ErrorPayload(
                 code="MODEL_NOT_READY", stage="speaker", message_key="pipeline.speakerInstallationInvalid",
+                safe_details=details, correlation_id=correlation_id,
             )
             return
         if isinstance(error, GatewayError) and error.stage == "asr" and error.code == GatewayErrorCode.RESOURCE_EXHAUSTED:
             session.last_error = ErrorPayload(
                 code="RESOURCE_EXHAUSTED", stage="asr", scope="session", fatal=True,
-                message_key="pipeline.finalRecognitionQueueFull", correlation_id=error.correlation_id,
+                message_key="pipeline.finalRecognitionQueueFull", correlation_id=correlation_id,
+                safe_details=details,
             )
             return
         if isinstance(error, GatewayError):
@@ -472,11 +547,13 @@ class RealtimePipelines:
                 code=code, stage=error.stage, message_key=f"gateway.{error.code.value}",
                 correlation_id=error.correlation_id, provider_code=error.provider_code,
                 retryable=error.retryable, retry_after_ms=error.retry_after_ms,
+                safe_details=details,
             )
             return
         session.last_error = ErrorPayload(
-            code="INTERNAL_ERROR", stage="pipeline", message_key="pipeline.recognitionFailed",
-            safe_details={"exception": type(error).__name__},
+            code="INTERNAL_ERROR", stage=stage,
+            message_key="pipeline.startFailed" if preparing else "pipeline.runtimeFailed",
+            safe_details=details, correlation_id=correlation_id,
         )
 
     async def _stop(self, key):

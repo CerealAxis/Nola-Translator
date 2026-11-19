@@ -4,15 +4,15 @@ import { createRoot } from 'react-dom/client'
 import { Button } from '@/components/ui/button'
 import { ToastProvider } from '@/components/ui/toast'
 import { X } from 'lucide-react'
-import { APPLICATION_PAGES, useApplicationNavigation } from '@/application'
+import { APPLICATION_PAGES, ApplicationShell } from '@/application'
 import { OnboardingTour } from '@/features/onboarding'
 import { ModelCapabilityNotices } from '@/features/models/ModelCapabilityNotices'
 import { ModelDownloadNotice } from '@/features/models/ModelDownloadNotice'
 import { I18nProvider, useI18n } from '@/i18n'
 import type { UiLanguage } from '@/i18n'
-import { AppShell, ErrorBoundary } from '@/components/primitives'
+import { ErrorBoundary } from '@/components/primitives'
 import { OverlayRoot } from '@/features/overlay'
-import { Routes, useRoute } from '@/routes'
+import { useRoute } from '@/routes'
 import { stores, updateSettings } from '@/store'
 import { demoCopy, prepareDemo } from './demo'
 import { connectDemo } from './demoBridge'
@@ -36,7 +36,6 @@ const { publish, closeOverlay } = connectDemo(settings, open => showOverlay(open
 function DemoApp() {
   const { t, language } = useI18n()
   const { navigate } = useRoute()
-  const navigation = useApplicationNavigation()
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
   showWorkspace = () => { setWorkspaceOpen(true); navigate('#/workspace') }
   const [overlayOpen, setOverlayOpen] = useState(false)
@@ -97,10 +96,10 @@ function DemoApp() {
   }, [navigate])
   return <>
     <div className="docs-desktop-surface z-base" inert={overlayOpen}>
-    {page.endsWith('-scene') ? <Scene browser={page === 'browser-scene'} /> : <AppShell navigation={navigation}>
-      <Routes pages={{ ...APPLICATION_PAGES, workspace: workspaceOpen ? () => <WorkspacePage /> : APPLICATION_PAGES.workspace }} />
+    {page.endsWith('-scene') ? <Scene browser={page === 'browser-scene'} /> : <ApplicationShell
+      pages={workspaceOpen ? { ...APPLICATION_PAGES, workspace: () => <WorkspacePage /> } : APPLICATION_PAGES}>
       <OnboardingTour autoStart={false} />
-    </AppShell>}
+    </ApplicationShell>}
     </div>
     {overlayOpen ? <div className="docs-overlay-backdrop z-overlay">
       <div className="docs-overlay-panel" role="dialog" aria-modal="true" aria-label={t('shellUi.overlay')}>

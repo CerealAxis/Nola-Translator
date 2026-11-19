@@ -13,8 +13,7 @@ import type {
   AppSettings,
   AppSettingsPatch,
   AudioDevice,
-  AudioTestSource,
-  AudioTestResult,
+  AudioPreviewSource,
   CaptionSegment,
   CredentialProvider,
   DiagnosticCopyContext,
@@ -69,7 +68,7 @@ export interface NolaBridge {
   engine: {
     listComputeDevices(): Promise<ComputeSnapshot>
     listDevices(): Promise<AudioDevice[]>
-    testAudio(source: AudioTestSource): Promise<AudioTestResult>
+    previewAudioInput(source: AudioPreviewSource, onLevel: (level: number) => void, signal: AbortSignal): Promise<void>
     listResources(): Promise<ResourceSnapshotWithRate>
     manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel' | 'pause' | 'resume', source?: ModelDownloadSource): Promise<ResourceRecord>
     startSession(config: SessionConfig): Promise<SessionStartResult>
@@ -241,7 +240,7 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'app.resolveLanguageModelAudio': 'ipc',
   'app.onLanguageModelStream': 'ipc',
   'engine.listDevices': 'ipc',
-  'engine.testAudio': 'ipc',
+  'engine.previewAudioInput': 'ipc',
   'engine.listResources': 'ipc',
   'engine.manageResource': 'ipc',
   'engine.startSession': 'ipc',
@@ -305,8 +304,6 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'meetingMode.start': 'ipc',
   'meetingMode.stop': 'ipc',
   'meetingMode.setPaused': 'ipc',
-  'meetingMode.testAudio': 'ipc',
-  'meetingMode.cancelAudioTest': 'ipc',
   'meetingMode.onChanged': 'ipc',
   'screenTranslation.snapshot': 'ipc',
   'screenTranslation.sources': 'ipc',

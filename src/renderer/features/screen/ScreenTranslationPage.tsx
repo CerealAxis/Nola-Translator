@@ -1,37 +1,41 @@
 import { WordRuleSelectionField } from '../settings/word-rules/WordRuleSelectionField'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, Crop, Keyboard, Play, Save, Square, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Menu } from '@base-ui/react/menu'
+import { Crop, Gamepad2, Play, Save, Square, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { getBridge, stores, updateSettings, useStore } from '@/store'
 import { useAvailableModels } from '@/available-models'
 import { PageHeader } from '@/components/primitives'
-import { notifyError, notifyGatewayStartIssue, notifySuccess } from '@/components/primitives/notify'
+import { notifyError } from '@/components/primitives/notify'
 import { LanguageDirectionSelect } from '@/components/primitives/LanguageDirectionSelect'
-import { modelSupportsTranslation } from '@/model-options'
+import { useScreenLanguageModels } from '@/model-options'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogCloseButton } from '@/components/ui/dialog'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
 import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Spinner } from '@/components/ui/spinner'
-import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
-import { DualColumnView } from '@/components/reading/DualColumnView'
 import { GlossarySelectionField } from '../settings/glossary/GlossarySelectionField'
 import { ModelAvailabilityLabel } from '../workspace/ModelAvailabilityLabel'
 import { normalizeLanguage } from '../../../shared/languages'
-import { configurationOf, translationLanguages } from '../../../shared/model-capabilities'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { defaultModelBinding, isModelEnabled } from '../../../shared/model-policy'
+import { SUPPORT_ERROR_CATALOG, type SupportErrorCode } from '../../../shared/error-catalog'
+import { normalizeThrownError, stripIpcErrorMessage } from '../../../shared/ipc-error'
 import { screenConfigSchema, screenProcessingMode, screenTranslationModel, type ScreenCommand, type ScreenConfig, type ScreenSource, type ScreenSnapshot } from '../../../shared/screen-translation'
 import { layoutScreenOverlay } from './overlay-layout'
+import { HarborScene } from './HarborScene'
+
+const presetMenuItem = 'nola-menu-item flex cursor-pointer items-center gap-2 rounded-nola-ui-md px-3 py-2 type-body data-disabled:opacity-50'
+let configurationWrites = Promise.resolve(true)
 
 export function ScreenTranslationPage() {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const api = getBridge()?.screenTranslation
   const available = useAvailableModels()
   const models = available.mt.filter(model => model.binding !== 'cloud:recognition')
@@ -45,25 +49,24 @@ export function ScreenTranslationPage() {
   }
   const configuredOcr = settings.modelGateway.ocrModel || defaultModelBinding(settings, 'ocr')
   const ocrBinding = ocrModels.some(option => option.value === configuredOcr) ? configuredOcr : available.ocr[0]?.binding ?? ''
-  const ocr = available.ocr.find(model => model.binding === ocrBinding)
   const [snapshot, setSnapshot] = useState<ScreenSnapshot>()
   const [config, setConfig] = useState<ScreenConfig>(() => screenConfigSchema.parse({}))
+  const draft = useRef(config)
+  const pendingConfig = useRef<ScreenConfig | undefined>(undefined)
   const processingMode = screenProcessingMode(config)
   const modelBinding = screenTranslationModel(config, settings)
-  const ocrResource = resources.find(resource => `resource:${resource.resourceId}` === ocrBinding)
-  const ocrLanguages = [...new Set((ocrResource ? ['auto', ...ocrResource.languages] : ocr?.sourceLanguages ?? []).map(normalizeLanguage))]
-  const selectedTranslation = models.find(model => model.binding === (processingMode === 'default' ? modelBinding : modelBinding || models[0]?.binding))
-  const translationResource = resources.find(resource => `resource:${resource.resourceId}` === selectedTranslation?.binding)
-  const translationSources = configurationOf(translationResource)?.sourceLanguages ?? selectedTranslation?.sourceLanguages
-  const sourceLanguages = ocrLanguages.filter(code => !translationSources || translationSources.map(normalizeLanguage).includes(code))
-  const targetLanguages = translationResource ? translationLanguages(translationResource, config.sourceLanguage).filter(code => code !== 'none')
-    : (selectedTranslation?.targetLanguages ?? []).filter(code => modelSupportsTranslation(selectedTranslation, undefined, config.sourceLanguage, code))
-  const incompatible = !!selectedTranslation && ocrLanguages.length > 0 && (!sourceLanguages.includes(normalizeLanguage(config.sourceLanguage))
-    || !modelSupportsTranslation(selectedTranslation, translationResource, config.sourceLanguage, config.targetLanguage))
+  const { sourceLanguages, targetLanguages, targetsFor, unavailable, requiredModels } = useScreenLanguageModels({
+    source: config.sourceLanguage, binding: modelBinding || (processingMode === 'cascade' ? models[0]?.binding : undefined),
+  })
+  const incompatible = unavailable === 'pair' || !unavailable && (!sourceLanguages.includes(normalizeLanguage(config.sourceLanguage))
+    || !targetLanguages.includes(normalizeLanguage(config.targetLanguage)))
   const canSwap = config.sourceLanguage !== 'auto' && sourceLanguages.includes(config.targetLanguage) && targetLanguages.includes(config.sourceLanguage)
   const [presetDialog, setPresetDialog] = useState<'save' | 'rename' | 'delete'>()
   const [presetName, setPresetName] = useState('')
   const [busy, setBusy] = useState(false)
+  const [intervalInput, setIntervalInput] = useState<string>()
+  const [thresholdInput, setThresholdInput] = useState<string>()
+  const [opacityPreview, setOpacityPreview] = useState<number>()
   const [sources, setSources] = useState<ScreenSource[]>([])
   useEffect(() => {
     if (!api || config.captureMode !== 'window') return
@@ -71,63 +74,93 @@ export function ScreenTranslationPage() {
     void api.sources().then(value => { if (live) setSources(value.filter(source => source.kind === 'window')) }).catch(error => notifyError(t('suite.actionFailed'), { cause: error }))
     return () => { live = false }
   }, [api, config.captureMode])
-  const savedConfig = useRef('')
-  const lastIssue = useRef<string | undefined>(undefined)
+  const savedConfig = useRef<ScreenConfig | undefined>(undefined)
   const commandPending = useRef(false)
-  const accept = (value: ScreenSnapshot, notify = true) => {
-    const issue = value.error ?? (value.shortcutError ? 'shortcutConflict' : undefined)
-    // Cleanup events and command replies share the same failure identity.
-    const issueId = issue ? `${value.errorId ?? `${value.sessionId}:${value.epoch}`}:${issue}` : undefined
-    if (issue && issueId !== lastIssue.current) {
-      lastIssue.current = issueId
-      if (notify) {
-        const currentSettings = stores.settings.getState().settings ?? DEFAULT_SETTINGS
-        if (issue === 'gatewayNotReady') void notifyGatewayStartIssue(t)
-        else if (issue === 'ocrNotReady') void notifyGatewayStartIssue(t, 'ocr', currentSettings.modelGateway.ocrModel || defaultModelBinding(currentSettings, 'ocr'))
-        else if (issue === 'translationModelMissing' || issue === 'translationModelNotReady') void notifyGatewayStartIssue(t, 'mt', screenTranslationModel(value.config, currentSettings))
-        else notifyError(t(`screen.errors.${issue}`))
-      }
-    }
+  const setDraft = (value: ScreenConfig) => {
+    draft.current = value
+    setConfig(value)
+  }
+  const accept = (value: ScreenSnapshot, syncDraft = false) => {
     setSnapshot(value)
-    const serialized = JSON.stringify(value.config)
-    if (serialized !== savedConfig.current) { savedConfig.current = serialized; setConfig(value.config) }
+    const changed = JSON.stringify(value.config) !== JSON.stringify(savedConfig.current)
+    savedConfig.current = value.config
+    if ((changed || syncDraft) && !pendingConfig.current) setDraft(value.config)
   }
   useEffect(() => {
     if (!api) return
     let active = true
-    let changed = false
-    const unsubscribe = api.onChanged(value => { changed = true; if (active) accept(value) })
-    void api.snapshot().then(value => { if (active && !changed) accept(value, false) }).catch(error => { if (active) notifyError(t('screen.errors.backendUnavailable'), { cause: error }) })
-    return () => { active = false; unsubscribe() }
+    let unsubscribe: (() => void) | undefined
+    void configurationWrites.then(async () => {
+      if (!active) return
+      let changed = false
+      unsubscribe = api.onChanged(value => { changed = true; if (active) accept(value) })
+      const value = await api.snapshot()
+      if (active && !changed) accept(value)
+    }).catch(error => { if (active) notifyError(t('screen.errors.backendUnavailable'), { cause: error }) })
+    return () => { active = false; unsubscribe?.() }
   }, [api])
   useEffect(() => {
-    if (['running', 'waiting', 'starting', 'editing'].includes(snapshot?.status ?? '')) return
+    if (!snapshot || unavailable || pendingConfig.current || ['running', 'waiting', 'starting', 'editing'].includes(snapshot.status)) return
     const source = sourceLanguages.includes(config.sourceLanguage) ? config.sourceLanguage : sourceLanguages[0]
     const target = targetLanguages.includes(config.targetLanguage) ? config.targetLanguage : targetLanguages[0]
     if (source && source !== config.sourceLanguage || target && target !== config.targetLanguage) {
-      setConfig(previous => ({ ...previous, sourceLanguage: source ?? previous.sourceLanguage, targetLanguage: target ?? previous.targetLanguage }))
+      setDraft({ ...draft.current, sourceLanguage: source ?? draft.current.sourceLanguage, targetLanguage: target ?? draft.current.targetLanguage })
     }
-  }, [sourceLanguages.join('|'), targetLanguages.join('|'), config.sourceLanguage, config.targetLanguage, snapshot?.status])
-  const patch = <K extends keyof ScreenConfig>(key: K, value: ScreenConfig[K]) => setConfig(previous => ({ ...previous, [key]: value }))
+  }, [sourceLanguages.join('|'), targetLanguages.join('|'), config.sourceLanguage, config.targetLanguage, snapshot?.status, unavailable])
+  const reportCommandError = (error: unknown, preset = false) => {
+    const failure = normalizeThrownError({ message: stripIpcErrorMessage(error instanceof Error ? error.message : '') })
+    const title = failure.code === 'presetNameExists' ? t('screen.presetNameExists') : t(preset ? 'screen.presetFailed' : 'suite.actionFailed')
+    const code = failure.supportCode as SupportErrorCode
+    const detail = t(SUPPORT_ERROR_CATALOG[code].messageKey)
+    notifyError(title, { description: detail !== title && !/\{\w+\}/.test(detail) ? detail : undefined, supportCode: code })
+  }
+  const updatedConfig = (value: ScreenConfig) => ({
+    ...value, model: value.model || (screenProcessingMode(value) === 'cascade' ? models[0]?.binding : '') || '',
+  })
+  const saveChanges = (changes: Partial<ScreenConfig>) => {
+    if (!api || !savedConfig.current || commandPending.current) return
+    const previous = draft.current
+    const next = updatedConfig({ ...previous, ...changes })
+    if (next.sourceId !== previous.sourceId) {
+      next.regions = []
+      next.windowIdentity = ''
+    }
+    if (JSON.stringify(next) === JSON.stringify(previous)) return
+    setDraft(next)
+    pendingConfig.current = next
+    configurationWrites = configurationWrites.then(async () => {
+      if (pendingConfig.current !== next) return true
+      try {
+        const result = await api.command({ action: 'configure', config: next })
+        const latest = pendingConfig.current === next
+        if (latest) pendingConfig.current = undefined
+        accept(result, latest)
+        return true
+      } catch (error) {
+        if (pendingConfig.current === next) {
+          pendingConfig.current = undefined
+          if (savedConfig.current) setDraft(savedConfig.current)
+          reportCommandError(error)
+        }
+        return false
+      }
+    })
+  }
+  const patch = <K extends keyof ScreenConfig>(key: K, value: ScreenConfig[K]) => saveChanges({ [key]: value })
   const run = async (command: ScreenCommand, save = false) => {
     if (!api || busy || commandPending.current || command.action === 'start' && incompatible) return
     commandPending.current = true
     setBusy(true)
     try {
-      if (save) accept(await api.command({ action: 'configure', config: { ...config, model: config.model || (processingMode === 'cascade' ? models[0]?.binding : '') || '' } }))
+      if (pendingConfig.current && !await configurationWrites) return false
+      const next = updatedConfig(draft.current)
+      if (save && JSON.stringify(next) !== JSON.stringify(savedConfig.current)) {
+        accept(await api.command({ action: 'configure', config: next }))
+      }
       accept(await api.command(command))
       return true
-    } catch (error) { notifyError(t(error instanceof Error && error.message.includes('presetNameExists') ? 'screen.presetNameExists' : command.action.includes('Preset') ? 'screen.presetFailed' : 'screen.errors.backendUnavailable'), { cause: error }); return false }
+    } catch (error) { reportCommandError(error, command.action.includes('Preset')); return false }
     finally { commandPending.current = false; setBusy(false) }
-  }
-  const save = async () => {
-    if (!api || busy) return
-    setBusy(true)
-    try {
-      accept(await api.command({ action: 'configure', config: { ...config, model: config.model || (processingMode === 'cascade' ? models[0]?.binding : '') || '' } }))
-      notifySuccess(t('screen.saved'))
-    } catch (error) { notifyError(t('screen.errors.invalidConfig'), { cause: error }) }
-    finally { setBusy(false) }
   }
   const selectOcr = async (binding: string) => {
     if (busy || !ocrModels.some(model => model.value === binding)) return
@@ -138,6 +171,7 @@ export function ScreenTranslationPage() {
   }
   const running = snapshot?.status === 'running' || snapshot?.status === 'waiting'
   const active = running || snapshot?.status === 'starting' || snapshot?.status === 'editing'
+  const settingsDisabled = !snapshot || active || busy
   const canStop = active || snapshot?.status === 'paused'
   const presets = snapshot?.presets ?? []
   const selectedPreset = presets.find(preset => preset.id === config.presetId)
@@ -161,100 +195,140 @@ export function ScreenTranslationPage() {
     return layoutScreenOverlay(snapshot.blocks, display, config.fontSize, config.showSource,
       (text, size) => { context.font = `${size}px ${font}`; return context.measureText(text).width }, padding, config.regions).some(block => block.overflow)
   }, [snapshot?.blocks, snapshot?.config.display, config.fontSize, config.showSource, config.regions])
-  const select = (id: string, label: string, value: string, options: Array<{ value: string; label: string }>, onChange: (value: string) => void) => (
-    <Field className="nola-settings-field"><FieldLabel htmlFor={id}>{label}</FieldLabel><Select value={value || null} onValueChange={value => { if (value) onChange(value) }} disabled={active || busy || !options.length}>
+  const select = (id: string, label: string, value: string, options: Array<{ value: string; label: string }>, onChange: (value: string) => void, action?: ReactNode) => (
+    <Field className="nola-settings-field"><FieldLabel htmlFor={id}>{label}</FieldLabel><div className="nola-inline-field-controls"><Select value={value || null} onValueChange={value => { if (value) onChange(value) }} disabled={settingsDisabled || !options.length}>
       <SelectTrigger id={id}><SelectValue placeholder={t('screen.select')}>{options.find(option => option.value === value)?.label}</SelectValue></SelectTrigger>
       <SelectContent><SelectGroup>{options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
-    </Select></Field>
+    </Select>{action}</div></Field>
   )
+  const areaActionsDisabled = busy || !api || snapshot?.status === 'editing'
+  const editArea = <Tooltip>
+    <TooltipTrigger render={<Button variant="bare" size="icon-sm" aria-label={t('screen.edit')} disabled={areaActionsDisabled}
+      onClick={() => void run({ action: 'edit' }, !canStop)}><Crop /></Button>} />
+    <TooltipContent>{t('screen.edit')}</TooltipContent>
+  </Tooltip>
   return <div className="screen-page" data-slot="screen-page">
-    <PageHeader title={t('screen.title')} warning={t('suite.experimentalInDevelopment')} actions={<div className="screen-page__actions">
+    <PageHeader title={t('screen.title')} warning={t('suite.experimentalInDevelopment')} subtitle={t('screen.description')} actions={<div className="screen-page__actions">
       {canStop && <Button variant="outline" disabled={busy || !api} onClick={() => void run({ action: 'showToolbar' })}>{t('suite.showToolbar')}</Button>}
       <Button variant={canStop ? 'destructive' : 'default'}
-        disabled={busy || !api || !canStop && incompatible}
+        disabled={!snapshot || busy || !api || !canStop && incompatible}
         onClick={() => void run({ action: canStop ? 'stop' : 'start' }, !canStop)}>
         {busy ? <Spinner data-icon="inline-start" /> : canStop ? <Square data-icon="inline-start" /> : <Play data-icon="inline-start" />}
         {t(canStop ? 'screen.stop' : 'screen.start')}
       </Button></div>
     } />
+    <Card data-slot="screen-stage">
+      <CardContent>
+        <div className="screen-scene-window">
+          <div className="screen-scene-titlebar">
+            <Gamepad2 aria-hidden="true" /><span>Tideglass Harbor</span>
+          </div>
+          <HarborScene />
+        </div>
+      </CardContent>
+    </Card>
     {textOverflow && <Alert><AlertDescription>{t('screen.layoutHint')}</AlertDescription></Alert>}
-    <Card className="screen-settings nola-settings-card"><CardContent className="nola-settings-content">
-      <section className="nola-settings-section" aria-label={t('screen.regions')}>
-        <FieldGroup>
+    <Card data-slot="screen-settings" className="nola-section-card nola-settings-card">
+      <CardContent className="nola-settings-content">
+        <FieldGroup className="nola-settings-fields" role="region" aria-labelledby="screen-translation-heading">
+          <h2 id="screen-translation-heading" className="nola-settings-heading">{t('screen.translationSettings')}</h2>
+          {select('screen-processing', t('session.pipeline'), processingMode, [{ value: 'default', label: t('session.followDefault') }, { value: 'cascade', label: t('screen.cascade') }], value => patch('processingMode', value as 'default' | 'cascade'))}
+          <Field className="nola-settings-field nola-language-pair-field">
+            <ModelAvailabilityLabel label={t('shellUi.languageDirection')} hint={t('shellUi.languageDirectionHint')} />
+            <LanguageDirectionSelect source={config.sourceLanguage} target={config.targetLanguage} sourceCodes={sourceLanguages} targetCodes={targetLanguages} unavailable={unavailable} requiredModels={requiredModels} disabled={settingsDisabled}
+              sourceLabel={t('screen.sourceLanguage')} targetLabel={t('screen.targetLanguage')}
+              onSourceChange={value => {
+                const targets = targetsFor(value)
+                const target = targets.includes(config.targetLanguage) ? config.targetLanguage : targets[0] ?? config.targetLanguage
+                saveChanges({ sourceLanguage: value, targetLanguage: target })
+              }} onTargetChange={value => patch('targetLanguage', value)}
+              onSwap={canSwap ? () => saveChanges({ sourceLanguage: config.targetLanguage, targetLanguage: config.sourceLanguage }) : undefined} />
+          </Field>
+          {processingMode === 'cascade' && select('screen-model', t('screen.model'), config.model || models[0]?.binding || '', models.map(model => ({ value: model.binding, label: model.name })), value => patch('model', value))}
+          <GlossarySelectionField className="nola-settings-field" compact showSettings value={config.glossarySelection} disabled={settingsDisabled} onChange={value => patch('glossarySelection', value)} />
+          <WordRuleSelectionField className="nola-settings-field" compact value={config.excludedSelection ?? { mode: 'auto' }} disabled={settingsDisabled} onChange={value => patch('excludedSelection', value)} />
+        </FieldGroup>
+        <FieldGroup className="nola-settings-fields" role="region" aria-labelledby="screen-ocr-heading">
+          <h2 id="screen-ocr-heading" className="nola-settings-heading">{t('screen.ocrSettings')}</h2>
           {select('screen-capture-mode', t('suite.captureMode'), config.captureMode, ['cursor', 'regions', 'window'].map(value => ({ value, label: t(`suite.${value as 'cursor' | 'regions' | 'window'}`) })), value => patch('captureMode', value as ScreenConfig['captureMode']))}
-          {config.captureMode === 'window' && select('screen-target-window', t('suite.selectWindow'), config.sourceId, sources.map(source => ({ value: source.id, label: source.name })), value => setConfig(previous => ({ ...previous, sourceId: value, sourceName: sources.find(source => source.id === value)?.name ?? '' })))}
+          {config.captureMode === 'window' && select('screen-target-window', t('suite.selectWindow'), config.sourceId, sources.map(source => ({ value: source.id, label: source.name })), value => saveChanges({ sourceId: value, sourceName: sources.find(source => source.id === value)?.name ?? '' }), config.sourceId ? editArea : undefined)}
+          {config.captureMode === 'regions' && <Field className="nola-settings-field"><FieldLabel htmlFor="screen-preset">{t('screen.regions')}</FieldLabel>
+            <div className="nola-inline-field-controls screen-region-controls">
+              <Select value={config.presetId || 'draft'} disabled={areaActionsDisabled} onValueChange={id => { if (id) void run({ action: 'loadPreset', id }, !canStop) }}>
+                <SelectTrigger id="screen-preset"><SelectValue>{selectedPreset ? `${selectedPreset.name}${presetDirty ? ` · ${t('screen.presetModified')}` : ''}` : t('screen.presetDraft')}</SelectValue></SelectTrigger>
+                <SelectContent><SelectGroup><SelectItem value="draft">{t('screen.presetDraft')}</SelectItem>{presets.map(preset => <SelectItem value={preset.id} key={preset.id}>{preset.name}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+              {editArea}
+              <Menu.Root>
+                <Tooltip>
+                  <TooltipTrigger render={<Menu.Trigger render={<Button variant="bare" size="icon-sm" aria-label={t('screen.presetManage')} disabled={areaActionsDisabled}><MoreHorizontal /></Button>} />} />
+                  <TooltipContent>{t('screen.presetManage')}</TooltipContent>
+                </Tooltip>
+                <Menu.Portal>
+                  <Menu.Positioner className="z-dropdown" align="end" sideOffset={4}>
+                    <Menu.Popup data-slot="dropdown-menu-content" className="min-w-40 rounded-nola-ui-xl bg-overlay p-1 text-overlay-foreground shadow-overlay">
+                      <Menu.Item className={presetMenuItem} disabled={!config.regions.length || config.reviewRequired} onClick={() => openPresetDialog('save')}><Save className="size-4" />{t('screen.presetSave')}</Menu.Item>
+                      {selectedPreset && <>
+                        <Menu.Item className={presetMenuItem} onClick={() => openPresetDialog('rename')}><Pencil className="size-4" />{t('screen.presetRename')}</Menu.Item>
+                        <Menu.Item className={`${presetMenuItem} text-destructive`} onClick={() => openPresetDialog('delete')}><Trash2 className="size-4" />{t('screen.presetDelete')}</Menu.Item>
+                      </>}
+                    </Menu.Popup>
+                  </Menu.Positioner>
+                </Menu.Portal>
+              </Menu.Root>
+            </div>
+          </Field>}
           {select('screen-ocr-mode', t('screen.ocrMode'), config.ocrMode, [
             { value: 'period', label: t('screen.ocrPeriod') },
             { value: 'analysis', label: t('screen.ocrAnalysis') },
             { value: 'trigger', label: t('screen.ocrTrigger') },
           ], value => patch('ocrMode', value as ScreenConfig['ocrMode']))}
+          {processingMode === 'cascade' && select('screen-ocr-model', t('screen.ocrTitle'), ocrBinding, ocrModels, value => void selectOcr(value))}
           {config.ocrMode === 'period' && <Field className="nola-settings-field">
             <FieldLabel htmlFor="screen-intervalMs">{t('screen.ocrInterval')}</FieldLabel>
             <Input id="screen-intervalMs" type="number" min={100} max={100000} step={100}
-              value={config.intervalMs} disabled={active || busy} onChange={event => patch('intervalMs', Number(event.target.value))} />
+              value={intervalInput ?? config.intervalMs} disabled={settingsDisabled}
+              onBlur={() => setIntervalInput(undefined)} onChange={event => {
+                setIntervalInput(event.currentTarget.value)
+                const value = event.currentTarget.valueAsNumber
+                if (Number.isInteger(value) && value >= 100 && value <= 100000) patch('intervalMs', value)
+              }} />
           </Field>}
-          {config.captureMode === 'window' && config.sourceId && <Field className="nola-settings-field">
-            <FieldLabel htmlFor="screen-window-areas">{t('screen.regions')}</FieldLabel>
-            <Button id="screen-window-areas" variant="outline" size="sm" disabled={busy || !api || snapshot?.status === 'editing'}
-              onClick={() => void run({ action: 'edit' }, !canStop)}><Crop data-icon="inline-start" />{t('screen.edit')}</Button>
-          </Field>}
-          <GlossarySelectionField className="nola-settings-field" value={config.glossarySelection} disabled={active || busy} onChange={value => patch('glossarySelection', value)} />
-          <WordRuleSelectionField value={config.excludedSelection ?? { mode: 'auto' }} disabled={active || busy} onChange={value => patch('excludedSelection', value)} />
-          {config.captureMode === 'regions' && <Field className="nola-settings-field screen-regions-field"><FieldLabel htmlFor="screen-preset">{t('screen.regions')}</FieldLabel>
-            <div className="screen-region-controls">
-              <Select value={config.presetId || 'draft'} disabled={busy || snapshot?.status === 'editing' || !api} onValueChange={id => { if (id) void run({ action: 'loadPreset', id }, !canStop) }}>
-                <SelectTrigger id="screen-preset"><SelectValue>{selectedPreset ? `${selectedPreset.name}${presetDirty ? ` · ${t('screen.presetModified')}` : ''}` : t('screen.presetDraft')}</SelectValue></SelectTrigger>
-                <SelectContent><SelectGroup><SelectItem value="draft">{t('screen.presetDraft')}</SelectItem>{presets.map(preset => <SelectItem value={preset.id} key={preset.id}>{preset.name}</SelectItem>)}</SelectGroup></SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" disabled={busy || !api || snapshot?.status === 'editing'} onClick={() => void run({ action: 'edit' }, !canStop)}><Crop data-icon="inline-start" />{t('screen.edit')}</Button>
-              <Tooltip><TooltipTrigger render={<Button variant="outline" size="icon-sm" aria-label={t('screen.presetSave')} disabled={busy || !config.regions.length || config.reviewRequired || snapshot?.status === 'editing'} onClick={() => openPresetDialog('save')}><Save /></Button>} /><TooltipContent>{t('screen.presetSave')}</TooltipContent></Tooltip>
-              {selectedPreset && <Popover><PopoverTrigger render={<Button variant="outline" size="icon-sm" aria-label={t('screen.presetManage')} disabled={busy}><MoreHorizontal /></Button>} /><PopoverContent className="screen-preset-menu">
-                <Button variant="outline" size="sm" onClick={() => openPresetDialog('rename')}><Pencil data-icon="inline-start" />{t('screen.presetRename')}</Button>
-                <Button variant="destructive" size="sm" onClick={() => openPresetDialog('delete')}><Trash2 data-icon="inline-start" />{t('screen.presetDelete')}</Button>
-              </PopoverContent></Popover>}
-            </div>
-          </Field>}
-        </FieldGroup>
-      </section>
-      <section className="nola-settings-section" aria-labelledby="screen-translation-heading">
-        <div className="nola-settings-heading"><h2 id="screen-translation-heading">{t('session.processingGroup')}</h2></div>
-        <FieldGroup className="nola-settings-fields">
-          {select('screen-processing', t('session.pipeline'), processingMode, [{ value: 'default', label: t('session.followDefault') }, { value: 'cascade', label: t('screen.cascade') }], value => patch('processingMode', value as 'default' | 'cascade'))}
-          {processingMode === 'cascade' && <>
-            {select('screen-model', t('screen.model'), config.model || models[0]?.binding || '', models.map(model => ({ value: model.binding, label: model.name })), value => patch('model', value))}
-            {select('screen-ocr-model', t('screen.ocrTitle'), ocrBinding, ocrModels, value => void selectOcr(value))}
-          </>}
-          <Field className="nola-settings-field screen-language-field"><ModelAvailabilityLabel label={t('shellUi.languageDirection')} hint={t('shellUi.languageDirectionHint')} />
-            <LanguageDirectionSelect source={config.sourceLanguage} target={config.targetLanguage} sourceCodes={sourceLanguages} targetCodes={targetLanguages} disabled={active || busy}
-              sourceLabel={t('screen.sourceLanguage')} targetLabel={t('screen.targetLanguage')}
-              onSourceChange={value => patch('sourceLanguage', value)} onTargetChange={value => patch('targetLanguage', value)}
-              onSwap={canSwap ? () => setConfig(previous => ({ ...previous, sourceLanguage: config.targetLanguage, targetLanguage: config.sourceLanguage })) : undefined} />
+          <Field className="nola-settings-field">
+            <ModelAvailabilityLabel label={t('screen.textChangeThreshold')} hint={t('screen.textChangeHint')} />
+            <Input id="screen-text-threshold" type="number" min={0} max={100000} step={1} value={thresholdInput ?? config.textChangeThreshold}
+              aria-label={t('screen.textChangeThreshold')} disabled={settingsDisabled}
+              onBlur={() => setThresholdInput(undefined)} onChange={event => {
+                setThresholdInput(event.currentTarget.value)
+                if (event.currentTarget.validity.valid && Number.isFinite(event.currentTarget.valueAsNumber)) patch('textChangeThreshold', event.currentTarget.valueAsNumber)
+              }} />
           </Field>
         </FieldGroup>
-      </section>
-      <section className="nola-settings-section" aria-labelledby="screen-style-heading">
-        <div className="nola-settings-heading"><h2 id="screen-style-heading">{t('screen.style')}</h2></div>
-        <FieldGroup className="nola-settings-fields">
-        {select('screen-fontSize', t('screen.fontSize'), String(config.fontSize), [{ value: '0', label: t('screen.fontAuto') }, ...[12, 14, 16, 18, 20, 24, 28, 32, 36].map(value => ({ value: String(value), label: String(value) }))], value => patch('fontSize', Number(value)))}
-        <Field className="nola-settings-field"><FieldLabel htmlFor="screen-opacity">{t('screen.opacity')}</FieldLabel>
-          <Input id="screen-opacity" type="number" min={0.35} max={1} step={0.05} value={config.opacity}
-            disabled={active || busy} onChange={event => patch('opacity', Number(event.target.value))} />
-        </Field>
-        <Field className="nola-settings-field"><FieldLabel htmlFor="screen-show-source">{t('screen.showSource')}</FieldLabel><Switch id="screen-show-source" checked={config.showSource} disabled={active || busy} onCheckedChange={value => patch('showSource', value)}><SwitchThumb /></Switch></Field>
+        <FieldGroup className="nola-settings-fields" role="region" aria-labelledby="screen-style-heading">
+          <h2 id="screen-style-heading" className="nola-settings-heading">{t('screen.translationDisplay')}</h2>
+          {select('screen-fontSize', t('screen.fontSize'), String(config.fontSize), [{ value: '0', label: t('screen.fontAuto') }, ...[12, 14, 16, 18, 20, 24, 28, 32, 36].map(value => ({ value: String(value), label: String(value) }))], value => patch('fontSize', Number(value)))}
+          <Field className="nola-settings-field">
+            <FieldLabel id="screen-opacity-label">{t('screen.blurOpacity')}</FieldLabel>
+            <div className="nola-meeting-volume-control">
+              <SliderRoot className="px-4" min={0.35} max={1} step={0.01} value={opacityPreview ?? config.opacity}
+                disabled={settingsDisabled}
+                locale={language} format={{ style: 'percent' }}
+                onValueChange={setOpacityPreview} onValueCommitted={value => {
+                  setOpacityPreview(undefined)
+                  patch('opacity', value)
+                }}>
+                <SliderControl><SliderTrack><SliderIndicator /><SliderThumb aria-labelledby="screen-opacity-label" /></SliderTrack></SliderControl>
+              </SliderRoot>
+              <span className="nola-meeting-volume-value">{new Intl.NumberFormat(language, { style: 'percent' }).format(opacityPreview ?? config.opacity)}</span>
+            </div>
+          </Field>
+          <Field className="nola-settings-field">
+            <FieldLabel htmlFor="screen-show-source">{t('screen.showSource')}</FieldLabel>
+            <Switch id="screen-show-source" checked={config.showSource} disabled={settingsDisabled} onCheckedChange={value => patch('showSource', value)}><SwitchThumb /></Switch>
+          </Field>
         </FieldGroup>
-      </section>
-      <div className="screen-settings__footer screen-page__actions"><Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/glossary" />}>{t('suite.manageGlossary')}</Button><Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/shortcuts" />}><Keyboard data-icon="inline-start" />{t('shortcuts.title')}</Button><Button variant="outline" size="sm" disabled={active || busy || !api} onClick={() => void save()}><Save data-icon="inline-start" />{t('screen.save')}</Button></div>
-    </CardContent></Card>
-    <Card data-slot="screen-results"><CardHeader><CardTitle>{t('suite.currentResult')}</CardTitle>
-      <div className="screen-page__actions">{(['source', 'translation'] as const).map(kind => <Button key={kind} variant="outline" size="sm" disabled={!snapshot?.blocks.some(block => !block.hidden && (kind === 'source' ? block.text : block.translation))} onClick={() => {
-        const text = snapshot!.blocks.filter(block => !block.hidden).map(block => kind === 'source' ? block.text : block.translation ?? '').filter(Boolean).join('\n')
-        void navigator.clipboard.writeText(text).then(() => notifySuccess(t('suite.copied'))).catch(error => notifyError(t('suite.copyFailed'), { cause: error }))
-      }}><Copy data-icon="inline-start" />{t(kind === 'source' ? 'suite.copySource' : 'suite.copyTranslation')}</Button>)}</div>
-    </CardHeader><CardContent>
-      <DualColumnView sourceLabel={t('suite.source')} targetLabel={t('suite.translation')}
-        segments={(snapshot?.blocks ?? []).filter(block => !block.hidden).map(block => ({ id: block.id, source: block.text, target: block.translation ?? (block.status === 'error' ? t('screen.errors.translationFailed') : block.status === 'translating' ? t('screen.states.running') : ''), interim: block.status !== 'ready' }))}
-        empty={<Empty><EmptyHeader><EmptyTitle>{t('suite.resultEmpty')}</EmptyTitle>{!canStop && <EmptyDescription>{t('suite.resultReady')}</EmptyDescription>}</EmptyHeader></Empty>} />
-    </CardContent></Card>
+      </CardContent>
+    </Card>
     <Dialog open={!!presetDialog} onOpenChange={open => { if (!open && !busy) setPresetDialog(undefined) }}>
       <DialogContent><DialogHeader><DialogTitle>{t(presetDialog === 'rename' ? 'screen.presetRename' : presetDialog === 'delete' ? 'screen.presetDelete' : 'screen.presetSave')}</DialogTitle><DialogCloseButton disabled={busy} />
         <DialogDescription>{presetDialog === 'delete' ? t('screen.presetDeleteHint') : t('screen.presetSaveHint')}</DialogDescription></DialogHeader>
