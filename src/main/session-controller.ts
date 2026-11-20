@@ -245,6 +245,7 @@ export class SessionController {
       }
       const backend = await this.options.prepareBackend?.(parsed, startSettings)
       checkCancelled()
+      if (!backend && this.options.prepareBackend) throw new Error('realtimeBackendUnavailable')
       if (!backend && parsed.outputMode === 'speech') throw new Error('realtimeSpeechUnavailable')
       if (backend) this.backendSession = backend.client
       else {
@@ -258,7 +259,7 @@ export class SessionController {
         await this.ensureReady()
       }
       checkCancelled()
-      if (owner === 'browser' && !this.options.engine.supports('browserAudio')) throw new Error('engineUpdateRequired')
+      if (!backend && owner === 'browser' && !this.options.engine.supports('browserAudio')) throw new Error('engineUpdateRequired')
       const keepAudio = this.options.getSettings().recording.keepAudio
       if (owner === 'desktop' && this.options.meetings) {
         const meeting = await this.options.meetings.begin({ sourceLanguage: parsed.sourceLanguage, targetLanguage: parsed.targetLanguages[0] ?? NO_TRANSLATION_LANGUAGE, recordAudio: keepAudio })

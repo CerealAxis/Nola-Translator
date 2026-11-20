@@ -3,7 +3,7 @@ import type { AppSettings, CredentialProvider } from '../shared/settings'
 import { languageModelStreamRequestSchema } from '../shared/language-model'
 import { resolveLanguageModelAudio, streamSavedLanguageModel } from './language-model-stream'
 import { directModelRequestSchema, workspaceActionSchema } from '../shared/agent-workspace'
-import { closeAllDirectModelWorkers, closeDirectModelWorker, runDirectModel, type DirectModelServices } from './direct-model'
+import { runDirectModel, type DirectModelServices } from './direct-model'
 import type { AgentWorkspace } from './agent-workspace'
 import type { GatewayLanguageModel } from './gateway-language-model'
 import type { ComicReaderService } from './comic-reader'
@@ -61,7 +61,7 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
     pending.set(id, controller)
     track(id)
     event.sender.once('destroyed', stop)
-    try { return await runDirectModel(services, request, controller.signal, inspect === true, event.sender.id) }
+    try { return await runDirectModel(services, request, controller.signal, inspect === true) }
     catch (error) {
       if (!controller.signal.aborted) logDiagnostic('agent.inference.failed', {
         requestId: request.id, classification: normalizeThrownError(error, { correlationId: request.id }), error,
@@ -75,8 +75,7 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
   })
   ipcMain.handle('app:direct-model:release', async event => {
     if (!trusted(event)) throw new Error('Direct model access denied')
-    if (services.releaseDirectModel) await services.releaseDirectModel(event.sender.id)
-      else if (!services.inferModel) await closeDirectModelWorker(event.sender.id)
+    await services.releaseDirectModel?.(event.sender.id)
   })
   ipcMain.handle('app:language-model:stream', async (event, raw: unknown) => {
     if (!trusted(event)) throw new Error('Language model access denied')
@@ -109,7 +108,6 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
       const tasks = [...settled.values()].map(item => item.promise)
       for (const controller of pending.values()) controller.abort()
       await Promise.allSettled(tasks)
-      if (!services.inferModel) await closeAllDirectModelWorkers()
     },
   }
 }

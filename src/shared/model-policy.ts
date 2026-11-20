@@ -91,6 +91,11 @@ export function sceneModelBinding(settings: AppSettings, kind: GatewayCapability
   return policy.selections[kind] ?? policy.defaults[kind] ?? ''
 }
 
+export function quickGatewayBinding(settings: AppSettings, kind: 'asr' | 'mt' | 'tts'): string {
+  if (settings.realtime?.quickS2sModel !== undefined || !settings.modelGateway[kind]) return ''
+  return normalizeModelBinding(kind, settings.modelGateway[`${kind}Model`]) || defaultModelBinding(settings, kind)
+}
+
 export function modelEnablePatch(settings: AppSettings, kind: GatewayCapability, binding: string, enabled: boolean): AppSettingsPatch {
   const key = modelPolicyKey(kind, binding)
   if (!key) return {}

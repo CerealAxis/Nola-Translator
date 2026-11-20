@@ -176,7 +176,6 @@ it('gates desktop legacy MT before capture when realtime glossary requires v2', 
   const sessions = new SessionController({ engine: { currentState: 'ready', request } as unknown as EngineProcess,
     meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {},
     prepare, startingChanged: () => {}, hideOverlay: () => {}, assertLegacyTranslationAllowed,
-    prepareBackend: async () => undefined,
   })
   await expect(sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
     sourceLanguage: 'zh', targetLanguages: ['en'], outputMode: 'translation' }, 'desktop')).rejects.toThrow('realtimeGlossaryLegacyUnsupported')
@@ -192,7 +191,6 @@ it('keeps browser legacy sessions outside the desktop glossary gate', async () =
     request: vi.fn(async () => ({ sessionId: 'browser-legacy' })) } as unknown as EngineProcess,
     meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {},
     prepare: async () => {}, startingChanged: () => {}, hideOverlay: () => {}, assertLegacyTranslationAllowed,
-    prepareBackend: async () => undefined,
   })
   await sessions.start({ audioSource: { kind: 'browserTab', streamId: 'browser' }, recognitionMode: 'realtime',
     browserTimeline: { epoch: 0, videoTimeMs: 0, playbackRate: 1 }, sourceLanguage: 'zh', targetLanguages: ['en'] }, 'browser')

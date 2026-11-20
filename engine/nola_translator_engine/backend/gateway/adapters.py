@@ -267,6 +267,16 @@ class LocalWorkerAdapter(Adapter):
 
         protected, restore = protect_keep_terms(text, ctx.translation_context.get("glossary") or [])
         payload: dict[str, Any] = {"text": protected, "source": source, "target": target}
+        image = ctx.translation_context.get("image")
+        if isinstance(image, str):
+            from ...resources import INDEX_TRANSLATE_RESOURCE_IDS, INDEX_TRANSLATE_TRANSFORMERS_SPECS
+
+            supported = instance.configuration.resource_id in INDEX_TRANSLATE_RESOURCE_IDS or any(
+                spec.model_id == instance.configuration.resource_id for spec in INDEX_TRANSLATE_TRANSFORMERS_SPECS
+            )
+            if not supported:
+                raise GatewayError(GatewayErrorCode.NOT_SUPPORTED, stage="mt", message="Image translation is unavailable")
+            payload["image"] = image
         fixed_terms = [term.model_dump() for term in ctx.translation_context.get("glossary") or [] if term.mode != "keep"]
         if fixed_terms:
             payload["glossary"] = fixed_terms
@@ -376,6 +386,15 @@ class _NetworkMtAdapter(Adapter):
             async with asyncio.timeout(timeout), aclosing(self._provider(instance, ctx.provider_options)) as provider:
                 from ..glossary import protect_keep_terms
 
+                image = ctx.translation_context.get("image")
+                if isinstance(image, str):
+                    if not isinstance(provider, IndexTranslatePublicProvider):
+                        raise GatewayError(GatewayErrorCode.NOT_SUPPORTED, stage="mt", message="Image translation is unavailable")
+                    from ...local_call import index_image_content, translate_public_index_image
+
+                    content = index_image_content(image, text, source, target)
+                    translated = await translate_public_index_image(provider, content)
+                    return TranslationResult(text=translated, source=source, target=target)
                 all_terms = ctx.translation_context.get("glossary") or []
                 protected, restore = protect_keep_terms(text, all_terms)
                 terms = [term for term in all_terms if term.mode != "keep"]

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { WebSocket } from 'ws'
 import type { DirectModelRequest, DirectModelResult } from '../shared/agent-workspace'
 import { gatewayConcurrency, normalizeModelBinding } from '../shared/model-gateway'
-import { MIMO_TTS_BINDING, MIMO_TTS_MODEL } from '../shared/settings'
+import { MIMO_TTS_BINDING, MIMO_TTS_MODEL, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { ResourceRecord, SessionConfig } from '../shared/contracts'
 import type { BackendSupervisor } from './backend-supervisor'
 import { GatewayWorkerError } from './model-gateway-worker'
@@ -11,7 +11,10 @@ import type { GatewayWorkerResult } from './model-gateway-worker'
 import { backendError, backendFailure, readBackendFailure } from './backend-error'
 import { logDiagnostic } from './session-log'
 import { resourceSchema } from '../shared/schemas'
-import type { AppSettings } from '../shared/settings'
+import { defaultModelBinding, isModelEnabled } from '../shared/model-policy'
+import { customCredentialSlot, customModelSchema, customModelsOf } from '../shared/custom-models'
+import { translationOptionsFor } from '../shared/cloud-config'
+import { validEndpoint } from '../shared/cloud-models'
 import { screenBlurPatchSchema, screenCaptureResultSchema, type ScreenCaptureRequest,
   type ScreenCaptureResult, type ScreenOcrRequest, type ScreenOcrResult, type ScreenOcrStatus } from '../shared/screen-translation'
 import { resolveModelNetwork } from './network-region'
@@ -54,6 +57,28 @@ const CLOUD_MT_MODELS = ['google', 'microsoft', 'mymemory', 'index-translate'] a
 export function backendCloudMt(binding: string) {
   return binding.startsWith('mt-custom:') && binding !== 'mt-custom:legacy-fallback' ? 'custom-mt'
     : CLOUD_MT_MODELS.find(model => binding === `cloud:${model}`)
+}
+
+export async function gatewayMtBackup(settings: AppSettings, primary: string, getCredential: (slot: CredentialProvider) => Promise<string>) {
+  const gateway = settings.modelGateway
+  const main = normalizeModelBinding('mt', gateway.mtModel) || defaultModelBinding(settings, 'mt')
+  const binding = normalizeModelBinding('mt', gateway.mtFallbackModel)
+  if (!gateway.mt || main !== primary || primary === binding || !isModelEnabled(settings, 'mt', binding)) return
+  if (binding.startsWith('resource:')) return { binding, provider: 'local' as const, options: undefined }
+  const model = backendCloudMt(binding)
+  if (model === 'custom-mt') {
+    const id = binding.slice('mt-custom:'.length)
+    const profile = customModelsOf(settings.translation).find(item => item.id === id)
+    if (!customModelSchema.safeParse(profile).success) return
+    const options = translationOptionsFor(settings.translation, 'cloud', id)
+    const apiKey = await getCredential(customCredentialSlot(id))
+    if (options && (options.apiFormat !== 'anthropic' || apiKey)) return { binding, provider: 'cloud' as const, options: { ...options, apiKey } }
+    return
+  }
+  if (model) {
+    const options = translationOptionsFor(settings.translation, model)
+    if (model !== 'mymemory' || validEndpoint(options?.endpoint)) return { binding, provider: model, options }
+  }
 }
 
 export function backendCloudAsr(binding: string) {
@@ -144,20 +169,22 @@ export async function openBackendAsrStream(
 
 export async function openBackendLanguageModel(backend: BackendConnection, model: string, signal: AbortSignal, concurrency = 1) {
   const headers = backend.authorizationHeader()
-  const list = await fetch(new URL('/api/v2/gateway/capabilities', backend.baseUrl), { headers, signal })
+  const baseUrl = backend.baseUrl
+  const list = await fetch(new URL('/api/v2/gateway/capabilities', baseUrl), { headers, signal })
   if (!list.ok) return rejectBackendModel(list)
   if (!catalog.parse(await list.json()).models.some(entry =>
     entry.enabled && entry.model_id === `llm:${model}` && entry.operations.includes('generate'))) return
   const leaseId = randomUUID()
+  const endpoint = new URL(`/api/v2/gateway/language-models/${leaseId}`, baseUrl)
   const release = async () => {
-    await fetch(new URL(`/api/v2/gateway/language-models/${leaseId}`, backend.baseUrl), {
+    await fetch(endpoint, {
       method: 'DELETE', headers, signal: AbortSignal.timeout(5000),
     }).catch(() => {})
   }
-  const schema = z.object({ lease_id: z.literal(leaseId), endpoint: z.url(), context_window: z.number().int().min(512).max(32768) })
+  const schema = z.object({ lease_id: z.literal(leaseId), context_window: z.number().int().min(512).max(32768) })
   let lease: z.infer<typeof schema>
   try {
-    const response = await fetch(new URL('/api/v2/gateway/language-models', backend.baseUrl), {
+    const response = await fetch(new URL('/api/v2/gateway/language-models', baseUrl), {
       method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, signal,
       body: JSON.stringify({ model, lease_id: leaseId, max_concurrency: concurrency }),
     })
@@ -167,14 +194,11 @@ export async function openBackendLanguageModel(backend: BackendConnection, model
     await release()
     throw error
   }
-  const endpoint = new URL(lease.endpoint)
-  if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1' || !endpoint.port
-      || endpoint.pathname !== '/v1' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash || signal.aborted) {
+  if (signal.aborted) {
     await release()
     signal.throwIfAborted()
-    throw new Error('Invalid realtime language model endpoint')
   }
-  return { endpoint: endpoint.href, contextWindow: lease.context_window, release }
+  return { endpoint: endpoint.href, headers, contextWindow: lease.context_window, release }
 }
 
 export async function inferBackendModel(
@@ -190,7 +214,7 @@ export async function inferBackendModel(
   const mimo = request.kind === 'tts' && binding === MIMO_TTS_BINDING
   const cloudMt = request.kind === 'mt' ? backendCloudMt(binding) : undefined
   const cloudAsr = request.kind === 'asr' ? backendCloudAsr(binding) : undefined
-  if ((!mimo && !cloudMt && !cloudAsr && !binding.startsWith('resource:')) || request.image || (mimo && !ttsApiKey) || (cloudAsr && !recognition?.['x-nola-asr-key'])) return
+  if ((!mimo && !cloudMt && !cloudAsr && !binding.startsWith('resource:')) || (mimo && !ttsApiKey) || (cloudAsr && !recognition?.['x-nola-asr-key'])) return
   const model = mimo ? MIMO_TTS_MODEL : cloudAsr ?? cloudMt ?? binding.slice('resource:'.length)
   const headers = backend.authorizationHeader()
   const list = await fetch(new URL('/api/v2/gateway/capabilities', backend.baseUrl), { headers, signal })
@@ -204,7 +228,7 @@ export async function inferBackendModel(
   const parameters = inspect ? {} : kind === 'asr'
     ? { audio, source: request.source, batch: options?.batchAsr }
     : kind === 'mt'
-      ? { text: request.text, source: request.source, target: request.target, ...(request.glossary?.length ? { glossary: request.glossary } : {}) }
+      ? { text: request.text ?? '', source: request.source, target: request.target, image: request.image, ...(request.glossary?.length ? { glossary: request.glossary } : {}) }
       : { text: request.text, voice: request.voice, response_format: options?.mp3 ? 'mp3' : undefined }
   const response = await fetch(new URL('/api/v2/gateway/infer', backend.baseUrl), {
     method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', ...(mimo && ttsApiKey ? { 'x-nola-tts-key': ttsApiKey } : {}),
@@ -216,6 +240,37 @@ export async function inferBackendModel(
   })
   if (!response.ok) return rejectBackendModel(response)
   return result.parse(await response.json())
+}
+
+export async function inferBackendMt(
+  backend: BackendConnection, request: DirectModelRequest, signal: AbortSignal, options: BackendInferenceOptions | undefined,
+  settings: AppSettings, getCredential: (slot: CredentialProvider) => Promise<string>,
+): Promise<DirectModelResult | undefined> {
+  const provider = backendCloudMt(request.model)
+  const customId = provider === 'custom-mt' ? request.model.slice('mt-custom:'.length) : undefined
+  if (customId && !customModelsOf(settings.translation).some(profile => profile.id === customId)) return
+  const translation = provider ? translationOptionsFor(settings.translation, provider === 'custom-mt' ? 'cloud' : provider, customId) : undefined
+  if (customId && !translation) return
+  if (customId && translation) translation.apiKey = await getCredential(customCredentialSlot(customId))
+  let primary: DirectModelResult | undefined
+  let failure: unknown
+  try {
+    primary = await inferBackendModel(backend, request, signal, options, undefined, translation)
+    if (!primary || primary.text.trim()) return primary
+  } catch (error) {
+    if (!(error instanceof GatewayWorkerError && error.code !== 'invalid_request'
+      || error instanceof BackendModelError && [429, 500, 502, 503, 504].includes(error.status))) throw error
+    failure = error
+  }
+  signal.throwIfAborted()
+  const backup = await gatewayMtBackup(settings, request.model, getCredential)
+  if (backup && (!request.image || backup.provider === 'index-translate')) {
+    logDiagnostic('backend.mt.fallback', { primary: request.model, backup: backup.binding })
+    const result = await inferBackendModel(backend, { ...request, model: backup.binding }, signal, options, undefined, backup.options)
+    if (result?.text.trim()) return result
+  }
+  if (failure) throw failure
+  return primary
 }
 
 

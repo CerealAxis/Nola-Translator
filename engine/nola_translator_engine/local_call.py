@@ -258,18 +258,30 @@ def synthesize(resources, request, compute):
     return {'text': request['text'], 'audio': encode_audio(result['audio'], result['sampling_rate']), 'voices': []}
 
 
-async def translate_image(runtime, request):
-    from .translation.index_translate import prompt_header, IndexTranslateTransformersProvider, IndexTranslatePublicProvider
+async def translate_public_index_image(provider, content):
     from .translation.network import _post_json
+
+    payload = {'model': provider.model, 'messages': [{'role': 'user', 'content': content}], 'max_tokens': provider.max_output_tokens,
+        'chat_template_kwargs': {'enable_thinking': False}}
+    response = await asyncio.to_thread(_post_json, provider.endpoint + '/chat/completions', payload, provider._headers())
+    return response['choices'][0]['message']['content']
+
+
+def index_image_content(image, text, source, target):
+    from .translation.index_translate import prompt_header
+
+    prompt = prompt_header(source, target) + '\nTranslate all text in this image. ' + text
+    return [{'type': 'text', 'text': prompt}, {'type': 'image_url', 'image_url': {'url': image}}]
+
+
+async def translate_image(runtime, request):
+    from .translation.index_translate import IndexTranslateTransformersProvider, IndexTranslatePublicProvider
+
     image = request['image']
-    prompt = prompt_header(request['source'], request['target']) + '\nTranslate all text in this image. ' + request.get('text', '')
-    content = [{'type': 'text', 'text': prompt}, {'type': 'image_url', 'image_url': {'url': image}}]
+    content = index_image_content(image, request.get('text', ''), request['source'], request['target'])
     provider = runtime.translation_provider
     if isinstance(provider, IndexTranslatePublicProvider):
-        payload = {'model': provider.model, 'messages': [{'role': 'user', 'content': content}], 'max_tokens': provider.max_output_tokens,
-            'chat_template_kwargs': {'enable_thinking': False}}
-        response = await asyncio.to_thread(_post_json, provider.endpoint + '/chat/completions', payload, provider._headers())
-        return response['choices'][0]['message']['content']
+        return await translate_public_index_image(provider, content)
     if isinstance(provider, IndexTranslateTransformersProvider):
         from PIL import Image
         import torch
@@ -278,7 +290,7 @@ async def translate_image(runtime, request):
             inference.load()
             bundle = inference._bundle
             photo = Image.open(io.BytesIO(base64.b64decode(image.split(',', 1)[-1]))).convert('RGB')
-            messages = [{'role': 'user', 'content': [{'type': 'image', 'image': photo}, {'type': 'text', 'text': prompt}]}]
+            messages = [{'role': 'user', 'content': [{'type': 'image', 'image': photo}, content[0]]}]
             inputs = bundle.tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True,
                 enable_thinking=False, return_tensors='pt', return_dict=True).to(inference.device)
             input_count = inputs['input_ids'].shape[1]

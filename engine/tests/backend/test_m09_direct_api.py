@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import json
+import httpx
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -17,6 +18,26 @@ from nola_translator_engine.backend.gateway.operations import AsrObservation, Sy
 
 def translation():
     return {"id": str(uuid4()), "model": "local-mt", "kind": "mt", "text": "Hello", "source": "en", "target": "zh"}
+
+
+def test_gateway_v2_accepts_compute_preferences_and_image_translation():
+    class Gateway:
+        async def translate(self, context, *, text, source, target, request):
+            assert self.compute_options == {"translationDevice": "cpu", "cpuThreads": 2}
+            assert request.model_id == "index-translate"
+            assert context.translation_context["image"] == "data:image/png;base64,AAAA"
+            return TranslationResult("你好", source, target)
+
+        async def shutdown(self):
+            pass
+
+    auth = {"Authorization": "Bearer local-control"}
+    with TestClient(create_app(control_token="local-control", gateway=Gateway())) as client:
+        compute = {"translationDevice": "cpu", "cpuThreads": 2}
+        assert client.put("/api/v2/gateway/compute", json=compute).status_code == 401
+        assert client.put("/api/v2/gateway/compute", headers=auth, json=compute).status_code == 204
+        image = {**translation(), "model": "index-translate", "text": "", "image": "data:image/png;base64,AAAA"}
+        assert client.post("/api/v2/gateway/infer", headers=auth, json=image).json() == {"text": "你好"}
 
 
 def test_realtime_gateway_transcribes_client_pcm_and_keeps_manual_commit_order():
@@ -204,17 +225,32 @@ def test_workbench_lease_is_held_until_explicit_release(monkeypatch):
         pass
 
     monkeypatch.setattr(direct_language_model, "open_direct_language_model", acquire)
+    client_class = httpx.AsyncClient
+
+    def completions(request):
+        assert request.url == "http://127.0.0.1:5000/v1/chat/completions"
+        assert "authorization" not in request.headers
+        assert json.loads(request.content) == {"model": "qwen-fixture", "stream": True}
+        return httpx.Response(200, text="data: [DONE]\n\n", headers={"Content-Type": "text/event-stream"})
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: client_class(transport=httpx.MockTransport(completions), **kwargs))
     auth = {"Authorization": "Bearer local-control"}
     body = {"model": "qwen-fixture", "lease_id": str(uuid4())}
     route = "/api/v2/gateway/language-models"
     with TestClient(create_app(control_token="local-control", gateway=SimpleNamespace(shutdown=shutdown))) as client:
         opened = client.post(route, headers=auth, json=body)
         assert opened.status_code == 200 and opened.json()["lease_id"] == body["lease_id"]
+        assert "endpoint" not in opened.json()
         assert client.post(route, headers=auth, json=body).status_code == 409
+        chat = f"{route}/{body['lease_id']}/chat/completions"
+        assert client.post(chat, json={}).status_code == 401
+        response = client.post(chat, headers=auth, json={"model": "qwen-fixture", "stream": True})
+        assert response.status_code == 200 and response.text == "data: [DONE]\n\n"
         assert not releases
         for _ in range(2):
             assert client.delete(route + "/" + body["lease_id"], headers=auth).status_code == 200
         assert releases == [True]
+        assert client.post(chat, headers=auth, json={}).status_code == 404
 
 
 async def test_workbench_http_disconnect_cancels_inflight_inference():

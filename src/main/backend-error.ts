@@ -13,7 +13,6 @@ const safeBackendDetails = z.object({
   winerror: optionalInteger,
   native_code: optionalInteger,
   reason: optionalToken,
-  provider_error: optionalToken,
   direction: z.enum(['uplink', 'downlink']).optional().catch(undefined),
 })
 

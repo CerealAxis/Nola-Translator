@@ -31,7 +31,7 @@ export type BackendSupervisorState = 'stopped' | 'starting' | 'ready' | 'failed'
 
 export type BackendSupervisorOptions = {
   /** Launch spec for `python -m nola_translator_engine.backend`. */
-  spec: EngineLaunchSpec
+  spec: EngineLaunchSpec | (() => EngineLaunchSpec)
   /** Extra environment merged over the bootstrap variables. */
   env?: NodeJS.ProcessEnv
   /** Bound on waiting for the ready frame; cold imports dominate startup. */
@@ -78,12 +78,12 @@ export class BackendSupervisor extends EventEmitter {
   async start(): Promise<BackendReadyFrame> {
     if (this.state === 'ready' && this.readyFrame) return this.readyFrame
     if (this.state === 'starting') throw new Error('Backend is already starting')
+    const spec = typeof this.options.spec === 'function' ? this.options.spec() : this.options.spec
     this.state = 'starting'
     this.token = randomBytes(32).toString('base64url')
     registerLogSecret(this.token)
     const instanceId = this.bootId = randomUUID()
 
-    const { spec } = this.options
     const child = spawn(spec.command, spec.args, {
       cwd: spec.cwd,
       env: {

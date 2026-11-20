@@ -26,6 +26,7 @@ import { OverlayCaptionPreview } from './OverlayCaptionPreview'
 import { speechOutputOptions, useAudioSourceOptions } from '@/audio-source-options'
 import { RealtimePipelineFields } from '../workspace/RealtimePipelineSelect'
 import { defaultRealtimeS2s } from '../../../shared/settings'
+import { quickGatewayBinding } from '../../../shared/model-policy'
 import { ALIYUN_LANGUAGES, ALIYUN_S2S_SPEECH_LANGUAGES, remoteSourceLanguages } from '../../../shared/cloud-config'
 import { vbCablePair } from '../../../shared/virtual-audio'
 
@@ -33,7 +34,9 @@ export function OverlayPage() {
   const { t } = useI18n()
   const { navigate } = useRoute()
   const settings = useStore(stores.settings, state => state.settings) ?? DEFAULT_SETTINGS
-  const modelOptions = useModelOptions()
+  const inheritedAsr = quickGatewayBinding(settings, 'asr')
+  const inheritedMt = quickGatewayBinding(settings, 'mt')
+  const modelOptions = useModelOptions(inheritedAsr, inheritedMt)
   const resources = useStore(stores.models, state => state.resources)
   const credentials = useStore(stores.models, state => state.credentials)
   const s2sReady = aliyunConnectionReady(settings, credentials['aliyun-asr'])
@@ -45,9 +48,9 @@ export function OverlayPage() {
   const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
   const s2sModel = translationDisabled ? null
     : settings.realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.quickS2sModel
-  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch, !!s2sModel)
+  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch, !!s2sModel, inheritedAsr)
   // With translation switched off there is nothing to repair: replacing its model would re-enable it.
-  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled || !!s2sModel)
+  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled || !!s2sModel, inheritedMt)
   const asrOptions: { value: string; label: string; isDisabled?: boolean }[] = catalog.asr.length
     ? catalog.asr.map(model => ({ value: model.binding, label: model.name }))
     : [{ value: '', label: t('gateway.modelNoneShort'), isDisabled: true }]
@@ -59,7 +62,7 @@ export function OverlayPage() {
   const selectedSource = settings.realtime?.virtualInputDeviceId || settings.recognition.audioSource
   const audioSourceOptions = useAudioSourceOptions(devices, selectedSource)
   const speechEnabled = !translationDisabled && settings.realtime?.outputMode === 'speech'
-  const tts = useModelSelection('tts', catalog.tts, settings, reportSwitch, !speechEnabled || !!s2sModel)
+  const tts = useModelSelection('tts', catalog.tts, settings, reportSwitch, !speechEnabled || !!s2sModel, quickGatewayBinding(settings, 'tts'))
   const savedSpeechModel = savedBindingOf('tts', settings)
   const speechModel = tts.binding || savedSpeechModel || 'unavailable'
   const speechModels = catalog.tts.map(model => ({ value: model.binding, label: model.name }))
@@ -103,7 +106,7 @@ export function OverlayPage() {
       }
       const missing = !s2sModel && asr.unavailable ? 'asr'
         : !s2sModel && !translationDisabled && mt.unavailable ? 'mt' : undefined
-      if (await notifyGatewayStartIssue(t, missing, missing && savedBindingOf(missing, settings))) return
+      if (await notifyGatewayStartIssue(t, missing, missing && (quickGatewayBinding(settings, missing) || savedBindingOf(missing, settings)))) return
       const opened = await actions.settings.showOverlay()
       if (opened === false) {
         if (!await notifyGatewayStartIssue(t)) notifyOverlayError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
@@ -197,14 +200,8 @@ export function OverlayPage() {
               </div>
               <div className="flex items-center gap-3">
                 <ModelAvailabilityLabel label={t('latency.title')} hint={t('latency.toggleHint')} />
-                <div className="flex flex-wrap items-center gap-2">
-                  <SettingSwitch ariaLabel={t('latency.title')} isSelected={settings.realtime?.latencyDetection === true}
-                    isDisabled={sessionActive} onChange={latencyDetection => patch({ realtime: { latencyDetection } })} />
-                  {settings.realtime?.latencyDetection && session.sessionId && <Button variant="secondary" size="sm"
-                    onClick={() => { void window.nolaTranslator?.openLatencyWindow?.().catch(error => notifyOverlayError(t('latency.openFailed'), { cause: error })) }}>
-                    {t('latency.reopen')}
-                  </Button>}
-                </div>
+                <SettingSwitch ariaLabel={t('latency.title')} isSelected={settings.realtime?.latencyDetection === true}
+                  isDisabled={sessionActive} onChange={latencyDetection => patch({ realtime: { latencyDetection } })} />
               </div>
             </div>
             {speechEnabled ? <div className="nola-settings-field">

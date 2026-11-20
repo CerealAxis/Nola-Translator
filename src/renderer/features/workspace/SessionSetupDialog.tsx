@@ -1,4 +1,5 @@
 import { modelBindingPatch, resolveModelBinding, savedBindingOf, useAvailableModels } from '@/available-models'
+import { quickGatewayBinding } from '../../../shared/model-policy'
 import { modelSupportsTranslation, useModelOptions } from '@/model-options'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -72,7 +73,9 @@ export function SessionSetupDialog({
   const aliyunCredential = useStore(stores.models, state => state.credentials['aliyun-asr'])
   const resources = useStore(stores.models, state => state.resources)
   const meetings = useStore(stores.meetings, state => state.meetings)
-  const modelOptions = useModelOptions()
+  const inheritedAsr = quickGatewayBinding(settings, 'asr')
+  const inheritedMt = quickGatewayBinding(settings, 'mt')
+  const modelOptions = useModelOptions(inheritedAsr, inheritedMt)
   const catalog = useAvailableModels()
   const { realtime, recognition, translation, synthesis } = settings
   const targetLanguage = translation.targetLanguage
@@ -82,9 +85,9 @@ export function SessionSetupDialog({
     ? realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : realtime.quickS2sModel
     : null
   const needsMt = translationEnabled && !s2sModel
-  const asr = resolveModelBinding('asr', savedBindingOf('asr', settings), catalog.asr)
-  const mt = resolveModelBinding('mt', savedBindingOf('mt', settings), catalog.mt)
-  const tts = resolveModelBinding('tts', savedBindingOf('tts', settings), catalog.tts)
+  const asr = resolveModelBinding('asr', savedBindingOf('asr', settings), catalog.asr, inheritedAsr)
+  const mt = resolveModelBinding('mt', savedBindingOf('mt', settings), catalog.mt, inheritedMt)
+  const tts = resolveModelBinding('tts', savedBindingOf('tts', settings), catalog.tts, quickGatewayBinding(settings, 'tts'))
   const effectiveRecognition = s2sModel
     ? { ...recognition, provider: 'aliyun' as const, aliyunModel: s2sModel }
     : { ...recognition, ...modelBindingPatch('asr', asr.binding, settings).recognition }

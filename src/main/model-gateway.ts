@@ -1,14 +1,12 @@
-import { supportsRealtimeCompute } from '../shared/compute'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'
 import { WebSocket, WebSocketServer } from 'ws'
-import type { ResourceRecord, SessionConfig } from '../shared/contracts'
+import type { ResourceRecord } from '../shared/contracts'
 import { defaultModelBinding, isModelEnabled, mergeModelPolicy, sceneModelBinding } from '../shared/model-policy'
 import { buildConfiguredCloudModels } from '../shared/model-availability'
 import { legacyFallbackReady } from '../shared/cloud-models'
 import { configurationOf, recognitionLanguages } from '../shared/model-capabilities'
-import { recognitionBindingOf, translationBindingOf } from './session-controller'
 import { fallbackTranslationFieldsOf, recognitionFieldsOf, supportsRecognitionNativeTranslation, translationOptionsFor, translationOptionsOf } from '../shared/cloud-config'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { customCredentialSlot, customModelsOf } from '../shared/custom-models'
@@ -17,7 +15,6 @@ import { MIMO_TTS_BINDING, MIMO_TTS_NAME } from '../shared/settings'
 import { DEFAULT_MODEL_GATEWAY, gatewayConcurrency, bindingIsLocal, modelGatewaySettingsSchema, normalizeModelBinding, type AvailableGatewayModel, type GatewayCapability, type GatewayRequestSnapshot, type ModelGatewaySettings, type ModelGatewaySnapshot } from '../shared/model-gateway'
 import type { EngineLaunchSpec } from './engine-process'
 import { createGatewayWorker, GatewayWorkerError, type GatewayWorker, type GatewayWorkerFactory, type GatewayWorkerResult } from './model-gateway-worker'
-import { GatewayInternalServer, type GatewayCapabilityLease } from './gateway-internal-server'
 import { createGatewayLanguageModel, type GatewayLanguageModel } from './gateway-language-model'
 import { directModelRequestSchema, type DirectModelRequest, type DirectModelResult } from '../shared/agent-workspace'
 import { BackendModelError, backendCloudAsr, backendCloudMt, type BackendInferenceOptions, type openBackendAsrStream } from './backend-direct-model'
@@ -45,6 +42,7 @@ interface WorkerSlot {
   lazy: boolean
   idle?: ReturnType<typeof setTimeout>
 }
+interface GatewayCapabilityLease { worker: GatewayWorker; model: string; release(error?: unknown): void }
 interface WorkerPlan {
   name: string
   resourceId?: string
@@ -115,8 +113,6 @@ export class ModelGateway {
   private services: Record<GatewayCapability, GatewayServiceSnapshot> = { asr: { state: 'stopped', model: '', name: '' }, mt: { state: 'stopped', model: '', name: '' }, tts: { state: 'stopped', model: '', name: '' }, llm: { state: 'stopped', model: '', name: '' }, ocr: { state: 'stopped', model: '', name: '' } }
   private ocrLoaded = false
   private ocrRefs = 0
-  private internal?: GatewayInternalServer
-  private internalStarting?: Promise<void>
   private cloudCatalog: Record<GatewayCapability, AvailableGatewayModel[]> = { asr: [], mt: [], tts: [], llm: [], ocr: [] }
   private inventory: ResourceRecord[] = []
   private readonly cloudLanguageLeases = new Set<() => void>()
@@ -129,7 +125,7 @@ export class ModelGateway {
   private readonly requests: GatewayRequestSnapshot[] = []
   private key = ''
   private keyLoading?: Promise<string>
-  private readonly tickets = new Map<string, { expires: number; path: string }>()
+  private readonly tickets = new Map<string, number>()
   private lifecycle: Promise<unknown> = Promise.resolve()
   private host = DEFAULT_MODEL_GATEWAY.host
   private port = DEFAULT_MODEL_GATEWAY.port
@@ -138,8 +134,6 @@ export class ModelGateway {
   private stopVersion = 0
 
   constructor(private readonly options: ModelGatewayOptions) {}
-
-  sessionEnvironment(): NodeJS.ProcessEnv { return this.internal?.environment() ?? (() => { throw new Error('Start the required capabilities in Model Gateway') })() }
 
   /**
    * Fail before spawning a business process when a capability the session needs is not ready.
@@ -277,18 +271,20 @@ export class ModelGateway {
 
   async infer(request: DirectModelRequest, signal: AbortSignal, inspect = false): Promise<DirectModelResult> {
     const kind = request.kind as WorkerKind
-    const binding = normalizeModelBinding(kind, request.model)
     const settings = this.options.getSettings()
-    const cloudMt = kind === 'mt' && backendCloudMt(binding)
+    const binding = normalizeModelBinding(kind, request.model) || this.bindingFor(kind, settings.modelGateway, settings)
     let entry: GatewayRequestSnapshot | undefined
     let held: WorkerSlot | undefined
     try {
       signal.throwIfAborted()
-      if (this.options.inferBackend && (!inspect || kind === 'tts' && this.usesBackend(kind, binding, settings))
-        && (cloudMt || kind === 'asr' && backendCloudAsr(binding) || binding.startsWith('resource:') || kind === 'tts' && binding === MIMO_TTS_BINDING) && isModelEnabled(settings, kind, binding)) {
+      if (this.options.inferBackend) {
+        const enabled = isModelEnabled(settings, kind, binding)
+        if (!binding || (bindingIsLocal(binding) || binding === MIMO_TTS_BINDING) && !enabled) throw new GatewayError(503, 'The requested model is not enabled.', 'model_disabled')
+        if (!enabled) await this.plan(kind, binding, [], settings, settings.modelGateway)
         if (!inspect) entry = this.begin(kind, binding, false)
         const result = await this.options.inferBackend({ ...request, model: binding }, signal, { ...(inspect ? { inspect: true } : {}), concurrency: this.concurrencyFor(kind, binding) })
         if (result) return result
+        throw new GatewayError(503, 'The requested model is unavailable in the backend.', 'model_unavailable')
       }
       if (kind === 'tts' && binding === MIMO_TTS_BINDING) throw new GatewayError(503, 'MiMo TTS is unavailable.', 'model_unavailable')
       const slot = await this.ensureSlot(kind, binding)
@@ -414,48 +410,8 @@ export class ModelGateway {
     for (const release of this.cloudLanguageLeases) release()
     await Promise.all(this.cloudLanguageClosing)
     await this.stop()
-    await this.internalStarting
-    await this.internal?.close()
-    this.internal = undefined
     await Promise.all([...this.slots.values()].map(slot => this.closeSlot(slot)))
     this.slots.clear()
-  }
-
-  /** Cloud calls share a private transport even when local loading and public API are stopped. */
-  private async ensureInternal(): Promise<void> {
-    if (this.internalStarting) return this.internalStarting
-    if (this.internal) return
-    const internal = new GatewayInternalServer({ snapshot: () => this.snapshot(), acquire: (kind, binding) => this.leaseCapability(kind, binding) })
-    this.internalStarting = internal.start().then(() => { this.internal = internal }).finally(() => { this.internalStarting = undefined })
-    return this.internalStarting
-  }
-
-  async prepareSession(config: SessionConfig): Promise<void> {
-    await this.ensureInternal()
-    const resolveLocal = (kind: 'asr' | 'mt', binding: string): string => {
-      if (!bindingIsLocal(binding)) return binding
-      if (this.state !== 'running' || this.stopping) throw new GatewayError(503, 'Start Model Gateway before using a local model.', 'gateway_not_running')
-      const service = this.services[kind]
-      if (service.state === 'ready' && bindingIsLocal(service.model) && isModelEnabled(this.options.getSettings(), kind, service.model)) return service.model
-      throw new GatewayError(503, 'The selected local model is not loaded in Model Gateway.', 'model_not_loaded')
-    }
-    const asrBinding = resolveLocal('asr', normalizeModelBinding('asr', config.recognitionBinding || recognitionBindingOf(config)))
-    config.recognitionBinding = asrBinding
-    if (bindingIsLocal(asrBinding)) { config.recognitionProvider = 'local'; config.recognitionModelId = asrBinding.slice(9) }
-    else config.recognitionProvider = asrBinding.slice(6) as SessionConfig['recognitionProvider']
-    const asr = await this.ensureSlot('asr', asrBinding)
-    if (!config.targetLanguages.length) return
-    const mtBinding = resolveLocal('mt', normalizeModelBinding('mt', config.translationBinding || (config.translationProvider === 'recognition' ? 'cloud:recognition' : translationBindingOf(config, this.options.getSettings()))))
-    config.translationBinding = mtBinding
-    if (mtBinding === 'cloud:recognition') config.translationProvider = 'recognition'
-    else if (bindingIsLocal(mtBinding)) { config.translationProvider = 'local'; config.translationModelId = mtBinding.slice(9) }
-    else if (mtBinding) config.translationProvider = mtBinding.startsWith('mt-custom:') ? 'cloud' : mtBinding.slice(6) as TranslationProvider
-    if (config.translationProvider === 'recognition') {
-      if (!isModelEnabled(this.options.getSettings(), 'mt', 'cloud:recognition')) throw new GatewayError(503, 'Enable native translation in Model Management before using it.', 'model_disabled')
-      if (!(await asr.worker.ready).nativeTranslation) throw new GatewayError(400, 'The selected ASR model does not support native translation', 'model_unavailable')
-      return
-    }
-    await this.ensureSlot('mt', mtBinding)
   }
 
   private readonly onDemandLocalLanguageControllers = new Set<AbortController>()
@@ -473,7 +429,7 @@ export class ModelGateway {
     let runtime: GatewayLanguageModel
     try {
       runtime = await (this.options.createLanguageModel ?? createGatewayLanguageModel)({ getSettings: this.options.getSettings,
-        directLaunch: this.options.directLaunch, getCredential: provider => this.options.getCredential?.(provider) ?? Promise.resolve('') }, wanted, controller.signal)
+        getCredential: provider => this.options.getCredential?.(provider) ?? Promise.resolve('') }, wanted, controller.signal)
       if (controller.signal.aborted) { await runtime.close(); throw new Error('Cloud model initialization cancelled') }
     } catch (error) { this.cloudLanguageControllers.delete(controller); this.onDemandLocalLanguageControllers.delete(controller); throw error }
     let entry: GatewayRequestSnapshot
@@ -501,7 +457,6 @@ export class ModelGateway {
       const config = modelGatewaySettingsSchema.parse(this.options.getSettings().modelGateway)
       this.host = config.host; this.port = config.port
       this.externalEnabled = config.externalEnabled !== false
-      await this.ensureInternal()
       if (this.externalEnabled) await this.startListener()
       await this.configureWorkers()
       if (this.stopping) return this.snapshot()
@@ -521,11 +476,11 @@ export class ModelGateway {
       this.server.on('upgrade', (request, socket, head) => {
         try {
           const url = new URL(request.url ?? '/', 'http://localhost')
-          if (url.pathname !== '/v2/realtime' && url.pathname !== '/v1/realtime') throw new GatewayError(404, 'Unknown endpoint')
+          if (url.pathname !== '/v2/realtime') throw new GatewayError(404, 'Unknown endpoint')
           const ticket = url.searchParams.get('ticket')
           if (ticket) {
-            const grant = this.tickets.get(ticket)
-            if (!grant || grant.path !== url.pathname || grant.expires < Date.now()) throw new GatewayError(401, 'Invalid realtime ticket')
+            const expires = this.tickets.get(ticket)
+            if (!expires || expires < Date.now()) throw new GatewayError(401, 'Invalid realtime ticket')
             this.tickets.delete(ticket)
           }
           else this.authorize(request)
@@ -640,15 +595,18 @@ export class ModelGateway {
     let fallbackConfig: GatewayWorkerResult | undefined
     let fallbackResourceId: string | undefined
     let fallbackUsesPrimary = false
-    if (kind === 'mt') {
+    if (kind === 'mt' && !this.options.inferBackend) {
       const chosen = this.fallbackBindingFor(config)
-      if (chosen && chosen !== binding) {
-        if (bindingIsLocal(chosen)) throw new GatewayError(503, 'A backup cannot load a second local translation model. Select an enabled cloud interface.', 'model_not_loaded')
-        const base = await this.plan('mt', chosen, resources, settings, config)
-        fallbackConfig = base.workerConfig
-        fallbackResourceId = base.resourceId
-      } else if (chosen || nativeFallback) {
-        // Explicit gateway choices take precedence over the legacy native-session backup.
+      if (chosen) {
+        if (chosen !== binding && backendCloudMt(chosen)) {
+          const base = await this.plan('mt', chosen, resources, settings, config).catch(error => {
+            if (!(error instanceof GatewayError)) throw error
+            return undefined
+          })
+          fallbackConfig = base?.workerConfig
+          fallbackResourceId = base?.resourceId
+        }
+      } else if (nativeFallback) {
         fallbackUsesPrimary = true
       } else {
         const legacy = fallbackTranslationFieldsOf(settings.translation)
@@ -747,7 +705,7 @@ export class ModelGateway {
       this.services[kind] = { state: 'failed', model: binding, name: '', error: message, errorCode: error instanceof GatewayError ? error.code : 'inference_failed' }
       this.changed(); return
     }
-    if (!bindingIsLocal(binding) || this.usesBackend(kind, binding, stored)) {
+    if (!bindingIsLocal(binding) || this.usesBackend(kind, binding)) {
       const existing = this.slots.get(`${kind}:${binding}`)
       if (existing && !existing.retired && (existing.signature !== plan.signature || (bindingIsLocal(binding) && !existing.lazy))) {
         this.slots.delete(`${kind}:${binding}`); this.retire(existing)
@@ -844,7 +802,7 @@ export class ModelGateway {
       if (JSON.stringify(stored) !== JSON.stringify(this.options.getSettings())) throw new GatewayError(409, 'Model configuration changed during initialization. Retry the request.', 'configuration_changed')
       if (found && !found.retired && found.signature === plan.signature) return found
       if (found) { this.slots.delete(key); this.retire(found) }
-      const slot = await this.createSlot(kind, wanted, plan, !bindingIsLocal(wanted) || this.usesBackend(kind, wanted, stored))
+      const slot = await this.createSlot(kind, wanted, plan, !bindingIsLocal(wanted) || this.usesBackend(kind, wanted))
       try { await slot.worker.ready }
       catch (error) {
         if (this.slots.get(key) === slot) { this.slots.delete(key); await this.closeSlot(slot) }
@@ -859,12 +817,12 @@ export class ModelGateway {
     try { return await task } finally { if (this.creating.get(key) === task) this.creating.delete(key) }
   }
 
-  private usesBackend(kind: WorkerKind, binding: string, settings: AppSettings): boolean {
+  private usesBackend(kind: WorkerKind, binding: string): boolean {
     if (kind === 'tts' && binding === MIMO_TTS_BINDING) return !!this.options.inferBackend
     if (!this.options.inferBackend) return false
     if (kind === 'asr' && backendCloudAsr(binding)) return true
     if (kind === 'mt' && backendCloudMt(binding)) return true
-    return binding.startsWith('resource:') && supportsRealtimeCompute(settings.compute)
+    return binding.startsWith('resource:')
   }
 
   private requireLocalBinding(kind: WorkerKind, binding: string, settings: AppSettings): void {
@@ -874,7 +832,7 @@ export class ModelGateway {
     if (!settings.modelGateway[kind]) throw new GatewayError(503, `${kind.toUpperCase()} is not loaded in Model Gateway.`, 'model_not_loaded')
     if (binding !== this.eager.get(kind)) throw new GatewayError(404, 'This local model is not loaded in Model Gateway. Load it there or pick a cloud interface.', 'model_not_found')
     const service = this.services[kind]
-    if (this.usesBackend(kind, binding, settings) && (service.model !== binding || service.state !== 'ready')) {
+    if (this.usesBackend(kind, binding) && (service.model !== binding || service.state !== 'ready')) {
       throw new GatewayError(503, service.error ?? 'Model configuration is unavailable.', service.errorCode ?? 'model_unavailable')
     }
   }
@@ -942,7 +900,7 @@ export class ModelGateway {
       this.changed()
       return
     }
-    const services: DirectModelServices = { getSettings: this.options.getSettings, directLaunch: this.options.directLaunch,
+    const services: DirectModelServices = { getSettings: this.options.getSettings,
       getCredential: provider => this.options.getCredential?.(provider) ?? Promise.resolve('') }
     let cloudName = ''
     let signature: string
@@ -1039,10 +997,7 @@ export class ModelGateway {
     try {
       const origin = request.headers.origin
       this.authorize(request)
-      const requestedPath = new URL(request.url ?? '/', 'http://localhost').pathname
-      // shortcut: retain the previous public prefix until live provider parity is verified.
-      const legacy = requestedPath.startsWith('/v1/')
-      const path = legacy ? '/v2/' + requestedPath.slice(4) : requestedPath
+      const path = new URL(request.url ?? '/', 'http://localhost').pathname
       if (!PUBLIC_HTTP_PATHS.has(path)) throw new GatewayError(404, 'Unknown endpoint')
       if (origin === 'http://localhost' || origin === 'http://127.0.0.1') {
         response.setHeader('Access-Control-Allow-Origin', origin)
@@ -1054,16 +1009,15 @@ export class ModelGateway {
       if (request.method === 'POST' && path === '/v2/realtime/sessions') {
         const binding = this.publicBinding('asr')
         const settings = this.options.getSettings()
-        if (this.options.openBackendAsr && this.usesBackend('asr', binding, settings)) {
+        if (this.options.openBackendAsr && this.usesBackend('asr', binding)) {
           if (bindingIsLocal(binding)) this.requireLocalBinding('asr', binding, settings)
           else await this.plan('asr', binding, [], settings, settings.modelGateway)
         } else await this.ensureSlot('asr', binding)
-        for (const [ticket, grant] of this.tickets) if (grant.expires < Date.now()) this.tickets.delete(ticket)
+        for (const [ticket, expires] of this.tickets) if (expires < Date.now()) this.tickets.delete(ticket)
         if (this.tickets.size >= 64) throw new GatewayError(429, 'Too many unused realtime tickets')
-        const realtimePath = legacy ? '/v1/realtime' : '/v2/realtime'
         const ticket = randomBytes(24).toString('base64url'); const expires = Date.now() + 30_000
-        this.tickets.set(ticket, { expires, path: realtimePath })
-        this.json(response, 200, { client_secret: { value: ticket, expires_at: Math.floor(expires / 1000) }, url: `${realtimePath}?ticket=${ticket}` }); return
+        this.tickets.set(ticket, expires)
+        this.json(response, 200, { client_secret: { value: ticket, expires_at: Math.floor(expires / 1000) }, url: `/v2/realtime?ticket=${ticket}` }); return
       }
       if (request.method === 'GET' && path === '/v2/models') {
         const catalog = (await this.snapshotWithCatalog()).availableModels!
@@ -1079,7 +1033,7 @@ export class ModelGateway {
           const binding = this.publicBinding(kind)
           const service = this.services.tts
           let voices = service.model === binding ? service.voices : undefined
-          if (!voices && service.state === 'ready' && service.model === binding && this.usesBackend(kind, binding, settings)) {
+          if (!voices && service.state === 'ready' && service.model === binding && this.usesBackend(kind, binding)) {
             const inspected = await this.infer({ kind, model: binding, id: randomUUID() }, controller.signal, true).catch(() => undefined)
             if (inspected?.voices && this.services.tts === service) service.voices = inspected.voices
             voices = inspected?.voices
@@ -1113,8 +1067,8 @@ export class ModelGateway {
       }
       const settings = this.options.getSettings()
       let result: GatewayWorkerResult | DirectModelResult | undefined
-      entry = this.begin(kind, publicBinding, !this.usesBackend(kind, publicBinding, settings))
-      if (this.options.inferBackend && this.usesBackend(kind, publicBinding, settings)) {
+      entry = this.begin(kind, publicBinding, !this.usesBackend(kind, publicBinding))
+      if (this.options.inferBackend && this.usesBackend(kind, publicBinding)) {
         if (bindingIsLocal(publicBinding)) this.requireLocalBinding(kind, publicBinding, settings)
         else await this.plan(kind, publicBinding, [], settings, settings.modelGateway)
         const direct = directModelRequestSchema.safeParse({ ...payload, kind, model: publicBinding, id: randomUUID() })
@@ -1125,6 +1079,7 @@ export class ModelGateway {
         }
       }
       if (!result) {
+        if (this.options.inferBackend) throw new GatewayError(503, 'The requested model is unavailable in the backend.', 'model_unavailable')
         if (kind === 'tts' && publicBinding === MIMO_TTS_BINDING) throw new GatewayError(503, 'MiMo TTS is unavailable.', 'model_unavailable')
         const slot = await this.ensureSlot(kind, publicBinding)
         slot.refs++; this.clearIdle(slot)
@@ -1179,7 +1134,7 @@ export class ModelGateway {
       if (wanted && wanted !== binding) throw new GatewayError(404, 'The public API only serves its configured model alias', 'model_not_found')
       entry = this.begin('asr', binding)
       const settings = this.options.getSettings()
-      if (this.options.openBackendAsr && this.usesBackend('asr', binding, settings)) {
+      if (this.options.openBackendAsr && this.usesBackend('asr', binding)) {
         if (bindingIsLocal(binding)) this.requireLocalBinding('asr', binding, settings)
         else await this.plan('asr', binding, [], settings, settings.modelGateway)
         backend = await this.options.openBackendAsr(binding, controller.signal, send)
@@ -1194,6 +1149,7 @@ export class ModelGateway {
         })
       }
       if (!backend) {
+        if (this.options.openBackendAsr) throw new GatewayError(503, 'The requested model is unavailable in the backend.', 'model_unavailable')
         slot = await this.ensureSlot('asr', binding)
         slot.refs++; this.clearIdle(slot)
         unsubscribe = slot.worker.subscribe(event => {

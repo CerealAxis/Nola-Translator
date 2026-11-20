@@ -33,9 +33,9 @@ it('uses the current defaults at execution time and ignores a model ID supplied 
   const tools = await nativeAgentTools(context)
   settings.translation.localModelId = 'new-default-mt'
   await executeTool(tools, 'translate_text', { model: 'resource:unselected', text: 'Hello', source: 'en', target: 'zh' })
-  expect(runDirectModel).toHaveBeenLastCalledWith(context.services, expect.objectContaining({ model: 'resource:new-default-mt', kind: 'mt' }), context.signal, false, context.ownerId)
+  expect(runDirectModel).toHaveBeenLastCalledWith(context.services, expect.objectContaining({ model: 'resource:new-default-mt', kind: 'mt' }), context.signal)
   await executeTool(tools, 'synthesize_speech', { model: 'resource:unselected', text: 'Hello', voice: '' })
-  expect(runDirectModel).toHaveBeenLastCalledWith(context.services, expect.objectContaining({ model: 'resource:default-tts', voice: 'default-voice' }), context.signal, false, context.ownerId)
+  expect(runDirectModel).toHaveBeenLastCalledWith(context.services, expect.objectContaining({ model: 'resource:default-tts', voice: 'default-voice' }), context.signal)
   expect(artifact).toHaveBeenCalledWith('data:audio/wav;base64,AA==')
 })
 
@@ -58,7 +58,7 @@ it('normalizes a video internally and transcribes it using the selected default 
   const tools = await nativeAgentTools(context)
   await executeTool(tools, 'recognize_audio', { attachment: 0, path: null, language: 'auto' })
   expect(prepareAudio).toHaveBeenCalledWith({ mimeType: 'video/webm', url: 'data:video/webm;base64,AA==' })
-  expect(runDirectModel).toHaveBeenCalledWith(context.services, expect.objectContaining({ model: `resource:${settings.recognition.modelId}`, audio: 'data:audio/wav;base64,AA==' }), context.signal, false, context.ownerId)
+  expect(runDirectModel).toHaveBeenCalledWith(context.services, expect.objectContaining({ model: `resource:${settings.recognition.modelId}`, audio: 'data:audio/wav;base64,AA==' }), context.signal)
   expect(context.messages[0].parts[0]).toMatchObject({ mediaType: 'video/webm', filename: 'original.webm' })
 })
 

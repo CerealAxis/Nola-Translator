@@ -10,7 +10,7 @@ import wave
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from .gateway.adapters import _decode_wav_data_url
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
@@ -43,10 +43,18 @@ class DirectAsrRequest(_DirectRequest):
 
 class DirectMtRequest(_DirectRequest):
     kind: Literal["mt"]
-    text: Text
+    text: Annotated[str, StringConstraints(strip_whitespace=True, max_length=64_000)]
+    image: str | None = Field(default=None, max_length=16_000_000, repr=False,
+                              pattern=r"^data:image/[a-z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}$")
     source: Language = "auto"
     target: Language
     glossary: list[GlossaryTerm] = Field(default_factory=list, max_length=256)
+
+    @model_validator(mode="after")
+    def require_input(self):
+        if not self.text and not self.image:
+            raise ValueError("Expected translation text or image")
+        return self
 
 
 class DirectTtsRequest(_DirectRequest):
@@ -150,6 +158,10 @@ async def run_direct_inference(
         task_mode=request.task_mode, max_concurrency=request.max_concurrency,
     )
     if isinstance(request, DirectMtRequest):
+        if request.image:
+            if request.glossary:
+                raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="mt", message="glossaryUnsupported")
+            ctx.translation_context["image"] = request.image
         if request.glossary:
             glossary_prompt(request.glossary)
             ctx.translation_context["glossary"] = request.glossary

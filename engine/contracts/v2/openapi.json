@@ -1799,6 +1799,75 @@
           }
         }
       }
+    },
+    "/api/v2/gateway/compute": {
+      "put": {
+        "summary": "Configure Gateway Compute",
+        "operationId": "configure_gateway_compute_api_v2_gateway_compute_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComputeOptions"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/gateway/language-models/{lease_id}/chat/completions": {
+      "post": {
+        "summary": "Language Model Chat",
+        "operationId": "language_model_chat_api_v2_gateway_language_models__lease_id__chat_completions_post",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lease Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3998,6 +4067,111 @@
           "image"
         ],
         "title": "OcrRequest"
+      },
+      "ComputeOptions": {
+        "properties": {
+          "recognitionEngine": {
+            "type": "string",
+            "enum": [
+              "pytorch",
+              "llama",
+              "crisp"
+            ],
+            "title": "Recognitionengine",
+            "default": "pytorch"
+          },
+          "translationEngine": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "pytorch",
+              "llama"
+            ],
+            "title": "Translationengine",
+            "default": "auto"
+          },
+          "recognitionDevice": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Recognitiondevice",
+            "default": "auto"
+          },
+          "translationDevice": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Translationdevice",
+            "default": "auto"
+          },
+          "allowCpuFallback": {
+            "type": "boolean",
+            "title": "Allowcpufallback",
+            "default": true
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "fp32",
+              "fp16",
+              "bf16"
+            ],
+            "title": "Precision",
+            "default": "auto"
+          },
+          "quantization": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "none",
+              "nf4",
+              "8bit"
+            ],
+            "title": "Quantization",
+            "default": "auto"
+          },
+          "reservedVramMb": {
+            "type": "integer",
+            "maximum": 65536.0,
+            "minimum": 256.0,
+            "title": "Reservedvrammb",
+            "default": 1024
+          },
+          "cpuThreads": {
+            "type": "integer",
+            "maximum": 256.0,
+            "minimum": 0.0,
+            "title": "Cputhreads",
+            "default": 0
+          },
+          "gpuLayers": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": -1.0,
+            "title": "Gpulayers",
+            "default": -1
+          },
+          "contextSize": {
+            "type": "integer",
+            "maximum": 32768.0,
+            "minimum": 512.0,
+            "title": "Contextsize",
+            "default": 2048
+          },
+          "flashAttention": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "on",
+              "off"
+            ],
+            "title": "Flashattention",
+            "default": "auto"
+          }
+        },
+        "type": "object",
+        "title": "ComputeOptions"
       }
     }
   }

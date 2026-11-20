@@ -4,7 +4,6 @@ import { z } from 'zod'
 
 import type { PlaybackAck, PlaybackChunk } from '../renderer/bridge/realtime-playback'
 import type { CaptionSegment, EngineEvent, SessionConfig, Translation } from '../shared/contracts'
-import { supportsRealtimeCompute } from '../shared/compute'
 import { MIMO_TTS_BINDING, MIMO_TTS_MODEL, type AppSettings } from '../shared/settings'
 import { INDEX_TRANSLATE_ENDPOINT } from '../shared/index-translate'
 import { BackendPlayback } from './backend-playback'
@@ -22,6 +21,8 @@ export interface BackendSessionOptions {
   s2sModel?: string
   ttsApiKey?: string
 }
+
+export type BackendSessionConfig = SessionConfig & { fallbackTranslationModelId?: string }
 
 export interface MappedBackendSession {
   config: {
@@ -51,7 +52,7 @@ export interface MappedBackendSession {
 }
 
 export function mapBrowserSessionConfig(
-  config: SessionConfig, settings: AppSettings, enabledModelIds: ReadonlySet<string>,
+  config: BackendSessionConfig, settings: AppSettings, enabledModelIds: ReadonlySet<string>,
   options: Pick<BackendSessionOptions, 's2sModel'> = {},
 ): MappedBackendSession | undefined {
   if (!config.browserTimeline || config.audioSource.kind === 'microphone' || config.audioSource.kind === 'virtualInput') return
@@ -70,7 +71,7 @@ export function mapBrowserSessionConfig(
 
 /** Map only configurations whose selected models and capture behavior can be preserved. */
 export function mapSessionConfig(
-  config: SessionConfig,
+  config: BackendSessionConfig,
   settings: AppSettings,
   enabledModelIds: ReadonlySet<string>,
   options: BackendSessionOptions = {},
@@ -92,7 +93,6 @@ export function mapSessionConfig(
     pipeline = { kind: 's2s', s2s_model: options.s2sModel }
   } else {
     const recognition = config.recognitionProvider ?? 'local'
-    if (recognition === 'local' && !supportsRealtimeCompute(config.compute)) return
     const asr = recognition === 'local' ? config.recognitionModelId : recognition
     if (!asr || !enabledModelIds.has(asr)) return
     if (recognition !== 'local') {
@@ -112,12 +112,12 @@ export function mapSessionConfig(
       pipeline.translation_model = mt
       const fallback = config.fallbackTranslationProvider
       if (fallback) {
-        const fallbackModel = fallback === 'local' ? config.translationModelId : fallback === 'cloud' ? 'custom-mt' : fallback
+        const fallbackModel = fallback === 'local' ? config.fallbackTranslationModelId ?? settings.translation.localModelId : fallback === 'cloud' ? 'custom-mt' : fallback
         const backup = config.fallbackTranslationOptions
-        if (!fallbackModel || !enabledModelIds.has(fallbackModel)) return
-        if (fallback === 'cloud' && (!backup?.endpoint || !backup.model)) return
-        pipeline.fallback_translation_model = fallbackModel
-        if (fallback === 'cloud' || fallback === 'mymemory') Object.assign(headers, backendMtHeaders(backup, 'x-nola-fallback-'))
+        if (fallbackModel && enabledModelIds.has(fallbackModel) && (fallback !== 'cloud' || backup?.endpoint && backup.model)) {
+          pipeline.fallback_translation_model = fallbackModel
+          if (fallback === 'cloud' || fallback === 'mymemory') Object.assign(headers, backendMtHeaders(backup, 'x-nola-fallback-'))
+        }
       }
     }
     if (speech) {
@@ -264,7 +264,7 @@ export class BackendSession {
   async start(mapped: MappedBackendSession, recordingPath?: string): Promise<string> {
     const pipeline = mapped.config.pipeline
     if (pipeline.kind === 'cascade') {
-      this.resourceIds = [pipeline.asr_model, pipeline.translation_model, pipeline.tts_model]
+      this.resourceIds = [pipeline.asr_model, pipeline.translation_model, pipeline.fallback_translation_model, pipeline.tts_model]
         .filter((id): id is string => !!id)
     }
     if (this.closed || this.id) throw new Error('Backend session already used')

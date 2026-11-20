@@ -134,6 +134,7 @@ class ModelGateway:
         self.concurrency = ConcurrencyGate()
         self._worker_factory = worker_factory
         self._resolve_configuration = resolve_configuration
+        self.compute_options: dict[str, Any] = {}
         loader = _WorkerLoader(self)
         self.manager = manager or InstanceManager(loader, self.admission)
 
@@ -385,6 +386,10 @@ def _check_match(
     if request.target_language:
         if languages.text_output and request.target_language not in languages.text_output:
             return f"target language {request.target_language} not supported"
+        if languages.explicit_pairs and request.source_language and request.source_language != request.target_language:
+            if not any(target == request.target_language and request.source_language in (source, "auto")
+                       for source, target in languages.explicit_pairs):
+                return "language pair not supported"
 
     if request.require_streaming_input is True and profile.streaming_input != "true":
         return "streaming input required but not confirmed"

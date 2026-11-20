@@ -1803,11 +1803,6 @@ html[data-reduce-motion="true"] .nola-caption-track-sentence .nola-caption-entry
  * means "the mic is live", and two states must not share one visual.
  */
 
-.nola-caption-card .nola-caption-mic[data-loading="true"] {
-  opacity: 0.7;
-  cursor: default;
-}
-
 .nola-caption-card .nola-caption-mic[data-active="true"] {
   background: #fff;
   color: #17181a;
@@ -1816,6 +1811,11 @@ html[data-reduce-motion="true"] .nola-caption-track-sentence .nola-caption-entry
 .nola-caption-card .nola-caption-mic:disabled,
 .nola-caption-card .nola-caption-mic[data-disabled="true"] {
   opacity: 0.5;
+  cursor: default;
+}
+
+.nola-caption-card .nola-caption-mic[data-loading="true"] {
+  opacity: 1;
   cursor: default;
 }
 
@@ -2789,7 +2789,7 @@ body {
   @apply type-body font-medium;
 }
 
-:is(button, [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):is(:disabled, [aria-disabled="true"], [data-disabled]) {
+:is(button, [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):is(:disabled, [aria-disabled="true"], [data-disabled]):not(:where(.nola-caption-mic[data-loading="true"])) {
   color: var(--text-disabled);
   cursor: not-allowed;
   opacity: 1;

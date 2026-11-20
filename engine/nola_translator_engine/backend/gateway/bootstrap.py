@@ -70,27 +70,33 @@ def register_device_budgets(admission: ResourceAdmission) -> list[ComputeDevice]
     return devices
 
 
-def _local_placement(entry: RegistryEntry, devices: list[ComputeDevice]) -> ProviderConfiguration:
+def _local_placement(entry: RegistryEntry, devices: list[ComputeDevice], overrides: dict | None = None) -> ProviderConfiguration:
     configuration = entry.configuration
     if configuration.is_cloud or configuration.device != "auto":
         return configuration
-    options = ComputeOptions.model_validate(configuration.compute_options.get("compute", {}))
+    model_compute = configuration.compute_options.get("compute", {})
+    compute = {**model_compute, **(overrides or {})}
+    for key in ("recognitionEngine", "translationEngine"):
+        if key in model_compute:
+            compute[key] = model_compute[key]
+    options = ComputeOptions.model_validate(compute)
     resource = RESOURCE_BY_ID.get(configuration.resource_id)
-    if resource is None:
+    adapter = resource.provider if resource else configuration.compute_options.get("model_adapter")
+    if adapter is None:
         return configuration
     estimate = entry.definition.estimated_memory_mb
     kind = configuration.kind
     device_field = "recognitionDevice" if kind in (ModelKind.ASR, ModelKind.TTS) else "translationDevice"
-    if not devices or resource.provider in ("crisp-asr", "crisp-tts"):
+    if not devices or adapter in ("crisp-asr", "crisp-tts"):
         # shortcut: Crisp stays on CPU until Vulkan placement can target a budgeted adapter.
         selected = "cpu"
     elif kind in (ModelKind.ASR, ModelKind.TTS):
-        recognition, _, _ = choose_devices(devices, options, estimate, 0, None, resource.provider)
+        recognition, _, _ = choose_devices(devices, options, estimate, 0, None, adapter)
         selected = recognition.id
     else:
-        _, translation, _ = choose_devices(devices, options, 0, estimate, resource.provider)
+        _, translation, _ = choose_devices(devices, options, 0, estimate, adapter)
         selected = translation.id
-    compute = {**configuration.compute_options.get("compute", {}), device_field: selected}
+    compute[device_field] = selected
     if kind in (ModelKind.MT, ModelKind.LLM):
         compute["recognitionDevice"] = "cpu"
     return replace(
@@ -140,6 +146,7 @@ def build_default_gateway(*, model_dir: Path | None = None, worker_factory: Call
         register_local_mt(registry, root)
         register_local_tts(registry, root)
         register_local_llm(registry, root)
+        register_custom_models(registry, root)
 
     index_definition = committed_mt_definition("index-translate", adapter_id="index-translate", auto_detection=True)
     index_definition.capabilities.translation_policy = TranslationPolicy(min_source_state="stable", allow_preview=True)
@@ -193,13 +200,14 @@ def build_default_gateway(*, model_dir: Path | None = None, worker_factory: Call
     adapters.register(MyMemoryMtAdapter())
     register_s2s(registry, adapters)
 
-    return ModelGateway(
+    gateway = ModelGateway(
         registry=registry,
         adapters=adapters,
         admission=admission,
-        resolve_configuration=lambda entry: _local_placement(entry, devices),
+        resolve_configuration=lambda entry: _local_placement(entry, devices, gateway.compute_options),
         worker_factory=worker_factory or (lambda: LocalModelWorker(model_dir=str(root) if root else None)),
     )
+    return gateway
 
 
 def register_local_asr(registry: ModelRegistry, root: Path | None = None) -> None:
@@ -288,17 +296,19 @@ def register_local_mt(registry: ModelRegistry, root: Path) -> None:
             compute = {"translationEngine": engine}
             if contextual:
                 compute["contextSize"] = 4096
-            registry.register(
-                local_mt_definition(
-                    spec.model_id,
-                    languages=resource.languages,
-                    family="qwen3.5" if contextual else resource.provider,
-                    contextual=contextual,
-                    model_revision=spec.revision,
-                    estimated_memory_mb=_estimate_memory_mb(
-                        root, spec.directory, "llama.cpp" if engine == "llama" else resource.provider, compute,
-                    ),
+            definition = local_mt_definition(
+                spec.model_id,
+                languages=resource.languages,
+                family="qwen3.5" if contextual else resource.provider,
+                contextual=contextual,
+                model_revision=spec.revision,
+                estimated_memory_mb=_estimate_memory_mb(
+                    root, spec.directory, "llama.cpp" if engine == "llama" else resource.provider, compute,
                 ),
+            )
+            definition.capabilities.languages.auto_detection = True
+            registry.register(
+                definition,
                 local_configuration(
                     spec.model_id, ModelKind.MT, runtime=engine,
                     compute_options={"compute": compute},
@@ -362,6 +372,53 @@ def register_local_llm(registry: ModelRegistry, root: Path) -> None:
             )
 
 
+def register_custom_models(registry: ModelRegistry, root: Path) -> None:
+    from ...models.manager import ModelManager
+    from ...models.registry import CustomModelRegistry, RegistryError
+
+    manager = ModelManager(root)
+    installed = set()
+    try:
+        custom_models = CustomModelRegistry(root).all()
+    except RegistryError:
+        custom_models = ()
+    for entry in custom_models:
+        spec = entry.spec()
+        config = entry.configuration
+        if not manager.is_installed(spec) or config is None and entry.slot != "synthesis":
+            continue
+        binding = {"recognition": ModelKind.ASR, "translation": ModelKind.MT, "synthesis": ModelKind.TTS}[entry.slot]
+        options: dict[str, object] = {"model_adapter": entry.adapter_id, "revision": entry.revision}
+        if config is not None:
+            options["model_configuration"] = config.model_dump(mode="json")
+            options["compute"] = {"recognitionEngine" if binding == ModelKind.ASR else "translationEngine": config.engine}
+        runtime = entry.adapter_id if binding == ModelKind.TTS else config.engine
+        connection = local_configuration(entry.resource_id, binding, runtime=runtime, compute_options=options)
+        existing = registry.get(entry.resource_id)
+        installed.add(entry.resource_id)
+        if existing is not None and existing.configuration == connection:
+            registry.set_enabled(entry.resource_id, True)
+            continue
+        estimate = _estimate_memory_mb(root, spec.directory, entry.adapter_id)
+        metadata = {"model_revision": entry.revision, "estimated_memory_mb": estimate}
+        if binding == ModelKind.ASR:
+            definition = asr_definition(entry.resource_id, languages=tuple(config.languages), family=entry.adapter_id, **metadata)
+            definition.capabilities.languages.auto_detection = config.supportsAutoDetection
+        elif binding == ModelKind.MT:
+            definition = local_mt_definition(entry.resource_id, family=entry.adapter_id, **metadata)
+            definition.capabilities.languages = LanguageCapabilities(
+                input=config.sourceLanguages, text_output=config.targetLanguages,
+                auto_detection=config.supportsAutoDetection and "auto" in config.sourceLanguages,
+                explicit_pairs=[(pair.source, pair.target) for pair in config.translationPairs or []],
+            )
+        else:
+            definition = local_tts_definition(entry.resource_id, languages=entry.languages, **metadata)
+        registry.register(definition, connection)
+    for entry in registry.entries():
+        if "model_adapter" in entry.configuration.compute_options and entry.definition.model_id not in installed:
+            registry.set_enabled(entry.definition.model_id, False)
+
+
 def refresh_local_models(registry: ModelRegistry) -> None:
     root = _model_dir()
     register_local_asr(registry, root)
@@ -369,6 +426,7 @@ def refresh_local_models(registry: ModelRegistry) -> None:
         register_local_mt(registry, root)
         register_local_tts(registry, root)
         register_local_llm(registry, root)
+        register_custom_models(registry, root)
 
 
 def register_s2s(registry: ModelRegistry, adapters: AdapterRegistry) -> None:

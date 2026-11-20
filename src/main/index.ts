@@ -7,7 +7,7 @@ import { FeatureActivity, type FeatureLease } from './feature-activity'
 import { ModelGateway } from './model-gateway'
 import { NolaTray } from './tray'
 import { ScreenTranslation } from './screen-translation'
-import { GlossaryStore, realtimeGlossarySnapshot, assertLegacyRealtimeGlossary } from './glossary-store'
+import { GlossaryStore, realtimeGlossarySnapshot } from './glossary-store'
 import { DesktopDataManager } from './desktop-data'
 import { drainLoggedIpc } from './logged-ipc'
 import { registerDesktopDataIpc } from './desktop-data-ipc'
@@ -23,7 +23,6 @@ import { registerWorkbench } from './workbench'
 import { windowTitleForUrl } from '../shared/window-titles'
 import { resolveUiLanguage } from '../shared/languages'
 import { registerOnboardingCard } from './onboardingCard'
-import { closeDirectModelWorker } from './direct-model'
 import { AgentWorkspace } from './agent-workspace'
 import { customCredentialSlot, customModelsOf } from '../shared/custom-models'
 import { captureMainConsole, initializeSessionLog, logActivityTotals, logDiagnostic, relocateSessionLogs } from './session-log'
@@ -48,12 +47,11 @@ import { handleMeetingAudio, MEETING_AUDIO_SCHEME, registerMeetingAudioScheme } 
 import { registerAppIpc, resetOverlayLock } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
 import { BackendSupervisor, backendLaunchSpec } from './backend-supervisor'
-import { BackendSession, mapBrowserSessionConfig, mapSessionConfig } from './backend-session'
+import { BackendSession, mapBrowserSessionConfig, mapSessionConfig, type BackendSessionConfig } from './backend-session'
 import { captionPaint, latencyMeta, LatencySession, latencyWavePoint } from './latency-session'
 import { LatencyWindow } from './latency-window'
-import { BackendScreenOcr, backendAsrHeaders, backendMtHeaders, backendCloudAsr, backendCloudMt, inferBackendModel, openBackendAsrStream, openBackendLanguageModel } from './backend-direct-model'
+import { BackendScreenOcr, backendAsrHeaders, backendMtHeaders, backendCloudAsr, gatewayMtBackup, inferBackendModel, inferBackendMt, openBackendAsrStream, openBackendLanguageModel } from './backend-direct-model'
 import { createGatewayLanguageModel } from './gateway-language-model'
-import { supportsRealtimeCompute } from '../shared/compute'
 import { ALIYUN_S2S_SPEECH_LANGUAGES, fallbackTranslationFieldsOf, recognitionFieldsOf, remoteSourceLanguages, translationOptionsFor } from '../shared/cloud-config'
 import { aliyunConnectionReady } from '../shared/cloud-models'
 import { clearDataRootPointer, clearPendingDataMigration, defaultDataRoot, fallbackDataRoot, legacyDefaultDataRoot, readDataRootPointer, readPendingDataMigration, resolveDataRoot, setSessionDataRoot, writeDataRootPointer, writePendingDataMigration } from './data-root'
@@ -622,13 +620,16 @@ if (!hasSingleInstanceLock) {
     backendInitialization = (async () => {
       await runtimeInitialization
       if (quitting) return
-      const directories = runtimes.selectedDirectories(settings.current().compute)
       backend = new BackendSupervisor({
-        spec: backendLaunchSpec({
-          isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
-          managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp,
-        }),
-        env: { ...resourceEnvironment, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? bundledLlamaDirectory,
+        spec: () => {
+          const directories = runtimes.selectedDirectories(settings.current().compute)
+          const spec = backendLaunchSpec({
+            isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
+            managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp,
+          })
+          return { ...spec, env: { ...spec.env, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? bundledLlamaDirectory } }
+        },
+        env: { ...resourceEnvironment,
           NOLA_COMIC_DIR: join(dataRoot, 'comics'),
           NOLA_COMIC_FONT_PATH: app.isPackaged ? join(process.resourcesPath, 'fonts', 'NotoSansCJK-SC-VF.otf')
             : join(app.getAppPath(), 'src', 'renderer', 'assets', 'fonts', 'NotoSansCJK-SC-VF.otf'),
@@ -644,14 +645,35 @@ if (!hasSingleInstanceLock) {
       }
     })().catch(error => logDiagnostic('backend.init.failed', { error }))
     let backendRestart: Promise<void> | undefined
+    let backendCompute: { key: string; task: Promise<void> } | undefined
     const ensureRealtimeBackend = async (): Promise<void> => {
       await backendInitialization
-      if (!backend || backend.ready || quitting) return
-      backendRestart ??= backend.start().then(
-        () => undefined,
-        error => { logDiagnostic('backend.restart.failed', { error }) },
-      ).finally(() => { backendRestart = undefined })
-      await backendRestart
+      if (!backend || quitting) return
+      if (!backend.ready) {
+        backendRestart ??= backend.start().then(
+          () => undefined,
+          error => { logDiagnostic('backend.restart.failed', { error }) },
+        ).finally(() => { backendRestart = undefined })
+        await backendRestart
+      }
+      if (!backend.ready) return
+      const host = backend
+      const body = JSON.stringify(settings.current().compute)
+      const key = `${host.instanceId}:${body}`
+      if (backendCompute?.key !== key) {
+        const task = (backendCompute?.task.catch(() => undefined) ?? Promise.resolve()).then(async () => {
+          const response = await fetch(new URL('/api/v2/gateway/compute', host.baseUrl), {
+            method: 'PUT', headers: { ...host.authorizationHeader(), 'Content-Type': 'application/json' },
+            body, signal: AbortSignal.timeout(10000),
+          })
+          if (!response.ok) throw new Error('realtimeBackendUnavailable')
+        }).catch(error => {
+          if (backendCompute?.task === task) backendCompute = undefined
+          throw error
+        })
+        backendCompute = { key, task }
+      }
+      await backendCompute.task
     }
     engine = new EngineProcess({
       resolveLaunchSpec: () => {
@@ -759,13 +781,14 @@ if (!hasSingleInstanceLock) {
       if (activity.snapshot().owner || sessionActive || sessionStarting || componentInstalling) throw new Error('sessionAlreadyRunning')
       componentInstalling = true
       try {
+        await backend?.stop()
         currentDirectories = JSON.stringify(await recheckRuntimeEnvironment(runtimes, engine!, components))
       } finally { componentInstalling = false }
     },
       () => !!activity.snapshot().owner || sessionActive || sessionStarting || componentInstalling, whenRuntimeReady, async (id, repair) => {
         componentInstalling = true
         try {
-          await engine!.stop()
+          await Promise.all([engine!.stop(), backend?.stop()])
           await runtimes.install(id, repair)
         } finally {
           currentDirectories = JSON.stringify(runtimes.selectedDirectories())
@@ -776,7 +799,7 @@ if (!hasSingleInstanceLock) {
       }, async kind => {
         componentInstalling = true
         try {
-          await engine!.stop()
+          await Promise.all([engine!.stop(), backend?.stop()])
           await runtimes.uninstall(kind)
         } finally {
           currentDirectories = JSON.stringify(runtimes.selectedDirectories())
@@ -793,33 +816,11 @@ if (!hasSingleInstanceLock) {
       return overlayWindow
     }
     const isOverlayVisible = (): boolean => !!overlayWindow && !overlayWindow.isDestroyed() && (overlayWindow.isVisible() || overlayWindow.isMinimized())
-    const createSessionEngine = () => new EngineProcess({
-      ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }),
-      resolveLaunchSpec: () => {
-        const directories = runtimes.selectedDirectories(settings.current().compute)
-        return { ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
-          managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp }),
-          env: { ...resourceEnvironment, ...gateway!.sessionEnvironment(), NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? '', NOLA_TRANSLATOR_RUN_LOG_STDERR: '1' } }
-      },
-    })
+    const createSessionEngine = () => new EngineProcess(createEngineLaunchSpec({
+      isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
+    }))
     const desktopEngine = createSessionEngine()
     const browserEngine = createSessionEngine()
-    // Business processes capture NOLA_GATEWAY_* at spawn time. Restarting the gateway replaces the
-    // private listener and key, so only then does an idle process need to be replaced.
-    let sessionEnvironmentKey: string | undefined
-    const prepareSession = async (config: SessionConfig, cancelled: () => boolean = () => false) => {
-      await whenRuntimeReady()
-      if (componentInstalling) throw new Error('Runtime installation is in progress')
-      await gateway!.prepareSession(config)
-      if (cancelled()) throw new Error('sessionStartCancelled')
-      const key = gateway!.sessionEnvironment().NOLA_GATEWAY_KEY ?? ''
-      if (key !== sessionEnvironmentKey) {
-        sessionEnvironmentKey = key
-        // A gateway teardown already stopped both controllers, so neither process owns a session here.
-        await Promise.all([desktopEngine, browserEngine].map(engine => engine.currentState === 'ready' ? engine.stop() : undefined))
-      }
-      if (cancelled()) throw new Error('sessionStartCancelled')
-    }
     const latencyWindow = new LatencyWindow(__dirname)
     loggedHandle('latency:open', event => {
       assertFeatureSender(event, true)
@@ -868,7 +869,7 @@ if (!hasSingleInstanceLock) {
       return endpoint.client.stop()
     })
     const prepareRealtimeCredentials = async (config: SessionConfig, current: AppSettings, s2sModel?: string) => {
-      const resolved = { ...config }
+      const resolved: BackendSessionConfig = { ...config }
       if (s2sModel) {
         const apiKey = await credentials.get('aliyun-asr')
         if (!aliyunConnectionReady(current, !!apiKey.trim())) throw new Error('S2S_CONFIGURATION_MISSING')
@@ -890,15 +891,30 @@ if (!hasSingleInstanceLock) {
       if (provider === 'google' || provider === 'microsoft' || provider === 'mymemory') {
         resolved.translationOptions = translationOptionsFor(current.translation, provider)
       }
-      const fallback = fallbackTranslationFieldsOf(current.translation)
-      if (config.fallbackTranslationProvider && config.fallbackTranslationProvider === fallback.fallbackTranslationProvider) {
+      const backup = config.targetLanguages.length && config.translationBinding
+        ? await gatewayMtBackup(current, config.translationBinding, slot => credentials.get(slot)) : undefined
+      if (backup) {
+        resolved.fallbackTranslationProvider = backup.provider
+        resolved.fallbackTranslationOptions = backup.options
+        if (backup.provider === 'local') resolved.fallbackTranslationModelId = backup.binding.slice('resource:'.length)
+      } else if (current.modelGateway.mtFallbackModel) {
+        delete resolved.fallbackTranslationProvider
+        delete resolved.fallbackTranslationOptions
+      } else {
+        const fallback = fallbackTranslationFieldsOf(current.translation)
+        resolved.fallbackTranslationProvider = fallback.fallbackTranslationProvider
         resolved.fallbackTranslationOptions = fallback.fallbackTranslationOptions
-        const kind = fallback.fallbackTranslationProvider
-        const slot = kind === 'cloud' ? 'fallback-cloud' : undefined
-        if (slot) resolved.fallbackTranslationOptions = { ...resolved.fallbackTranslationOptions, apiKey: await credentials.get(slot) }
+        if (resolved.fallbackTranslationProvider === 'cloud') {
+          const apiKey = await credentials.get('fallback-cloud')
+          if (apiKey) resolved.fallbackTranslationOptions = { ...resolved.fallbackTranslationOptions, apiKey }
+          else if (resolved.fallbackTranslationOptions?.apiFormat === 'anthropic') delete resolved.fallbackTranslationProvider
+        }
       }
       return resolved
     }
+    const nativeRealtimeModel = (config: SessionConfig, current: AppSettings) =>
+      config.translationProvider === 'recognition' && config.recognitionProvider === 'aliyun' && config.targetLanguages.length
+        ? REALTIME_S2S_MODELS.find(model => model === current.recognition.aliyunModel) : undefined
     let glossaryAck: { instanceId: string; revision: number } | undefined
     async function syncRealtimeGlossary(host: BackendSupervisor, document: Awaited<ReturnType<GlossaryStore['snapshot']>>) {
       const instanceId = host.instanceId
@@ -917,13 +933,13 @@ if (!hasSingleInstanceLock) {
     const sessions: SessionController = new SessionController({
       engine: desktopEngine, meetings, activity, useGateway: true,
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
-      prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady,
+      prepare: async () => { throw new Error('realtimeBackendUnavailable') }, whenReady: whenRuntimeReady,
       startingChanged: starting => { sessionStarting = starting },
       hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() },
       isOverlayVisible,
-      assertLegacyTranslationAllowed: async targets => assertLegacyRealtimeGlossary(await glossary.snapshot(), targets),
       prepareBackend: async (config, current) => {
         if (activity.has('meeting')) throw new Error('FEATURE_CONFLICT:meeting')
+        if (componentInstalling) throw new Error('runtimeInstallInProgress')
         const speech = config.outputMode === 'speech'
         const measure = current.realtime?.latencyDetection === true
         pendingLatency = measure ? new LatencySession({
@@ -933,14 +949,10 @@ if (!hasSingleInstanceLock) {
         let measurement: LatencySession | undefined
         if (speech && config.audioSource.kind === 'systemOutput') throw new Error('systemAudioSpeechUnavailable')
         const s2sModel = config.outputMode === 'source' ? undefined
-          : (config.s2sModel === undefined ? defaultRealtimeS2s(current) : config.s2sModel) ?? undefined
+          : (config.s2sModel === undefined ? defaultRealtimeS2s(current) : config.s2sModel) ?? nativeRealtimeModel(config, current)
         const directConfig = s2sModel ? await prepareRealtimeCredentials(config, current, s2sModel) : undefined
-        const requiresBackend = !!s2sModel || config.audioSource.kind === 'virtualInput' || config.audioSource.kind === 'processAudio'
         await ensureRealtimeBackend()
-        if (!backend?.ready) {
-          if (requiresBackend) throw new Error('realtimeBackendUnavailable')
-          return
-        }
+        if (!backend?.ready) throw new Error('realtimeBackendUnavailable')
         const target = (workspaceWindow && !workspaceWindow.isDestroyed() ? workspaceWindow : mainWindow)?.webContents
         if (speech && (!target || target.isDestroyed())) return
         const token = randomUUID()
@@ -1009,8 +1021,7 @@ if (!hasSingleInstanceLock) {
         })
         if (!mapped) {
           client.close()
-          if (requiresBackend) throw new Error('realtimeBackendUnavailable')
-          return
+          throw new Error('invalidConfiguration')
         }
         if (!s2sModel && config.targetLanguages.length && config.outputMode !== 'source') await syncRealtimeGlossary(backend, await glossary.snapshot())
         if (measure) {
@@ -1022,26 +1033,23 @@ if (!hasSingleInstanceLock) {
     })
     const browserSessions: SessionController = new SessionController({ engine: browserEngine, meetings: null, activity, useGateway: true,
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
-      prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady,
+      prepare: async () => { throw new Error('realtimeBackendUnavailable') }, whenReady: whenRuntimeReady,
       startingChanged: () => {}, hideOverlay: () => {},
       prepareBackend: async (config, current) => {
         if (activity.has('meeting')) throw new Error('FEATURE_CONFLICT:meeting')
+        if (componentInstalling) throw new Error('runtimeInstallInProgress')
         await ensureRealtimeBackend()
-        if (!backend?.ready) {
-          if (config.s2sModel || config.audioSource.kind === 'processAudio') throw new Error('realtimeBackendUnavailable')
-          return
-        }
+        if (!backend?.ready) throw new Error('realtimeBackendUnavailable')
         const client = new BackendSession(backend, {
           onEvent: event => browserEngine.emit('event', event),
           onLoss: () => browserSessions.releaseOnLoss(true),
         })
-        const s2sModel = config.s2sModel ?? undefined
+        const s2sModel = config.s2sModel ?? nativeRealtimeModel(config, current)
         const resolved = await prepareRealtimeCredentials(config, current, s2sModel)
         const mapped = mapBrowserSessionConfig(resolved, current, await client.models(), { s2sModel })
         if (!mapped) {
           client.close()
-          if (s2sModel || config.audioSource.kind === 'processAudio') throw new Error('realtimeBackendUnavailable')
-          return
+          throw new Error('invalidConfiguration')
         }
         return { client, mapped }
       },
@@ -1383,24 +1391,16 @@ if (!hasSingleInstanceLock) {
       inferBackend: async (request, signal, options) => {
         await ensureRealtimeBackend()
         const mimo = request.kind === 'tts' && request.model === MIMO_TTS_BINDING
-        const provider = request.kind === 'mt' ? backendCloudMt(request.model) : undefined
         const asr = request.kind === 'asr' ? backendCloudAsr(request.model) : undefined
         const current = settings.current()
-        if (backend?.ready && (mimo || provider || asr || supportsRealtimeCompute(current.compute))) {
+        if (backend?.ready) {
           if (asr) {
             const recognition = recognitionFieldsOf({ ...current.recognition, provider: asr }).recognitionOptions
             return inferBackendModel(backend, request, signal, options, undefined, undefined,
               backendAsrHeaders({ ...recognition, apiKey: await credentials.get(`${asr}-asr`) }))
           }
-          if (provider === 'custom-mt') {
-            const id = request.model.slice('mt-custom:'.length)
-            const translation = translationOptionsFor(current.translation, 'cloud', id)
-            if (!translation) return
-            return inferBackendModel(backend, request, signal, options, undefined,
-              { ...translation, apiKey: await credentials.get(customCredentialSlot(id)) })
-          }
-          const translation = provider ? translationOptionsFor(current.translation, provider) : undefined
-          return inferBackendModel(backend, request, signal, options, mimo ? await credentials.get('mimo-tts') : undefined, translation)
+          if (request.kind === 'mt') return inferBackendMt(backend, request, signal, options, current, slot => credentials.get(slot))
+          return inferBackendModel(backend, request, signal, options, mimo ? await credentials.get('mimo-tts') : undefined)
         }
       },
       createLanguageModel: (services, binding, signal) => createGatewayLanguageModel({
@@ -1408,7 +1408,10 @@ if (!hasSingleInstanceLock) {
         openLocalLanguageModel: async (resourceId, localSignal) => {
           await ensureRealtimeBackend()
           const concurrency = gatewayConcurrency(`resource:${resourceId}`, settings.current().modelGateway.concurrency?.llm)
-          return backend?.ready ? openBackendLanguageModel(backend, resourceId, localSignal, concurrency) : undefined
+          if (!backend?.ready) throw new Error('realtimeBackendUnavailable')
+          const connection = await openBackendLanguageModel(backend, resourceId, localSignal, concurrency)
+          if (!connection) throw new Error('modelUnavailable')
+          return connection
         },
       }, binding, signal),
       getSettings: () => settings.current(), directLaunch,
@@ -1492,8 +1495,7 @@ if (!hasSingleInstanceLock) {
     loggedHandle('glossary:command', async (event, request: unknown) => {
       assertFeatureSender(event, true)
       const mutation = glossaryMutationSchema.parse(request)
-      const document = await glossary.command(mutation, (next, current) =>
-        assertLegacyRealtimeGlossary(next, sessions.legacyTranslationTargets, current))
+      const document = await glossary.command(mutation)
       if (backend?.ready && (sessions.busy || activity.has('meeting'))) {
         try { await syncRealtimeGlossary(backend, document) }
         catch { throw new Error('realtimeGlossarySavedSyncFailed') }

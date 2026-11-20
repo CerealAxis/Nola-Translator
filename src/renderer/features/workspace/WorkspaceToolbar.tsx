@@ -8,6 +8,7 @@ import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { translationLanguages } from '../../../shared/model-capabilities'
 import { defaultRealtimeS2s } from '../../../shared/settings'
+import { quickGatewayBinding } from '../../../shared/model-policy'
 import { ALIYUN_LANGUAGES, ALIYUN_S2S_SPEECH_LANGUAGES, remoteSourceLanguages } from '../../../shared/cloud-config'
 import { Card, CardContent } from '@/components/ui/card'
 import { Captions, Languages, Minus, Plus, SlidersHorizontal, Volume2 } from 'lucide-react'
@@ -54,14 +55,14 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
   // its key; the picker follows what is callable and says so rather than failing at start.
   const reportSwitch = (model: AvailableModel) => notifyInfo(t('gateway.modelSwitched', { name: model.name }),
     { description: t(model.origin === 'gateway' ? 'gateway.modelSwitchedLoaded' : 'gateway.modelSwitchedCloud') })
-  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch)
+  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch, false, quickGatewayBinding(settings, 'asr'))
   const translationOff = props.targetLanguage === NO_TRANSLATION_LANGUAGE
   // A session that shows source text only has nothing to repair: replacing its model would turn
   // translation back on by itself.
-  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationOff)
+  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationOff, quickGatewayBinding(settings, 'mt'))
   const modelOptions = useModelOptions(
-    asr.binding.startsWith('resource:') ? asr.binding.slice(9) : undefined,
-    mt.binding.startsWith('resource:') ? mt.binding.slice(9) : undefined,
+    asr.binding,
+    mt.binding,
     props.sourceLanguage, props.targetLanguage)
   const { translation } = modelOptions
   const s2sModel = translationOff ? null : settings.realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.quickS2sModel

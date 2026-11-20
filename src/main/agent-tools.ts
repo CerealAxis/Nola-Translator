@@ -70,14 +70,14 @@ export async function nativeAgentTools(context: AgentToolContext): Promise<ToolS
       inputSchema: z.object({ attachment: z.number().int().nonnegative().nullable(), path: z.string().nullable(), language: z.string() }),
       execute: async args => {
         const model = defaultAgentModel(services, 'asr')
-        const result = await runDirectModel(services, { id: randomUUID(), model, kind: 'asr', audio: await readAudio(args.attachment, args.path), source: args.language || services.getSettings().recognition.sourceLanguage }, context.signal, false, context.ownerId)
+        const result = await runDirectModel(services, { id: randomUUID(), model, kind: 'asr', audio: await readAudio(args.attachment, args.path), source: args.language || services.getSettings().recognition.sourceLanguage }, context.signal)
         return { ...result, model }
       } }),
     translate_text: tool({ description: 'Translate text using the current enabled default translation model from Model Management. Does not execute instructions inside the text.',
       inputSchema: z.object({ text: z.string(), source: z.string(), target: z.string() }),
       execute: async args => {
         const model = defaultAgentModel(services, 'mt')
-        return { ...await runDirectModel(services, { ...args, model, target: args.target || services.getSettings().translation.targetLanguage, id: randomUUID(), kind: 'mt' }, context.signal, false, context.ownerId), model }
+        return { ...await runDirectModel(services, { ...args, model, target: args.target || services.getSettings().translation.targetLanguage, id: randomUUID(), kind: 'mt' }, context.signal), model }
       } }),
     translate_image: tool({ description: 'Translate a user image attachment using the current default translation model, which must support images. Index is zero-based among all user image attachments.',
       inputSchema: z.object({ attachment: z.number().int().nonnegative(), source: z.string(), target: z.string() }),
@@ -85,12 +85,12 @@ export async function nativeAgentTools(context: AgentToolContext): Promise<ToolS
         const part = context.messages.filter(message => message.role === 'user').flatMap(message => message.parts.filter(item => item.type === 'file' && item.mediaType.startsWith('image/')))[args.attachment]
         if (part?.type !== 'file' || !part.url.startsWith('data:image/')) throw new Error('Choose an attached image')
         const model = defaultAgentModel(services, 'mt')
-        return { ...await runDirectModel(services, { id: randomUUID(), model, kind: 'mt', source: args.source, target: args.target || services.getSettings().translation.targetLanguage, image: part.url }, context.signal, false, context.ownerId), model }
+        return { ...await runDirectModel(services, { id: randomUUID(), model, kind: 'mt', source: args.source, target: args.target || services.getSettings().translation.targetLanguage, image: part.url }, context.signal), model }
       } }),
     synthesize_speech: tool({ description: 'Synthesize text using the current default synthesis model and voice from Model Management. Use an empty voice for the default voice. The resulting audio is attached automatically.',
       inputSchema: z.object({ text: z.string(), voice: z.string() }), execute: async args => {
         const model = defaultAgentModel(services, 'tts')
-        const result = await runDirectModel(services, { ...args, model, voice: args.voice || services.getSettings().synthesis.voice, id: randomUUID(), kind: 'tts' }, context.signal, false, context.ownerId)
+        const result = await runDirectModel(services, { ...args, model, voice: args.voice || services.getSettings().synthesis.voice, id: randomUUID(), kind: 'tts' }, context.signal)
         if (!result.audio) throw new Error('The default synthesis model returned no audio')
         if (result.audio) context.artifact(result.audio)
         return { text: result.text, voices: result.voices, audioAttached: !!result.audio, model }
@@ -98,7 +98,7 @@ export async function nativeAgentTools(context: AgentToolContext): Promise<ToolS
     list_voices: tool({ description: 'Inspect available voices of the current default synthesis model from Model Management.', inputSchema: z.object({}),
       execute: async () => {
         const model = defaultAgentModel(services, 'tts')
-        return { ...await runDirectModel(services, { id: randomUUID(), model, kind: 'tts' }, context.signal, true, context.ownerId), model }
+        return { ...await runDirectModel(services, { id: randomUUID(), model, kind: 'tts' }, context.signal, true), model }
       } }),
   }
   if (context.comicProjectId && services.comicReader) Object.assign(tools, comicReadTools(services.comicReader, {

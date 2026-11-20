@@ -1,6 +1,6 @@
 import { ALIYUN_S2S_SPEECH_LANGUAGES, recognitionFieldsOf, remoteSourceLanguages } from '../../../shared/cloud-config'
 
-import { useModelSelection, useAvailableModels, savedBindingOf, type AvailableModel } from '@/available-models'
+import { useModelSelection, useAvailableModels, modelBindingPatch, savedBindingOf, type AvailableModel } from '@/available-models'
 /**
  * Control bar at the bottom of the caption window.
  *
@@ -30,6 +30,7 @@ import {
 import type { AppSettings, AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { audioSourceFrom } from '@/features/workspace/SessionSetupDialog'
 import { defaultRealtimeS2s } from '../../../shared/settings'
+import { quickGatewayBinding } from '../../../shared/model-policy'
 import { vbCablePair } from '../../../shared/virtual-audio'
 import { errorCopyOf } from '@/features/workspace/WorkspacePage'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
@@ -92,9 +93,11 @@ export function useMenuMaxHeight(): number {
  * assembled by hand: the audio source goes through `audioSourceFrom` and the
  * translation fields through `translationFieldsOf`, which own the rules.
  */
-function startConfigOf(settings: AppSettings, devices: readonly AudioDevice[], outputMode: 'source' | 'translation' | 'speech', speechModelId: string, targetLanguage: string): SessionConfig {
+function startConfigOf(settings: AppSettings, devices: readonly AudioDevice[], outputMode: 'source' | 'translation' | 'speech', speechModelId: string, targetLanguage: string, translationBinding: string): SessionConfig {
   const s2sModel = outputMode === 'source' ? null : settings.realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.quickS2sModel
   const recognition = s2sModel ? { ...settings.recognition, provider: 'aliyun' as const, aliyunModel: s2sModel } : settings.recognition
+  const translationPatch = modelBindingPatch('mt', translationBinding, settings).translation
+  const translation = { ...settings.translation, ...translationPatch, fallback: { ...settings.translation.fallback, ...translationPatch?.fallback } }
   const virtualInputDeviceId = settings.realtime?.virtualInputDeviceId
   return {
     audioSource: virtualInputDeviceId ? { kind: 'virtualInput', deviceId: virtualInputDeviceId } : audioSourceFrom(optionOf(settings.recognition.audioSource, devices), settings.recognition.audioSource),
@@ -105,7 +108,7 @@ function startConfigOf(settings: AppSettings, devices: readonly AudioDevice[], o
     sourceLanguage: s2sModel && !remoteSourceLanguages(recognition).includes(recognition.sourceLanguage) ? 'auto' : recognition.sourceLanguage,
     // No target language: the setting's `translation.targetLanguage` applies,
     // and the pill is what edits it.
-    ...(s2sModel ? { targetLanguages: [targetLanguage], translationProvider: 'recognition' as const } : translationFieldsOf(settings.translation, { enabled: outputMode !== 'source', targetLanguage })),
+    ...(s2sModel ? { targetLanguages: [targetLanguage], translationProvider: 'recognition' as const } : translationFieldsOf(translation, { enabled: outputMode !== 'source', targetLanguage })),
     outputMode,
     s2sModel: s2sModel ?? null,
     ...(outputMode === 'speech' ? { speechOutputDeviceId: settings.realtime?.speechOutputDeviceId } : {}),
@@ -220,9 +223,9 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
     { description: t('gateway.modelSwitchedLoaded') })
   const s2sModel = translationDisabled ? null
     : settings.realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.quickS2sModel
-  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch, !!s2sModel)
-  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled || !!s2sModel)
-  const tts = useModelSelection('tts', catalog.tts, settings, reportSwitch, outputMode !== 'speech' || !!s2sModel)
+  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch, !!s2sModel, quickGatewayBinding(settings, 'asr'))
+  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled || !!s2sModel, quickGatewayBinding(settings, 'mt'))
+  const tts = useModelSelection('tts', catalog.tts, settings, reportSwitch, outputMode !== 'speech' || !!s2sModel, quickGatewayBinding(settings, 'tts'))
   const needsMt = !translationDisabled && !s2sModel
   const asrUnavailable = asr.unavailable
   const mtUnavailable = mt.unavailable
@@ -296,11 +299,11 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       const missing = !s2sModel && asrUnavailable ? 'asr'
         : needsMt && mtUnavailable ? 'mt' : needsTts && ttsUnavailable ? 'tts' : undefined
       if (missing) {
-        await notifyGatewayStartIssue(t, missing, savedBindingOf(missing, settings))
+        await notifyGatewayStartIssue(t, missing, quickGatewayBinding(settings, missing) || savedBindingOf(missing, settings))
         return
       }
       setLastIntent('start')
-      const config = { ...startConfigOf(settings, devices, outputMode, tts.binding, target), ...(!s2sModel ? { recognitionBinding: asr.binding } : {}), ...(needsMt ? { translationBinding: mt.binding } : {}) }
+      const config = { ...startConfigOf(settings, devices, outputMode, tts.binding, target, mt.binding), ...(!s2sModel ? { recognitionBinding: asr.binding } : {}), ...(needsMt ? { translationBinding: mt.binding } : {}) }
       void actions.session.startSession(config).catch((error: unknown) => {
         if (isSessionAlreadyRunningError(error)) {
           notifyError(sessionConflictMessage(t, error))

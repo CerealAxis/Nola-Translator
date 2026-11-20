@@ -42,6 +42,7 @@ it.each(['zh', 'none'])('enforces custom MT source restrictions only with transl
   stores.settings.setState({ settings: { ...settings,
     recognition: { ...settings.recognition, sourceLanguage: 'ja' },
     translation: { ...settings.translation, targetLanguage },
+    realtime: { ...settings.realtime, quickS2sModel: null },
     modelPolicy: { enabled: {}, defaults: {}, ...settings.modelPolicy, selections: { ...settings.modelPolicy?.selections, mt: 'mt-custom:limited' } },
   } })
   const { onSubmit } = renderDialog()
@@ -86,6 +87,23 @@ it('submits an explicitly selected enabled cloud translation binding and provide
   const { onSubmit: submit } = renderDialog()
   fireEvent.click(screen.getByRole('button', { name: '开始' }))
   expect(submit).toHaveBeenCalledWith(expect.objectContaining({ translationBinding: 'cloud:mymemory', translationProvider: 'mymemory', targetLanguages: ['zh'] }))
+})
+
+it('follows a changed gateway MT without rewriting the saved cascade selection', () => {
+  state.catalog.mt = [{ binding: 'cloud:index-translate', name: 'Index Translate', kind: 'mt', origin: 'cloud', free: true,
+    sourceLanguages: ['en'], targetLanguages: ['zh'] }]
+  const settings = stores.settings.getState().settings!
+  stores.settings.setState({ settings: { ...settings,
+    realtime: { ...settings.realtime, defaultPipeline: 'cascade' },
+    modelGateway: { ...settings.modelGateway, asr: true, asrModel: 'resource:new', mt: true, mtModel: 'cloud:index-translate' },
+    translation: { ...settings.translation, provider: 'local', localModelId: 'hy-mt2-1.8b-q3-k-m', targetLanguage: 'zh' },
+  } })
+  const { onSubmit } = renderDialog()
+  fireEvent.click(screen.getByRole('button', { name: '开始' }))
+  expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+    recognitionBinding: 'resource:new', translationBinding: 'cloud:index-translate', translationProvider: 'index-translate',
+  }))
+  expect(stores.settings.getState().settings?.translation.localModelId).toBe('hy-mt2-1.8b-q3-k-m')
 })
 
 it('submits speech settings only for the speech output mode', () => {

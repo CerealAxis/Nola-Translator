@@ -16,9 +16,12 @@ from typing import Annotated, Literal
 from time import monotonic
 from uuid import UUID, uuid4
 
+import httpx
+from anyio import CancelScope
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
+from ..compute import ComputeOptions
 
 from .contracts import (
     AUDIO_KIND_OUTPUT,
@@ -405,6 +408,15 @@ def build_router() -> APIRouter:
 
     # -- gateway management (private, control-token only; doc 08 §9) ----------
 
+    @router.put("/gateway/compute", status_code=204)
+    async def configure_gateway_compute(request: Request, body: ComputeOptions):
+        ctx = backend(request)
+        if ctx.gateway is None:
+            return _error_response(503, ErrorPayload(
+                code="RESOURCE_BUSY", stage="gateway", message_key="backend.gatewayDisabled",
+            ), ctx.server_instance_id)
+        ctx.gateway.compute_options = body.model_dump(exclude_defaults=True)
+
     @router.post("/gateway/infer", response_model=DirectInferenceResult, response_model_exclude_none=True)
     async def gateway_infer(request: Request):
         ctx = backend(request)
@@ -474,7 +486,57 @@ def build_router() -> APIRouter:
             ctx.language_model_openings.pop(token, None)
         if lease is None:
             return JSONResponse(status_code=499, content={})
-        return {"lease_id": str(token), "endpoint": lease.endpoint, "context_window": lease.context_window}
+        return {"lease_id": str(token), "context_window": lease.context_window}
+
+    @router.post("/gateway/language-models/{lease_id}/chat/completions")
+    async def language_model_chat(request: Request, lease_id: UUID):
+        ctx = backend(request)
+        lease = ctx.language_model_leases.get(lease_id)
+        if lease is None:
+            return _error_response(404, ErrorPayload(
+                code="MODEL_NOT_READY", stage="llm", message_key="gateway.languageModelLeaseUnavailable",
+            ), ctx.server_instance_id)
+        body = bytearray()
+        async for block in request.stream():
+            if len(body) + len(block) > 32 * 1024 * 1024:
+                return _error_response(413, ErrorPayload(
+                    code="INVALID_CONFIG", stage="llm", message_key="gateway.inputTooLarge",
+                ), ctx.server_instance_id)
+            body.extend(block)
+
+        async def completions():
+            client = httpx.AsyncClient(trust_env=False, timeout=httpx.Timeout(600.0, connect=5.0))
+            try:
+                upstream = await client.send(client.build_request(
+                    "POST", lease.endpoint + "/chat/completions",
+                    headers={"Content-Type": "application/json"}, content=bytes(body),
+                ), stream=True)
+                return client, upstream
+            except BaseException:
+                await client.aclose()
+                raise
+
+        try:
+            connection = await _run_while_connected(request, completions())
+        except httpx.HTTPError:
+            return _error_response(502, ErrorPayload(
+                code="PROVIDER_DISCONNECTED", stage="llm", message_key="gateway.languageModelUnavailable",
+            ), ctx.server_instance_id)
+        if connection is None:
+            return JSONResponse(status_code=499, content={})
+        client, upstream = connection
+
+        async def chunks():
+            try:
+                async for chunk in upstream.aiter_bytes():
+                    yield chunk
+            finally:
+                with CancelScope(shield=True):
+                    await upstream.aclose()
+                    await client.aclose()
+
+        return StreamingResponse(chunks(), status_code=upstream.status_code,
+                                 media_type=upstream.headers.get("content-type", "application/json"))
 
     @router.delete("/gateway/language-models/{lease_id}")
     async def close_language_model(request: Request, lease_id: UUID):

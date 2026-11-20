@@ -11,7 +11,7 @@ import type { ResourceRecord } from '../shared/contracts'
 import { configurationOf, recognitionLanguages } from '../shared/model-capabilities'
 import { INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { LANGUAGE_CODES } from '../shared/languages'
-import { defaultModelBinding, isModelEnabled, modelEnablePatch, modelPolicyOf, sceneModelBinding, sceneModelPatch } from '../shared/model-policy'
+import { defaultModelBinding, isModelEnabled, modelEnablePatch, modelPolicyOf, quickGatewayBinding, sceneModelBinding, sceneModelPatch } from '../shared/model-policy'
 import { notifyError, notifyGatewayStartIssue, notifyWarning } from '@/components/primitives/notify'
 import { cloudModelsOf } from '../shared/cloud-models'
 
@@ -226,7 +226,8 @@ export interface ModelResolution {
 }
 
 /** Keep a valid explicit choice; otherwise only a loaded local model may replace it. */
-export function resolveModelBinding(kind: GatewayCapability, saved: string, options: readonly AvailableModel[]): ModelResolution {
+export function resolveModelBinding(kind: GatewayCapability, saved: string, options: readonly AvailableModel[], inherit = ''): ModelResolution {
+  if (inherit) return { binding: inherit, replaced: null, unavailable: !options.some(model => model.kind === kind && model.binding === inherit) }
   const wanted = normalizeModelBinding(kind, saved)
   const hit = options.find(model => model.kind === kind && model.binding === wanted)
   if (hit) return { binding: hit.binding, replaced: null, unavailable: false }
@@ -301,10 +302,11 @@ export function gatewayBindingPatch(kind: GatewayCapability, binding: string): A
  * track becomes visible again; a selection that only changes the provider keeps the display state
  * the user last set.
  */
-export async function selectModelBinding(kind: GatewayCapability, binding: string, settings: AppSettings): Promise<void> {
+export async function selectModelBinding(kind: GatewayCapability, binding: string, settings: AppSettings, useCascadeOverride = false): Promise<void> {
   const current = stores.settings.getState().settings ?? settings
   const patch = modelBindingPatch(kind, binding, current)
   if (!Object.keys(patch).length) return
+  if (useCascadeOverride) patch.realtime = { quickS2sModel: null }
   const target = patch.translation?.targetLanguage
   if (target && target !== NO_TRANSLATION_LANGUAGE && current.translation.targetLanguage === NO_TRANSLATION_LANGUAGE) {
     patch.overlay = { showTranslation: true }
@@ -332,7 +334,7 @@ export interface ModelSelection {
  * only. Then there is nothing to repair: replacing it would re-enable translation on its own.
  */
 export function useModelSelection(kind: GatewayCapability, options: readonly AvailableModel[],
-  settings: AppSettings, onSwitch?: (replaced: AvailableModel) => void, off = false): ModelSelection {
+  settings: AppSettings, onSwitch?: (replaced: AvailableModel) => void, off = false, inherit = ''): ModelSelection {
   const { t } = useI18n()
   const gatewaySnapshot = useGatewaySnapshot()
   const resources = useStore(stores.models, state => state.resources)
@@ -342,7 +344,7 @@ export function useModelSelection(kind: GatewayCapability, options: readonly Ava
   const reported = useRef('')
   const hadAvailable = useRef(false)
   const saved = savedBindingOf(kind, settings)
-  const resolution = off ? { binding: '', replaced: null, unavailable: false } : resolveModelBinding(kind, saved || defaultModelBinding(settings, kind), options)
+  const resolution = off ? { binding: '', replaced: null, unavailable: false } : resolveModelBinding(kind, saved || defaultModelBinding(settings, kind), options, inherit)
   const replaced = resolution.replaced
   useEffect(() => {
     if (locked || off) return
@@ -352,7 +354,7 @@ export function useModelSelection(kind: GatewayCapability, options: readonly Ava
     void notifyGatewayStartIssue(t, kind)
   }, [resolution.unavailable, locked, off, kind, t, gatewaySnapshot])
   // Do not leak a stale saved binding into the UI when nothing can serve it.
-  const binding = locked ? saved : resolution.unavailable ? '' : resolution.binding
+  const binding = locked ? inherit || saved : resolution.unavailable ? '' : resolution.binding
   useEffect(() => {
     if (locked || !replaced || replaced.binding === saved) return
     if (replaced.origin === 'gateway'
@@ -379,6 +381,6 @@ export function useModelSelection(kind: GatewayCapability, options: readonly Ava
         })
         return
       }
-      void selectModelBinding(kind, next, settings).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
+      void selectModelBinding(kind, next, settings, !!inherit).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
     } }
 }

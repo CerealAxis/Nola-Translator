@@ -96,6 +96,8 @@ it('routes public realtime PCM through the backend without a legacy ASR worker',
   await test.gateway.start()
   const response = await fetch(test.base + '/v2/realtime/sessions', { method: 'POST', headers: await test.headers() })
   const { url } = await response.json()
+  const legacy = new WebSocket(test.base.replace('http:', 'ws:') + '/v1/realtime', { headers: await test.headers() })
+  await expect(once(legacy, 'open')).rejects.toThrow('404')
   const client = new WebSocket(test.base.replace('http:', 'ws:') + url)
   const events: GatewayWorkerResult[] = []
   client.on('message', raw => events.push(JSON.parse(raw.toString())))
@@ -114,7 +116,7 @@ it('routes public realtime PCM through the backend without a legacy ASR worker',
   expect(close).toHaveBeenCalled()
 })
 
-it('excludes workbench LLMs from both public API versions', async () => {
+it('excludes workbench LLMs from the public v2 API', async () => {
   const test = await fixture()
   test.settings.translation.customModels = [{ id: 'scene', name: 'Scene', model: 'fixture', endpoint: 'https://fixture.invalid/v1',
     apiFormat: 'chat-completions', contextWindow: 4096, maxOutputTokens: 512, languages: ['en'] }]
@@ -122,15 +124,13 @@ it('excludes workbench LLMs from both public API versions', async () => {
   enable(test.settings, 'llm', 'custom:scene')
   await test.gateway.start()
   expect(test.gateway.snapshot().services.llm.state).toBe('ready')
-  for (const version of ['v1', 'v2']) {
-    const models = await fetch(`${test.base}/${version}/models`, { headers: await test.headers() }).then(response => response.json())
-    expect(models.data.map((model: { id: string }) => model.id)).not.toContain('nola-llm')
-    const response = await fetch(`${test.base}/${version}/chat/completions`, {
-      method: 'POST', headers: await test.headers(),
-      body: JSON.stringify({ model: 'nola-llm', messages: [{ role: 'user', content: 'Hello' }] }),
-    })
-    expect(response.status).toBe(404)
-  }
+  const models = await fetch(`${test.base}/v2/models`, { headers: await test.headers() }).then(response => response.json())
+  expect(models.data.map((model: { id: string }) => model.id)).not.toContain('nola-llm')
+  const response = await fetch(`${test.base}/v2/chat/completions`, {
+    method: 'POST', headers: await test.headers(),
+    body: JSON.stringify({ model: 'nola-llm', messages: [{ role: 'user', content: 'Hello' }] }),
+  })
+  expect(response.status).toBe(404)
 })
 
 it('rejects excess realtime streams before opening a backend connection', async () => {
@@ -246,7 +246,7 @@ describe('local gateway', () => {
     const catalog = await fetch(test.base + '/v2/models', { headers: await test.headers() }).then(response => response.json())
     expect(catalog.data).toContainEqual(expect.objectContaining({ id: 'nola-tts', voices: ['Voice'] }))
     expect(test.gateway.snapshot().address).toBe(test.base + '/v2')
-    expect(await fetch(test.base + '/v1/models', { headers: await test.headers() }).then(response => response.json())).toEqual(catalog)
+    expect((await fetch(test.base + '/v1/models', { headers: await test.headers() })).status).toBe(404)
     await expect(test.gateway.infer({ kind: 'tts', id: randomUUID(), model: 'resource:tts-test' },
       new AbortController().signal, true)).resolves.toEqual({ text: '', voices: ['Voice'] })
     expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tts' }),
@@ -271,9 +271,9 @@ describe('local gateway', () => {
     expect(test.workers).toHaveLength(0)
 
     infer.mockResolvedValueOnce(undefined)
-    const legacy = await post('/v2/chat/completions', translation)
-    expect((await legacy.json()).choices[0].message.content).toBe('zh:Hello')
-    expect(test.workers.map(worker => worker.kind)).toEqual(['mt'])
+    const unavailable = await post('/v2/chat/completions', translation)
+    expect(unavailable.status).toBe(503)
+    expect(test.workers).toHaveLength(0)
     expect(test.gateway.snapshot().activeRequests).toBe(0)
   })
 
@@ -476,73 +476,16 @@ describe('local gateway', () => {
     expect(translationRequest({ messages: [{ role: 'user', content: 'Translate into English: 你好' }], translation_options: { target_lang: 'fr' } }, 'zh')).toMatchObject({ text: '你好', target: 'fr' })
   })
 
-  it('keeps internal inference alive when the public listener is disabled or reconfigured', async () => {
-    const test = await fixture()
+  it('keeps backend inference available when the public listener is disabled', async () => {
+    const infer = vi.fn(async () => ({ text: 'ja:Hello' }))
+    const test = await fixture(undefined, undefined, undefined, infer)
     test.settings.modelGateway.externalEnabled = false
     await test.gateway.start()
-    const environment = test.gateway.sessionEnvironment()
-    const headers = { Authorization: `Bearer ${environment.NOLA_GATEWAY_KEY}`, 'Content-Type': 'application/json' }
-    const address = environment.NOLA_GATEWAY_ADDRESS!
-    expect((await fetch(address + '/internal/status', { headers })).status).toBe(200)
-    expect((await fetch(address + '/internal/status', { headers: await test.headers() })).status).not.toBe(200)
     await expect(fetch(test.base + '/v2/models', { headers: await test.headers() })).rejects.toThrow()
-    expect(await test.gateway.infer({ id: crypto.randomUUID(), model: 'nola-mt', kind: 'mt', text: 'Hello', target: 'ja' }, new AbortController().signal)).toMatchObject({ text: 'ja:Hello' })
-    test.settings.modelGateway.externalEnabled = true
-    await test.gateway.reconfigure()
-    expect((await fetch(test.base + '/v2/models', { headers: await test.headers() })).status).toBe(200)
-    expect(test.gateway.sessionEnvironment()).toEqual(environment)
-    expect(test.workers).toHaveLength(3)
-    await test.gateway.rotateKey()
-    expect((await fetch(address + '/internal/status', { headers })).status).toBe(200)
-  })
-
-  it('preserves streamed translation events, semantic cloud errors and readiness over the private API', async () => {
-    const test = await fixture()
-    await test.gateway.start()
-    const environment = test.gateway.sessionEnvironment()
-    const headers = { Authorization: `Bearer ${environment.NOLA_GATEWAY_KEY}`, 'Content-Type': 'application/json' }
-    const mt = test.workers.find(worker => worker.kind === 'mt')!
-    mt.request = vi.fn(async (_payload, _signal, onEvent) => {
-      onEvent?.({ event: { type: 'translation.delta', text: 'partial' } })
-      return { text: 'complete', path: ['en', 'zh'] }
-    })
-    const response = await fetch(environment.NOLA_GATEWAY_ADDRESS + '/internal/mt', { method: 'POST', headers, body: JSON.stringify({ text: 'Hello', source: 'en', target: 'zh', stream: true }) })
-    expect((await response.text()).trim().split('\n').map(line => JSON.parse(line))).toEqual([{ text: 'partial' }, { text: 'complete', path: ['en', 'zh'], done: true }])
-    mt.request = vi.fn(async () => { throw new GatewayWorkerError('rate_limited', 'Cloud rate limit or quota exceeded') })
-    const failed = await fetch(environment.NOLA_GATEWAY_ADDRESS + '/internal/mt', { method: 'POST', headers, body: JSON.stringify({ text: 'Hello', source: 'en', target: 'zh', stream: true }) })
-    expect(await failed.json()).toMatchObject({ error: { code: 'rate_limited' } })
-    expect(test.gateway.snapshot().services.asr.state).toBe('ready')
-    expect(test.gateway.snapshot().activeRequests).toBe(0)
-  })
-
-  it('pins ASR and MT for each business socket, including reset after a model switch', async () => {
-    const test = await fixture()
-    await test.gateway.start()
-    const environment = test.gateway.sessionEnvironment()
-    const client = new WebSocket(environment.NOLA_GATEWAY_ADDRESS!.replace('http:', 'ws:') + '/internal/asr', { headers: { Authorization: `Bearer ${environment.NOLA_GATEWAY_KEY}` } })
-    await once(client, 'open')
-    const rpc = async (payload: GatewayWorkerResult) => {
-      const message = once(client, 'message')
-      client.send(JSON.stringify(payload))
-      return JSON.parse(String((await message)[0]))
-    }
-    expect(await rpc({ id: 'open', op: 'session.open', session: 'business', language: 'auto', targetLanguages: ['zh'] })).toMatchObject({ id: 'open', result: {} })
-    const oldAsr = test.workers.find(worker => worker.kind === 'asr')!
-    const oldMt = test.workers.find(worker => worker.kind === 'mt')!
-    for (const kind of ['asr', 'mt'] as const) test.resources.push({ ...test.resources.find(resource => resource.resourceId === `${kind}-test`)!, resourceId: `${kind}-new` })
-    test.settings.recognition.modelId = 'asr-new'
-    test.settings.translation.localModelId = 'mt-new'
-    await test.gateway.reconfigure()
-    expect(oldAsr.close).not.toHaveBeenCalled()
-    expect(oldMt.close).not.toHaveBeenCalled()
-    await rpc({ id: 'reset', op: 'session.reset', session: 'business' })
-    expect(oldAsr.request).toHaveBeenCalledWith(expect.objectContaining({ op: 'session.reset' }))
-    const translated = await fetch(environment.NOLA_GATEWAY_ADDRESS + '/internal/mt', { method: 'POST', headers: { Authorization: `Bearer ${environment.NOLA_GATEWAY_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ session: 'business', text: 'Hello', target: 'zh' }) })
-    expect((await translated.json()).text).toBe('zh:Hello')
-    expect(oldMt.request).toHaveBeenCalledWith(expect.objectContaining({ text: 'Hello' }), expect.any(AbortSignal), expect.any(Function))
-    const closed = once(client, 'close')
-    client.close(); await closed
-    await vi.waitFor(() => { expect(oldAsr.close).toHaveBeenCalledOnce(); expect(oldMt.close).toHaveBeenCalledOnce() })
+    await expect(test.gateway.infer({ id: crypto.randomUUID(), model: 'nola-mt', kind: 'mt', text: 'Hello', target: 'ja' },
+      new AbortController().signal)).resolves.toMatchObject({ text: 'ja:Hello' })
+    expect(infer).toHaveBeenCalledOnce()
+    expect(test.workers).toHaveLength(0)
   })
 
   it('owns loaded local LLM lifecycle independently and keeps active requests pinned until released', async () => {
@@ -636,20 +579,27 @@ describe('local gateway', () => {
   it('marks a stopped local LLM failed and can restart the same binding', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.modelGateway = { ...settings.modelGateway, externalEnabled: false, asr: false, mt: false, tts: false, llm: true, llmModel: 'resource:qwen35-fixture' }
-    const script = `require('readline').createInterface({input:process.stdin}).on('line',line=>{const v=JSON.parse(line);process.stdout.write(JSON.stringify({id:v.id,endpoint:'http://127.0.0.1:12345/v1',contextWindow:4096})+'\\n');setTimeout(()=>process.exit(0),150)})`
-    const launch = vi.fn(async () => ({ command: process.execPath, args: ['-e', script], cwd: process.cwd() }))
-    const gateway = new ModelGateway({ getSettings: () => settings, getCredential: async () => '', directLaunch: launch,
+    let fail: (() => void) | undefined
+    const createLanguageModel = vi.fn(async () => ({
+      profile: { id: 'resource:qwen35-fixture', model: 'local', endpoint: 'http://127.0.0.1:12345/api/v2/gateway/language-models/fixture',
+        apiFormat: 'chat-completions' as const, contextWindow: 4096, maxOutputTokens: 2048 },
+      name: 'Local model', local: true, model: () => 'fixture', redact: (value: string) => value,
+      close: vi.fn(async () => {}),
+      onFailed: (listener: () => void) => { fail = listener; return () => { fail = undefined } },
+    }))
+    const gateway = new ModelGateway({ getSettings: () => settings, getCredential: async () => '', directLaunch: vi.fn(), createLanguageModel,
       listResources: async () => [], getKey: async () => 'fixture-key', setKey: async () => {} })
     gateways.push(gateway)
     await gateway.start()
     const lease = gateway.languageModel()
+    fail?.()
     await vi.waitFor(() => expect(gateway.snapshot().services.llm.state).toBe('failed'))
     expect(lease.signal.aborted).toBe(true)
     lease.release()
     await gateway.reconfigure()
     expect(gateway.snapshot().services.llm.state).toBe('ready')
-    expect(launch).toHaveBeenCalledTimes(2)
-  }, 20_000)
+    expect(createLanguageModel).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('independent cloud consumers', () => {
@@ -664,27 +614,6 @@ describe('independent cloud consumers', () => {
     test.settings.translation.mymemoryEndpoint = 'file:///private'
     await expect(test.gateway.leaseCapability('mt', 'cloud:mymemory')).rejects.toMatchObject({ code: 'invalid_configuration' })
     expect(lease.worker.close).not.toHaveBeenCalled()
-    lease.release()
-  })
-
-  it('prepares cloud ASR and MT on the private transport without loading local weights', async () => {
-    const test = await fixture(undefined, undefined, async () => 'fixture-key')
-    test.settings.recognition.aliyunWorkspaceId = 'fixture-workspace'
-    enable(test.settings, 'asr', 'cloud:aliyun')
-    enable(test.settings, 'mt', 'cloud:mymemory')
-    await test.gateway.prepareSession({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'en', targetLanguages: ['zh'],
-      recognitionProvider: 'aliyun', recognitionBinding: 'cloud:aliyun', translationProvider: 'mymemory', translationBinding: 'cloud:mymemory' })
-    expect(test.gateway.snapshot().state).toBe('stopped')
-    expect(test.workers.map(worker => worker.kind)).toEqual(['asr', 'mt'])
-    const environment = test.gateway.sessionEnvironment()
-    const headers = { Authorization: `Bearer ${environment.NOLA_GATEWAY_KEY}`, 'Content-Type': 'application/json' }
-    const response = await fetch(environment.NOLA_GATEWAY_ADDRESS + '/internal/mt', { method: 'POST', headers,
-      body: JSON.stringify({ model: 'cloud:mymemory', text: 'Hello', target: 'zh' }) })
-    expect(await response.json()).toMatchObject({ text: 'zh:Hello' })
-    await test.gateway.stop()
-    expect((await fetch(environment.NOLA_GATEWAY_ADDRESS + '/internal/status', { headers })).status).toBe(200)
-    const lease = await test.gateway.leaseCapability('mt', 'cloud:mymemory')
-    expect(lease.worker).toBe(test.workers.find(worker => worker.kind === 'mt'))
     lease.release()
   })
 

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { WebSocketServer, type WebSocket } from 'ws'
 
 import { BackendSession, mapBrowserSessionConfig, mapSessionConfig } from '../../../src/main/backend-session'
+import { gatewayMtBackup, inferBackendMt } from '../../../src/main/backend-direct-model'
 import * as sessionLog from '../../../src/main/session-log'
 import type { SessionConfig } from '../../../src/shared/contracts'
 import { DEFAULT_SETTINGS, MIMO_TTS_BINDING, MIMO_TTS_MODEL, REALTIME_S2S_MODELS } from '../../../src/shared/settings'
@@ -16,6 +17,37 @@ const config: SessionConfig = {
   recognitionModelId: asr, sourceLanguage: 'en', targetLanguages: ['zh'],
   translationProvider: 'google', translationOptions: { apiKey: 'private-provider-key' },
 }
+
+it('retries a failed v2 Index Translate request with the configured Google backup', async () => {
+  const settings = { ...DEFAULT_SETTINGS,
+    modelGateway: { ...DEFAULT_SETTINGS.modelGateway, mtModel: 'cloud:index-translate', mtFallbackModel: 'cloud:google' },
+    modelPolicy: { enabled: { 'mt:cloud:index-translate': true, 'mt:cloud:google': true }, defaults: {}, selections: {} },
+  }
+  const getCredential = vi.fn(async () => '')
+  const primary = 'cloud:index-translate'
+  const backup = await gatewayMtBackup(settings, primary, getCredential)
+  expect(mapSessionConfig({ ...config, translationProvider: 'index-translate', fallbackTranslationProvider: backup?.provider },
+    settings, new Set([...models, 'index-translate']))?.config.pipeline).toMatchObject({
+    translation_model: 'index-translate', fallback_translation_model: 'google',
+  })
+  const calls: string[] = []
+  vi.stubGlobal('fetch', vi.fn(async (url: URL, options: RequestInit) => {
+    if (url.pathname === '/api/v2/gateway/capabilities') return Response.json({ models: ['index-translate', 'google'].map(model_id => ({
+      model_id, enabled: true, operations: ['translate'],
+    })) })
+    expect(url.pathname).toBe('/api/v2/gateway/infer')
+    const { model } = JSON.parse(String(options.body))
+    calls.push(model)
+    return model === 'index-translate' ? new Response(null, { status: 502 }) : Response.json({ text: '你好' })
+  }))
+  try {
+    const backend = { baseUrl: 'http://127.0.0.1:1234', authorizationHeader: () => ({}) }
+    await expect(inferBackendMt(backend, { id: '7be83820-3293-42c0-a66a-ac4496b82616', kind: 'mt', model: primary,
+      text: 'Hello', source: 'en', target: 'zh' }, new AbortController().signal, undefined, settings, getCredential))
+      .resolves.toEqual({ text: '你好' })
+    expect(calls).toEqual(['index-translate', 'google'])
+  } finally { vi.unstubAllGlobals() }
+})
 
 describe('desktop backend session', () => {
   it('preserves the backend stage and correlation ID on a failed start', async () => {
@@ -57,6 +89,13 @@ describe('desktop backend session', () => {
   it('maps the interim translation interval to the backend session', () => {
     const mapped = mapSessionConfig({ ...config, intermediateTranslationIntervalMs: 1200 }, DEFAULT_SETTINGS, models)
     expect(mapped?.config.translation_preview_interval_ms).toBe(1200)
+  })
+  it('maps a separate installed local backup and keeps the primary if the backup is missing', () => {
+    const session = { ...config, fallbackTranslationProvider: 'local' as const, fallbackTranslationModelId: 'local-backup' }
+    expect(mapSessionConfig(session, DEFAULT_SETTINGS, new Set([...models, 'local-backup']))?.config.pipeline)
+      .toMatchObject({ translation_model: 'google', fallback_translation_model: 'local-backup' })
+    expect(mapSessionConfig(session, DEFAULT_SETTINGS, models)?.config.pipeline)
+      .toEqual({ kind: 'cascade', asr_model: asr, translation_model: 'google' })
   })
   it.each(['google', 'microsoft'] as const)('maps keyless %s primary and fallback without forwarding old credentials', provider => {
     const ids = new Set([...models, provider])
