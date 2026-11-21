@@ -79,6 +79,7 @@ export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'trans
 export type NolaTranslatorApi = {
   desktopData?: import('./desktop-data').DesktopDataApi
   wordRules?: import('./word-rules').WordRulesBridge
+  textProcessing?: import('./text-processing').TextProcessingBridge
   glossary?: import('./glossary').GlossaryBridge
   comic?: import('./comic').ComicBridge
   gameTranslation?: import('./game-translation').GameTranslationBridge

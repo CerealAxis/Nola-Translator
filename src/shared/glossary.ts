@@ -40,6 +40,7 @@ export type GlossaryContext = z.infer<typeof glossaryContextSchema>
 export const glossaryCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('setEnabled'), enabled: z.boolean() }).strict(),
   z.object({ action: z.literal('saveLibrary'), library: glossaryLibrarySchema.omit({ entries: true }) }).strict(),
+  z.object({ action: z.literal('mergeLibrary'), library: glossaryLibrarySchema }).strict(),
   z.object({ action: z.literal('deleteLibrary'), libraryId: id }).strict(),
   z.object({ action: z.literal('saveTerm'), libraryId: id, entry: glossaryEntrySchema }).strict(),
   z.object({ action: z.literal('deleteTerms'), libraryId: id, entryIds: z.array(id).max(20000) }).strict(),

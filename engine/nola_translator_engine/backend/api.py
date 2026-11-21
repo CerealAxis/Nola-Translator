@@ -22,6 +22,7 @@ from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from ..compute import ComputeOptions
+from . import text_processing
 
 from .contracts import (
     AUDIO_KIND_OUTPUT,
@@ -48,6 +49,16 @@ from .contracts import (
     WsPlaybackAck,
     pack_audio_frame,
 )
+
+
+class TextProcessingInput(BaseModel):
+    document: dict
+    phase: Literal["input", "output", "preview"]
+    text: str = Field(max_length=text_processing.MAX_TEXT)
+    source: str | None = Field(default=None, max_length=32)
+    target: str | None = Field(default=None, max_length=32)
+    kind: Literal["text", "hook", "embedded", "preview"] = "text"
+    context: dict | None = None
 
 
 class PlaybackResolution(BaseModel):
@@ -183,6 +194,14 @@ def build_router() -> APIRouter:
 
     def backend(request: Request):
         return request.app.state.backend
+
+    @router.post("/text-processing/apply")
+    async def apply_text_processing(body: TextProcessingInput):
+        return await text_processing.apply(body.document, body.phase, body.text, body.source, body.target, body.kind, body.context)
+
+    @router.get("/text-processing/issues")
+    async def text_processing_issues():
+        return text_processing.take_realtime_issues()
 
     # -- health ---------------------------------------------------------------
 

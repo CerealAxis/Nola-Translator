@@ -1,4 +1,5 @@
 import { useWordRules } from '../settings/word-rules/useWordRules'
+import { useTextProcessingEnabled } from '../settings/text-processing/text-processing-preview'
 import { maskSubtitleTracks } from '../../../shared/subtitle-word-rules'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useI18n } from '@/i18n'
@@ -9,9 +10,11 @@ import { CaptionTrack } from '../overlay/CaptionTrack'
 
 export function GameOverlay({ api, sessionId }: { api: Pick<GameTranslationBridge, 'snapshot' | 'onChanged'>; sessionId: string }) {
   const { t } = useI18n()
-  const { document: wordRules } = useWordRules()
+  const { document: words } = useWordRules()
   const config = useStore(stores.settings, state => state.settings?.overlay) ?? DEFAULT_SETTINGS.overlay
   const [snapshot, setSnapshot] = useState<GameSnapshot>()
+  const processingActive = useTextProcessingEnabled(snapshot?.activeGameId ? 'game:' + snapshot.activeGameId : undefined)
+  const wordRules = processingActive ? words : { ...words, maskEnabled: false }
   useEffect(() => {
     let live = true, changed = false
     const accept = (value: GameSnapshot) => { if (live) setSnapshot(value.sessionId === sessionId && value.status === 'running' && (value.source === 'hook' || value.source === 'clipboard') ? value : undefined) }

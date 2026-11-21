@@ -114,8 +114,7 @@ import {
   notifyUpdate,
   notifyWarning,
 } from '@/components/primitives/notify'
-import { GlossarySelectionField } from '../settings/glossary/GlossarySelectionField'
-import { WordRuleSelectionField } from '../settings/word-rules/WordRuleSelectionField'
+import { TextProcessingSceneField } from '../settings/text-processing/TextProcessingSceneField'
 import { LanguageDirectionSelect } from '@/components/primitives/LanguageDirectionSelect'
 import { getBridge, stores, useStore } from '@/store'
 import type {
@@ -1499,22 +1498,7 @@ export function ComicTranslationWorkspace({
                   />
                 </Field>
               )}
-              <GlossarySelectionField
-                value={book.config.glossary ?? { mode: 'auto' }}
-                onChange={(glossary) =>
-                  saveComicBook({
-                    ...book,
-                    config: { ...book.config, glossary },
-                  })
-                }
-              />
-              <WordRuleSelectionField
-                value={book.config.excludedSelection}
-                showSettings={false}
-                onChange={(excludedSelection) =>
-                  updateConfig({ excludedSelection })
-                }
-              />
+              <TextProcessingSceneField key={projectId} scene={`comic:${projectId}`} />
             </FieldGroup>
             <Separator />
             <h3>{p('style')}</h3>

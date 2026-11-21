@@ -22,12 +22,16 @@ export function applyGlossaryMutation(current: GlossaryDocument, request: Glossa
   const document = structuredClone(current)
   const command = request.command
   if (command.action === 'setEnabled') document.enabled = command.enabled
-  else if (command.action === 'saveLibrary') {
+  else if (command.action === 'saveLibrary' || command.action === 'mergeLibrary') {
     const library = document.libraries.find(item => item.id === command.library.id)
-    if (library) Object.assign(library, command.library)
-    else {
+    if (!library) {
       if (document.libraries.length >= 50) throw new Error('capReached')
-      document.libraries.push({ ...command.library, entries: [] })
+      document.libraries.push(command.action === 'mergeLibrary' ? command.library : { ...command.library, entries: [] })
+    } else if (command.action === 'mergeLibrary') {
+      const existing = new Set(library.entries.map(glossaryEntryKey))
+      library.entries.push(...command.library.entries.filter(entry => !existing.has(glossaryEntryKey(entry))))
+    } else {
+      Object.assign(library, command.library)
     }
   } else if (command.action === 'reorderLibraries') {
     if (new Set(command.libraryIds).size !== document.libraries.length || command.libraryIds.length !== document.libraries.length) throw new Error('invalid')

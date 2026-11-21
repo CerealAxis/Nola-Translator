@@ -17,6 +17,7 @@ import { GameHook, type GameHookEvent } from './game-hook'
 import { GameSubtitleWindow } from './game-overlay'
 
 import type { MeetingStore } from './meeting-store'
+import type { TextProcessing } from './text-processing'
 import type { GameTextLine } from '../shared/game-translation'
 
 interface GameTranslationOptions {
@@ -26,6 +27,7 @@ interface GameTranslationOptions {
   glossary?(): Promise<GlossaryDocument>; wordRules?(): Promise<WordRulesDocument>; publish(snapshot: GameSnapshot): void
   getMainWindow?(): BrowserWindow | null; activity?: FeatureActivity
   records?: MeetingStore
+  textProcessing?: TextProcessing
   hookRoot?: string
 }
 
@@ -92,10 +94,13 @@ export class GameTranslation {
     this.invalidateEmbedding()
     if (!this.lastText || !this.state.activeGameId || this.state.status !== 'running' || this.state.source === 'ocr') return
     const profile = this.profile(this.state.activeGameId), epoch = this.epoch
+    const processing = this.options.textProcessing?.snapshot()
+    const selection = processing?.values['scene:game:' + profile.id] === true ? { mode: 'auto' as const } : undefined
     const match = resolveGlossaryTerms(await this.options.glossary?.() ?? emptyGlossary(), { text: this.lastText, targetLanguage: profile.targetLanguage,
-      context: { scenario: 'game', projectId: profile.id }, selection: profile.glossarySelection })
-    const protection = protectTranslation(await this.options.wordRules?.() ?? emptyWordRules(), this.lastText, profile.sourceLanguage, { scenario: 'game', projectId: profile.id }, profile.excludedSelection)
-    const signature = match.signature + protection.signature
+      context: { scenario: 'game', projectId: profile.id }, selection: selection ?? profile.glossarySelection })
+    const protection = protectTranslation(await this.options.wordRules?.() ?? emptyWordRules(), this.lastText, profile.sourceLanguage,
+      { scenario: 'game', projectId: profile.id }, selection ?? profile.excludedSelection)
+    const signature = (processing?.revision ?? 0) + ':' + match.signature + protection.signature
     if (epoch !== this.epoch || signature === this.effectiveSignature) return
     this.abort.abort(); this.abort = new AbortController(); ++this.epoch
     this.effectiveSignature = signature
@@ -333,29 +338,49 @@ export class GameTranslation {
     void this.drain()
   }
 
-  private translate(text: string, profile: GameProfile, signal: AbortSignal) {
-    const key = JSON.stringify([this.epoch, text])
+  private translate(text: string, profile: GameProfile, signal: AbortSignal, embedded = false) {
+    const separate = embedded && this.options.textProcessing?.separatesEmbedded('game:' + profile.id) === true
+    const key = JSON.stringify([this.epoch, separate, text])
     const inferences = this.inferences
     const existing = inferences.get(key)
     if (existing) return existing
-    const pending = this.infer(text, profile, signal).finally(() => inferences.delete(key))
+    const pending = this.infer(text, profile, signal, separate).finally(() => inferences.delete(key))
     inferences.set(key, pending)
     return pending
   }
 
-  private async infer(text: string, profile: GameProfile, signal: AbortSignal) {
+  private async infer(text: string, profile: GameProfile, signal: AbortSignal, embedded: boolean) {
+    const processing = this.options.textProcessing
+    const prepared = await processing?.prepare('game:' + profile.id, {
+      text, source: profile.sourceLanguage, target: profile.targetLanguage,
+      kind: embedded ? 'embedded' : this.state.source === 'hook' ? 'hook' : 'text',
+    }, signal)
+    if (prepared?.skip) return { text: prepared.text || text }
     if (this.options.gatewaySnapshot().state !== 'running') throw new Error('gatewayNotReady')
     const model = screenTranslationModel(screenConfigSchema.parse({}), this.options.settings())
     if (!model || !this.options.gatewaySnapshot().availableModels?.mt?.some(item => item.binding === model)) throw new Error('translationModelNotReady')
     const inferences = this.inferences
-    const glossary = resolveGlossaryTerms(await this.options.glossary?.() ?? emptyGlossary(), { text, targetLanguage: profile.targetLanguage,
-      context: { scenario: 'game', projectId: profile.id }, selection: profile.glossarySelection })
-    const protection = protectTranslation(await this.options.wordRules?.() ?? emptyWordRules(), text, profile.sourceLanguage, { scenario: 'game', projectId: profile.id }, profile.excludedSelection)
+    const input = prepared?.text ?? text
+    const library = await this.options.glossary?.() ?? emptyGlossary()
+    const words = await this.options.wordRules?.() ?? emptyWordRules()
+    const glossary = resolveGlossaryTerms(prepared?.glossary === false ? emptyGlossary() : library, { text: input, targetLanguage: profile.targetLanguage,
+      context: { scenario: 'game', projectId: profile.id }, selection: prepared?.selection ?? profile.glossarySelection })
+    const protection = protectTranslation(prepared?.protect === false ? emptyWordRules() : words, input, profile.sourceLanguage,
+      { scenario: 'game', projectId: profile.id }, prepared?.selection ?? profile.excludedSelection)
     signal.throwIfAborted()
-    if (inferences === this.inferences && text === this.lastText) this.effectiveSignature = glossary.signature + protection.signature
+    if (!embedded && inferences === this.inferences && text === this.lastText) {
+      const originalGlossary = resolveGlossaryTerms(library, { text, targetLanguage: profile.targetLanguage,
+        context: { scenario: 'game', projectId: profile.id }, selection: prepared?.selection ?? profile.glossarySelection })
+      const originalProtection = protectTranslation(words, text, profile.sourceLanguage, { scenario: 'game', projectId: profile.id },
+        prepared?.selection ?? profile.excludedSelection)
+      this.effectiveSignature = (processing?.snapshot().revision ?? 0) + ':' + originalGlossary.signature + originalProtection.signature
+    }
     const result = await this.options.inferModel({ id: randomUUID(), kind: 'mt', model, text: protection.text, source: profile.sourceLanguage, target: profile.targetLanguage,
-      taskMode: 'realtime', glossary: glossary.terms }, AbortSignal.any([signal, AbortSignal.timeout(25000)]))
-    return { ...result, text: protection.restore(result.text) }
+      taskMode: 'realtime', glossary: glossary.terms,
+      skipUnsupportedGlossary: prepared ? true : undefined },
+    AbortSignal.any([signal, AbortSignal.timeout(25000)]))
+    const output = protection.restore(result.text)
+    return { ...result, text: prepared ? await prepared.finish(output) : output }
   }
 
   private async embedTranslation(event: Extract<GameHookEvent, { type: 'embedRequest' }>): Promise<void> {
@@ -366,7 +391,7 @@ export class GameTranslation {
     if (this.embedding || profile.embedWaitMs === 0 || profile.embedStyle?.mode === 'original' || profile.embedStyle?.clear) return
     const job = Symbol(); this.embedding = job
     try {
-      const result = await this.translate(event.text, profile, this.abort.signal)
+      const result = await this.translate(event.text, profile, this.abort.signal, true)
       if (this.embedding !== job || epoch !== this.epoch || event.id !== this.state.embedThreadId || !result.text.trim() || result.text.length >= 1000) return
       if (this.embedCache.size >= 256) this.embedCache.delete(this.embedCache.keys().next().value!)
       const width = profile.embedStyle?.lineLength

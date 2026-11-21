@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import * as store from '@/store'
 import * as notices from '@/components/primitives/notify'
 import type { NolaBridge } from '@/bridge'
+import { useRoute } from '@/routes'
 import {
   applyWordRuleMutation,
   emptyWordRules,
@@ -10,8 +11,13 @@ import {
 } from '../../../../shared/word-rules'
 import { WordRulesTab } from './WordRulesTab'
 
+function RoutedWordRules() {
+  return <WordRulesTab kind="preserve" libraryId={useRoute().glossaryLibraryId} />
+}
+
 afterEach(() => {
   cleanup()
+  history.replaceState(null, '', '#/')
   vi.restoreAllMocks()
 })
 it('manages a global preserve library and edits words without a translation field', async () => {
@@ -32,14 +38,14 @@ it('manages a global preserve library and edits words without a translation fiel
       },
     },
   } as unknown as NolaBridge)
-  render(<WordRulesTab kind="preserve" />)
-  await waitFor(() => expect(screen.getByRole('button', { name: '新建词库' })).toBeEnabled())
-  fireEvent.click(screen.getByRole('button', { name: '新建词库' }))
+  render(<RoutedWordRules />)
+  await waitFor(() => expect(screen.getAllByRole('button', { name: '新建词库' })[0]).toBeEnabled())
+  fireEvent.click(screen.getAllByRole('button', { name: '新建词库' })[0])
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Characters' } })
   fireEvent.click(screen.getByRole('button', { name: '保存' }))
   await screen.findByText('Characters')
-  fireEvent.click(screen.getByRole('button', { name: '编辑' }))
-  fireEvent.click(screen.getByRole('button', { name: '添加词语' }))
+  fireEvent.click(screen.getByRole('link', { name: 'Characters' }))
+  fireEvent.click(await screen.findByRole('button', { name: '添加词语' }))
   expect(screen.queryByLabelText('译文')).not.toBeInTheDocument()
   fireEvent.change(screen.getByRole('textbox', { name: '词语' }), { target: { value: 'Nola' } })
   fireEvent.click(screen.getByRole('button', { name: '保存' }))
@@ -56,7 +62,7 @@ it('offers subtitle-only scopes for blocked word libraries', async () => {
     },
   } as unknown as NolaBridge)
   render(<WordRulesTab kind="mask" />)
-  fireEvent.click(await screen.findByRole('button', { name: '新建词库' }))
+  fireEvent.click((await screen.findAllByRole('button', { name: '新建词库' }))[0])
   fireEvent.click(screen.getByRole('combobox', { name: /范围/ }))
   expect(screen.queryByRole('option', { name: '漫画翻译' })).not.toBeInTheDocument()
   expect(screen.queryByRole('option', { name: '屏幕翻译' })).not.toBeInTheDocument()
@@ -78,10 +84,10 @@ it('closes a saved draft and reloads the stored document when realtime synchroni
     },
   } as unknown as NolaBridge)
   render(<WordRulesTab kind="preserve" />)
-  fireEvent.click(await screen.findByRole('button', { name: '新建词库' }))
+  fireEvent.click((await screen.findAllByRole('button', { name: '新建词库' }))[0])
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Saved library' } })
   fireEvent.click(screen.getByRole('button', { name: '保存' }))
-  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  await waitFor(() => expect(screen.queryByRole('textbox')).not.toBeInTheDocument())
   expect(await screen.findByText('Saved library')).toBeInTheDocument()
   expect(snapshot.mock.calls.length).toBeGreaterThanOrEqual(2)
   expect(notify).toHaveBeenCalledWith(expect.stringContaining('已保存'), { cause: error })

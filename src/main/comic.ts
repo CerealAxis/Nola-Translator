@@ -21,6 +21,7 @@ export interface ComicTranslationOptions {
   glossary(): Promise<GlossaryDocument>; wordRules(): Promise<WordRulesDocument>;
   activity?: FeatureActivity;
   modelConfigSignature?(): string;
+  textProcessingDocument?(): import('../shared/text-processing').TextProcessingConfig
   publish(event: { projectId?: string; sequence?: number }): void;
 }
 const idSchema = z.string().uuid()
@@ -77,7 +78,8 @@ export class ComicTranslation {
     handle('comic:run', async raw => {
       const request = comicRunSchema.parse(raw)
       const [glossaryDocument, wordRulesDocument] = await Promise.all([options.glossary(), options.wordRules()])
-      const task = await this.request<ComicTask>('/jobs', { ...request, glossaryDocument, wordRulesDocument, modelConfigSignature: options.modelConfigSignature?.() ?? '' })
+      const task = await this.request<ComicTask>('/jobs', { ...request, glossaryDocument, wordRulesDocument,
+        textProcessingDocument: options.textProcessingDocument?.(), modelConfigSignature: options.modelConfigSignature?.() ?? '' })
       this.publish(request.projectId); this.runner.wake(); return task
     })
     handle('comic:tasks', async () => {

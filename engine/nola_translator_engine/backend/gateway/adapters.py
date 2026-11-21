@@ -288,7 +288,13 @@ class LocalWorkerAdapter(Adapter):
             resource_id=instance.configuration.resource_id,
             payload=payload,
         )
-        response = await self._call(instance, request, ctx, stage="mt")
+        try:
+            response = await self._call(instance, request, ctx, stage="mt")
+        except GatewayError as error:
+            if not fixed_terms or error.provider_code != "glossaryUnsupported" or not ctx.translation_context.get("skip_unsupported_glossary"):
+                raise
+            del payload["glossary"]
+            response = await self._call(instance, request, ctx, stage="mt")
         try:
             translated = restore(str(response.get("text", "")))
         except ValueError as error:
@@ -402,9 +408,10 @@ class _NetworkMtAdapter(Adapter):
                     from ...translation.network import _BudgetedChatProvider
                     from ..glossary import glossary_prompt
 
-                    if not isinstance(provider, _BudgetedChatProvider):
+                    if isinstance(provider, _BudgetedChatProvider):
+                        provider.glossary_instructions = glossary_prompt(terms)
+                    elif not ctx.translation_context.get("skip_unsupported_glossary"):
                         raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="mt", message="glossaryUnsupported")
-                    provider.glossary_instructions = glossary_prompt(terms)
                 result = await provider.translate(protected, source, target)
                 translated = restore(result.text)
         except (TimeoutError, httpx.TimeoutException):

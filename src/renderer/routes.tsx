@@ -24,10 +24,12 @@ import { Spinner } from '@/components/ui/spinner'
 import type { RouteId } from '@/bridge'
 import { useI18n } from '@/i18n'
 
-export type SettingsTab = 'general' | 'audio' | 'appearance' | 'browser' | 'shortcuts' | 'engine' | 'storage' | 'glossary' | 'preserve-words' | 'subtitle-words' | 'help' | 'developer'
+export type SettingsTab = 'general' | 'audio' | 'appearance' | 'browser' | 'shortcuts' | 'engine' | 'storage' | 'text-processing' | 'help' | 'developer'
+
+export type TextProcessingLibrary = 'glossary' | 'preserve-words' | 'subtitle-words'
 
 const ALL_SETTINGS_TABS: readonly SettingsTab[] = [
-  'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'preserve-words', 'subtitle-words', 'help', 'developer',
+  'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'text-processing', 'help', 'developer',
 ]
 
 /**
@@ -56,13 +58,17 @@ export interface Route {
   pageId?: string
   reader?: boolean
   glossaryLibraryId?: string
+  textProcessingLibrary?: TextProcessingLibrary
+  textProcessingSection?: 'optimization'
+  textProcessingFeature?: string
+  textProcessingTableId?: string
   /** 规范化后的 hash，例如 `#/settings/audio`。用作过渡动画的 key。 */
   path: string
 }
 
 // -- 解析 ---------------------------------------------------------------------
 
-export function settingsPath(tab: SettingsTab): string {
+export function settingsPath(tab: SettingsTab | TextProcessingLibrary): string {
   return `#/settings/${tab}`
 }
 
@@ -70,7 +76,7 @@ export function recordPath(id: string): string {
   return `#/records/${encodeURIComponent(id)}`
 }
 
-export function pathOf(route: RouteId, options?: { tab?: SettingsTab; id?: string }): string {
+export function pathOf(route: RouteId, options?: { tab?: SettingsTab | TextProcessingLibrary; id?: string }): string {
   switch (route) {
     case 'home':
       return '#/'
@@ -180,10 +186,27 @@ export function parseRoute(hash: string): Route {
     case 'models':
       return segments[1] === 'downloads' ? { route: 'models', modelsTab: 'downloads', path: '#/models/downloads' } : { route: 'models', path: '#/models' }
     case 'settings': {
+      const section = segments[1] === 'text-processing' ? segments[2] : segments[1]
+      if (section === 'glossary' || section === 'preserve-words' || section === 'subtitle-words') {
+        const id = segments[segments[1] === 'text-processing' ? 3 : 2]
+        const glossaryLibraryId = id ? safeDecode(id) : undefined
+        return {
+          route: 'settings', tab: 'text-processing', textProcessingLibrary: section, glossaryLibraryId,
+          path: `#/settings/text-processing/${section}${glossaryLibraryId ? `/${encodeURIComponent(glossaryLibraryId)}` : ''}`,
+        }
+      }
       const tab = normalizeTab(segments[1])
-      if (['glossary', 'preserve-words', 'subtitle-words'].includes(tab) && segments[2]) {
-        const glossaryLibraryId = safeDecode(segments[2])
-        return { route: 'settings', tab, glossaryLibraryId, path: `#/settings/${tab}/${encodeURIComponent(glossaryLibraryId)}` }
+      if (tab === 'text-processing' && section === 'config' && segments[3]) {
+        const textProcessingFeature = safeDecode(segments[3])
+        const textProcessingTableId = segments[4] ? safeDecode(segments[4]) : undefined
+        return {
+          route: 'settings', tab, textProcessingFeature, textProcessingTableId,
+          path: '#/settings/text-processing/config/' + segments.slice(3, 5)
+            .map(segment => encodeURIComponent(safeDecode(segment))).join('/'),
+        }
+      }
+      if (tab === 'text-processing' && section === 'optimization') {
+        return { route: 'settings', tab, textProcessingSection: section, path: '#/settings/text-processing/optimization' }
       }
       return { route: 'settings', tab, path: `#/settings/${tab}` }
     }

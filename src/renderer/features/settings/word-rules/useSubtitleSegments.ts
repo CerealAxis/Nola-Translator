@@ -2,15 +2,18 @@ import type { CaptionSegment } from '../../../../shared/contracts'
 import { projectSubtitleSegments } from '../../../../shared/subtitle-word-rules'
 import { useWordRules } from './useWordRules'
 import { formatChineseCaption } from '@/chinese-script'
+import { useTextProcessingEnabled } from '../text-processing/text-processing-preview'
 
 export function useSubtitleSegments<T extends CaptionSegment>(
   segments: readonly T[],
   interim: T | null = null,
   sourceLanguage = '*',
+  scene = 'quick-interpret',
 ) {
   const { document } = useWordRules()
+  const active = useTextProcessingEnabled(scene)
   const projected = projectSubtitleSegments(
-    document,
+    active ? document : { ...document, maskEnabled: false },
     (interim ? [...segments, interim] : segments).map((segment) => ({
       ...segment,
       sourceText: formatChineseCaption(

@@ -11,6 +11,7 @@ export const directModelRequestSchema = z.object({
   voice: z.string().max(256).default(''), audio: z.string().max(32 * 1024 * 1024 + 64).optional(),
   image: z.string().max(16000000).optional(),
   glossary: translationGlossarySchema.optional(),
+  skipUnsupportedGlossary: z.boolean().optional(),
 })
 export type DirectModelRequest = z.input<typeof directModelRequestSchema>
 export interface DirectModelResult { text: string; audio?: string; voices?: string[] }

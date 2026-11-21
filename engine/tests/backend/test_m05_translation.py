@@ -71,6 +71,26 @@ def make_scheduler(gateway: FakeGateway, events: list[tuple[str, dict]], **kwarg
     )
 
 
+async def test_desktop_text_processing_switch_and_punctuation(monkeypatch):
+    config = {"revision": 1, "values": {"enabled": {"normalize": True, "skip-punctuation": True}}}
+    monkeypatch.setattr("nola_translator_engine.backend.text_processing.current_document", lambda: config)
+    gateway, events = FakeGateway(), []
+    scheduler = make_scheduler(gateway, events, text_processing_scene="quick-interpret")
+    try:
+        await scheduler.source_final(source("s1", 1, "ＡＢ"))
+        await scheduler.source_final(source("s2", 1, "……"))
+        await asyncio.wait_for(scheduler.wait_idle(), 1)
+        assert [call[1] for call in gateway.calls] == ["AB"]
+        assert [payload["text"] for event, payload in events if event == "translation_committed"] == ["zh:AB"]
+        assert any(payload["text"] == "......" for event, payload in events if event == "translated_text")
+        config = {"revision": 2, "values": {**config["values"], "scene:quick-interpret": False}}
+        await scheduler.source_final(source("s3", 1, "ＡＢ"))
+        await asyncio.wait_for(scheduler.wait_idle(), 1)
+        assert [call[1] for call in gateway.calls] == ["AB", "ＡＢ"]
+    finally:
+        await scheduler.close()
+
+
 def test_translation_failure_preserves_public_provider_code_and_exception_type():
     scheduler = make_scheduler(FakeGateway(), [])
     error = GatewayError(

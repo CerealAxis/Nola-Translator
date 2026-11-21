@@ -190,6 +190,7 @@ class JobRequest(Model):
   regionIds: list[UUID] | None = Field(default=None, min_length=1, max_length=2048)
   glossaryDocument: dict = Field(default_factory=dict)
   wordRulesDocument: dict = Field(default_factory=dict)
+  textProcessingDocument: dict | None = None
   modelConfigSignature: str = Field(default='', max_length=128)
 
 

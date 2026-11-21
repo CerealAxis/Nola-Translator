@@ -1,4 +1,4 @@
-import { AudioLines, BookOpen, Captions, CircleHelp, Cpu, FlaskConical, FolderOpen, Keyboard, PanelsTopLeft, SlidersHorizontal } from 'lucide-react'
+import { AudioLines, Captions, CircleHelp, Cpu, FlaskConical, FolderOpen, Keyboard, ListFilter, PanelsTopLeft, SlidersHorizontal } from 'lucide-react'
 import type { SettingsTab } from '@/routes'
 
 export const SETTINGS_NAVIGATION = {
@@ -9,9 +9,7 @@ export const SETTINGS_NAVIGATION = {
   shortcuts: { label: 'modelsSettingsUi.shortcuts', icon: Keyboard },
   engine: { label: 'modelsSettingsUi.engine', icon: Cpu },
   storage: { label: 'modelsSettingsUi.storage', icon: FolderOpen },
-  'preserve-words': { label: 'suite.preserveWords', icon: BookOpen },
-  'subtitle-words': { label: 'suite.subtitleBlockedWords', icon: BookOpen },
-  glossary: { label: 'suite.glossaryTitle', icon: BookOpen },
+  'text-processing': { label: 'suite.textProcessing', icon: ListFilter },
   help: { label: 'modelsSettingsUi.help', icon: CircleHelp },
   developer: { label: 'dev.tabLabel', icon: FlaskConical },
 } as const satisfies Record<SettingsTab, { label: string; icon: typeof AudioLines }>

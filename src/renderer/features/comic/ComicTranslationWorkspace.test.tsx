@@ -28,9 +28,6 @@ vi.mock('@/available-models', () => ({
     ocr: [],
   })),
 }))
-vi.mock('../settings/word-rules/WordRuleSelectionField', () => ({
-  WordRuleSelectionField: () => <div>禁翻词</div>,
-}))
 afterEach(() => {
   cleanup()
   vi.mocked(useAvailableModels).mockReturnValue({

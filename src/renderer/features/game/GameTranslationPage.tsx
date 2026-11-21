@@ -1,4 +1,4 @@
-import { WordRuleSelectionField } from '../settings/word-rules/WordRuleSelectionField'
+import { TextProcessingSceneField } from '../settings/text-processing/TextProcessingSceneField'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Gamepad2, Pause, Play, Plus, Save, Square, Trash2 } from 'lucide-react'
 import { useI18n, type TranslationKey } from '@/i18n'
@@ -24,7 +24,6 @@ import type { ScreenSource } from '../../../shared/screen-translation'
 import type { GameCommand, GameProfile, GameSnapshot } from '../../../shared/game-translation'
 import type { MeetingMeta } from '../../../shared/contracts'
 import { recordPath } from '@/routes'
-import { GlossarySelectionField } from '../settings/glossary/GlossarySelectionField'
 import { stripIpcErrorMessage } from '../../../shared/ipc-error'
 
 const gameIssueKeys = {
@@ -156,9 +155,8 @@ export function GameTranslationPage({ gameId }: { gameId?: string }) {
         <label className="flex items-center gap-2"><Switch checked={embedStyle.clear ?? false} disabled={active || busy} onCheckedChange={clear => patchStyle({ clear })}><SwitchThumb /></Switch>{t('suite.embedClear')}</label>
       </FieldGroup></details>}
       {!!draft.hookCodes?.length && <Field><FieldLabel>{t('suite.hookCode')}</FieldLabel>{draft.hookCodes.map(code => <div key={code} className="flex items-center justify-between gap-2"><code className="break-all">{code}</code><Button variant="outline" disabled={busy || active} onClick={() => patch({ hookCodes: draft.hookCodes?.filter(item => item !== code) })}>{t('suite.delete')}</Button></div>)}</Field>}
-      <GlossarySelectionField className="nola-settings-field" value={draft.glossarySelection} disabled={active || busy} onChange={glossarySelection => patch({ glossarySelection })} />
-      <WordRuleSelectionField value={draft.excludedSelection ?? { mode: 'auto' }} disabled={active || busy} onChange={excludedSelection => patch({ excludedSelection })} />
-      </FieldGroup></section><div className="screen-settings__footer flex flex-wrap justify-end gap-2"><Button nativeButton={false} variant="outline" render={<a href="#/settings/glossary" />}>{t('suite.manageGlossary')}</Button><Button variant="outline" disabled={active || busy} onClick={() => setDeleting(true)}><Trash2 data-icon="inline-start" />{t('suite.delete')}</Button><Button disabled={active || busy || !draft.name.trim()} onClick={() => void save()}><Save data-icon="inline-start" />{t('suite.save')}</Button></div></CardContent></Card>
+      <TextProcessingSceneField key={draft.id} scene={`game:${draft.id}`} disabled={active || busy} />
+      </FieldGroup></section><div className="screen-settings__footer flex flex-wrap justify-end gap-2"><Button variant="outline" disabled={active || busy} onClick={() => setDeleting(true)}><Trash2 data-icon="inline-start" />{t('suite.delete')}</Button><Button disabled={active || busy || !draft.name.trim()} onClick={() => void save()}><Save data-icon="inline-start" />{t('suite.save')}</Button></div></CardContent></Card>
     {snapshot.activeGameId === gameId && snapshot.source === 'hook' && snapshot.sessionId && <Card><CardHeader><CardTitle>{t('suite.hookThreads')}</CardTitle></CardHeader><CardContent className="flex flex-col gap-4">
       {!snapshot.threads?.length && <p role="status">{t('suite.hookWaiting')}</p>}
       {snapshot.threads?.slice((visibleThreadPage - 1) * 12, visibleThreadPage * 12).map(thread => <section key={thread.id} className="flex min-w-0 flex-col gap-2"><div className="flex items-center justify-between gap-3"><span className="type-body font-semibold">{thread.name}</span><Switch aria-label={`${t('suite.active')} ${thread.name}`} checked={thread.selected} disabled={busy || !thread.selected && (snapshot.threads?.filter(item => item.selected).length ?? 0) >= 8} onCheckedChange={selected => { const ids = snapshot.threads!.filter(item => item.id === thread.id ? selected : item.selected).map(item => item.id); void run({ action: 'selectThreads', sessionId: snapshot.sessionId!, ids }) }}><SwitchThumb /></Switch></div>{thread.embedSupported && <label className="flex items-center gap-2"><Switch checked={snapshot.embedThreadId === thread.id} disabled={busy || snapshot.status !== 'running'} onCheckedChange={on => { if (on) setEmbedId(thread.id); else void run({ action: 'embedHook', sessionId: snapshot.sessionId!, id: '' }) }}><SwitchThumb /></Switch>{t('suite.embedText')}</label>}<code className="break-all text-muted">{thread.code}</code><p className="whitespace-pre-wrap break-words">{thread.preview}</p></section>)}

@@ -19,7 +19,7 @@ export function MeetingReader({ snapshot }: { snapshot: MeetingModeSnapshot }) {
   const { t } = useI18n()
   const mode = useStore(stores.settings, state => state.settings?.meetingMode) ?? DEFAULT_MEETING_MODE
   const rawSegments = snapshot.segments ?? []
-  const { segments } = useSubtitleSegments(rawSegments)
+  const { segments } = useSubtitleSegments(rawSegments, null, '*', 'meeting')
   const labels = Object.fromEntries(segments.map(segment => {
     const speakers = [...new Set(segments.filter(item => item.direction === segment.direction).map(item => item.speakerId).filter(Boolean))]
     return [segment.segmentId, `${t(segment.direction === 'uplink' ? 'meeting.me' : 'meeting.remote')}${mode.showSpeaker && segment.speakerId ? ` · ${t('meeting.speaker', { number: segment.speakerNumber ?? speakers.indexOf(segment.speakerId) + 1 })}` : ''}`]

@@ -21,6 +21,7 @@ import { PageHeader } from '@/components/primitives'
 import { notifyGatewayStartIssue, notifyOverlayError, notifyOverlayInfo } from '@/components/primitives/notify'
 import { modelBindingPatch, savedBindingOf, useAvailableModels, useModelSelection, type AvailableModel } from '@/available-models'
 import { SettingSelect, SettingSwitch } from '../settings/SettingsPage'
+import { TextProcessingSceneField } from '../settings/text-processing/TextProcessingSceneField'
 import { useSpeechOutputDevices } from '../workspace/SessionSetupDialog'
 import { OverlayCaptionPreview } from './OverlayCaptionPreview'
 import { speechOutputOptions, useAudioSourceOptions } from '@/audio-source-options'
@@ -138,6 +139,7 @@ export function OverlayPage() {
             <h2 className="nola-settings-heading">{t('session.processingGroup')}</h2>
             <RealtimePipelineFields hideInheritedModel className="nola-settings-field" model={settings.realtime?.quickS2sModel} gatewayModel={defaultRealtimeS2s(settings)}
               s2sReady={s2sReady} disabled={sessionActive} onChange={quickS2sModel => patch({ realtime: { quickS2sModel } })} />
+            <TextProcessingSceneField scene="quick-interpret" disabled={sessionActive} />
             {settings.realtime?.quickS2sModel === null ? <>
             <div className="nola-settings-field" data-onboarding="quick-asr">
               <span><ModelAvailabilityLabel label={t('session.recognitionModel')} hint={t('gateway.modelNoneHint')} /></span>

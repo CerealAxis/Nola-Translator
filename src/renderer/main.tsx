@@ -30,6 +30,7 @@ import { StartupFailureDialog } from './features/settings/StartupFailureDialog'
 import { AppUpdateNotice } from './features/settings/AppUpdateNotice'
 import { OnboardingTour } from './features/onboarding'
 import { DataMigrationDialog } from './features/settings/DataMigrationDialog'
+import { initTextProcessing } from './features/settings/text-processing/text-processing-preview'
 
 /*
  * 桥接的唯一挂载点。
@@ -55,6 +56,7 @@ const bridge = createIpcBridge()
 const onOverlayToastEmpty = isOverlayToastDocument ? () => bridge.app.dismissOverlayToast?.() : undefined
 // Migration owns the data files before stores or engine IPC can safely start.
 if (!isMigrationDocument && !isOverlayToastDocument) initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument && !isWorkspaceDocument, overlayMenu: isOverlayMenuDocument, offline: !isOverlayDocument && !isWorkspaceDocument })
+if (!isMigrationDocument && !isOverlayToastDocument && !isOverlayDocument && !isOverlayMenuDocument && !isWorkspaceDocument) initTextProcessing(true)
 
 function OverlayToastWindow() {
   useEffect(() => bridge.events.onMainErrorNotification?.(notification => {

@@ -192,6 +192,7 @@ class RealtimePipelines:
                         fallback_provider_options=connection.get("fallback_mt_options"),
                         latency_detection=latency_detection,
                         glossary=self.desktop_glossary if session.owner in ("quick_interpret", "meeting") else None,
+                        text_processing_scene={"quick_interpret": "quick-interpret", "meeting": "meeting"}.get(session.owner),
                     )
                 stage = "asr"
                 if config.asr_model in ("aliyun", "minimax"):

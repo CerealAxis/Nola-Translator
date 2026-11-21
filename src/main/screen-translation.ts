@@ -18,6 +18,7 @@ import { observeScreenWindow } from './screen-target'
 import type { ScreenRegion } from '../shared/screen-translation'
 import { emptyGlossary, type GlossaryDocument } from '../shared/glossary'
 import { resolveGlossaryTerms } from '../shared/glossary-match'
+import type { TextProcessing } from './text-processing'
 import { defaultModelBinding } from '../shared/model-policy'
 import { normalizeThrownError } from '../shared/ipc-error'
 import { featureConflictOwner } from '../shared/feature-activity'
@@ -44,6 +45,7 @@ interface ScreenTranslationOptions {
   publish(snapshot: ScreenSnapshot): void; activity?: FeatureActivity
   glossary?(): Promise<GlossaryDocument>
   wordRules?(): Promise<WordRulesDocument>
+  textProcessing?: TextProcessing
 }
 export class ScreenTranslation {
   private state: ScreenSnapshot = { status: 'ready', config: screenConfigSchema.parse({}), sessionId: randomUUID(), epoch: 0, blocks: [], shortcutError: false, frames: 0, ocrMs: 0, translationMs: 0 }
@@ -70,6 +72,7 @@ export class ScreenTranslation {
   private overlayVisible = true
   private glossaryDocument = emptyGlossary()
   private wordRulesDocument = emptyWordRules()
+  private processingRevision = 0
   private singleRead = false
   private readRevision = 0
   private readonly requestedRegions = new Set<string>()
@@ -220,18 +223,26 @@ export class ScreenTranslation {
 
   async refreshGlossary(): Promise<void> {
     await this.refreshWordRules()
+    const revision = this.options.textProcessing?.snapshot().revision ?? 0
+    const rulesChanged = revision !== this.processingRevision
+    this.processingRevision = revision
     if (!this.options.glossary) return
     const document = await this.options.glossary()
     if (document.revision < this.glossaryDocument.revision) return
     const changed = document.matchingRevision !== this.glossaryDocument.matchingRevision
     this.glossaryDocument = document
-    if (!changed) return
+    if (!changed && !rulesChanged) return
     this.pipeline?.refreshRules()
   }
 
-  private glossaryMatch(text: string) {
+  private processingScope() {
+    const scene = this.state.gameId ? 'game:' + this.state.gameId : 'screen'
+    return this.options.textProcessing?.snapshot().values['scene:' + scene] === true ? { mode: 'auto' as const } : undefined
+  }
+
+  private glossaryMatch(text: string, selection = this.processingScope() ?? this.state.config.glossarySelection) {
     return resolveGlossaryTerms(this.glossaryDocument, { text, targetLanguage: this.state.config.targetLanguage,
-      context: this.state.gameId ? { scenario: 'game', projectId: this.state.gameId } : { scenario: 'screen' }, selection: this.state.config.glossarySelection })
+      context: this.state.gameId ? { scenario: 'game', projectId: this.state.gameId } : { scenario: 'screen' }, selection })
   }
 
   private updateCursorRegion(): void {
@@ -725,11 +736,22 @@ export class ScreenTranslation {
     this.pipeline = new ScreenPipeline({ ...this.state.config, regions: this.captureRegions, model }, async (text, signal) => {
       const started = Date.now()
       const context = this.state.gameId ? { scenario: 'game' as const, projectId: this.state.gameId } : { scenario: 'screen' as const }
-      const protection = protectTranslation(this.wordRulesDocument, text, this.state.config.sourceLanguage, context, this.state.config.excludedSelection)
+      const source = this.state.config.sourceLanguage, target = this.state.config.targetLanguage
+      const prepared = await this.options.textProcessing?.prepare(this.state.gameId ? 'game:' + this.state.gameId : 'screen', {
+        text, source, target,
+      }, signal)
+      if (prepared?.skip) return prepared.text || text
+      const input = prepared?.text ?? text
+      const protection = protectTranslation(prepared?.protect === false ? emptyWordRules() : this.wordRulesDocument,
+        input, source, context, prepared?.selection ?? this.state.config.excludedSelection)
+      const terms = prepared?.glossary === false ? [] : this.glossaryMatch(input, prepared?.selection).terms
       const result = await this.options.inferModel({ id: randomUUID(), kind: 'mt', model, taskMode: 'realtime',
-        text: protection.text, source: this.state.config.sourceLanguage, target: this.state.config.targetLanguage, glossary: this.glossaryMatch(text).terms }, AbortSignal.any([signal, AbortSignal.timeout(25000)]))
+        text: protection.text, source, target, glossary: terms,
+        skipUnsupportedGlossary: prepared ? true : undefined },
+      AbortSignal.any([signal, AbortSignal.timeout(25000)]))
       if (epoch === this.state.epoch) this.state.translationMs = Date.now() - started
-      return protection.restore(result.text)
+      const output = protection.restore(result.text)
+      return prepared ? prepared.finish(output) : output
     }, () => {
       if (epoch !== this.state.epoch) return
       this.state.blocks = this.pipeline?.blocks() ?? []
@@ -739,7 +761,7 @@ export class ScreenTranslation {
       if (epoch !== this.state.epoch) return
       this.recordFailure('translationFailed', 'translate', error)
       this.publish()
-    }, text => this.glossaryMatch(text).signature + resolveWordRules(this.wordRulesDocument, { kind: 'preserve', text, language: this.state.config.sourceLanguage, context: this.state.gameId ? { scenario: 'game', projectId: this.state.gameId } : { scenario: 'screen' }, selection: this.state.config.excludedSelection }).signature)
+    }, text => this.processingRevision + ':' + this.glossaryMatch(text).signature + resolveWordRules(this.wordRulesDocument, { kind: 'preserve', text, language: this.state.config.sourceLanguage, context: this.state.gameId ? { scenario: 'game', projectId: this.state.gameId } : { scenario: 'screen' }, selection: this.processingScope() ?? this.state.config.excludedSelection }).signature)
   }
 
   private invalidate(): void {

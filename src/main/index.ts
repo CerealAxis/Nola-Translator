@@ -8,6 +8,9 @@ import { ModelGateway } from './model-gateway'
 import { NolaTray } from './tray'
 import { ScreenTranslation } from './screen-translation'
 import { GlossaryStore, realtimeGlossarySnapshot } from './glossary-store'
+import { TextProcessing } from './text-processing'
+import { textProcessingErrorKey } from '../shared/text-processing'
+import { suiteLocales } from '../renderer/i18n/translation-suite-ui'
 import { DesktopDataManager } from './desktop-data'
 import { drainLoggedIpc } from './logged-ipc'
 import { registerDesktopDataIpc } from './desktop-data-ipc'
@@ -630,6 +633,7 @@ if (!hasSingleInstanceLock) {
           return { ...spec, env: { ...spec.env, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? bundledLlamaDirectory } }
         },
         env: { ...resourceEnvironment,
+          NOLA_TEXT_PROCESSING_PATH: join(dataRoot, 'text-processing.json'),
           NOLA_COMIC_DIR: join(dataRoot, 'comics'),
           NOLA_COMIC_FONT_PATH: app.isPackaged ? join(process.resourcesPath, 'fonts', 'NotoSansCJK-SC-VF.otf')
             : join(app.getAppPath(), 'src', 'renderer', 'assets', 'fonts', 'NotoSansCJK-SC-VF.otf'),
@@ -1467,6 +1471,57 @@ if (!hasSingleInstanceLock) {
       void screenTranslation?.refreshWordRules().catch(error => console.error('[screen.words]', error))
       void gameTranslation?.refreshWordRules().catch(error => console.error('[game.words]', error))
     })
+    const textProcessing = new TextProcessing(join(dataRoot, 'text-processing.json'), async () => {
+      await ensureRealtimeBackend()
+      return backend?.ready ? backend : null
+    }, () => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send('text-processing:changed', textProcessing.snapshot())
+      }
+      void screenTranslation?.refreshGlossary().catch(error => console.error('[screen.text-processing]', error))
+      void gameTranslation?.refreshGlossary().catch(error => console.error('[game.text-processing]', error))
+    }, issue => {
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      if (mainWindow.isVisible() && !mainWindow.isMinimized()) mainWindow.webContents.send('text-processing:error', issue)
+      else {
+        const language = resolveUiLanguage(settings.current().uiLanguage, app.getLocale())
+        showOverlayToast({ message: suiteLocales[language][textProcessingErrorKey(issue.reason)] }, overlayWindow ?? mainWindow)
+      }
+    }, async library => {
+      const current = await glossary.snapshot()
+      const document = await glossary.command({
+        operationId: randomUUID(), expectedRevision: current.revision, command: { action: 'mergeLibrary', library },
+      })
+      if (backend?.ready && (sessions.busy || activity.has('meeting'))) {
+        void syncRealtimeGlossary(backend, document).catch(() => textProcessing.report({ feature: 'glossary', reason: 'backend' }))
+      }
+    })
+    const processingNoticeTimer = setInterval(() => {
+      if (backend?.ready && (activity.has('interpretation') || activity.has('meeting'))) {
+        void textProcessing.receiveRealtimeIssues(backend).catch(() => {})
+      }
+    }, 1000)
+    processingNoticeTimer.unref()
+    app.once('will-quit', () => clearInterval(processingNoticeTimer))
+    loggedHandle('text-processing:load', (event, legacy: Record<string, unknown>) => {
+      assertFeatureSender(event, true)
+      return textProcessing.migrate(legacy)
+    })
+    loggedHandle('text-processing:snapshot', async event => {
+      if (gameTranslation?.ownsOverlay(event.sender.id)) {
+        if (event.senderFrame !== event.sender.mainFrame || !isTrustedRendererUrl(event.sender.getURL(), __dirname)) throw new Error('Access denied')
+      } else assertFeatureSender(event)
+      await textProcessing.readReady()
+      return textProcessing.snapshot()
+    })
+    loggedHandle('text-processing:save', (event, request: { key: string; value: unknown }) => {
+      assertFeatureSender(event, true)
+      return textProcessing.save(request.key, request.value)
+    })
+    loggedHandle('text-processing:preview', (event, request: { text: string; overrides?: Record<string, unknown> }) => {
+      assertFeatureSender(event, true)
+      return textProcessing.preview(request.text, request.overrides)
+    })
     loggedHandle('word-rules:snapshot', event => {
       if (gameTranslation?.ownsOverlay(event.sender.id)) {
         if (event.senderFrame !== event.sender.mainFrame || !isTrustedRendererUrl(event.sender.getURL(), __dirname)) throw new Error('Access denied')
@@ -1512,11 +1567,13 @@ if (!hasSingleInstanceLock) {
       mainDir: __dirname, getMainWindow: () => mainWindow,
       backend: async () => { await ensureRealtimeBackend(); if (!backend?.ready) throw new Error('backendUnavailable'); return backend },
       glossary: () => glossary.snapshot(), wordRules: () => wordRules.snapshot(),
-      translate: (input, signal) => translateComicPage({ gateway: gateway!, modelConfigSignature: comicModelConfigSignature, glossary: () => glossary.snapshot(), wordRules: () => wordRules.snapshot() }, input, signal),
+      textProcessingDocument: () => textProcessing.snapshot(),
+      translate: (input, signal) => translateComicPage({ gateway: gateway!, modelConfigSignature: comicModelConfigSignature, glossary: () => glossary.snapshot(), wordRules: () => wordRules.snapshot(), textProcessing }, input, signal),
       publish: event => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('comic:changed', event) },
     })
     let lastScreenStatus = ''
     screenTranslation = new ScreenTranslation({
+      textProcessing,
       wordRules: () => wordRules.snapshot(),
       glossary: () => glossary.snapshot(),
       mainDir: __dirname, configPath: join(dataRoot, 'screen-translation.json'),
@@ -1532,6 +1589,7 @@ if (!hasSingleInstanceLock) {
       },
     })
     gameTranslation = new GameTranslation({
+      textProcessing,
       wordRules: () => wordRules.snapshot(),
       records: meetings,
       mainDir: __dirname,
@@ -1552,7 +1610,7 @@ if (!hasSingleInstanceLock) {
     loggedHandle('game:command', (event, command: unknown) => { assertFeatureSender(event, true); return gameTranslation!.command(command) })
     createMainWindow(initialSettings.theme)
     desktopData = new DesktopDataManager(dataRoot, safeStorage, app.getVersion(), () => settings.current().modelStoragePath || dataRoot)
-    flushDesktopData = async () => { await Promise.all([settings.flush(), credentials.flush(), glossary.flush(), wordRules.flush(), meetings.flush()]) }
+    flushDesktopData = async () => { await Promise.all([settings.flush(), credentials.flush(), glossary.flush(), wordRules.flush(), textProcessing.flush(), meetings.flush()]) }
     disposeDesktopDataIpc = registerDesktopDataIpc(desktopData, {
       getWindow: () => mainWindow,
       busy: () => quitting || activity.snapshot().owner !== null || !!gameTranslation?.busy || componentInstalling || readPendingDataMigration() !== null,
@@ -1637,19 +1695,27 @@ if (!hasSingleInstanceLock) {
         return Object.values(snapshot.availableModels ?? {}).flat().map(model => ({ model: model.binding, name: model.name, kind: model.kind }))
       },
       inferModel: async (request, signal, inspect) => {
+        const prepared = request.kind === 'mt' && !request.image && request.text && !inspect
+          ? await textProcessing.prepare('tool', { text: request.text, source: request.source, target: request.target }, signal)
+          : undefined
+        if (prepared?.skip) return { text: prepared.text }
+        if (prepared) request = { ...request, text: prepared.text, skipUnsupportedGlossary: true }
         if (request.kind === 'mt' && !request.image && request.glossary === undefined) {
-          const { terms } = resolveGlossaryTerms(await glossary.snapshot(), {
+          const library = await glossary.snapshot()
+          const { terms } = resolveGlossaryTerms(library, {
             text: request.text ?? '', targetLanguage: request.target ?? 'zh',
-            context: { scenario: 'tool' }, selection: { mode: 'auto' },
+            context: { scenario: 'tool' }, selection: { mode: prepared?.glossary === false ? 'off' : 'auto' },
           })
           request = { ...request, glossary: terms }
         }
-        if (request.kind === 'mt' && request.text && !inspect) {
+        if (request.kind === 'mt' && request.text && !inspect && prepared?.protect !== false) {
           const protectedText = protectTranslation(await wordRules.snapshot(), request.text, request.source ?? 'auto', { scenario: 'tool' })
           const result = await gateway!.infer({ ...request, text: protectedText.text }, signal, inspect)
-          return { ...result, text: protectedText.restore(result.text ?? '') }
+          const output = protectedText.restore(result.text ?? '')
+          return { ...result, text: prepared ? await prepared.finish(output) : output }
         }
-        return gateway!.infer(request, signal, inspect)
+        const result = await gateway!.infer(request, signal, inspect)
+        return prepared ? { ...result, text: await prepared.finish(result.text) } : result
       },
       acquireLanguageModel: binding => gateway!.acquireLanguageModel(binding),
       releaseDirectModel: async () => {},

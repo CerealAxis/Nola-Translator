@@ -29,7 +29,7 @@ const output = resolve('artifacts/layout')
 app.setPath('userData', resolve(output, `electron-cache-${process.pid}`))
 const delay = (ms) => new Promise((done) => setTimeout(done, ms))
 
-const SETTINGS_TABS = ['general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'preserve-words', 'subtitle-words', 'help']
+const SETTINGS_TABS = ['general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'text-processing', 'help']
 
 /** Each entry names the `data-page` its route root renders, which is what the run asserts; the settings tabs all collapse to `settings`. */
 const PAGES = [
@@ -845,6 +845,159 @@ async function main() {
     return
   }
 
+  if (process.argv.includes('--text-processing')) {
+    await window.webContents.insertCSS('.settings-page .switch::after { content: none !important; }')
+    const base = '#/settings/text-processing'
+    const rules = [
+      { id: 'first', pattern: '【系统】', replacement: '', regex: false, escape: false, caseSensitive: false, wholeWord: false },
+      { id: 'second', pattern: 'NPC', replacement: '角色', regex: false, escape: false, caseSensitive: false, wholeWord: true },
+    ]
+    const tables = [{ id: 'example', name: '游戏对白', rules }]
+    await window.webContents.executeJavaScript('localStorage.setItem("nola:text-processing-preview:tables:replace-before", ' +
+      JSON.stringify(JSON.stringify(tables)) + ')')
+    const cases = [
+      ['zh-CN', 'light', 1180, 1],
+      ['zh-CN', 'dark', 1180, 1],
+      ['zh-TW', 'light', 760, 1],
+      ['zh-HK', 'dark', 760, 1],
+      ['en', 'light', 1180, 2],
+      ['ja', 'dark', 1180, 2],
+      ['ko', 'light', 760, 1],
+    ]
+    const readPage = () => window.webContents.executeJavaScript(
+      '(() => { const panel = document.querySelector(".settings-panels"); return {' +
+        ' overflow: panel?.scrollWidth > panel?.clientWidth + 2,' +
+        ' headings: document.querySelectorAll("#settings-heading").length,' +
+        ' title: document.querySelector("#settings-heading")?.textContent,' +
+        ' switches: panel.querySelectorAll(".settings-row [role=switch]").length,' +
+        ' tables: panel.querySelectorAll("table").length,' +
+        ' rows: panel?.querySelectorAll("tbody tr").length,' +
+        ' tableOverflow: [...panel.querySelectorAll("[data-slot=table-container]")].some(el => el.scrollWidth > el.clientWidth + 2),' +
+        ' dialog: !!document.querySelector("[role=dialog]"), lang: document.documentElement.lang }; })()',
+    )
+    const assertPage = (context, state) => {
+      if (state.overflow || state.tableOverflow || state.headings !== 1 || state.dialog || state.title?.includes('suite.') || state.lang !== context.language) {
+        fail(context, 'Text processing page did not fit', { state })
+      }
+    }
+    for (const [language, theme, width, zoom] of cases) {
+      const context = { language, theme, width, zoom }
+      window.setContentSize(width, 780)
+      window.webContents.setZoomFactor(zoom)
+      await window.webContents.executeJavaScript(
+        'window.nolaTranslator.updateSettings(' + JSON.stringify({ uiLanguage: language, theme }) + ')',
+      )
+      await goto(window, base, 'settings')
+      const overview = await readPage()
+      assertPage(context, overview)
+      if (overview.switches !== 18 || overview.tables) fail(context, 'Preprocessing must use settings rows', overview)
+      if (language === 'zh-CN' && theme === 'light') {
+        await writeFile(resolve(output, 'text-processing-overview-light.png'), (await window.webContents.capturePage()).toPNG())
+      }
+
+      await window.webContents.executeJavaScript('document.querySelector(".text-processing-tabs [role=tab]:last-child").click()')
+      await settle(window)
+      const optimization = await readPage()
+      assertPage(context, optimization)
+      if (optimization.switches !== 8 || optimization.tables) fail(context, 'Optimization must use settings rows', optimization)
+      if (language === 'zh-CN' && theme === 'dark') {
+        await writeFile(resolve(output, 'text-processing-optimization-dark.png'), (await window.webContents.capturePage()).toPNG())
+      }
+      await window.webContents.executeJavaScript('document.querySelector(\'a[href$="/config/replace-before"]\').click()')
+      await settle(window)
+      const list = await readPage()
+      assertPage(context, list)
+      if (list.rows !== 1) fail(context, 'Rule table list did not open', list)
+      if (language === 'zh-CN' && theme === 'light') {
+        await writeFile(resolve(output, 'text-processing-table-list-light.png'), (await window.webContents.capturePage()).toPNG())
+      }
+      await window.webContents.executeJavaScript('document.querySelector(".processing-table-link").click()')
+      await settle(window)
+      const entries = await readPage()
+      assertPage(context, entries)
+      if (entries.rows !== 2 || entries.title !== tables[0].name) fail(context, 'Named rule table did not open', entries)
+      if (language === 'zh-CN' && theme === 'dark') {
+        await writeFile(resolve(output, 'text-processing-rules-dark.png'), (await window.webContents.capturePage()).toPNG())
+      }
+
+      await goto(window, base + '/glossary/' + suiteId, 'settings')
+      await settle(window)
+      const glossary = await readPage()
+      assertPage(context, glossary)
+      if (glossary.rows !== 1 || glossary.title !== '游戏专名') fail(context, 'Glossary table did not open', glossary)
+      if (language === 'zh-CN' && theme === 'light') {
+        await writeFile(resolve(output, 'text-processing-glossary-light.png'), (await window.webContents.capturePage()).toPNG())
+      }
+      for (const feature of ['python-pre', 'python-optimize']) {
+        await goto(window, base + '/config/' + feature, 'settings')
+        for (let attempt = 0; attempt < 100; attempt++) {
+          if (await window.webContents.executeJavaScript('!!document.querySelector(".processing-python-editor .cm-content")')) break
+          await delay(50)
+        }
+        const script = await readPage()
+        assertPage(context, script)
+        const form = await window.webContents.executeJavaScript(`(() => {
+          const panel = document.querySelector('.settings-panels');
+          const editor = panel.querySelector('[data-slot="code-block"]');
+          const field = editor?.querySelector('[data-slot="code-block-editor"]');
+          const stage = editor?.querySelector('.processing-python-stage');
+          return {
+            textareas: panel.querySelectorAll('textarea').length,
+            editable: field?.isContentEditable,
+            filename: editor?.querySelector('[data-slot="code-block-title"]')?.textContent,
+            actions: editor?.querySelectorAll('[data-slot="code-block-actions"] button').length,
+            code: field?.textContent,
+            numbered: editor?.querySelectorAll('.cm-lineNumbers .cm-gutterElement').length,
+            highlighted: !!field?.querySelector('.text-danger'),
+            width: editor?.clientWidth,
+            height: stage?.clientHeight,
+            scrollerHeight: field?.closest('.cm-scroller')?.clientHeight,
+            availableWidth: panel.clientWidth,
+          };
+        })()`)
+        if (script.tables || form.textareas || !form.editable || form.width < form.availableWidth - 2 ||
+          form.scrollerHeight < form.height - 2 || !form.filename?.endsWith('.py') || form.actions !== 3 ||
+          !form.highlighted || !(form.numbered > 1) || !form.code?.includes(feature === 'python-pre' ? 'POSTSOLVE' : 'process_after')) {
+          fail({ ...context, feature }, 'Python editor must use a full-width code block with a numbered, highlighted example', { script, form })
+        }
+        if (language === 'zh-CN' && ((theme === 'light' && feature === 'python-pre') || (theme === 'dark' && feature === 'python-optimize'))) {
+          await writeFile(resolve(output, 'text-processing-' + feature + '.png'), (await window.webContents.capturePage()).toPNG())
+        }
+        if (language === 'zh-CN' && theme === 'light') {
+          await window.webContents.executeJavaScript(`(() => {
+            const field = document.querySelector('[data-slot="code-block-editor"]');
+            field.focus();
+            getSelection().selectAllChildren(field);
+          })()`)
+          await window.webContents.insertText('pass')
+          await settle(window)
+          const typed = await window.webContents.executeJavaScript(`(() => {
+            const editor = document.querySelector('[data-slot="code-block"]');
+            const field = editor.querySelector('[data-slot="code-block-editor"]');
+            document.querySelector('.processing-script-form button[type="submit"]').click();
+            return { text: field.textContent };
+          })()`)
+          await settle(window)
+          const invalid = await window.webContents.executeJavaScript(`({
+            error: document.querySelector('.processing-script-form [role="alert"]')?.textContent,
+            stored: localStorage.getItem('nola:text-processing-preview:script:' + ${JSON.stringify(feature)}),
+          })`)
+          if (typed.text !== 'pass' || !invalid.error || invalid.stored !== null) {
+            fail({ ...context, feature }, 'Saving invalid Python must keep the form open and preserve storage', { typed, invalid })
+          }
+          if (feature === 'python-pre') {
+            await writeFile(resolve(output, 'text-processing-python-invalid.png'), (await window.webContents.capturePage()).toPNG())
+          }
+        }
+      }
+      scenarios++
+    }
+    console.log(JSON.stringify({ scenarios, failures }, null, 2))
+    window.destroy()
+    app.exit(failures.length ? 1 : 0)
+    return
+  }
+
   if (process.argv.includes('--settings-navigation')) {
     // Expanded hit targets do not represent visible overflow.
     await window.webContents.insertCSS('.settings-page .switch::after, .settings-page .slider__thumb::after { content: none !important; }')
@@ -878,7 +1031,7 @@ async function main() {
             icons: tabs.map(el => el.querySelector('svg')?.getAttribute('class')),
             crashed: !!document.querySelector('.nola-main pre'),
             sourceLanguageGroup: !!panel.querySelector('[data-onboarding="recognition-service"]'),
-            groups: panel.querySelectorAll('.settings-group, [data-slot="card"], [data-slot="empty"], .shortcuts-page__table, .browser-settings__list').length,
+            groups: panel.querySelectorAll('.settings-group, [data-slot="card"], [data-slot="empty"], .shortcuts-page__table, .browser-settings__list, .processing-table').length,
             overflow: [...document.querySelectorAll('.settings-page, .settings-panels, .settings-group, .settings-row__label, .settings-control-field, .settings-page button')].filter(el => el.clientWidth > 0 && !el.matches('input, [role="switch"]') && !el.classList.contains('sr-only') && getComputedStyle(el).overflowX !== 'auto' && el.scrollWidth > el.clientWidth + 2).map(el => ({ className: String(el.className), text: el.textContent.slice(0, 80) })),
             collapsed: panel.querySelectorAll('[data-slot="accordion-trigger"]').length,
             sections: [...panel.querySelectorAll('.settings-group')].map(el => {

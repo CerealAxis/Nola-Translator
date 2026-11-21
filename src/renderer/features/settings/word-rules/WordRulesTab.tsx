@@ -1,8 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Download, Pencil, Plus, Trash2, Upload } from 'lucide-react'
+import { Braces, Check, ChevronRight, Download, FlaskConical, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogCloseButton,
@@ -13,7 +25,7 @@ import {
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import {
   Select,
   SelectContent,
@@ -31,7 +43,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { notifyError } from '@/components/primitives/notify'
+import { ProcessingIconButton, ProcessingPageHeading, textProcessingPath, type BreadcrumbEntry } from '../text-processing/ProcessingPage'
 import { LANGUAGE_CODES, LANGUAGE_LABELS } from '../../../../shared/languages'
 import {
   exportWordRulesCsv,
@@ -51,31 +66,35 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
   const { t, language } = useI18n(),
     p = useWordRuleText(),
     { document, api, failed, refresh } = useWordRules()
-  const [activeId, setActiveId] = useState(libraryId)
   const [busy, setBusy] = useState(false)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<string[]>([])
   const [libraryDraft, setLibraryDraft] = useState<WordRuleLibrary>()
-  const [entryDraft, setEntryDraft] = useState<WordRuleEntry>()
+  const [addingEntry, setAddingEntry] = useState<WordRuleEntry>()
+  const [editingTexts, setEditingTexts] = useState<Record<string, string>>({})
   const [baseRevision, setBaseRevision] = useState(0)
   const [deleting, setDeleting] = useState<{ name: string; command: WordRuleCommand }>()
   const [csv, setCsv] = useState<ReturnType<typeof parseWordRulesCsv>>()
   const [csvOpen, setCsvOpen] = useState(false)
   const [policy, setPolicy] = useState<'skip' | 'replace'>('skip')
+  const [testing, setTesting] = useState(false)
   const [testText, setTestText] = useState('')
   const [testLanguage, setTestLanguage] = useState('*')
   const [matches, setMatches] = useState<WordRuleMatch>()
-  useEffect(() => {
-    setActiveId(libraryId)
-  }, [libraryId])
+
   useEffect(() => {
     setQuery('')
     setPage(0)
     setSelected([])
     setMatches(undefined)
-  }, [activeId])
-  const library = document.libraries.find((item) => item.id === activeId && item.kind === kind)
+    setAddingEntry(undefined)
+    setEditingTexts({})
+  }, [libraryId])
+
+  const library = document.libraries.find((item) => item.id === libraryId && item.kind === kind)
+  const base = textProcessingPath + (kind === 'preserve' ? '/preserve-words' : '/subtitle-words')
+  const overview = textProcessingPath + '/optimization'
   const libraries = document.libraries.filter((item) => item.kind === kind)
   const shownEntries = useMemo(
     () =>
@@ -152,13 +171,22 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
           },
     )
   }
-  const editEntry = (value?: WordRuleEntry) => {
+  const startNewEntry = () => {
     setBaseRevision(document.revision)
-    setEntryDraft(
-      value
-        ? { ...value }
-        : { id: crypto.randomUUID(), text: '', language: '*', caseSensitive: false, enabled: true },
-    )
+    setAddingEntry({ id: crypto.randomUUID(), text: '', language: '*', caseSensitive: false, enabled: true })
+  }
+  const commitExisting = (entry: WordRuleEntry) => {
+    const draftText = editingTexts[entry.id]
+    if (draftText === undefined || !library) return
+    setEditingTexts((prev) => {
+      const next = { ...prev }
+      delete next[entry.id]
+      return next
+    })
+    const updated = { ...entry, text: draftText }
+    if (draftText !== entry.text && wordRuleEntrySchema.safeParse(updated).success) {
+      void mutate({ action: 'saveTerm', libraryId: library.id, entry: updated })
+    }
   }
   const download = (format: 'csv' | 'json') => {
     if (!library) return
@@ -198,380 +226,429 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
       </Select>
     </Field>
   )
+  const scopeName = (item: WordRuleLibrary) => item.scope.mode === 'global'
+    ? scopeLabel('global') : item.scope.targets.map(target => scopeLabel(target.kind)).join(', ')
+  const failure = failed && <Alert variant="danger"><AlertDescription>{t('suite.actionFailed')}</AlertDescription></Alert>
+
+  const breadcrumbs: BreadcrumbEntry[] = [
+    { label: t('suite.textProcessing'), href: textProcessingPath },
+    { label: t('suite.textOptimize'), href: overview },
+    { label: p(kind), href: library ? base : undefined },
+    ...(library ? [{ label: library.name }] : []),
+  ]
+
+  const allSelected = visible.length > 0 && visible.every((entry) => selected.includes(entry.id))
+  const someSelected = visible.some((entry) => selected.includes(entry.id)) && !allSelected
+
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      {failed && <p role="alert">{t('suite.actionFailed')}</p>}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          {library && (
-            <Button
-              variant="outline"
-              size="icon-sm"
-              aria-label={t('suite.back')}
-              onClick={() => {
-                setActiveId(undefined)
-                setSelected([])
-                setQuery('')
-                setPage(0)
-              }}
-            >
-              <ArrowLeft />
-            </Button>
-          )}
-          <h2 className="type-body font-semibold">{library?.name ?? p(kind)}</h2>
-        </div>
-        {!library && (
-          <div className="flex items-center gap-3">
-            <Switch
-              aria-label={p('enabled')}
-              disabled={busy || !api}
-              checked={kind === 'preserve' ? document.preserveEnabled : document.maskEnabled}
-              onCheckedChange={(enabled) => void mutate({ action: 'setEnabled', kind, enabled })}
-            >
-              <SwitchThumb />
-            </Switch>
-            <Button disabled={busy || !api} onClick={() => editLibrary()}>
-              <Plus data-icon="inline-start" />
-              {p('newLibrary')}
-            </Button>
-          </div>
-        )}
-      </div>
-      {!library &&
-        libraries.map((item) => (
-          <Card size="sm" key={item.id}>
-            <CardHeader>
-              <CardTitle>{item.name}</CardTitle>
-              <CardAction className="flex items-center gap-2">
-                <Switch
-                  aria-label={`${t('suite.active')} ${item.name}`}
-                  disabled={busy}
-                  checked={item.enabled}
-                  onCheckedChange={(enabled) =>
-                    void mutate({ action: 'saveLibrary', library: { ...item, enabled } })
-                  }
-                >
-                  <SwitchThumb />
-                </Switch>
-                <Button variant="outline" size="sm" onClick={() => setActiveId(item.id)}>
-                  {t('suite.edit')}
-                </Button>
-              </CardAction>
-            </CardHeader>
-            <CardContent>{p('entries') + ' · ' + item.entries.length}</CardContent>
-          </Card>
-        ))}
-      {!library && !libraries.length && (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>{p('empty')}</EmptyTitle>
-          </EmptyHeader>
-        </Empty>
-      )}
-      {library && (
+    <div className="settings-panel">
+      {!library ? (
         <>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => editLibrary(library)}>
-              <Pencil data-icon="inline-start" />
-              {t('suite.edit')}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setDeleting({
-                  name: library.name,
-                  command: { action: 'deleteLibrary', libraryId: library.id },
-                })
-              }
-            >
-              <Trash2 data-icon="inline-start" />
-              {t('suite.delete')}
-            </Button>
-            <span className="self-center text-muted">
-              {library.scope.mode === 'global'
-                ? scopeLabel('global')
-                : library.scope.targets.map((target) => scopeLabel(target.kind)).join(', ')}
-            </span>
-          </div>
+          <ProcessingPageHeading
+            title={p(kind)}
+            back={overview}
+            breadcrumbs={breadcrumbs}
+            actions={
+              <Button size="sm" disabled={busy || !api} onClick={() => editLibrary()}>
+                <Plus data-icon="inline-start" />{p('newLibrary')}
+              </Button>
+            }
+          />
+          {failure}
           <Card>
-            <CardHeader>
-              <CardTitle className="type-body font-semibold">{p('entries') + ' · ' + library.entries.length}</CardTitle>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => download('csv')}>
-                  <Download data-icon="inline-start" />
-                  {t('suite.exportCsv')}
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => download('json')}>
-                  {t('suite.exportJson')}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCsvOpen(true)
-                    setCsv(undefined)
-                    setBaseRevision(document.revision)
-                  }}
-                >
-                  <Upload data-icon="inline-start" />
-                  {t('suite.importCsv')}
-                </Button>
-                <Button size="sm" onClick={() => editEntry()}>
-                  <Plus data-icon="inline-start" />
-                  {p('addTerm')}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="flex min-w-0 flex-col gap-3">
-              <Field>
-                <FieldLabel htmlFor="word-rule-query">{t('suite.search')}</FieldLabel>
-                <Input
-                  id="word-rule-query"
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value)
-                    setPage(0)
-                  }}
-                />
-              </Field>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setSelected(selected.length ? [] : visible.map((entry) => entry.id))
-                  }
-                >
-                  {p('selectAll')}
-                </Button>
-                {selected.length > 0 && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() =>
-                        void mutate({
-                          action: 'setTermsEnabled',
-                          libraryId: library.id,
-                          entryIds: selected,
-                          enabled: true,
-                        })
-                      }
-                    >
-                      {p('enable')}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() =>
-                        void mutate({
-                          action: 'setTermsEnabled',
-                          libraryId: library.id,
-                          entryIds: selected,
-                          enabled: false,
-                        })
-                      }
-                    >
-                      {p('disable')}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() =>
-                        setDeleting({
-                          name: `${selected.length}`,
-                          command: {
-                            action: 'deleteTerms',
-                            libraryId: library.id,
-                            entryIds: selected,
-                          },
-                        })
-                      }
-                    >
-                      {t('suite.delete')}
-                    </Button>
-                  </>
-                )}
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <span className="sr-only">{p('selectAll')}</span>
-                    </TableHead>
-                    <TableHead>{p('term')}</TableHead>
-                    <TableHead>{p('language')}</TableHead>
-                    <TableHead>{t('suite.active')}</TableHead>
-                    <TableHead>
-                      <span className="sr-only">{t('suite.edit')}</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visible.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>
-                        <Switch
-                          aria-label={`${p('selected')} ${entry.text}`}
-                          checked={selected.includes(entry.id)}
-                          onCheckedChange={(checked) =>
-                            setSelected(
-                              checked
-                                ? [...selected, entry.id]
-                                : selected.filter((id) => id !== entry.id),
-                            )
-                          }
-                        >
-                          <SwitchThumb />
-                        </Switch>
-                      </TableCell>
-                      <TableCell className="break-all">{entry.text}</TableCell>
-                      <TableCell>{languageLabel(entry.language)}</TableCell>
-                      <TableCell>
-                        <Switch
-                          aria-label={`${t('suite.active')} ${entry.text}`}
-                          disabled={busy}
-                          checked={entry.enabled}
-                          onCheckedChange={(enabled) =>
-                            void mutate({
-                              action: 'saveTerm',
-                              libraryId: library.id,
-                              entry: { ...entry, enabled },
-                            })
-                          }
-                        >
-                          <SwitchThumb />
-                        </Switch>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="icon-sm"
-                          aria-label={`${t('suite.edit')} ${entry.text}`}
-                          onClick={() => editEntry(entry)}
-                        >
-                          <Pencil />
-                        </Button>
-                      </TableCell>
+            <CardContent>
+              {libraries.length ? (
+                <Table aria-label={p(kind)}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead scope="col">{t('suite.title')}</TableHead>
+                      <TableHead scope="col">{t('suite.scope')}</TableHead>
+                      <TableHead scope="col" className="processing-fit">{p('entries')}</TableHead>
+                      <TableHead scope="col" className="processing-fit">{t('suite.active')}</TableHead>
+                      <TableHead scope="col" className="processing-fit text-right">{t('suite.textActions')}</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {!visible.length && <p>{t('suite.noMatches')}</p>}
+                  </TableHeader>
+                  <TableBody>
+                    {libraries.map(item => (
+                      <TableRow key={item.id}>
+                        <TableCell className="processing-text-cell">
+                          <a className="processing-table-link font-medium" href={base + '/' + encodeURIComponent(item.id)}>{item.name}</a>
+                        </TableCell>
+                        <TableCell className="processing-text-cell">
+                          <Badge variant="secondary">{scopeName(item)}</Badge>
+                        </TableCell>
+                        <TableCell>{item.entries.length}</TableCell>
+                        <TableCell>
+                          <Switch aria-label={t('suite.active') + ' ' + item.name} disabled={busy}
+                            checked={item.enabled} onCheckedChange={enabled => void mutate({ action: 'saveLibrary', library: { ...item, enabled } })}>
+                            <SwitchThumb />
+                          </Switch>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-processing-actions">
+                            <Tooltip>
+                              <TooltipTrigger render={
+                                <ProcessingIconButton label={t('suite.textOpenTable') + ' ' + item.name} nativeButton={false}
+                                  render={<a href={base + '/' + encodeURIComponent(item.id)} />}><ChevronRight /></ProcessingIconButton>
+                              } />
+                              <TooltipContent>{t('suite.textOpenTable')}</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyTitle>{p('empty')}</EmptyTitle>
+                  </EmptyHeader>
+                </Empty>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <>
+          <ProcessingPageHeading
+            title={library.name}
+            back={base}
+            breadcrumbs={breadcrumbs}
+            actions={
+              <>
+                <Badge variant="secondary">{scopeName(library)}</Badge>
+                <Tooltip>
+                  <TooltipTrigger render={
+                    <ProcessingIconButton label={t('suite.edit')} disabled={busy} onClick={() => editLibrary(library)}><Pencil /></ProcessingIconButton>
+                  } />
+                  <TooltipContent>{t('suite.edit')}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger render={
+                    <ProcessingIconButton label={t('suite.delete')} disabled={busy} onClick={() => setDeleting({
+                      name: library.name, command: { action: 'deleteLibrary', libraryId: library.id },
+                    })}><Trash2 /></ProcessingIconButton>
+                  } />
+                  <TooltipContent>{t('suite.delete')}</TooltipContent>
+                </Tooltip>
+              </>
+            }
+          />
+          {failure}
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <InputGroup className="w-full max-w-xs">
+              <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
+              <InputGroupInput
+                type="search"
+                aria-label={t('suite.search')}
+                placeholder={t('suite.search')}
+                value={query}
+                onChange={event => { setQuery(event.target.value); setPage(0); setSelected([]) }}
+              />
+            </InputGroup>
+            <div className="text-processing-actions">
+              <Tooltip>
+                <TooltipTrigger render={
+                  <ProcessingIconButton label={t('suite.matchTest')} onClick={() => setTesting(true)}><FlaskConical /></ProcessingIconButton>
+                } />
+                <TooltipContent>{t('suite.matchTest')}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger render={
+                  <ProcessingIconButton label={t('suite.exportCsv')} onClick={() => download('csv')}><Download /></ProcessingIconButton>
+                } />
+                <TooltipContent>{t('suite.exportCsv')}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger render={
+                  <ProcessingIconButton label={t('suite.exportJson')} onClick={() => download('json')}><Braces /></ProcessingIconButton>
+                } />
+                <TooltipContent>{t('suite.exportJson')}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger render={
+                  <ProcessingIconButton label={t('suite.importCsv')} onClick={() => {
+                    setCsvOpen(true); setCsv(undefined); setBaseRevision(document.revision)
+                  }}><Upload /></ProcessingIconButton>
+                } />
+                <TooltipContent>{t('suite.importCsv')}</TooltipContent>
+              </Tooltip>
+              <Button size="sm" disabled={busy || Boolean(addingEntry)} onClick={startNewEntry}>
+                <Plus data-icon="inline-start" />{p('addTerm')}
+              </Button>
+            </div>
+          </div>
+
+          {selected.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="type-small text-nola-ui-muted-foreground">{t('suite.textSelectedCount', { count: selected.length })}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  void mutate({
+                    action: 'setTermsEnabled',
+                    libraryId: library.id,
+                    entryIds: selected,
+                    enabled: true,
+                  })
+                }
+              >
+                {p('enable')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  void mutate({
+                    action: 'setTermsEnabled',
+                    libraryId: library.id,
+                    entryIds: selected,
+                    enabled: false,
+                  })
+                }
+              >
+                {p('disable')}
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() =>
+                  setDeleting({
+                    name: `${selected.length}`,
+                    command: {
+                      action: 'deleteTerms',
+                      libraryId: library.id,
+                      entryIds: selected,
+                    },
+                  })
+                }
+              >
+                {t('suite.delete')}
+              </Button>
+            </div>
+          )}
+
+          <Card>
+            <CardContent className="flex flex-col gap-3">
+              {(visible.length > 0 || addingEntry) ? (
+                <Table aria-label={library.name}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="processing-fit">
+                        <Checkbox
+                          aria-label={p('selectAll')}
+                          disabled={!visible.length || busy}
+                          checked={allSelected}
+                          indeterminate={someSelected}
+                          onCheckedChange={checked => setSelected(checked ? visible.map(entry => entry.id) : [])}
+                        />
+                      </TableHead>
+                      <TableHead>{p('term')}</TableHead>
+                      <TableHead className="processing-fit">{p('language')}</TableHead>
+                      <TableHead className="processing-fit text-center">{t('suite.caseSensitive')}</TableHead>
+                      <TableHead className="processing-fit">{t('suite.active')}</TableHead>
+                      <TableHead className="processing-fit text-right">{t('suite.textActions')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {addingEntry && (
+                      <TableRow>
+                        <TableCell />
+                        <TableCell className="min-w-40">
+                          <Input
+                            aria-label={p('term')}
+                            placeholder={p('term')}
+                            autoFocus
+                            maxLength={200}
+                            disabled={busy}
+                            value={addingEntry.text}
+                            onChange={(event) => setAddingEntry({ ...addingEntry, text: event.target.value })}
+                          />
+                        </TableCell>
+                        <TableCell className="processing-fit">
+                          <Select value={addingEntry.language} disabled={busy}
+                            onValueChange={(value) => { if (value) setAddingEntry({ ...addingEntry, language: value }) }}>
+                            <SelectTrigger size="sm" aria-label={p('language')}>
+                              <SelectValue>{languageLabel(addingEntry.language)}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>{['*', ...LANGUAGE_CODES].map((code) => <SelectItem key={code} value={code}>{languageLabel(code)}</SelectItem>)}</SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="processing-fit">
+                          <div className="flex justify-center">
+                            <Checkbox
+                              aria-label={t('suite.caseSensitive')}
+                              checked={addingEntry.caseSensitive}
+                              disabled={busy}
+                              onCheckedChange={(checked) => setAddingEntry({ ...addingEntry, caseSensitive: Boolean(checked) })}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="processing-fit">
+                          <Switch checked={addingEntry.enabled} disabled={busy} aria-label={t('suite.active')}
+                            onCheckedChange={(enabled) => setAddingEntry({ ...addingEntry, enabled })}><SwitchThumb /></Switch>
+                        </TableCell>
+                        <TableCell className="processing-fit">
+                          <div className="text-processing-actions">
+                            <ProcessingIconButton label={t('suite.save')} disabled={busy || !wordRuleEntrySchema.safeParse(addingEntry).success}
+                              onClick={() => {
+                                if (wordRuleEntrySchema.safeParse(addingEntry).success) {
+                                  void mutate({ action: 'saveTerm', libraryId: library.id, entry: addingEntry }, baseRevision).then((ok) => {
+                                    if (ok) setAddingEntry(undefined)
+                                  })
+                                }
+                              }}><Check /></ProcessingIconButton>
+                            <ProcessingIconButton label={t('common.cancel')} disabled={busy} onClick={() => setAddingEntry(undefined)}>
+                              <X />
+                            </ProcessingIconButton>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {visible.map((entry) => {
+                      const textVal = editingTexts[entry.id] ?? entry.text
+                      return (
+                        <TableRow key={entry.id} data-state={selected.includes(entry.id) ? 'selected' : undefined}>
+                          <TableCell>
+                            <Checkbox
+                              aria-label={`${p('selected')} ${entry.text}`}
+                              checked={selected.includes(entry.id)}
+                              onCheckedChange={(checked) =>
+                                setSelected(
+                                  checked
+                                    ? [...selected, entry.id]
+                                    : selected.filter((id) => id !== entry.id),
+                                )
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="min-w-40">
+                            <Input
+                              aria-label={`${p('term')} ${entry.text}`}
+                              maxLength={200}
+                              disabled={busy}
+                              value={textVal}
+                              onChange={(event) => setEditingTexts((prev) => ({ ...prev, [entry.id]: event.target.value }))}
+                              onBlur={() => commitExisting(entry)}
+                            />
+                          </TableCell>
+                          <TableCell className="processing-fit">
+                            <Select value={entry.language} disabled={busy}
+                              onValueChange={(value) => {
+                                if (value) void mutate({ action: 'saveTerm', libraryId: library.id, entry: { ...entry, language: value } })
+                              }}>
+                              <SelectTrigger size="sm" aria-label={`${p('language')} ${entry.text}`}>
+                                <SelectValue>{languageLabel(entry.language)}</SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>{['*', ...LANGUAGE_CODES].map((code) => <SelectItem key={code} value={code}>{languageLabel(code)}</SelectItem>)}</SelectGroup>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="processing-fit">
+                            <div className="flex justify-center">
+                              <Checkbox
+                                aria-label={`${t('suite.caseSensitive')} ${entry.text}`}
+                                checked={entry.caseSensitive}
+                                disabled={busy}
+                                onCheckedChange={(checked) => void mutate({
+                                  action: 'saveTerm', libraryId: library.id, entry: { ...entry, caseSensitive: Boolean(checked) },
+                                })}
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Switch
+                              aria-label={`${t('suite.active')} ${entry.text}`}
+                              disabled={busy}
+                              checked={entry.enabled}
+                              onCheckedChange={(enabled) =>
+                                void mutate({
+                                  action: 'saveTerm',
+                                  libraryId: library.id,
+                                  entry: { ...entry, enabled },
+                                })
+                              }
+                            >
+                              <SwitchThumb />
+                            </Switch>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-processing-actions">
+                              <Tooltip>
+                                <TooltipTrigger render={
+                                  <ProcessingIconButton
+                                    label={`${t('suite.delete')} ${entry.text}`}
+                                    disabled={busy}
+                                    onClick={() => setDeleting({
+                                      name: entry.text,
+                                      command: { action: 'deleteTerms', libraryId: library.id, entryIds: [entry.id] },
+                                    })}
+                                  >
+                                    <Trash2 />
+                                  </ProcessingIconButton>
+                                } />
+                                <TooltipContent>{t('suite.delete')}</TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyTitle>{t('suite.noMatches')}</EmptyTitle>
+                  </EmptyHeader>
+                  {query && (
+                    <Button size="sm" variant="outline" onClick={() => setQuery('')}>{t('suite.textClearSearch')}</Button>
+                  )}
+                </Empty>
+              )}
               {shownEntries.length > 50 && (
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!page}
-                    onClick={() => setPage(page - 1)}
-                  >
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="outline" size="sm" disabled={!page} onClick={() => { setPage(page - 1); setSelected([]) }}>
                     {t('suite.previous')}
                   </Button>
-                  <span>
+                  <span className="type-muted tabular-nums">
                     {page + 1} / {Math.ceil(shownEntries.length / 50)}
                   </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={(page + 1) * 50 >= shownEntries.length}
-                    onClick={() => setPage(page + 1)}
-                  >
+                  <Button variant="outline" size="sm" disabled={(page + 1) * 50 >= shownEntries.length} onClick={() => { setPage(page + 1); setSelected([]) }}>
                     {t('suite.next')}
                   </Button>
                 </div>
               )}
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="type-body font-semibold">{t('suite.matchTest')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup>
-                {languageChoice('word-test-language', testLanguage, setTestLanguage)}
-                <Field>
-                  <FieldLabel htmlFor="word-test-text">{p('term')}</FieldLabel>
-                  <Textarea
-                    id="word-test-text"
-                    maxLength={64000}
-                    value={testText}
-                    onChange={(event) => {
-                      setTestText(event.target.value)
-                      setMatches(undefined)
-                    }}
-                  />
-                </Field>
-                <Button
-                  variant="outline"
-                  disabled={!testText || busy || !api}
-                  onClick={() => {
-                    const target =
-                      library.scope.mode === 'selected' ? library.scope.targets[0] : undefined
-                    const scenario = target?.kind ?? (kind === 'mask' ? 'realtime' : 'tool')
-                    if (api && scenario !== 'website')
-                      void api
-                        .testMatch({
-                          kind,
-                          text: testText,
-                          language: testLanguage,
-                          context: {
-                            scenario,
-                            ...(target && 'ids' in target && target.ids !== '*'
-                              ? { projectId: target.ids[0] }
-                              : {}),
-                          },
-                          selection: { mode: 'selected', libraryIds: [library.id] },
-                        })
-                        .then(setMatches)
-                        .catch((error) => notifyError(t('suite.actionFailed'), { cause: error }))
-                  }}
-                >
-                  {t('suite.matchTest')}
-                </Button>
-                {matches && (
-                  <div role="status">
-                    {matches.hits.length
-                      ? matches.hits.map((hit) => (
-                          <p key={`${hit.entryId}:${hit.start}`}>
-                            {hit.actual} → {kind === 'mask' ? '**' : t('suite.keep')}
-                          </p>
-                        ))
-                      : t('suite.noMatches')}
-                  </div>
-                )}
-              </FieldGroup>
-            </CardContent>
-          </Card>
         </>
       )}
-      <Dialog
-        open={!!libraryDraft}
-        onOpenChange={(open) => {
-          if (!open && !busy) setLibraryDraft(undefined)
-        }}
-      >
+
+      <Dialog open={Boolean(libraryDraft)} onOpenChange={open => { if (!open && !busy) setLibraryDraft(undefined) }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{p('newLibrary')}</DialogTitle>
+            <DialogTitle>{libraryDraft?.id === library?.id ? t('suite.edit') + ' ' + library?.name : p('newLibrary')}</DialogTitle>
             <DialogCloseButton disabled={busy} />
           </DialogHeader>
-          <CardContent>
-            {libraryDraft && (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  void mutate({ action: 'saveLibrary', library: libraryDraft }, baseRevision).then(
-                    (ok) => {
-                      if (ok) setLibraryDraft(undefined)
-                    },
-                  )
-                }}
-                className="flex flex-col gap-4"
-              >
+          {libraryDraft && (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault()
+                void mutate({ action: 'saveLibrary', library: libraryDraft }, baseRevision).then(
+                  (ok) => {
+                    if (ok) setLibraryDraft(undefined)
+                  },
+                )
+              }}
+            >
+              <CardContent className="px-0 pb-4">
                 <FieldGroup>
                   <Field>
                     <FieldLabel htmlFor="word-library-name">{t('suite.title')}</FieldLabel>
@@ -632,102 +709,33 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
                     </Select>
                   </Field>
                 </FieldGroup>
-                <Button
-                  disabled={busy || !wordRuleLibrarySchema.safeParse(libraryDraft).success}
-                  type="submit"
-                >
+              </CardContent>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" disabled={busy} onClick={() => setLibraryDraft(undefined)}>{t('common.cancel')}</Button>
+                <Button disabled={busy || !wordRuleLibrarySchema.safeParse(libraryDraft).success} type="submit">
                   {t('suite.save')}
                 </Button>
-              </form>
-            )}
-          </CardContent>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
-      <Dialog
-        open={!!entryDraft}
-        onOpenChange={(open) => {
-          if (!open && !busy) setEntryDraft(undefined)
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{p('addTerm')}</DialogTitle>
-            <DialogCloseButton disabled={busy} />
-          </DialogHeader>
-          <CardContent>
-            {entryDraft && library && (
-              <form
-                className="flex flex-col gap-4"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  void mutate(
-                    { action: 'saveTerm', libraryId: library.id, entry: entryDraft },
-                    baseRevision,
-                  ).then((ok) => {
-                    if (ok) setEntryDraft(undefined)
-                  })
-                }}
-              >
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="word-entry-text">{p('term')}</FieldLabel>
-                    <Input
-                      required
-                      id="word-entry-text"
-                      maxLength={200}
-                      value={entryDraft.text}
-                      onChange={(event) =>
-                        setEntryDraft({ ...entryDraft, text: event.target.value })
-                      }
-                    />
-                  </Field>
-                  {languageChoice('word-entry-language', entryDraft.language, (value) =>
-                    setEntryDraft({ ...entryDraft, language: value }),
-                  )}
-                  <Field>
-                    <FieldLabel htmlFor="word-entry-case">{t('suite.caseSensitive')}</FieldLabel>
-                    <Switch
-                      id="word-entry-case"
-                      checked={entryDraft.caseSensitive}
-                      onCheckedChange={(caseSensitive) =>
-                        setEntryDraft({ ...entryDraft, caseSensitive })
-                      }
-                    >
-                      <SwitchThumb />
-                    </Switch>
-                  </Field>
-                </FieldGroup>
-                <Button
-                  type="submit"
-                  disabled={busy || !wordRuleEntrySchema.safeParse(entryDraft).success}
-                >
-                  {t('suite.save')}
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={!!deleting}
-        onOpenChange={(open) => {
-          if (!open && !busy) setDeleting(undefined)
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('suite.deleteConfirm', { name: deleting?.name ?? '' })}</DialogTitle>
-            <DialogCloseButton disabled={busy} />
-          </DialogHeader>
-          <CardContent>
-            <Button
+
+      <AlertDialog open={Boolean(deleting)} onOpenChange={open => { if (!open && !busy) setDeleting(undefined) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{deleting ? t('suite.deleteConfirm', { name: deleting.name }) : ''}</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
               variant="destructive"
               disabled={busy}
               onClick={() => {
                 if (deleting)
                   void mutate(deleting.command).then((ok) => {
                     if (ok) {
-                      if (deleting.command.action === 'deleteLibrary') setActiveId(undefined)
+                      if (deleting.command.action === 'deleteLibrary') location.hash = base
                       setDeleting(undefined)
                       setSelected([])
                     }
@@ -735,22 +743,18 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
               }}
             >
               {t('suite.delete')}
-            </Button>
-          </CardContent>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={csvOpen}
-        onOpenChange={(open) => {
-          if (!busy) setCsvOpen(open)
-        }}
-      >
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={csvOpen} onOpenChange={open => { if (!open && !busy) setCsvOpen(false) }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('suite.preview')}</DialogTitle>
+            <DialogTitle>{t('suite.importCsv')}</DialogTitle>
             <DialogCloseButton disabled={busy} />
           </DialogHeader>
-          <CardContent>
+          <CardContent className="px-0 pb-4">
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="word-rule-file">{t('suite.importCsv')}</FieldLabel>
@@ -797,36 +801,111 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
                 <>
                   <p>{p('entries') + ' · ' + csv.entries.length}</p>
                   {csv.errors.length > 0 && (
-                    <p role="alert">{t('suite.csvErrors', { count: csv.errors.length })}</p>
+                    <Alert variant="danger"><AlertDescription>{t('suite.csvErrors', { count: csv.errors.length })}</AlertDescription></Alert>
                   )}
-                  <ul>
+                  <ul className="list-disc ps-5 type-body">
                     {csv.entries.slice(0, 5).map((entry) => (
                       <li key={entry.id}>{entry.text}</li>
                     ))}
                   </ul>
                 </>
               )}
-              <Button
-                disabled={busy || !library || !csv?.entries.length || !!csv?.errors.length}
-                onClick={() => {
-                  if (library && csv)
-                    void mutate(
-                      {
-                        action: 'importTerms',
-                        libraryId: library.id,
-                        entries: csv.entries,
-                        policy,
-                      },
-                      baseRevision,
-                    ).then((ok) => {
-                      if (ok) setCsvOpen(false)
-                    })
-                }}
-              >
-                {t('suite.importCsv')}
-              </Button>
             </FieldGroup>
           </CardContent>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" disabled={busy} onClick={() => setCsvOpen(false)}>{t('common.cancel')}</Button>
+            <Button
+              disabled={busy || !library || !csv?.entries.length || !!csv?.errors.length}
+              onClick={() => {
+                if (library && csv)
+                  void mutate(
+                    {
+                      action: 'importTerms',
+                      libraryId: library.id,
+                      entries: csv.entries,
+                      policy,
+                    },
+                    baseRevision,
+                  ).then((ok) => {
+                    if (ok) setCsvOpen(false)
+                  })
+              }}
+            >
+              {t('suite.importCsv')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(testing && library)} onOpenChange={open => { if (!open) setTesting(false) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('suite.matchTest')}</DialogTitle>
+            <DialogCloseButton />
+          </DialogHeader>
+          {library && (
+            <>
+              <CardContent className="px-0 pb-4">
+                <FieldGroup>
+                  {languageChoice('word-test-language', testLanguage, setTestLanguage)}
+                  <Field>
+                    <FieldLabel htmlFor="word-test-text">{p('term')}</FieldLabel>
+                    <Textarea
+                      id="word-test-text"
+                      maxLength={64000}
+                      value={testText}
+                      onChange={(event) => {
+                        setTestText(event.target.value)
+                        setMatches(undefined)
+                      }}
+                    />
+                  </Field>
+                  {matches && (
+                    <Alert>
+                      <AlertDescription role="status">
+                        {matches.hits.length
+                          ? matches.hits.map((hit) => (
+                              <p key={`${hit.entryId}:${hit.start}`}>
+                                {hit.actual} → {kind === 'mask' ? '**' : t('suite.keep')}
+                              </p>
+                            ))
+                          : t('suite.noMatches')}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </FieldGroup>
+              </CardContent>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setTesting(false)}>{t('common.close')}</Button>
+                <Button
+                  disabled={!testText || busy || !api}
+                  onClick={() => {
+                    const target =
+                      library.scope.mode === 'selected' ? library.scope.targets[0] : undefined
+                    const scenario = target?.kind ?? (kind === 'mask' ? 'realtime' : 'tool')
+                    if (api && scenario !== 'website')
+                      void api
+                        .testMatch({
+                          kind,
+                          text: testText,
+                          language: testLanguage,
+                          context: {
+                            scenario,
+                            ...(target && 'ids' in target && target.ids !== '*'
+                              ? { projectId: target.ids[0] }
+                              : {}),
+                          },
+                          selection: { mode: 'selected', libraryIds: [library.id] },
+                        })
+                        .then(setMatches)
+                        .catch((error) => notifyError(t('suite.actionFailed'), { cause: error }))
+                  }}
+                >
+                  {t('suite.matchTest')}
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

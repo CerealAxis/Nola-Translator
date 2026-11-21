@@ -49,6 +49,7 @@ class DirectMtRequest(_DirectRequest):
     source: Language = "auto"
     target: Language
     glossary: list[GlossaryTerm] = Field(default_factory=list, max_length=256)
+    skip_unsupported_glossary: bool = False
 
     @model_validator(mode="after")
     def require_input(self):
@@ -165,6 +166,7 @@ async def run_direct_inference(
         if request.glossary:
             glossary_prompt(request.glossary)
             ctx.translation_context["glossary"] = request.glossary
+            ctx.translation_context["skip_unsupported_glossary"] = request.skip_unsupported_glossary
         if translation_history:
             ctx.translation_context["history"] = translation_history
     match = MatchRequest(operation=operation, model_id=request.model)

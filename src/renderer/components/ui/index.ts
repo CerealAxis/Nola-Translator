@@ -1,9 +1,24 @@
+export {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
+  AlertDialogPortal,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from './alert-dialog'
 export { Button } from './button'
 export type { ButtonProps, ButtonSize, ButtonVariant } from './button'
 export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './card'
 export type { CardProps } from './card'
-export { AlertDialogContent, Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPortal, DialogTitle, DialogTrigger } from './dialog'
-export type { AlertDialogContentProps, DialogContentProps, DialogFooterProps, DialogHeaderProps } from './dialog'
+export { Checkbox } from './checkbox'
+export { Collapsible, CollapsibleContent, CollapsibleTrigger } from './collapsible'
+export { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPortal, DialogTitle, DialogTrigger } from './dialog'
+export type { DialogContentProps, DialogFooterProps, DialogHeaderProps } from './dialog'
 export { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from './field'
 export type { FieldDescriptionProps, FieldGroupProps, FieldLabelProps, FieldProps } from './field'
 export { Input } from './input'

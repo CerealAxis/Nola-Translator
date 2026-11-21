@@ -255,6 +255,7 @@ class ComicService:
         regionIds=region_ids, status='queued', progress=0, createdAt=now(), changes=[],
         failedPageIds=[], done=[], config=Config.model_validate(book['config']).model_dump(mode='json'), active=None,
         glossaryDocument=request.glossaryDocument, wordRulesDocument=request.wordRulesDocument,
+        textProcessingDocument=request.textProcessingDocument,
         modelConfigSignature=request.modelConfigSignature)
       self.repository.write_job(db, job)
       return job
@@ -416,6 +417,7 @@ class ComicService:
         config=config, page=page, regionIds=job.get('regionIds'), sourceImage=base64.b64encode(await asyncio.to_thread(png_bytes, visual)).decode(),
         regionImages=region_images,
         glossaryDocument=job.get('glossaryDocument'), wordRulesDocument=job.get('wordRulesDocument'), bookId=job['bookId'],
+        textProcessingDocument=job.get('textProcessingDocument'),
         modelConfigSignature=job.get('modelConfigSignature', ''))
 
   async def complete(self, job_id, request):

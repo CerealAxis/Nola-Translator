@@ -119,6 +119,18 @@ def auth() -> dict[str, str]:
     return {"Authorization": f"Bearer {TOKEN}"}
 
 
+def test_text_processing_preview_uses_the_authenticated_engine_route():
+    with make_client() as client:
+        url = "/api/v2/text-processing/apply"
+        body = {"phase": "preview", "text": "Ａ😀", "document": {"values": {
+            "enabled": {"normalize": True, "shift-jis": True},
+        }}}
+        assert client.post(url, json=body).status_code == 401
+        assert client.post(url, json=body, headers=auth()).json() == {
+            "text": "A", "skip": False, "context": None, "issues": [],
+        }
+
+
 def test_realtime_glossary_is_authenticated_and_cannot_restore_an_older_revision():
     from unittest.mock import AsyncMock
 

@@ -176,9 +176,9 @@ it('confirms copying diagnostics only after the store action succeeds', async ()
 })
 
 
-it('lists user settings including glossary and removes retired routes', () => {
+it('lists text processing as one settings category and removes retired routes', () => {
   expect(SETTINGS_TABS.filter(tab => tab !== 'developer')).toEqual([
-    'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'glossary', 'preserve-words', 'subtitle-words', 'help',
+    'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'text-processing', 'help',
   ])
   for (const tab of ['translation', 'compute', 'performance', 'advanced', 'more']) {
     expect(parseRoute(`#/settings/${tab}`).tab).toBe('general')

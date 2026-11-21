@@ -54,7 +54,7 @@ it('replaces the sidebar in settings and returns to the originating subpage afte
   rerender()
   expect(result.current.map(item => item.id)).toEqual([
     'settings-back', 'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine',
-    'storage', 'glossary', 'preserve-words', 'subtitle-words', 'help', 'developer',
+    'storage', 'text-processing', 'help', 'developer',
   ])
 
   Object.assign(route, { path: '#/settings/browser', tab: 'browser' })
@@ -77,9 +77,9 @@ vi.mock('./features/overlay/OverlayPage', () => ({ OverlayPage: () => null }))
 vi.mock('./features/meeting/MeetingModePage', () => ({ MeetingModePage: () => null }))
 vi.mock('./features/screen/ScreenTranslationPage', () => ({ ScreenTranslationPage: () => null }))
 vi.mock('./features/game/GameTranslationPage', () => ({ GameTranslationPage: () => null }))
-vi.mock('./features/comic/ComicTranslationPage', () => {
+vi.mock('./features/comic/ComicFrontendPage', () => {
   deferred.comicImports++
-  return { ComicTranslationPage: ({ projectId, pageId, reader }: { projectId?: string; pageId?: string; reader?: boolean }) => <div>{projectId}/{pageId}/{reader ? 'reader' : 'editor'}</div> }
+  return { ComicFrontendPage: ({ projectId, pageId, reader }: { projectId?: string; pageId?: string; reader?: boolean }) => <div>{projectId}/{pageId}/{reader ? 'reader' : 'editor'}</div> }
 })
 vi.mock('./features/records', () => ({ RecordsPage: () => null, RecordDetailPage: () => null }))
 vi.mock('./features/models', () => ({ ModelsPage: () => null }))
@@ -90,7 +90,9 @@ it('keeps screen, game and comic as independent entries and preserves editor dee
   expect(result.current.filter(item => ['screen-translation', 'game-translation', 'comic-translation'].includes(item.id)).map(item => item.path))
     .toEqual(['#/screen-translation', '#/game-translation', '#/comic-translation'])
   expect(result.current.some(item => item.id === 'glossary')).toBe(false)
-  expect(parseRoute('#/settings/glossary/library-1')).toMatchObject({ tab: 'glossary', glossaryLibraryId: 'library-1' })
+  expect(parseRoute('#/settings/glossary/library-1')).toMatchObject({
+    tab: 'text-processing', textProcessingLibrary: 'glossary', glossaryLibraryId: 'library-1',
+  })
   expect(parseRoute('#/comic-translation/book-1/reader')).toMatchObject({ projectId: 'book-1', reader: true })
   expect(parseRoute('#/comic-translation/book-1/reader/page-2')).toMatchObject({
     projectId: 'book-1', reader: true, pageId: 'page-2', path: '#/comic-translation/book-1/reader/page-2',

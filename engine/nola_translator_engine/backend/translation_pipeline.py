@@ -17,6 +17,7 @@ from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, O
 from .gateway.gateway import MatchRequest, ModelGateway
 from .latency import unix_ms
 from .glossary import GlossaryTerm, RealtimeGlossary
+from . import text_processing
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,7 @@ class _Task:
     task_class: str
     glossary: list[GlossaryTerm]
     glossary_generation: int
+    text_processing_document: dict = field(default_factory=dict)
     task_id: str = field(default_factory=lambda: str(uuid4()))
 
 
@@ -82,6 +84,7 @@ class TranslationScheduler:
         final_deadline_s: float = 10.0,
         latency_detection: bool = False,
         glossary: RealtimeGlossary | None = None,
+        text_processing_scene: str | None = None,
     ) -> None:
         self.gateway = gateway
         self.session_id = session_id
@@ -99,6 +102,7 @@ class TranslationScheduler:
         self.final_deadline_s = final_deadline_s
         self.latency_detection = latency_detection
         self.glossary = glossary
+        self.text_processing_scene = text_processing_scene
         self._segments: dict[tuple[str, int, str], _Segment] = {}
         self._finals: deque[_Task] = deque()
         self._wake = asyncio.Event()
@@ -325,16 +329,37 @@ class TranslationScheduler:
         try:
             request = self._request(task.source, task.key[3], accept_preview=True)
             final = task.task_class == "final"
+            document = task.text_processing_document
+            processing_active = text_processing.scene_enabled(document, self.text_processing_scene)
+            source = str(task.source.get("language") or "auto")
+            text = task.source["text"]
+            glossary = task.glossary
+            optimization_context = None
+            if document:
+                if processing_active:
+                    prepared = await text_processing.apply(document, "input", text, source, task.key[3])
+                    text_processing.report_realtime(document, prepared["issues"])
+                    if not self._current(task, state):
+                        return
+                    if prepared["skip"]:
+                        if final:
+                            await self._commit(task, prepared["text"], synthesize=False)
+                        return
+                    text, optimization_context = prepared["text"], prepared["context"]
+                glossary = self.glossary.match(text, task.key[3], source) if processing_active and self.glossary else []
             deadline = time.monotonic() + (self.final_deadline_s if final else self.preview_deadline_s)
             ctx = CallContext(
                 operation=Operation.TRANSLATE, task_id=task.task_id,
                 session_id=self._uuid_or_none(self.session_id), pipeline_id=self.pipeline_id,
                 epoch=self.epoch, deadline=deadline, config_revision=task.config_revision,
                 provider_options=self.provider_options,
-                translation_context={**task.context, "glossary": task.glossary} if task.glossary else task.context,
+                translation_context={
+                    **task.context, "glossary": glossary,
+                    **({"skip_unsupported_glossary": True} if self.text_processing_scene else {}),
+                } if glossary else task.context,
             )
             arguments = {
-                "text": task.source["text"], "source": str(task.source.get("language") or "auto"),
+                "text": text, "source": source,
                 "target": task.key[3], "request": request,
             }
             try:
@@ -372,19 +397,26 @@ class TranslationScheduler:
             return
         if not self._current(task, state):
             return
+        output = result.text.strip()
+        if document and processing_active:
+            processed = await text_processing.apply(document, "output", output, source, task.key[3], context=optimization_context)
+            text_processing.report_realtime(document, processed["issues"])
+            if not self._current(task, state):
+                return
+            output = processed["text"]
         if task.task_class == "final":
             if started is not None:
                 ready = unix_ms()
                 fields = {"segment_id": task.key[2], "provider": arguments["request"].model_id}
                 await self._emit("latency_observation", {**fields, "kind": "translation_started", "at_ms": started})
                 await self._emit("latency_observation", {**fields, "kind": "translation_ready", "at_ms": ready})
-            await self._commit(task, result.text.strip())
+            await self._commit(task, output)
         else:
             assert state is not None
             state.target_revisions[task.key[3]] = state.target_revisions.get(task.key[3], 0) + 1
             translation_id = state.translation_ids.setdefault(task.key[3], str(uuid4()))
             target_revision = state.target_revisions[task.key[3]]
-            state.provisional[task.key[3]] = (result.text.strip(), task.fingerprint, task.source.get("source_revision", 0))
+            state.provisional[task.key[3]] = (output, task.fingerprint, task.source.get("source_revision", 0))
             state.last_preview_text = task.source["text"]
             await self._emit(
                 "translated_text",
@@ -394,7 +426,7 @@ class TranslationScheduler:
                     "source_revision": int(task.source.get("source_revision", 1)),
                     "target_language": task.key[3],
                     "target_revision": target_revision,
-                    "text": result.text.strip(),
+                    "text": output,
                     "state": "provisional",
                     "based_on_source_revision": int(task.source.get("source_revision", 0)),
                     "based_on_context_revision": int(task.context.get("context_revision", 0)),
@@ -402,7 +434,7 @@ class TranslationScheduler:
                 },
             )
 
-    async def _commit(self, task: _Task, text: str) -> None:
+    async def _commit(self, task: _Task, text: str, *, synthesize: bool = True) -> None:
         state = self._segments.get(task.key[:3])
         if not self._current(task, state):
             return
@@ -427,6 +459,9 @@ class TranslationScheduler:
                 "quality_flags": (),
             },
         )
+        if not synthesize:
+            state.committed.add(language)
+            return
         await self._emit(
             "translation_committed",
             {
@@ -444,7 +479,8 @@ class TranslationScheduler:
         state.committed.add(language)
 
     def _make_task(self, base_key: tuple[str, int, str], state: _Segment, language: str, task_class: str, matched: Any) -> _Task:
-        terms, term_key = self._glossary_terms(state.source["text"], language, state.source.get("language", "auto"))
+        document = text_processing.current_document() if self.text_processing_scene else {}
+        terms, term_key = self._glossary_terms(state.source["text"], language, state.source.get("language", "auto"), document)
         state.glossary_keys[language] = term_key
         if terms is None:
             raise ValueError(term_key)
@@ -464,7 +500,8 @@ class TranslationScheduler:
             "model": model_fingerprint,
             "source_language": state.source.get("language", "auto"),
             "target_language": language,
-            **({"glossary": term_key} if terms else {}),
+            **({"glossary": term_key} if term_key else {}),
+            **({"text_processing": document["revision"]} if "revision" in document else {}),
         })
         return _Task(
             key=(*base_key, language), generation=state.generation,
@@ -473,19 +510,25 @@ class TranslationScheduler:
             fingerprint=fingerprint, model_fingerprint=model_fingerprint,
             config_revision=config_revision, task_class=task_class, glossary=terms,
             glossary_generation=state.glossary_generations.get(language, 0),
+            text_processing_document=document,
         )
 
-    def _glossary_terms(self, text: str, language: str, source_language: str = "auto") -> tuple[list[GlossaryTerm] | None, str]:
+    def _glossary_terms(self, text: str, language: str, source_language: str = "auto", document=None) -> tuple[list[GlossaryTerm] | None, str]:
         try:
-            terms = self.glossary.match(text, language, source_language) if self.glossary else []
+            if not self.glossary or document and not text_processing.scene_enabled(document, self.text_processing_scene):
+                return [], ""
+            if document and text_processing.has_input_filters(document, source_language, language):
+                return [], str(self.glossary.revision)
+            terms = self.glossary.match(text, language, source_language)
             return terms, _hash([term.model_dump() for term in terms]) if terms else ""
         except ValueError as error:
             return None, str(error)
 
     async def refresh_glossary(self):
+        document = text_processing.current_document() if self.text_processing_scene else {}
         for key, state in tuple(self._segments.items()):
             for lang in state.glossary_keys.keys() - state.committed:
-                _, signature = self._glossary_terms(state.source["text"], lang, state.source.get("language", "auto"))
+                _, signature = self._glossary_terms(state.source["text"], lang, state.source.get("language", "auto"), document)
                 if signature == state.glossary_keys[lang]:
                     continue
                 state.glossary_keys[lang] = signature

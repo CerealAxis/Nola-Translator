@@ -28,7 +28,7 @@ export function loggedHandle(channel: string, listener: Parameters<typeof ipcMai
   ipcMain.handle(channel, async (event, ...args: unknown[]) => {
     const operationId = randomUUID()
     const started = performance.now()
-    const privatePayload = /^(glossary|word-rules|comic|game|meeting|desktop-data|screen):/.test(channel)
+    const privatePayload = /^(glossary|word-rules|text-processing|comic|game|meeting|desktop-data|screen):/.test(channel)
     const privateArguments = privatePayload || /credential|hub:(search|model-card)|app:(agent-workspace|update-settings)|offline:select-model/.test(channel)
     logDiagnostic('ipc.request', { operationId, channel, windowId: event.sender?.id,
       arguments: privateArguments ? { count: args.length, contents: '[omitted]' } : args })

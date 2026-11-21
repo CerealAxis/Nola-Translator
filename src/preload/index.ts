@@ -214,6 +214,22 @@ const api: NolaTranslatorApi = {
     testMatch: request => invoke('word-rules:test', request),
     onChanged: callback => { const listener = (_: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value); ipcRenderer.on('word-rules:changed', listener); return () => ipcRenderer.off('word-rules:changed', listener) },
   },
+  textProcessing: {
+    load: legacy => invoke('text-processing:load', legacy),
+    snapshot: () => invoke('text-processing:snapshot'),
+    save: (key, value) => invoke('text-processing:save', { key, value }),
+    preview: (text, overrides) => invoke('text-processing:preview', { text, overrides }),
+    onChanged: callback => {
+      const listener = (_: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value)
+      ipcRenderer.on('text-processing:changed', listener)
+      return () => ipcRenderer.off('text-processing:changed', listener)
+    },
+    onError: callback => {
+      const listener = (_: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value)
+      ipcRenderer.on('text-processing:error', listener)
+      return () => ipcRenderer.off('text-processing:error', listener)
+    },
+  },
   glossary: {
     snapshot: () => invoke('glossary:snapshot'),
     command: request => invoke('glossary:command', request),

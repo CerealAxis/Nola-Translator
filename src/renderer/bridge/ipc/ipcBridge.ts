@@ -116,6 +116,7 @@ export function createIpcBridge(): NolaBridge {
     glossary: adaptFeature(injectedApi()?.glossary),
     comic: adaptFeature(injectedApi()?.comic),
     wordRules: adaptFeature(injectedApi()?.wordRules),
+    textProcessing: adaptFeature(injectedApi()?.textProcessing),
     gameTranslation: adaptFeature(injectedApi()?.gameTranslation),
     workspaceView: adaptFeature(injectedApi()?.workspaceView),
     requestQuit: () => call('requestQuit', api => api.requestQuit?.() ?? Promise.reject(new MissingIpcApiError('requestQuit'))),

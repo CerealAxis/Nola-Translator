@@ -1,4 +1,4 @@
-import { WordRuleSelectionField } from '../settings/word-rules/WordRuleSelectionField'
+import { TextProcessingSceneField } from '../settings/text-processing/TextProcessingSceneField'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Menu } from '@base-ui/react/menu'
 import { Crop, Gamepad2, Play, Save, Square, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
@@ -20,7 +20,6 @@ import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } 
 import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Spinner } from '@/components/ui/spinner'
-import { GlossarySelectionField } from '../settings/glossary/GlossarySelectionField'
 import { ModelAvailabilityLabel } from '../workspace/ModelAvailabilityLabel'
 import { normalizeLanguage } from '../../../shared/languages'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
@@ -245,8 +244,7 @@ export function ScreenTranslationPage() {
               onSwap={canSwap ? () => saveChanges({ sourceLanguage: config.targetLanguage, targetLanguage: config.sourceLanguage }) : undefined} />
           </Field>
           {processingMode === 'cascade' && select('screen-model', t('screen.model'), config.model || models[0]?.binding || '', models.map(model => ({ value: model.binding, label: model.name })), value => patch('model', value))}
-          <GlossarySelectionField className="nola-settings-field" compact showSettings value={config.glossarySelection} disabled={settingsDisabled} onChange={value => patch('glossarySelection', value)} />
-          <WordRuleSelectionField className="nola-settings-field" compact value={config.excludedSelection ?? { mode: 'auto' }} disabled={settingsDisabled} onChange={value => patch('excludedSelection', value)} />
+          <TextProcessingSceneField scene="screen" disabled={settingsDisabled} />
         </FieldGroup>
         <FieldGroup className="nola-settings-fields" role="region" aria-labelledby="screen-ocr-heading">
           <h2 id="screen-ocr-heading" className="nola-settings-heading">{t('screen.ocrSettings')}</h2>

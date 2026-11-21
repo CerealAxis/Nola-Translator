@@ -2,7 +2,7 @@
 
 import type { SessionState } from '@/store'
 import type { TranslationKey } from '@/i18n'
-import type { SettingsTab } from '@/routes'
+import type { SettingsTab, TextProcessingLibrary } from '@/routes'
 import { SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
 import type { SupportErrorCode } from '../../../shared/error-catalog'
 
@@ -13,7 +13,7 @@ export type ErrorActionTarget =
   | { kind: 'reset' } // start the session again
   | { kind: 'stop' } // end the session
   | { kind: 'record' } // open this session's record
-  | { kind: 'settings'; tab: SettingsTab } // jump to one tab of the settings page
+  | { kind: 'settings'; tab: SettingsTab | TextProcessingLibrary } // jump to one tab of the settings page
   | { kind: 'models' } // jump to model management
   | { kind: 'gateway' }
   | { kind: 'runtime'; component: 'engine' | 'llama' | 'crisp' } // open the runtime component settings

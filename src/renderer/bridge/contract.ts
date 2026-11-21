@@ -52,6 +52,7 @@ export type RouteId = 'workbench' | 'home' | 'workspace' | 'overlay' | 'meeting'
 export interface NolaBridge {
   desktopData?: import('../../shared/desktop-data').DesktopDataApi
   wordRules?: import('../../shared/word-rules').WordRulesBridge
+  textProcessing?: import('../../shared/text-processing').TextProcessingBridge
   glossary?: import('../../shared/glossary').GlossaryBridge
   comic?: import('../../shared/comic').ComicBridge
   gameTranslation?: import('../../shared/game-translation').GameTranslationBridge

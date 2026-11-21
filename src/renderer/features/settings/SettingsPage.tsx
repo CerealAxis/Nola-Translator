@@ -23,26 +23,34 @@ import { PerformanceTab } from './tabs/PerformanceTab'
 import { BrowserTab } from './tabs/BrowserTab'
 import { DeveloperTab } from './tabs/DeveloperTab'
 import { ShortcutsTab } from './tabs/ShortcutsTab'
-import { WordRulesTab } from './word-rules/WordRulesTab'
-import { GlossaryTab } from './glossary/GlossaryTab'
+import { TextProcessingTab } from './text-processing/TextProcessingTab'
 import { SETTINGS_NAVIGATION } from './settingsNavigation'
 
 export interface SettingsPanelProps { settings: AppSettings }
 
+const textProcessingScroll = new Map<string, number>()
+
 export function SettingsPage() {
   const { t } = useI18n()
-  const { tab, path, glossaryLibraryId } = useRoute()
+  const route = useRoute()
+  const { tab, path } = route
   const settings = useStore(stores.settings, (state) => state.settings)
   const loadError = useStore(stores.settings, (state) => state.loadError)
   const error = useStore(stores.settings, (state) => state.error)
   const active = tab ?? DEFAULT_SETTINGS_TAB
+  const processingSubpage = settings && (route.textProcessingFeature || route.textProcessingLibrary)
   const page = useRef<HTMLElement>(null)
   const [shortcutHeadingAction, setShortcutHeadingAction] = useState<HTMLDivElement | null>(null)
 
   useLayoutEffect(() => {
     const scroller = page.current?.closest('.nola-main')
-    if (scroller) scroller.scrollTop = 0
-  }, [path])
+    if (!scroller) return
+    scroller.scrollTop = active === 'text-processing' ? textProcessingScroll.get(path) ?? 0 : 0
+    if (active !== 'text-processing' || processingSubpage) return
+    const remember = () => textProcessingScroll.set(path, scroller.scrollTop)
+    scroller.addEventListener('scroll', remember, { passive: true })
+    return () => scroller.removeEventListener('scroll', remember)
+  }, [path, active, processingSubpage])
 
   useEffect(() => { if (loadError) console.error('[settings.load]', loadError) }, [loadError])
   useEffect(() => { if (error) console.error('[settings]', error) }, [error])
@@ -58,9 +66,7 @@ export function SettingsPage() {
     </div>,
     appearance: <AppearanceTab settings={settings} />,
     storage: <StorageTab settings={settings} />,
-    glossary: <GlossaryTab libraryId={glossaryLibraryId} />,
-    'preserve-words': <WordRulesTab key="preserve" kind="preserve" libraryId={glossaryLibraryId} />,
-    'subtitle-words': <WordRulesTab key="mask" kind="mask" libraryId={glossaryLibraryId} />,
+    'text-processing': <TextProcessingTab route={route} />,
     help: <MoreTab />,
     browser: <BrowserTab />,
     developer: import.meta.env.DEV ? <DeveloperTab /> : null,
@@ -68,11 +74,11 @@ export function SettingsPage() {
 
   return (
     <section className="settings-page" ref={page} aria-labelledby="settings-heading">
-      <header className="flex min-h-8 flex-wrap items-center justify-between gap-x-[var(--space-2)] gap-y-[var(--space-1)]">
+      {!processingSubpage && <header className="flex min-h-8 flex-wrap items-center justify-between gap-x-[var(--space-2)] gap-y-[var(--space-1)]">
         <h1 id="settings-heading" className="settings-page__heading">{t(SETTINGS_NAVIGATION[active].label)}</h1>
         {active === 'appearance' && settings ? <ResetCaptionAppearanceButton /> : null}
         {active === 'shortcuts' && settings ? <div className="ms-auto" ref={setShortcutHeadingAction} /> : null}
-      </header>
+      </header>}
       <div className="settings-panels">
         {panels ? panels[active] : loadError ? (
           <Card size="sm">

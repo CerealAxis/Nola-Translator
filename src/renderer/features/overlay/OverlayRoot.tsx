@@ -1,4 +1,5 @@
 import { useWordRules } from '../settings/word-rules/useWordRules'
+import { useTextProcessingEnabled } from '../settings/text-processing/text-processing-preview'
 import { maskSubtitleTracks } from '../../../shared/subtitle-word-rules'
 /**
  * Root of the caption window. `main.tsx` renders it for `?overlay=1`, outside
@@ -55,7 +56,7 @@ export const CAPTION_SCHEMES = {
 export type CaptionScheme = keyof typeof CAPTION_SCHEMES
 
 export function OverlayRoot() {
-  const { document: wordRules } = useWordRules()
+  const { document: words } = useWordRules()
   const menuOpen = useStore(stores.settings, state => state.overlayMenuOpen)
   const { t } = useI18n()
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
@@ -66,6 +67,8 @@ export function OverlayRoot() {
   const meetingSettings = useStore(stores.settings, state => state.settings?.meetingMode) ?? DEFAULT_MEETING_MODE
   const meeting = quick.meeting
   const meetingActive = !!meeting && ['running', 'starting', 'stopping', 'unknown'].includes(meeting.state)
+  const processingActive = useTextProcessingEnabled(meetingActive ? 'meeting' : 'quick-interpret')
+  const wordRules = processingActive ? words : { ...words, maskEnabled: false }
   const meetingRows = meeting?.segments?.filter(segment => meetingSettings.captionScope === 'both' || segment.direction === meetingSettings.captionScope) ?? []
   const session = meetingActive ? { ...quick, status: 'running' as const, sessionId: meeting.meetingId ?? null, segments: meetingRows, interim: null } : quick
   const labelOf = (segment: typeof meetingRows[number]) => {

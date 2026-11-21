@@ -25,6 +25,7 @@ import { useI18n, type TranslationKey } from '@/i18n'
 import { meetingZh } from '@/i18n/meeting-ui'
 import { actions, getBridge, stores, useStore } from '@/store'
 import { SettingSelect, type PickerOption } from '../settings/SettingsPage'
+import { TextProcessingSceneField } from '../settings/text-processing/TextProcessingSceneField'
 import { MeetingStage } from './MeetingStage'
 import { ModelAvailabilityLabel } from '../workspace/ModelAvailabilityLabel'
 
@@ -213,6 +214,7 @@ export function MeetingModePage() {
             </div>
           </div>
           <RealtimeProcessingField id="meeting-pipeline" className="nola-settings-field" disabled={locked} value={mode.pipeline === 'auto' ? 'default' : mode.pipeline} onChange={value => change('pipeline', value === 'default' ? 'auto' : value)} />
+          <TextProcessingSceneField scene="meeting" disabled={locked} />
           <Field className="nola-settings-field nola-language-pair-field">
             <ModelAvailabilityLabel label={t('shellUi.languageDirection')} hint={t('meeting.languageDirectionHint')} />
             <LanguageDirectionSelect source={mode.localLanguage} target={mode.remoteLanguage} sourceCodes={localCodes} targetCodes={remoteCodes}
