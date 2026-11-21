@@ -3,7 +3,7 @@ import { captureDiagnostics, recordDiagnostic, setupDiagnosticsRuntime } from '.
 
 afterEach(() => vi.unstubAllGlobals())
 
-it('records recognized compatibility and provider errors without document text or credentials', async () => {
+it('records original compatibility and provider errors while redacting credentials', async () => {
   const sendMessage = vi.fn().mockResolvedValue(undefined)
   vi.stubGlobal('chrome', { runtime: { sendMessage } })
   recordDiagnostic('document', new TypeError('Math.sumPrecise is not a function'))
@@ -11,7 +11,9 @@ it('records recognized compatibility and provider errors without document text o
   recordDiagnostic('document', new Error('providerNetwork'))
   await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(3))
   expect(sendMessage.mock.calls.map(([entry]) => entry.code)).toEqual(['Math.sumPrecise unavailable', 'Error', 'providerNetwork'])
-  expect(JSON.stringify(sendMessage.mock.calls)).not.toMatch(/secret|example\.com|Document text/)
+  expect(sendMessage.mock.calls[1][0].error.message).toContain('Document text')
+  expect(sendMessage.mock.calls[1][0].error.stack).toContain('diagnostics.test.ts')
+  expect(JSON.stringify(sendMessage.mock.calls)).not.toContain('api_key=secret')
 })
 
 it('does not disrupt the caller if runtime messaging throws or rejects', async () => {
@@ -20,6 +22,16 @@ it('does not disrupt the caller if runtime messaging throws or rejects', async (
   expect(() => recordDiagnostic('document', new Error('providerNetwork'))).not.toThrow()
   expect(() => recordDiagnostic('document', new Error('providerNetwork'))).not.toThrow()
   await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(2))
+})
+
+it('keeps original nested and aggregate errors in extension diagnostics', async () => {
+  const sendMessage = vi.fn().mockResolvedValue(undefined)
+  vi.stubGlobal('chrome', { runtime: { sendMessage } })
+  const cause = new Error('original provider failure api_key=private-value')
+  recordDiagnostic('background', new AggregateError([cause], 'batch failed', { cause }))
+  await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledOnce())
+  expect(sendMessage.mock.calls[0][0].error.cause.message).toBe('original provider failure api_key=[redacted]')
+  expect(JSON.stringify(sendMessage.mock.calls)).not.toContain('private-value')
 })
 
 it('captures uncaught errors and unhandled rejections using bounded safe codes', async () => {

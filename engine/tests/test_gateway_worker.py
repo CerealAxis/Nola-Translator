@@ -73,6 +73,8 @@ def test_errors_do_not_expose_native_diagnostics():
     assert error_code(RuntimeError('CUDA out of memory: private model path')) == ('out_of_memory', True)
     assert error_code(ValueError('private request text')) == ('invalid_request', False)
     assert error_code(RuntimeError('private native diagnostics')) == ('inference_failed', True)
+    assert error_code(RuntimeError('CUDA error: invalid device function')) == ('inference_failed', True)
+    assert error_code(RuntimeError('device lost')) == ('inference_failed', True)
 
 
 def test_cloud_request_failure_does_not_kill_other_sessions():

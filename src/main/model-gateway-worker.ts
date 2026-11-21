@@ -2,6 +2,7 @@ import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { EngineLaunchSpec } from './engine-process'
+import { logDiagnostic, logPythonStderr } from './session-log'
 
 export type GatewayWorkerResult = Record<string, unknown>
 const responseSchema = z.object({
@@ -37,13 +38,15 @@ class PythonGatewayWorker implements GatewayWorker {
     const args = launch.args.map(arg => arg.replaceAll('nola_translator_engine.local_call', 'nola_translator_engine.gateway_worker'))
     if (!args.some(arg => arg.includes('nola_translator_engine.gateway_worker'))) throw new Error('Gateway worker launch module is unavailable')
     this.child = spawn(launch.command, args, { cwd: launch.cwd, env: { ...process.env, ...launch.env,
-      HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true, stdio: 'pipe' })
+      HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', PYTHONIOENCODING: 'utf-8', NOLA_TRANSLATOR_RUN_LOG_STDERR: '1' }, windowsHide: true, stdio: 'pipe' })
     this.child.stdout.setEncoding('utf8').on('data', (chunk: string) => this.receive(chunk))
-    // Native libraries can print paths, prompts and credentials; diagnostics never cross this boundary.
-    this.child.stderr.on('data', () => undefined)
-    this.child.stdin.on('error', () => this.fail('Inference worker communication failed'))
-    this.child.once('error', () => { this.fail('Inference worker could not start'); this.resolveClosed() })
-    this.child.once('close', () => { this.fail('Inference worker exited'); this.resolveClosed() })
+    logPythonStderr(this.child.stderr, 'gateway', undefined, { pid: this.child.pid })
+    this.child.stdin.on('error', error => this.fail('Inference worker communication failed', new Error('Inference worker communication failed', { cause: error })))
+    this.child.once('error', error => { this.fail('Inference worker could not start', error); this.resolveClosed() })
+    this.child.once('close', (code, signal) => {
+      if (!this.stopped) logDiagnostic('gateway.worker.exited', { pid: this.child.pid, code, signal, requestIds: [...this.pending.keys()] })
+      this.fail('Inference worker exited'); this.resolveClosed()
+    })
     this.ready = this.request({ op: 'init', ...init }).catch(error => { this.fail(error.message); throw error })
   }
 
@@ -87,16 +90,19 @@ class PythonGatewayWorker implements GatewayWorker {
         } else if (request) {
           this.pending.delete(String(message.id)); request.cleanup()
           if (message.error) {
+            logDiagnostic('gateway.worker.request.failed', { pid: this.child.pid, requestId: message.id, code: message.error, fatal: message.fatal })
             const messages = { out_of_memory: 'Model ran out of memory', invalid_request: 'Invalid inference request',
               authentication_failed: 'Cloud authentication failed', rate_limited: 'Cloud rate limit or quota exceeded',
               network_unavailable: 'Cloud connection unavailable', request_timeout: 'Cloud request timed out', inference_failed: 'Inference worker failed' } as const
             const reason = String(message.error) as keyof typeof messages
             const code = Object.hasOwn(messages, reason) ? reason : 'inference_failed'
-            request.reject(new GatewayWorkerError(code, messages[code]))
+            request.reject(Object.assign(new GatewayWorkerError(code, messages[code]), {
+              requestId: message.id, correlationId: message.id,
+            }))
             if (message.fatal) this.fail(messages[code])
           } else request.resolve((message.result ?? {}) as GatewayWorkerResult)
         }
-      } catch { this.fail('Inference worker returned an invalid response') }
+      } catch (error) { this.fail('Inference worker returned an invalid response', new Error('Inference worker returned an invalid response', { cause: error })) }
     }
   }
 
@@ -105,6 +111,7 @@ class PythonGatewayWorker implements GatewayWorker {
 
   private fail(message: string, error = new Error(message)): void {
     if (this.stopped) return
+    logDiagnostic('gateway.worker.failed', { pid: this.child.pid, requestIds: [...this.pending.keys()], message, error })
     this.stopped = true
     for (const request of this.pending.values()) { request.cleanup(); request.reject(error) }
     this.pending.clear()

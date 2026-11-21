@@ -12,6 +12,7 @@ export interface DiagnosticEntry {
   requestId?: string
   version: string
   browser: string
+  error?: { name: string; message: string; stack?: string; cause?: DiagnosticEntry['error']; errors?: DiagnosticEntry['error'][] }
 }
 const errorCodes = new Set([
   'providerAddress', 'providerAuthentication', 'providerCapability', 'providerDisabled',
@@ -39,6 +40,23 @@ function safeCode(error: unknown): string {
   if (errorCodes.has(text) || (/^[a-z][a-z0-9_]{0,79}$/i.test(text) && browserSupportCode(text))) return text
   if (/^(?:TypeError|RangeError|SyntaxError|Error|AbortError)$/.test(text)) return text
   return error instanceof Error && /^(?:TypeError|RangeError|SyntaxError|Error)$/.test(error.name) ? error.name : 'unknownError'
+}
+
+function originalError(error: unknown, seen = new Set<unknown>()): DiagnosticEntry['error'] {
+  if (seen.has(error)) return { name: 'Error', message: '[circular]' }
+  seen = new Set(seen).add(error)
+  const source = error && typeof error === 'object' ? error as Record<string, unknown> : {}
+  const redact = (value: string) => value.replace(/\b(?:sk|pk|rk)-[a-zA-Z0-9._-]{6,}/g, '[redacted]')
+    .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|token|secret)["'\s]*[:=]["'\s]*)[^\s,"'}&#]+/gi, '$1[redacted]')
+    .replace(/(authorization["'\s]*[:=]["'\s]*(?:bearer\s+|basic\s+)?)[^\s,"'}]+/gi, '$1[redacted]')
+    .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi, '$1[redacted]@')
+  return {
+    name: typeof source.name === 'string' ? redact(source.name) : 'Error',
+    message: redact(typeof source.message === 'string' ? source.message : String(error)),
+    ...(typeof source.stack === 'string' ? { stack: redact(source.stack) } : {}),
+    ...(source.cause === undefined ? {} : { cause: originalError(source.cause, seen) }),
+    ...(Array.isArray(source.errors) ? { errors: source.errors.map(item => originalError(item, seen)) } : {}),
+  }
 }
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -102,7 +120,7 @@ export async function clearDiagnostics(): Promise<void> {
 export function recordDiagnostic(context: DiagnosticContext, error: unknown, event: DiagnosticEntry['event'] = 'operation', requestId?: string): void {
   const code = safeCode(error)
   if (code === 'AbortError') return
-  void Promise.resolve().then(() => chrome.runtime.sendMessage({ type: 'nolaDiagnostic', context, event, code, requestId })).catch(() => {})
+  void Promise.resolve().then(() => chrome.runtime.sendMessage({ type: 'nolaDiagnostic', context, event, code, requestId, error: originalError(error) })).catch(() => {})
 }
 
 export function captureDiagnostics(context: DiagnosticContext): void {
@@ -119,7 +137,7 @@ export function setupDiagnosticsRuntime(): void {
   captureDiagnostics('background')
   chrome.runtime.onMessage.addListener((message, sender, reply) => {
     if (!message || typeof message !== 'object' || (message as { type?: unknown }).type !== 'nolaDiagnostic') return
-    const item = message as { context?: unknown; event?: unknown; code?: unknown; requestId?: unknown }
+    const item = message as { context?: unknown; event?: unknown; code?: unknown; requestId?: unknown; error?: unknown }
     if (sender.id !== chrome.runtime.id || !['background', 'document', 'settings', 'popup', 'content'].includes(String(item.context)) ||
       !['error', 'unhandled-rejection', 'operation'].includes(String(item.event)) || typeof item.code !== 'string') return
     const agent = navigator.userAgent
@@ -134,6 +152,7 @@ export function setupDiagnosticsRuntime(): void {
       event: item.event as DiagnosticEntry['event'], code, ...(supportCode ? { supportCode } : {}),
       ...(requestId ? { requestId } : {}),
       version: chrome.runtime.getManifest().version, browser,
+      ...(item.error === undefined ? {} : { error: originalError(item.error) }),
     }
     void save(entry).then(() => reply({ ok: true }), () => reply({ ok: false }))
     return true

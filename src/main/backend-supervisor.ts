@@ -93,6 +93,7 @@ export class BackendSupervisor extends EventEmitter {
         NOLA_BACKEND_INSTANCE_ID: instanceId,
         ...(this.options.journalDir ? { NOLA_BACKEND_JOURNAL_DIR: this.options.journalDir } : {}),
         PYTHONUNBUFFERED: '1',
+        NOLA_TRANSLATOR_RUN_LOG_STDERR: '1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,

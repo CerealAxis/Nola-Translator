@@ -290,6 +290,25 @@ def _shutdown(servers: list) -> None:
         server.server_close()
 
 
+def test_loopback_health_and_chat_bypass_system_proxy(monkeypatch) -> None:
+    import urllib.request
+    from nola_translator_engine.translation.llama_server import _default_health_get, _post_chat
+
+    captured, servers = {}, []
+    _server_factory(captured, [False], servers)(["--port", "0"])
+    monkeypatch.setattr(urllib.request, "getproxies", lambda: {"http": "http://127.0.0.1:1"})
+    monkeypatch.setattr(urllib.request, "proxy_bypass", lambda _host: False)
+    monkeypatch.setattr(urllib.request, "_opener", None)
+    url = f"http://127.0.0.1:{servers[0].server_port}"
+    try:
+        assert _default_health_get(url + "/health", 1) == 200
+        result = _post_chat(url + "/v1/chat/completions", {"messages": []}, 1)
+        assert result["choices"][0]["message"]["content"].strip() == "你好，世界。"
+        assert captured["payload"] == {"messages": []}
+    finally:
+        _shutdown(servers)
+
+
 async def test_chat_sync_parses_content_from_real_server(tmp_path) -> None:
     captured: dict = {}
     servers: list = []

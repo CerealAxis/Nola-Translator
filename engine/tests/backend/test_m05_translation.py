@@ -99,9 +99,25 @@ def test_translation_failure_preserves_public_provider_code_and_exception_type()
     )
     payload = scheduler._error_event_payload("segment-1", error, "translation-1")["error"]
     assert payload["provider_code"] == "rate_limited"
-    assert payload["correlation_id"] == "translation-1"
+    assert payload["correlation_id"] == error.correlation_id
     assert payload["safe_details"] == {"exception": "GatewayError"}
     assert "private provider response" not in str(payload)
+
+
+@pytest.mark.parametrize("gateway_code, wire_code", [
+    (GatewayErrorCode.WORKER_OOM, "RESOURCE_EXHAUSTED"),
+    (GatewayErrorCode.LOAD_FAILED, "MODEL_NOT_READY"),
+    (GatewayErrorCode.LEASE_CONFLICT, "RESOURCE_BUSY"),
+    (GatewayErrorCode.NOT_SUPPORTED, "CAPABILITY_MISMATCH"),
+    (GatewayErrorCode.TIMEOUT, "TRANSLATION_TIMEOUT"),
+])
+def test_translation_errors_preserve_specific_gateway_category(gateway_code, wire_code):
+    scheduler = make_scheduler(FakeGateway(), [])
+    error = GatewayError(gateway_code, stage="mt", message="native failure")
+    payload = scheduler._error_event_payload("segment-1", error, "task-1")["error"]
+    assert payload["code"] == wire_code
+    assert payload["message_key"] == f"gateway.{gateway_code.value}"
+    assert payload["correlation_id"] == error.correlation_id
 
 
 async def test_configured_preview_interval_delays_queued_snapshot(monkeypatch):

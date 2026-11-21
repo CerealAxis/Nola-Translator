@@ -5,6 +5,7 @@ from collections import deque
 import re
 import threading
 from ..compute import ComputeDevice, ComputeOptions, cpu_threads
+from ..debug_log import log_exception, write as write_debug
 
 import asyncio
 import json
@@ -16,7 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 LLAMA_DIR_ENV = "NOLA_TRANSLATOR_LLAMA_DIR"
 DEFAULT_GGUF_RELATIVE = Path("hy-mt2-1.8b-q4-k-m") / "Hy-MT2-1.8B-Q4_K_M.gguf"
@@ -54,11 +55,12 @@ def default_gguf_path() -> Path:
 def _default_health_get(url: str, timeout: float) -> int:
     """GET /health; a failed connection returns 0 (not ready yet), an HTTP error returns its status code."""
     try:
-        with urlopen(url, timeout=timeout) as response:  # noqa: S310 - loopback only
+        with build_opener(ProxyHandler({})).open(url, timeout=timeout) as response:  # noqa: S310 - loopback only
             return int(response.status)
     except HTTPError as error:
         return int(error.code)
-    except (URLError, OSError):
+    except (URLError, OSError) as error:
+        log_exception("engine", "llama.health.pending", error, url=url)
         return 0
 
 
@@ -72,7 +74,7 @@ def _post_chat(url: str, payload: object, timeout: float) -> Any:
         headers={"Content-Type": "application/json; charset=UTF-8"},
     )
     try:
-        with urlopen(request, timeout=timeout) as response:  # noqa: S310 - loopback only
+        with build_opener(ProxyHandler({})).open(request, timeout=timeout) as response:  # noqa: S310 - loopback only
             raw = response.read()
     except HTTPError as error:
         raise LlamaServerError(f"llama-server 返回 HTTP {error.code}") from error
@@ -155,14 +157,16 @@ class LlamaServerManager:
                 if self._process is not process:
                     return
                 line = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+                level = "error" if any(word in line.lower() for word in ("error", "failed", "exception", "fatal")) else "info"
+                write_debug("engine", f"llama.stderr.{level}", {"pid": getattr(process, "pid", None), "message": line})
                 self._logs.append(line[:1024])
                 match = re.search(r"offloaded\s+(\d+)(?:/\d+)?\s+layers", line)
                 if match:
                     self._offloaded_layers = int(match.group(1))
                     if self._ready:
                         self._device = self._decide_device("auto", None)
-        except (OSError, ValueError):
-            pass
+        except (OSError, ValueError) as error:
+            log_exception("engine", "llama.stderr.failed", error)
 
     @property
     def ready(self) -> bool:
@@ -296,6 +300,10 @@ class LlamaServerManager:
             self._terminate(process)
             self._log_thread.join(timeout=1)
             diagnostic = " ".join(list(self._logs)[-8:])[-1024:].strip()
+            write_debug("engine", "llama.start.failed", {
+                "pid": getattr(process, "pid", None), "exitCode": process.poll(), "reason": reason,
+                "gpuLayers": ngl, "timeoutSeconds": attempt_timeout, "logs": list(self._logs),
+            })
             failures.append(f"ngl={ngl}: {reason}" + (f"；{diagnostic}" if diagnostic else ""))
             log_detail = "".join(self._logs).lower()
             if self._process is process:
@@ -384,7 +392,8 @@ class LlamaServerManager:
                 return False
             try:
                 status = int(self._health_get(url, timeout=1.0))
-            except Exception:
+            except Exception as error:
+                log_exception("engine", "llama.health.failed", error, url=url)
                 status = 0
             if status == 200:
                 return True

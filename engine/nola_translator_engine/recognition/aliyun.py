@@ -201,6 +201,8 @@ class AliyunRecognizer:
                 raise self._sanitize(error) from None
 
     def _sanitize(self, error: Exception) -> CloudRecognitionError:
+        from ..debug_log import log_exception
+        log_exception("engine", "aliyun.recognition.failed", error)
         if isinstance(error, CloudRecognitionError):
             return error
         status = getattr(getattr(error, "response", None), "status_code", None)
@@ -334,6 +336,8 @@ class AliyunRecognizer:
 
     @staticmethod
     def _event_error(event: dict) -> CloudRecognitionError:
+        from ..debug_log import write
+        write("engine", "aliyun.provider.error", {"providerEvent": event})
         code = str(event.get("error", {}).get("code", "")).lower()
         reason = "recognitionUnauthorized" if any(item in code for item in ("auth", "api_key", "permission")) else (
             "recognitionRateLimited" if any(item in code for item in ("rate", "quota", "limit")) else "recognitionRejected")
@@ -641,12 +645,16 @@ class AliyunInferenceRecognizer:
 
     @staticmethod
     def _event_error(event: dict) -> CloudRecognitionError:
+        from ..debug_log import write
+        write("engine", "aliyun.provider.error", {"providerEvent": event})
         code = str(event.get("header", {}).get("error_code", "")).lower()
         reason = "recognitionUnauthorized" if any(item in code for item in ("auth", "api_key", "permission")) else (
             "recognitionRateLimited" if any(item in code for item in ("rate", "quota", "limit")) else "recognitionRejected")
         return CloudRecognitionError(reason)
 
     def _sanitize(self, error: Exception) -> CloudRecognitionError:
+        from ..debug_log import log_exception
+        log_exception("engine", "aliyun.recognition.failed", error)
         if isinstance(error, CloudRecognitionError):
             return error
         status = getattr(getattr(error, "response", None), "status_code", None)

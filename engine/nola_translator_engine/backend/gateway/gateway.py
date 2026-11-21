@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Iterable
 
+from ...debug_log import write as write_debug
 from .adapters import Adapter, AdapterRegistry, CloudAsrAdapter, LocalWorkerAdapter
 from .capabilities import (
     CallContext,
@@ -350,8 +351,17 @@ class _WorkerLoader:
                     await adapter.translate(instance, ctx, text="Hello.", source=source, target=target)
             if not worker.running:
                 raise GatewayError(GatewayErrorCode.WORKER_EXITED, stage="load", message="local worker exited")
-        except BaseException:
+        except BaseException as error:
             await worker.close()
+            if isinstance(error, GatewayError):
+                write_debug("backend", "gateway.load.failed", {
+                    "model": instance.definition.model_id, **error.to_payload(),
+                })
+                if error.code == GatewayErrorCode.PROVIDER_ERROR:
+                    raise GatewayError(
+                        GatewayErrorCode.LOAD_FAILED, stage=error.stage, message=error.raw_message,
+                        fatal_scope="instance", correlation_id=error.correlation_id,
+                    ) from error
             raise
         memory = worker.resident_memory_mb() if instance.configuration.device in (None, "cpu") else None
         return LoadResult(handle=worker, measured_memory_mb=memory)

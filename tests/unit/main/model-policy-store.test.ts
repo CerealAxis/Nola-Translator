@@ -4,7 +4,30 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import { SettingsStore } from '../../../src/main/settings-store'
-import { isModelEnabled, modelEnablePatch, sceneModelBinding, sceneModelPatch } from '../../../src/shared/model-policy'
+import { isModelEnabled, modelEnablePatch, quickGatewayBinding, sceneModelBinding, sceneModelPatch } from '../../../src/shared/model-policy'
+
+it('keeps the legacy quick interpretation gateway bindings across upgrade and reload', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nola-policy-upgrade-'))
+  try {
+    const path = join(directory, 'settings.json')
+    await writeFile(path, JSON.stringify({
+      version: 2,
+      recognition: { provider: 'local', modelId: 'qwen3-asr-0.6b-crisp-q4-k', sourceLanguage: 'auto' },
+      translation: { provider: 'local', localModelId: 'hy-mt2-1.8b-q4-k-m', targetLanguage: 'zh' },
+      modelGateway: { asr: true, mt: true, asrModel: 'resource:fun-asr-nano-q4-k', mtModel: '' },
+      compute: { recognitionEngine: 'pytorch', translationEngine: 'auto', allowCpuFallback: true },
+    }))
+    for (let load = 0; load < 2; load++) {
+      const settings = await new SettingsStore(path).load()
+      expect(quickGatewayBinding(settings, 'asr')).toBe('resource:fun-asr-nano-q4-k')
+      expect(quickGatewayBinding(settings, 'mt')).toBe('resource:hy-mt2-1.8b-q4-k-m')
+      expect(sceneModelBinding(settings, 'asr')).toBe('resource:qwen3-asr-0.6b-crisp-q4-k')
+      expect(isModelEnabled(settings, 'mt', 'hy-mt2-1.8b-q4-k-m')).toBe(true)
+      expect(settings.compute).toMatchObject({ recognitionEngine: 'pytorch', translationEngine: 'auto', allowCpuFallback: true })
+      expect(settings.translation.targetLanguage).toBe('zh')
+    }
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
 
 it('persists migrated policy and keeps a disabled model disabled after reloading legacy fields', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'nola-policy-'))

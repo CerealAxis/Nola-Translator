@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from ..audio.devices import AudioDeviceUnavailableError
 from ..audio.recorder import Mp3Recorder
-from ..debug_log import write as write_debug
+from ..debug_log import exception_fields, log_exception, write as write_debug
 from .asr_pipeline import AsrPipeline, CloudAsrPipeline
 from .contracts import ErrorPayload, SessionCommand
 from .desktop_capture import start_desktop_capture
@@ -255,7 +255,7 @@ class RealtimePipelines:
                             cleanup.push_async_callback(pipeline.close)
                 except Exception as cleanup_error:
                     write_debug("backend", "realtime.cleanup.failed", {
-                        "sessionId": str(key), "stage": stage, **_safe_error_details(cleanup_error),
+                        "sessionId": str(key), "stage": stage, **exception_fields(cleanup_error),
                     })
                 if isinstance(error, asyncio.CancelledError):
                     raise
@@ -321,7 +321,7 @@ class RealtimePipelines:
                     await provider_context.__aexit__(None, None, None)
                 except Exception as cleanup_error:
                     write_debug("backend", "realtime.cleanup.failed", {
-                        "sessionId": str(key), "stage": stage, **_safe_error_details(cleanup_error),
+                        "sessionId": str(key), "stage": stage, **exception_fields(cleanup_error),
                     })
                 raise
         except (Exception, asyncio.CancelledError) as error:
@@ -329,7 +329,7 @@ class RealtimePipelines:
                 await self._close_recording(key)
             except Exception as cleanup_error:
                 write_debug("backend", "realtime.cleanup.failed", {
-                    "sessionId": str(key), "stage": stage, **_safe_error_details(cleanup_error),
+                    "sessionId": str(key), "stage": stage, **exception_fields(cleanup_error),
                 })
             if isinstance(error, asyncio.CancelledError):
                 raise
@@ -483,6 +483,8 @@ class RealtimePipelines:
             error = error.exceptions[0]
         details = _safe_error_details(error)
         correlation_id = error.correlation_id if isinstance(error, GatewayError) else str(uuid4())
+        log_exception("backend", "realtime.failed", error, sessionId=str(getattr(session, "session_id", "")),
+                      stage=stage, correlationId=correlation_id)
         if isinstance(error, ProcessSourceError) or (isinstance(error, ProcessLoopbackError) and session.config.input.kind == "process_audio"):
             reason = error.reason if isinstance(error, ProcessSourceError) else error.stage
             session.last_error = ErrorPayload(
@@ -545,7 +547,8 @@ class RealtimePipelines:
                 GatewayErrorCode.NOT_SUPPORTED: "CAPABILITY_MISMATCH",
             }.get(error.code, "INTERNAL_ERROR")
             session.last_error = ErrorPayload(
-                code=code, stage=error.stage, message_key=f"gateway.{error.code.value}",
+                code=code, stage=error.stage, message_key=f"pipeline.{error.__cause__.reason}"
+                if error.stage == "asr" and isinstance(error.__cause__, CloudRecognitionError) else f"gateway.{error.code.value}",
                 correlation_id=error.correlation_id, provider_code=error.provider_code,
                 retryable=error.retryable, retry_after_ms=error.retry_after_ms,
                 safe_details=details,

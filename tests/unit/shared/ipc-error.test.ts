@@ -3,6 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { normalizeThrownError, stripIpcErrorMessage } from '../../../src/shared/ipc-error'
 
 describe('normalizeThrownError', () => {
+  it('preserves backend retryability over the support catalog default', () => {
+    const error = Object.assign(new Error('translationProviderUnavailable'), {
+      engineCode: 'translationProviderUnavailable', backendRetryable: false, correlationId: 'backend-id',
+    })
+    expect(normalizeThrownError(error)).toMatchObject({ retryable: false, correlationId: 'backend-id', supportCode: 'MT-014' })
+  })
   it.each([
     ['INVALID_ARGUMENT', 'ARG-001'], ['MEETING_NAME_EMPTY', 'ARG-002'],
     ['MEETING_NOT_FOUND', 'ARG-003'], ['INVALID_CREDENTIAL', 'ARG-004'],

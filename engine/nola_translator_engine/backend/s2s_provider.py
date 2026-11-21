@@ -155,6 +155,8 @@ class QwenS2SSession:
         except Exception:
             raise S2SProtocolError("provider_connection_failed") from None
         if event.get("type") == "error" or event.get("code"):
+            from ..debug_log import write
+            write("backend", "s2s.provider.error", {"providerEvent": event})
             raise S2SProtocolError("provider_rejected_request")
         return event
 

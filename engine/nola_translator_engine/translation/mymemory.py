@@ -87,7 +87,8 @@ class MyMemoryTranslationProvider(_NetworkTransport):
                 parts.append(html.unescape(translated))
                 if sum(len(part) for part in parts) + len(parts) - 1 > 16_384:
                     raise MyMemoryError("translationOutputTooLong")
-            except MyMemoryError:
+            except MyMemoryError as error:
+                error.response = response
                 raise
             except httpx.TimeoutException:
                 raise MyMemoryError("translationTimeout") from None

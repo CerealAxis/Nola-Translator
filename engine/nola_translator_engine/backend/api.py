@@ -774,9 +774,14 @@ _GATEWAY_FAILURES = {
 
 
 def _gateway_failure(error: GatewayError) -> tuple[int, ErrorPayload]:
+    from ..debug_log import log_exception
+    from ..recognition.aliyun import CloudRecognitionError
+
     status, code = _GATEWAY_FAILURES.get(error.code, (500, "INTERNAL_ERROR"))
+    log_exception("backend", "gateway.request.failed", error, status=status, backendCode=code, stage=error.stage)
     return status, ErrorPayload(
-        code=code, stage=error.stage, message_key=f"gateway.{error.code.value}",
+        code=code, stage=error.stage, message_key=f"pipeline.{error.__cause__.reason}"
+        if error.stage == "asr" and isinstance(error.__cause__, CloudRecognitionError) else f"gateway.{error.code.value}",
         retryable=error.retryable, correlation_id=error.correlation_id,
         provider_code=error.provider_code if error.provider_code in PUBLIC_PROVIDER_CODES else None,
     )
@@ -911,7 +916,9 @@ class _ConnectionWriter:
                     await self._ws.send_bytes(item)
                 else:
                     await self._ws.send_text(item)
-            except Exception:
+            except Exception as error:
+                from ..debug_log import log_exception
+                log_exception("backend", "websocket.send.failed", error)
                 return
 
     def push_json(self, payload: dict) -> bool:

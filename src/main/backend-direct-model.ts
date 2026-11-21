@@ -39,11 +39,11 @@ function backendModelFailure(status: number, failure?: z.infer<typeof backendErr
   const diagnostic = failure ? backendFailure(failure) : undefined
   logDiagnostic('backend.inference.failed', { status, error: diagnostic })
   const provider = failure?.provider_code
-  if (provider === 'authentication_failed') return new GatewayWorkerError(provider, 'The model provider rejected its credentials')
-  if (provider === 'rate_limited') return new GatewayWorkerError(provider, 'The model provider rate limit was reached')
-  if (provider === 'network_unavailable') return new GatewayWorkerError(provider, 'Could not reach the model provider')
+  if (provider === 'authentication_failed') return Object.assign(new GatewayWorkerError(provider, 'The model provider rejected its credentials'), diagnostic, { cause: diagnostic })
+  if (provider === 'rate_limited') return Object.assign(new GatewayWorkerError(provider, 'The model provider rate limit was reached'), diagnostic, { cause: diagnostic })
+  if (provider === 'network_unavailable') return Object.assign(new GatewayWorkerError(provider, 'Could not reach the model provider'), diagnostic, { cause: diagnostic })
   if (provider === 'request_timeout' || failure?.message_key === 'gateway.TIMEOUT') {
-    return new GatewayWorkerError('request_timeout', 'The model request timed out')
+    return Object.assign(new GatewayWorkerError('request_timeout', 'The model request timed out'), diagnostic, { cause: diagnostic })
   }
   if (status === 400) return new GatewayWorkerError('invalid_request', 'Invalid inference input')
   if (diagnostic) return Object.assign(

@@ -7,6 +7,7 @@ describe('v2 diagnostic causes', () => {
     ['RESOURCE_BUSY', 'backend.gatewayDisabled', 'gatewayNotRunning', 'GTW-001'],
     ['RESOURCE_BUSY', 'gateway.directInferenceFailed', 'resourceBusy', 'MDL-015'],
     ['MODEL_NOT_READY', 'pipeline.recognitionUnauthorized', 'invalidCredential', 'ARG-004'],
+    ['PROVIDER_DISCONNECTED', 'pipeline.recognitionInsufficientBalance', 'cloudRecognitionInsufficientBalance', 'ASR-002'],
     ['PROVIDER_DISCONNECTED', 'pipeline.recognitionTimeout', 'recognitionTimeout', 'ASR-005'],
     ['RESOURCE_EXHAUSTED', 'pipeline.finalRecognitionQueueFull', 'recognitionBufferOverflow', 'ASR-008'],
     ['PROVIDER_DISCONNECTED', 'pipeline.s2sConnectionLost', 's2sConnectionLost', 'S2S-002'],

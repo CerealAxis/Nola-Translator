@@ -7,12 +7,11 @@ import ctypes
 import re
 from contextlib import suppress
 from time import monotonic, time
-from traceback import extract_tb
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from ..debug_log import write as write_debug
+from ..debug_log import log_exception, write as write_debug
 from .contracts import ErrorPayload, SessionCommand, SessionConfig
 from .desktop_capture import _CAPTURE_FORMAT, _desktop_backend
 from .ingestion import InputAudioFrame
@@ -55,9 +54,7 @@ def _error(code, stage, key, direction=None):
 
 
 def _unexpected(exc: Exception, key: str):
-    write_debug("engine", "meeting.unexpected", {
-        "type": type(exc).__name__, "frames": [f"{frame.name}:{frame.lineno}" for frame in extract_tb(exc.__traceback__)],
-    })
+    log_exception("engine", "meeting.unexpected", exc)
     return _error("INTERNAL_ERROR", "session", key)
 
 

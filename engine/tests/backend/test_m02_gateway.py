@@ -464,6 +464,51 @@ async def test_worker_accepts_audio_responses_larger_than_default_pipe_limit(mon
         await worker.close()
 
 
+async def test_worker_forwards_original_stderr_and_flushes_it_before_exit(monkeypatch) -> None:
+    from nola_translator_engine.backend.gateway import worker as module
+    from nola_translator_engine.backend.gateway.worker import WorkerRequest
+
+    records = []
+    monkeypatch.setattr(module, "write_debug", lambda layer, event, data: records.append((layer, event, data)))
+    spawn = asyncio.create_subprocess_exec
+
+    async def spawn_worker(*args, **kwargs):
+        return await spawn(sys.executable, "-c",
+            "import sys,json; r=json.loads(sys.stdin.readline()); "
+            "print('native failure ' + 'X'*80000, file=sys.stderr, flush=True); "
+            "print('NOLA_DIAGNOSTIC '+json.dumps({'layer':'engine','event':'local-call.failed','data':{'requestId':r['id'],'message':'original error'}}),file=sys.stderr,flush=True); "
+            "print(json.dumps({'id':r['id'],'text':'ok'}),flush=True)", **kwargs)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn_worker)
+    worker = LocalModelWorker()
+    await worker.start()
+    try:
+        await worker.request(WorkerRequest(kind="mt", config={}), timeout=5)
+        await worker._reader_task
+        assert any(data.get("message") == "native failure " + "X" * 80000 for _, _, data in records)
+        original = next(data for _, event, data in records if event == "local-call.failed")
+        assert original["message"] == "original error"
+        assert original["requestId"].startswith("gw-")
+        assert original["workerPid"] is not None
+    finally:
+        await worker.close()
+
+
+async def test_adapter_worker_timeout_preserves_operation_stage_and_correlation() -> None:
+    class TimeoutWorker(LocalModelWorker):
+        async def request(self, request, *, timeout=None):
+            raise GatewayError(GatewayErrorCode.TIMEOUT, stage="worker", message="native request timed out", correlation_id="worker-id")
+
+    from types import SimpleNamespace
+    from nola_translator_engine.backend.gateway.worker import WorkerRequest
+    instance = SimpleNamespace(handle=TimeoutWorker(), configuration=SimpleNamespace(device="auto"))
+    with pytest.raises(GatewayError) as caught:
+        await LocalWorkerAdapter()._call(instance, WorkerRequest("mt", {}), CallContext(Operation.TRANSLATE, "task", request_id="worker-id"), stage="mt")
+    assert caught.value.stage == "mt"
+    assert caught.value.correlation_id == "worker-id"
+    assert caught.value.code == GatewayErrorCode.TIMEOUT
+
+
 async def test_cancelled_load_releases_budget_and_can_retry() -> None:
     admission = ResourceAdmission()
     admission.register_device("cpu", total_mb=500)
@@ -534,6 +579,55 @@ async def test_local_worker_warms_each_revision_and_idle_exit_fails_instance() -
 # ---------------------------------------------------------------------------
 # G05: bounded concurrency per instance
 # ---------------------------------------------------------------------------
+
+
+async def test_local_mt_load_failure_keeps_diagnostics_and_releases_reservation(monkeypatch) -> None:
+    from types import SimpleNamespace
+    from nola_translator_engine.backend.gateway.languages import local_configuration, local_mt_definition
+    from nola_translator_engine.backend.realtime import RealtimePipelines
+
+    diagnostics = []
+    monkeypatch.setattr("nola_translator_engine.backend.gateway.gateway.write_debug",
+                        lambda layer, event, data: diagnostics.append((layer, event, data)))
+
+    class FailingWorker(LocalModelWorker):
+        running = True
+
+        async def start(self, *, on_exit=None):
+            pass
+
+        async def request(self, request, *, timeout=None):
+            return {"error": "LlamaServerError: llama-server health check failed at C:\\Users\\private\\model.gguf api_key=sk-private-secret"}
+
+        async def close(self):
+            self.running = False
+
+    registry = ModelRegistry()
+    registry.register(local_mt_definition("hy-mt2", languages=("en", "zh"), estimated_memory_mb=500),
+                      local_configuration("hy-mt2", ModelKind.MT, device="cpu"))
+    adapters = AdapterRegistry()
+    adapters.register(LocalWorkerAdapter())
+    admission = ResourceAdmission()
+    admission.register_device("cpu", total_mb=1_000)
+    gateway = ModelGateway(registry=registry, adapters=adapters, admission=admission, worker_factory=FailingWorker)
+    try:
+        with pytest.raises(GatewayError) as info:
+            await gateway.acquire(MatchRequest(Operation.TRANSLATE, model_id="hy-mt2"))
+        assert info.value.code == GatewayErrorCode.LOAD_FAILED
+        assert info.value.stage == "mt"
+        assert info.value.fatal_scope == "instance"
+        session = SimpleNamespace(last_error=None)
+        RealtimePipelines._report(session, info.value, stage="mt", preparing=True)
+        assert session.last_error.code == "MODEL_NOT_READY"
+        assert session.last_error.message_key == "gateway.LOAD_FAILED"
+        assert admission.snapshot("cpu").reserved_mb == 0
+        layer, event, data = diagnostics[0]
+        assert (layer, event, data["model"]) == ("backend", "gateway.load.failed", "hy-mt2")
+        assert data["correlation_id"] == info.value.correlation_id
+        assert "health check failed" in data["sanitized_details"]
+        assert "private" not in data["sanitized_details"]
+    finally:
+        await gateway.shutdown()
 
 
 async def test_concurrency_gate_bounds_active_inference() -> None:

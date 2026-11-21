@@ -15,6 +15,34 @@ from nola_translator_engine.translation.base import (
 from nola_translator_engine.translation.scheduler import TranslationScheduler
 
 
+def test_runtime_arbitrates_late_translation_results_independently_per_target(tmp_path):
+    runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
+    runtime.service.session_id = 'session'
+    old = RecognitionUpdate('segment', 1, 0, None, 'old source', 'en', False)
+    new = RecognitionUpdate('segment', 2, 0, None, 'new source', 'en', False)
+    runtime.latest_updates['segment'] = new
+    runtime.latest_translations['segment'] = [
+        Translation(targetLanguage=target, state='pending', provider='controlled') for target in ('zh', 'ja')
+    ]
+    old_request = TranslationRequest(old, 'en', ('zh', 'ja'), True)
+    new_request = TranslationRequest(new, 'en', ('zh', 'ja'), True)
+    for request, target, text in (
+        (new_request, 'zh', 'new zh'), (old_request, 'zh', 'old zh'), (old_request, 'ja', 'old ja'),
+    ):
+        runtime._publish_translation_result(request, ScheduledTranslation(target, 'complete', 'controlled', text=text),
+                                            'session', runtime._stream_generation)
+    assert {item.targetLanguage: item.text for item in runtime.latest_translations['segment']} == {
+        'zh': 'new zh', 'ja': 'old ja',
+    }
+    runtime._publish_translation_result(new_request, ScheduledTranslation('ja', 'complete', 'controlled', text='new ja'),
+                                        'session', runtime._stream_generation)
+    runtime._publish_translation_result(old_request, ScheduledTranslation('ja', 'complete', 'controlled', text='late old ja'),
+                                        'session', runtime._stream_generation)
+    assert {item.targetLanguage: item.text for item in runtime.latest_translations['segment']} == {
+        'zh': 'new zh', 'ja': 'new ja',
+    }
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize('provider_name', ['index-translate', 'openai', 'openai-responses', 'anthropic', 'ollama'])
 async def test_revision_uses_matching_completed_source_for_each_target(tmp_path, provider_name):

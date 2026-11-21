@@ -77,7 +77,8 @@ class GoogleTranslateProvider(_NetworkTransport):
                 parts.append(html.unescape(translated))
                 if sum(len(part) for part in parts) + len(parts) - 1 > MAX_INPUT_CHARS:
                     raise GoogleTranslateError("translationOutputTooLong")
-            except GoogleTranslateError:
+            except GoogleTranslateError as error:
+                error.response = response
                 raise
             except httpx.TimeoutException:
                 raise GoogleTranslateError("translationTimeout") from None

@@ -563,6 +563,14 @@ def main():
                     result = await infer(request, runtime)
                     result = {'id': request.get('id'), **result}
                 except Exception as error:
+                    from .debug_log import log_exception
+                    log_exception('engine', 'local-call.failed', error,
+                        requestId=request.get('id') if isinstance(request, dict) else None,
+                        correlationId=request.get('correlationId') if isinstance(request, dict) else None,
+                        taskId=request.get('taskId') if isinstance(request, dict) else None,
+                        correlationIds=[item.get('correlationId') for item in request.get('requests', []) if isinstance(item, dict)]
+                            if isinstance(request, dict) and isinstance(request.get('requests'), list) else None,
+                        kind=request.get('kind') if isinstance(request, dict) else None)
                     message = str(error)
                     prefix = f'{type(error).__name__}: '
                     while message.startswith(prefix):

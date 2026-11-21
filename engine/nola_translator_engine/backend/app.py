@@ -146,13 +146,18 @@ def create_app(
                 await comic_service.close()
             if screen_ocr is not None:
                 await screen_ocr.close()
-            await asyncio.gather(*(meeting.close() for meeting in ctx.meetings.values()), return_exceptions=True)
+            from ..debug_log import log_exception
+            for result in await asyncio.gather(*(meeting.close() for meeting in ctx.meetings.values()), return_exceptions=True):
+                if isinstance(result, Exception):
+                    log_exception("backend", "meeting.shutdown.failed", result)
             if registry is not None:
                 await registry.shutdown()
             openings = tuple(ctx.language_model_openings.values())
             for opening in openings:
                 opening.cancel()
-            await asyncio.gather(*openings, return_exceptions=True)
+            for result in await asyncio.gather(*openings, return_exceptions=True):
+                if isinstance(result, Exception):
+                    log_exception("backend", "language-model.shutdown.failed", result)
             for lease in ctx.language_model_leases.values():
                 await lease.release()
             ctx.language_model_leases.clear()

@@ -39,6 +39,7 @@ export function describeError(cause: unknown): string | undefined {
 
 function failureOptions(message: string, options: NotifyOptions): NotifyOptions {
   if (options.cause === undefined) return options
+  console.error('renderer.notification.failed', options.cause)
   const cause = restoreIpcError(options.cause)
   const source = cause && typeof cause === 'object' ? cause : {}
   const normalized = normalizeThrownError({ ...source, message: stripIpcErrorMessage(describeError(cause) ?? '') })

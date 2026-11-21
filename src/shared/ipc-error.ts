@@ -19,6 +19,8 @@ type ErrorLike = {
   supportCode?: unknown
   commandType?: unknown
   action?: unknown
+  retryable?: unknown
+  backendRetryable?: unknown
 }
 
 /**
@@ -126,7 +128,8 @@ export function normalizeThrownError(
   return {
     code,
     supportCode,
-    retryable: SUPPORT_ERROR_CATALOG[supportCode].retryable,
+    retryable: typeof source?.backendRetryable === 'boolean' ? source.backendRetryable
+      : typeof source?.retryable === 'boolean' ? source.retryable : SUPPORT_ERROR_CATALOG[supportCode].retryable,
     ...(correlationId ? { correlationId } : {}),
   }
 }

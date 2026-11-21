@@ -12,9 +12,11 @@ afterEach(() => { vi.restoreAllMocks(); window.history.replaceState({}, '', '/')
 it('describes known IPC failures in the current interface language without exposing raw details', () => {
   document.documentElement.lang = 'ja'
   const showToast = vi.spyOn(toast, 'showToast')
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
   notifyError('Export failed', { cause: new Error("Error invoking remote method 'comic:export': Error: modelOutOfMemory") })
   expect(showToast).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Export failed', description: `${translate('errors.modelOutOfMemory', 'ja')} (MDL-020)` }))
   notifyError('Export failed', { cause: new Error('secret path or provider response') })
+  expect(logged).toHaveBeenLastCalledWith('renderer.notification.failed', expect.objectContaining({ message: 'secret path or provider response' }))
   expect(showToast).toHaveBeenLastCalledWith({ type: 'error', description: 'Export failed (ERR-999)', duration: 10000 })
   notifyError('Export failed', { cause: { code: 'ENOSPC', supportCode: 'STO-022' }, description: 'Choose another disk.' })
   expect(showToast).toHaveBeenLastCalledWith(expect.objectContaining({ description: 'Choose another disk. (STO-022)' }))

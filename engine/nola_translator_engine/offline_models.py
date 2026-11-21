@@ -349,6 +349,8 @@ def main() -> None:
                         "bytes": entry.total_bytes, "status": "ready"}], "totalBytes": entry.total_bytes,
                         "issues": [], "compatible": True}
             except LocalModelError as error:
+                from .debug_log import log_exception
+                log_exception("engine", "offline.local-model.failed", error, operation=operation)
                 result = {"items": [{"id": "local", "name": source.name, "kind": "model", "bytes": 0,
                     "status": "invalid", "issue": error.issue, "reason": error.reason[:2048]}],
                     "totalBytes": 0, "issues": [error.issue], "compatible": False}
@@ -366,6 +368,8 @@ def main() -> None:
             raise OfflineError("failed")
         emit({"type": "result", "result": result})
     except Exception as error:
+        from .debug_log import log_exception
+        log_exception("engine", "offline.model.failed", error)
         emit({"type": "error", "issue": error.issue if isinstance(error, OfflineError) else "failed",
               "reason": error.reason if isinstance(error, OfflineError) else None})
         sys.exit(1)

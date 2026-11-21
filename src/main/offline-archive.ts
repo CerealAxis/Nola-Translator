@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import type { OfflineProgress } from './offline-manager'
+import { logDiagnostic, logPythonStderr } from './session-log'
 
 // Stream ZIP64 entries instead of buffering multi-gigabyte model weights in Electron.
 const script = String.raw`import json,os,pathlib,shutil,stat,sys,zipfile
@@ -78,8 +79,9 @@ export async function offlineArchive(python: string, mode: 'pack' | 'extract', s
       } catch { /* Ignore incomplete worker diagnostics; exit status determines success. */ }
     })
     child.stderr.on('data', chunk => { error = (error + String(chunk)).slice(-4096) })
+    logPythonStderr(child.stderr, 'offline', undefined, { pid: child.pid, operation: mode })
     let failure: Error | undefined
-    child.once('error', error => { failure = error })
+    child.once('error', error => { logDiagnostic('offline.zip.failed', { pid: child.pid, error }); failure = error })
     child.once('close', code => {
       lines.close()
       if (failure) reject(failure)

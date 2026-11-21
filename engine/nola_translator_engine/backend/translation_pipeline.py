@@ -611,7 +611,18 @@ class TranslationScheduler:
         return self._error_event_payload(task.key[2], error, task.task_id)
 
     def _error_event_payload(self, segment_id: str, error: Exception, task_id: str | None = None) -> dict[str, Any]:
-        code = "TRANSLATION_TIMEOUT" if getattr(error, "code", None) == GatewayErrorCode.TIMEOUT else "INTERNAL_ERROR"
+        from ..debug_log import log_exception
+
+        correlation_id = error.correlation_id if isinstance(error, GatewayError) else task_id or str(uuid4())
+        log_exception("backend", "translation.failed", error, segmentId=segment_id, taskId=task_id,
+                      correlationId=correlation_id)
+        code = {
+            GatewayErrorCode.TIMEOUT: "TRANSLATION_TIMEOUT", GatewayErrorCode.WORKER_OOM: "RESOURCE_EXHAUSTED",
+            GatewayErrorCode.RESOURCE_EXHAUSTED: "RESOURCE_EXHAUSTED", GatewayErrorCode.LEASE_CONFLICT: "RESOURCE_BUSY",
+            GatewayErrorCode.MODEL_NOT_INSTALLED: "MODEL_NOT_READY", GatewayErrorCode.MODEL_INTEGRITY: "MODEL_NOT_READY",
+            GatewayErrorCode.LOAD_FAILED: "MODEL_NOT_READY", GatewayErrorCode.CAPABILITY_MISMATCH: "CAPABILITY_MISMATCH",
+            GatewayErrorCode.NOT_SUPPORTED: "CAPABILITY_MISMATCH", GatewayErrorCode.INVALID_INPUT: "INVALID_CONFIG",
+        }.get(getattr(error, "code", None), "INTERNAL_ERROR")
         provider_code = error.provider_code if isinstance(error, GatewayError) else None
         reason = next((value for value in (provider_code, str(error))
                        if value in ("glossaryUnsupported", "glossaryBudgetExceeded")), None)
@@ -622,8 +633,9 @@ class TranslationScheduler:
                 "scope": "task" if reason else "pipeline",
                 "retryable": code == "TRANSLATION_TIMEOUT" or bool(getattr(error, "retryable", False)),
                 "fatal": False,
-                "message_key": reason or "translation.failed",
-                "correlation_id": task_id or str(uuid4()),
+                "message_key": reason or (f"gateway.{error.code.value}" if isinstance(error, GatewayError)
+                                          and error.code != GatewayErrorCode.PROVIDER_ERROR else "translation.failed"),
+                "correlation_id": correlation_id,
                 "provider_code": provider_code if provider_code in (
                     "authentication_failed", "rate_limited", "request_timeout", "network_unavailable",
                 ) else None,

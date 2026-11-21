@@ -88,7 +88,7 @@ def map_local_error(message: str, *, stage: str) -> GatewayError:
     return GatewayError(
         code,
         stage=stage,
-        message=sanitize_details(message),
+        message=message,
         fatal_scope=scope,  # type: ignore[arg-type]
     )
 
@@ -144,7 +144,8 @@ class CloudAsrAdapter(Adapter):
             raise GatewayError(
                 GatewayErrorCode.PROVIDER_ERROR, stage="asr", message="Cloud recognition failed",
                 provider_code=error_code(error)[0],
-            ) from None
+                retryable=error.reason in ("recognitionTimeout", "recognitionNetworkError", "recognitionClosed", "recognitionRateLimited"),
+            ) from error
         return AsrObservation(text, detected, is_final=True)
 
 
@@ -186,6 +187,12 @@ class MiMoTtsAdapter(Adapter):
                 pcm, rate, channels = _decode_wav_data_url("data:audio/wav;base64," + data)
         except (TimeoutError, httpx.TimeoutException):
             raise GatewayError(GatewayErrorCode.TIMEOUT, stage="tts", message="MiMo synthesis timed out") from None
+        except httpx.HTTPError as error:
+            from ...gateway_worker import error_code
+            provider_code = error_code(error)[0]
+            raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="tts", message="MiMo synthesis failed",
+                               provider_code=provider_code,
+                               retryable=provider_code in ("rate_limited", "request_timeout", "network_unavailable")) from error
         except (httpx.HTTPError, ValueError, TypeError, KeyError, IndexError, wave.Error, EOFError):
             raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="tts", message="MiMo synthesis failed") from None
         ctx.cancel_token.raise_if_cancelled()
@@ -219,12 +226,20 @@ class LocalWorkerAdapter(Adapter):
             request.gateway_device = instance.configuration.device
         limit = 1 if ctx.task_mode == "realtime" else min(5, instance.definition.capabilities.concurrency.max_active_requests, max(1, ctx.max_concurrency))
         request.payload["max_concurrency"] = limit
-        if ctx.task_mode == "offline" and instance.definition.capabilities.concurrency.batching and limit > 1 and request.kind != "llm" and not request.payload.get("inspect"):
-            response = await worker.request_batch(request, limit=limit, timeout=timeout)
-        else:
-            response = await worker.request(request, timeout=timeout)
+        request.payload["correlationId"] = ctx.request_id
+        request.payload["taskId"] = ctx.task_id
+        try:
+            if ctx.task_mode == "offline" and instance.definition.capabilities.concurrency.batching and limit > 1 and request.kind != "llm" and not request.payload.get("inspect"):
+                response = await worker.request_batch(request, limit=limit, timeout=timeout)
+            else:
+                response = await worker.request(request, timeout=timeout)
+        except GatewayError as error:
+            raise GatewayError(error.code, stage=stage, message=error.raw_message, fatal_scope=error.fatal_scope,
+                               provider_code=error.provider_code, retryable=error.retryable,
+                               retry_after_ms=error.retry_after_ms, correlation_id=ctx.request_id) from error
         if response.get("error"):
             error = map_local_error(str(response["error"]), stage=stage)
+            error.correlation_id = ctx.request_id
             if error.code == GatewayErrorCode.WORKER_OOM:
                 await worker.abort()
             raise error
@@ -418,22 +433,29 @@ class _NetworkMtAdapter(Adapter):
             raise GatewayError(GatewayErrorCode.TIMEOUT, stage="mt", message="translation provider timed out") from None
         except (GoogleTranslateError, MyMemoryError) as error:
             code = GatewayErrorCode.TIMEOUT if error.error_code == "translationTimeout" else GatewayErrorCode.PROVIDER_ERROR
+            provider_code = {"translationTimeout": "request_timeout", "translationRateLimited": "rate_limited",
+                             "URLError": "network_unavailable"}.get(error.error_code)
             raise GatewayError(
-                code, stage="mt", message="translation provider failed", provider_code=error.error_code
-            ) from None
+                code, stage="mt", message="translation provider failed", provider_code=provider_code,
+                retryable=provider_code in ("request_timeout", "rate_limited", "network_unavailable"),
+            ) from error
         except httpx.HTTPStatusError as error:
             from ...gateway_worker import error_code
 
+            provider_code = error_code(error)[0]
             raise GatewayError(
                 GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="Translation provider failed",
-                provider_code=error_code(error)[0],
+                provider_code=provider_code, retryable=provider_code in ("rate_limited", "request_timeout", "network_unavailable"),
             ) from None
         except ValueError as error:
             if str(error) in ("glossaryBudgetExceeded", "preserveTermsChanged"):
                 raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="mt", message=str(error), provider_code=str(error)) from None
             raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="translation provider failed") from None
-        except (httpx.HTTPError, OSError, RuntimeError):
-            raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="translation provider failed") from None
+        except (httpx.HTTPError, OSError, RuntimeError) as error:
+            from ...gateway_worker import error_code
+            provider_code = error_code(error)[0]
+            raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="translation provider failed",
+                               provider_code=provider_code, retryable=provider_code == "network_unavailable") from error
         ctx.cancel_token.raise_if_cancelled()
         return TranslationResult(text=translated, source=source, target=target)
 

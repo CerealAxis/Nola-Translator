@@ -10,6 +10,12 @@ from nola_translator_engine.translation.scheduler import TranslationScheduler
 from nola_translator_engine.protocol import Translation
 
 
+async def finish_translations(runtime):
+    while tasks := [*runtime.translation_tasks.values(),
+                    *(job for jobs in list(runtime.translation_jobs.values()) for job in jobs)]:
+        await asyncio.wait_for(asyncio.gather(*tasks), 1)
+
+
 class ImmediateProvider:
     name = "immediate"
 
@@ -46,21 +52,20 @@ async def test_fast_target_is_visible_while_slow_target_is_pending(tmp_path):
     runtime.active_config = SimpleNamespace(targetLanguages=['zh', 'ja'], allowIntermediateTranslation=False)
     runtime.translation_scheduler = TranslationScheduler(Provider())
     await runtime._emit_update(RecognitionUpdate('segment', 1, 0, 10, 'hello', 'en', True))
-    worker = next(iter(runtime.translation_tasks.values()))
     try:
         for _ in range(30):
             await asyncio.sleep(0)
         latest = emitted[-1].segment.translations
         assert latest[0].text == 'zh:hello'
         assert latest[1].state == 'pending'
-        assert not worker.done()
+        assert any(not job.done() for jobs in runtime.translation_jobs.values() for job in jobs)
     finally:
         release.set()
-        await worker
+        await finish_translations(runtime)
 
 
 @pytest.mark.asyncio
-async def test_final_caption_preempts_obsolete_network_intermediate(tmp_path):
+async def test_final_caption_respects_shared_request_limit_without_cancelling_intermediate(tmp_path):
     started = asyncio.Event()
     final_started = asyncio.Event()
     cancelled = asyncio.Event()
@@ -88,13 +93,16 @@ async def test_final_caption_preempts_obsolete_network_intermediate(tmp_path):
     await started.wait()
     await runtime._emit_update(RecognitionUpdate('segment', 1, 0, 10, 'final', 'en', True))
     try:
-        for _ in range(50):
-            await asyncio.sleep(0)
-        assert final_started.is_set(), 'Final text must not wait for obsolete intermediate HTTP work'
-        assert cancelled.is_set()
+        await asyncio.gather(*runtime.translation_tasks.values())
+        assert not final_started.is_set()
+        assert not cancelled.is_set()
+        release.set()
+        await finish_translations(runtime)
+        assert final_started.is_set()
+        assert not cancelled.is_set()
     finally:
         release.set()
-        await asyncio.gather(*runtime.translation_tasks.values())
+        await finish_translations(runtime)
         await runtime.translation_scheduler.close()
 
 
@@ -126,17 +134,18 @@ async def test_streamed_text_is_published_before_completion_and_stale_updates_ar
         assert len(emitted) == count
     finally:
         release.set()
-        await asyncio.gather(*runtime.translation_tasks.values())
+        await finish_translations(runtime)
         await runtime.translation_scheduler.close()
 
 
 @pytest.mark.asyncio
-async def test_changed_source_does_not_pair_with_previous_revision_translation(tmp_path) -> None:
+async def test_changed_source_keeps_previous_translation_until_final_replacement(tmp_path) -> None:
     emitted = []
     runtime = EngineRuntime(tmp_path / "models", emitted.append)
     runtime.service.session_id = "session-live"
     runtime.active_config = SimpleNamespace(targetLanguages=["zh"], allowIntermediateTranslation=False)
-    runtime.translation_scheduler = TranslationScheduler(ControlledProvider())
+    provider = ControlledProvider()
+    runtime.translation_scheduler = TranslationScheduler(provider)
     runtime.latest_updates["segment-live"] = RecognitionUpdate(
         "segment-live", 1, 0, None, "First words", "en", False
     )
@@ -147,11 +156,12 @@ async def test_changed_source_does_not_pair_with_previous_revision_translation(t
     await runtime._emit_update(RecognitionUpdate(
         "segment-live", 2, 0, None, "Second words", "en", False
     ))
-    assert emitted[0].segment.translations[0].state == "pending"
-    assert emitted[0].segment.translations[0].text is None
-    for task in runtime.translation_tasks.values():
-        task.cancel()
-    await asyncio.gather(*runtime.translation_tasks.values(), return_exceptions=True)
+    assert emitted[0].segment.translations[0].state == "complete"
+    assert emitted[0].segment.translations[0].text == "第一句"
+    await runtime._emit_update(RecognitionUpdate('segment-live', 3, 0, 10, 'Second words', 'en', True))
+    provider.release.set()
+    await finish_translations(runtime)
+    assert emitted[-1].segment.translations[0].text == 'zh:Second words'
 
 
 @pytest.mark.asyncio
@@ -182,7 +192,7 @@ async def test_partial_is_not_translated_until_final_by_default(tmp_path) -> Non
         segment_id="segment-live", revision=4, started_at_ms=0, ended_at_ms=900,
         source_text="Hello world.", language="en", is_final=True,
     ))
-    await asyncio.gather(*runtime.translation_tasks.values())
+    await finish_translations(runtime)
 
     captions = [event for event in emitted if event.type == "caption"]
     final = captions[-1].segment
@@ -206,7 +216,7 @@ async def test_allow_intermediate_translates_partials(tmp_path) -> None:
         segment_id="segment-live", revision=3, started_at_ms=0, ended_at_ms=None,
         source_text="Hello world", language="en", is_final=False,
     ))
-    await asyncio.gather(*runtime.translation_tasks.values())
+    await finish_translations(runtime)
 
     captions = [event for event in emitted if event.type == "caption"]
     assert captions[-1].segment.translations[0].state == "complete"
@@ -243,6 +253,7 @@ async def test_slow_translation_does_not_block_the_audio_consumer(tmp_path) -> N
 
 
     await emit_task
+    await finish_translations(runtime)
 
 @pytest.mark.asyncio
 async def test_partial_updates_coalesce_and_final_wakes_throttle(tmp_path) -> None:
@@ -254,16 +265,15 @@ async def test_partial_updates_coalesce_and_final_wakes_throttle(tmp_path) -> No
             return await super().translate(text, source, target)
     runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
     runtime.service.session_id = 'session'
-    runtime.active_config = SimpleNamespace(targetLanguages=['zh'], allowIntermediateTranslation=True)
+    runtime.active_config = SimpleNamespace(targetLanguages=['zh'], allowIntermediateTranslation=True, intermediateTranslationIntervalMs=2000)
     runtime.translation_scheduler = TranslationScheduler(Provider())
-    runtime.partial_translation_interval = 60
     update = RecognitionUpdate('segment', 0, 0, None, 'hello', 'en', False)
     await runtime._emit_update(update)
-    await asyncio.gather(*runtime.translation_tasks.values())
+    await finish_translations(runtime)
     await runtime._emit_update(replace(update, revision=1, source_text='hello again'))
     await asyncio.sleep(0)
     await runtime._emit_update(replace(update, revision=2, source_text='final', is_final=True, ended_at_ms=10))
-    await asyncio.wait_for(asyncio.gather(*runtime.translation_tasks.values()), 1)
+    await finish_translations(runtime)
     assert calls == ['hello', 'final']
 
 
@@ -279,7 +289,7 @@ async def test_completed_caption_state_is_bounded_and_korean_detected(tmp_path) 
     assert runtime._detect_language('안녕하세요') == 'ko'
 
 @pytest.mark.asyncio
-async def test_stale_translation_completion_is_not_emitted(tmp_path) -> None:
+async def test_final_translation_wins_after_concurrent_intermediate_completion(tmp_path) -> None:
     emitted = []
     runtime = EngineRuntime(tmp_path / 'models', emitted.append)
     runtime.service.session_id = 'session'
@@ -291,13 +301,12 @@ async def test_stale_translation_completion_is_not_emitted(tmp_path) -> None:
 
     stale = RecognitionUpdate('segment-slow', 1, 0, None, 'old words', 'en', False)
     await runtime._emit_update(stale)
-    worker = next(iter(runtime.translation_tasks.values()))
     await provider.started.wait()
 
     fresh = RecognitionUpdate('segment-slow', 2, 0, 10, 'final words', 'en', True)
     await runtime._emit_update(fresh)
     provider.release.set()
-    await asyncio.wait_for(worker, 1)
+    await finish_translations(runtime)
 
     completed = [
         event.segment.translations[0].text
@@ -306,8 +315,8 @@ async def test_stale_translation_completion_is_not_emitted(tmp_path) -> None:
         and event.segment.translations
         and event.segment.translations[0].state == 'complete'
     ]
-    assert 'zh:old words' not in completed, '旧 revision 的翻译完成后不能覆盖新句'
-    assert completed == ['zh:final words']
+    final_index = completed.index('zh:final words')
+    assert all(text == 'zh:final words' for text in completed[final_index:])
 
 
 @pytest.mark.asyncio

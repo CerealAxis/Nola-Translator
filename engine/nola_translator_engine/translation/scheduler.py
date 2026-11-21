@@ -10,7 +10,7 @@ import unicodedata
 import httpx
 
 from .base import ProviderTranslation, ScheduledTranslation, TranslationProvider, revision_context
-from ..debug_log import write as write_debug
+from ..debug_log import log_exception, write as write_debug
 
 
 class TranslationScheduler:
@@ -159,21 +159,25 @@ class TranslationScheduler:
                     timeout=self._budget_seconds(normalized, source, target),
                 )
                 outcome = 'complete'
-        except (TimeoutError, httpx.TimeoutException):
+        except (TimeoutError, httpx.TimeoutException) as error:
+            log_exception('engine', 'translation.failed', error, provider=self.provider.name, target=target)
             outcome = 'timeout'
             error_code = 'translationTimeout'
             return ScheduledTranslation(
                 target, "failed", self.provider.name, error_code=error_code
             )
         except httpx.HTTPStatusError as error:
+            log_exception('engine', 'translation.failed', error, provider=self.provider.name, target=target)
             outcome = 'failed'
             error_code = 'translationRateLimited' if error.response.status_code == 429 else 'HTTPError'
             return ScheduledTranslation(target, 'failed', self.provider.name, error_code=error_code)
-        except httpx.RequestError:
+        except httpx.RequestError as error:
+            log_exception('engine', 'translation.failed', error, provider=self.provider.name, target=target)
             outcome = 'failed'
             error_code = 'URLError'
             return ScheduledTranslation(target, 'failed', self.provider.name, error_code=error_code)
         except Exception as error:
+            log_exception('engine', 'translation.failed', error, provider=self.provider.name, target=target)
             outcome = 'failed'
             error_code = getattr(error, "error_code", type(error).__name__)
             return ScheduledTranslation(

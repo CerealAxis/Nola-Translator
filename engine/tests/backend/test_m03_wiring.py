@@ -23,6 +23,25 @@ from nola_translator_engine.backend import create_app
 TOKEN = "test-control-token"
 
 
+def test_cloud_recognition_error_keeps_its_reason_in_both_error_routes():
+    from nola_translator_engine.backend.api import _gateway_failure
+    from nola_translator_engine.backend.realtime import RealtimePipelines
+    from nola_translator_engine.backend.gateway import GatewayError, GatewayErrorCode
+    from nola_translator_engine.recognition.aliyun import CloudRecognitionError
+
+    try:
+        try:
+            raise CloudRecognitionError("recognitionInsufficientBalance")
+        except CloudRecognitionError as cause:
+            raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="asr", message="Cloud recognition failed") from cause
+    except GatewayError as error:
+        _, payload = _gateway_failure(error)
+        session = SimpleNamespace(last_error=None)
+        RealtimePipelines._report(session, error, stage="asr")
+        assert payload.message_key == session.last_error.message_key == "pipeline.recognitionInsufficientBalance"
+        assert payload.correlation_id == session.last_error.correlation_id == error.correlation_id
+
+
 def make_app(tmp_path=None):
     kwargs = {"control_token": TOKEN, "instance_id": "test-instance"}
     if tmp_path is not None:

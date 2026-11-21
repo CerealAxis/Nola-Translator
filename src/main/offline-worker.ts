@@ -2,7 +2,7 @@ import { execFile, spawn } from 'node:child_process'
 import { z } from 'zod'
 import type { EngineLaunchSpec } from './engine-process'
 import { OfflineError, type ModelWorkerRequest, type OfflineProgress } from './offline-manager'
-import { logDiagnostic } from './session-log'
+import { logDiagnostic, logPythonStderr } from './session-log'
 
 const progressSchema = z.object({ phase: z.enum(['check', 'download', 'copy', 'install', 'verify', 'pack']),
   current: z.number().finite().nonnegative(), total: z.number().finite().nonnegative(), detail: z.string().max(512).optional() })
@@ -13,7 +13,7 @@ export function runOfflineModelWorker(spec: EngineLaunchSpec, request: ModelWork
   signal.throwIfAborted()
   return new Promise((resolve, reject) => {
     const child = spawn(spec.command, spec.args, { cwd: spec.cwd, windowsHide: true,
-      env: { ...process.env, ...spec.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, stdio: 'pipe' })
+      env: { ...process.env, ...spec.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', NOLA_TRANSLATOR_RUN_LOG_STDERR: '1' }, stdio: 'pipe' })
     const terminate = () => {
       // Native model trials can own a second Python process and a llama-server.
       if (process.platform === 'win32' && child.pid) {
@@ -42,12 +42,13 @@ export function runOfflineModelWorker(spec: EngineLaunchSpec, request: ModelWork
             progress(event.phase, event.current, event.total, event.detail)
           } else if (value.type === 'result') { result = value.result; hasResult = true }
           else if (value.type === 'error') failure = new OfflineError(errorSchema.catch('failed').parse(value.issue), value.reason ?? undefined)
-        } catch { failure = new OfflineError('failed'); terminate() }
+        } catch (error) { logDiagnostic('offline.model-worker.protocol.failed', { pid: child.pid, error }); failure = new OfflineError('failed'); terminate() }
       }
     })
-    child.stderr.on('data', (chunk: string) => logDiagnostic('offline.model-worker.stderr', { output: chunk.slice(-16000) }))
-    child.on('error', error => { failure = error })
-    child.on('close', code => {
+    logPythonStderr(child.stderr, 'offline', undefined, { pid: child.pid })
+    child.on('error', error => { logDiagnostic('offline.model-worker.failed', { pid: child.pid, error }); failure = error })
+    child.on('close', (code, processSignal) => {
+      if (code !== 0 && !signal.aborted) logDiagnostic('offline.model-worker.exited', { pid: child.pid, code, signal: processSignal, error: failure })
       signal.removeEventListener('abort', terminate)
       if (signal.aborted) reject(signal.reason ?? new Error('cancelled'))
       else if (failure) reject(failure)

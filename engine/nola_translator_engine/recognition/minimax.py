@@ -270,7 +270,9 @@ class MiniMaxRecognizer:
             detail = str(error.get("type", "")).lower() if isinstance(error, dict) else ""
         except (ValueError, AttributeError):
             detail = ""
-        raise CloudRecognitionError(self._reason(response.status_code, detail))
+        error = CloudRecognitionError(self._reason(response.status_code, detail))
+        error.response = response
+        raise error
 
     @staticmethod
     def _reason(status: int, detail: str) -> str:
@@ -348,6 +350,8 @@ class MiniMaxRecognizer:
         return updates
 
     def _fail(self, error: CloudRecognitionError) -> None:
+        from ..debug_log import log_exception
+        log_exception("engine", "minimax.recognition.failed", error)
         self._failure = self._failure or error
         if self._reported:
             return

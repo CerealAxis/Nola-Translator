@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from ...debug_log import log_exception, write as write_debug
 from .capabilities import GatewayError, GatewayErrorCode
 
 
@@ -54,6 +55,7 @@ def _child_env(model_dir: str | None) -> dict[str, str]:
             "TMPDIR",
             "NOLA_TRANSLATOR_MODEL_DIR",
             "NOLA_TRANSLATOR_LLAMA_DIR",
+            "NOLA_TRANSLATOR_RUN_LOG_STDERR",
         )
         if key in os.environ
     }
@@ -293,7 +295,9 @@ class LocalModelWorker:
                     break
                 try:
                     message = json.loads(raw.decode("utf-8", errors="replace"))
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as error:
+                    log_exception("backend", "gateway.worker.protocol.failed", error,
+                                  requestIds=list(self._pending), bytes=len(raw))
                     continue
                 if not isinstance(message, dict):
                     continue
@@ -301,13 +305,14 @@ class LocalModelWorker:
                 future = self._pending.get(request_id) if isinstance(request_id, str) else None
                 if future is not None and not future.done():
                     future.set_result(message)
-        except ValueError:
+        except ValueError as error:
+            log_exception("backend", "gateway.worker.protocol.failed", error, requestIds=list(self._pending))
             await self._kill(self._process)
             await stdout.read()
         finally:
             await self._process.wait()
+            await stderr_task
             await self._mark_exited()
-            stderr_task.cancel()
             if on_exit is not None:
                 await on_exit()
 
@@ -319,16 +324,34 @@ class LocalModelWorker:
                 raw = await stderr.readline()
                 if not raw:
                     break
-                self._stderr_tail.append(raw.decode("utf-8", errors="replace").rstrip())
+                line = raw.decode("utf-8", errors="replace").rstrip()
+                self._stderr_tail.append(line)
+                context = {"workerPid": self._process.pid if self._process else None,
+                           "requestIds": list(self._pending)}
+                if line.startswith("NOLA_DIAGNOSTIC "):
+                    try:
+                        record = json.loads(line.removeprefix("NOLA_DIAGNOSTIC "))
+                        write_debug(record["layer"], record["event"], {**record.get("data", {}), **context})
+                    except (ValueError, KeyError, TypeError):
+                        write_debug("backend", "gateway.worker.diagnostic-invalid", context)
+                else:
+                    level = "error" if any(word in line.lower() for word in ("error", "failed", "exception", "fatal")) else "info"
+                    write_debug("backend", f"gateway.worker.stderr.{level}", {**context, "message": line})
                 if len(self._stderr_tail) > 40:
                     self._stderr_tail.pop(0)
-        except (asyncio.CancelledError, ValueError):
-            return
+        except asyncio.CancelledError:
+            raise
+        except ValueError as error:
+            log_exception("backend", "gateway.worker.stderr.failed", error)
 
     async def _mark_exited(self) -> None:
         self.exited = True
         if self._process is not None:
             self.exit_code = self._process.returncode
+        write_debug("backend", "gateway.worker.failed" if self._pending or self.exit_code else "gateway.worker.exited", {
+            "workerPid": self._process.pid if self._process else None,
+            "exitCode": self.exit_code, "requestIds": list(self._pending),
+        })
         error = GatewayError(
             GatewayErrorCode.WORKER_EXITED,
             stage="worker",

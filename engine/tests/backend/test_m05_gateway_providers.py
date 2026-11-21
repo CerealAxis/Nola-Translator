@@ -27,6 +27,21 @@ def request(model, *, source="en", provisional=False):
     )
 
 
+@pytest.mark.parametrize("reason, expected", [("translationRateLimited", "rate_limited"), ("URLError", "network_unavailable"), ("translationTimeout", "request_timeout")])
+async def test_free_provider_failure_uses_public_codes_and_keeps_original_cause(gateway, monkeypatch, reason, expected):
+    from nola_translator_engine.translation.mymemory import MyMemoryError
+
+    async def fail(*args):
+        raise MyMemoryError(reason)
+
+    monkeypatch.setattr(MyMemoryTranslationProvider, "translate", fail)
+    with pytest.raises(GatewayError) as caught:
+        await gateway.translate(CallContext(Operation.TRANSLATE, "task"), text="hello", source="en", target="zh", request=request("mymemory"))
+    assert caught.value.provider_code == expected
+    assert caught.value.retryable
+    assert isinstance(caught.value.__cause__, MyMemoryError)
+
+
 def test_index_public_accepts_provisional_source(gateway):
     matched = gateway.match(request("index-translate", provisional=True))
     capabilities = matched.entry.definition.capabilities

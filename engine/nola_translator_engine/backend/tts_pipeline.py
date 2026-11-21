@@ -135,7 +135,10 @@ class TtsPipeline:
                 samples = sum(len(chunk.pcm) // (2 * chunk.channels) for chunk in result.chunks)
                 if samples <= 0:
                     raise ValueError("Synthesis returned no audio")
-            except Exception:
+            except Exception as error:
+                from ..debug_log import log_exception
+                log_exception("backend", "synthesis.failed", error, jobId=job.job_id, pipelineId=self.pipeline_id,
+                              attempt=job.synthesis_attempt)
                 if self.queue.fail(job.job_id, attempt=job.synthesis_attempt) and job.synthesis_attempt < 2:
                     self.queue.retry(job.job_id)
                 self._play_wake.set()
@@ -177,7 +180,9 @@ class TtsPipeline:
                     attachment = self._attachment
                     try:
                         await sink(PlaybackGrant(job, claim, result))
-                    except Exception:
+                    except Exception as error:
+                        from ..debug_log import log_exception
+                        log_exception("backend", "playback.delivery.failed", error, jobId=job.job_id, ownerId=owner)
                         if attachment == self._attachment:
                             self.queue.owner_lost(owner)
                     continue

@@ -72,6 +72,7 @@ const reasons: Readonly<Partial<Record<string, EngineErrorCode>>> = {
   'session.alreadyClosed': 'sessionNotRunning',
   'gateway.INVALID_INPUT': 'invalidConfiguration',
   'gateway.CAPABILITY_MISMATCH': 'invalidConfiguration',
+  'gateway.NOT_SUPPORTED': 'invalidConfiguration',
   'gateway.MODEL_NOT_INSTALLED': 'modelMissing',
   'gateway.MODEL_INTEGRITY': 'modelWeightsInvalid',
   'gateway.LOAD_FAILED': 'modelLoadFailed',

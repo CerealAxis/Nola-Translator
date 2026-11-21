@@ -631,7 +631,7 @@ def error_code(error):
     import httpx
     from .recognition.aliyun import CloudRecognitionError
     message = str(error).lower()
-    if isinstance(error, MemoryError) or any(part in message for part in ('out of memory', 'out_of_memory', 'cuda error', 'device lost')):
+    if isinstance(error, MemoryError) or any(part in message for part in ('out of memory', 'out_of_memory')):
         return 'out_of_memory', True
     if isinstance(error, (ValueError, KeyError, TypeError, EOFError, wave.Error, binascii.Error, struct.error)):
         return 'invalid_request', False
@@ -639,7 +639,9 @@ def error_code(error):
         reason = error.reason
         code = {'recognitionUnauthorized': 'authentication_failed',
                 'recognitionRateLimited': 'rate_limited',
-                'recognitionTimeout': 'request_timeout'}.get(reason, 'network_unavailable')
+                'recognitionTimeout': 'request_timeout',
+                'recognitionNetworkError': 'network_unavailable',
+                'recognitionClosed': 'network_unavailable'}.get(reason, 'inference_failed')
         return code, False
     if isinstance(error, httpx.HTTPStatusError):
         status = error.response.status_code
@@ -662,6 +664,8 @@ async def serve(reader, emit, factory=GatewayWorker):
             result = await worker.request(request)
             emit({'id': request_id, 'result': result})
         except Exception as error:
+            from .debug_log import log_exception
+            log_exception('engine', 'gateway.request.failed', error, requestId=request_id, operation=request.get('op'))
             code, fatal = error_code(error)
             config = getattr(worker, 'config', None)
             if request.get('fallback') and not getattr(worker, 'fallback_uses_primary', False):
@@ -682,6 +686,8 @@ async def serve(reader, emit, factory=GatewayWorker):
             result = await worker.initialize(request)
             emit({'id': request.get('id'), 'result': result})
         except Exception as error:
+            from .debug_log import log_exception
+            log_exception('engine', 'gateway.initialize.failed', error, requestId=request.get('id'))
             code, _fatal = error_code(error)
             emit({'id': request.get('id'), 'error': code, 'fatal': True})
             return
@@ -721,7 +727,9 @@ def main():
         return await asyncio.to_thread(sys.stdin.readline, MAX_LINE + 1)
     try:
         asyncio.run(serve(read, emit))
-    except Exception:
+    except Exception as error:
+        from .debug_log import log_exception
+        log_exception('engine', 'gateway.failed', error)
         # Never echo request data, resource paths or native diagnostics to API clients.
         emit({'error': 'inference_failed', 'fatal': True})
 

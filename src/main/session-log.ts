@@ -31,8 +31,8 @@ export function logActivityTotals(): void {
   logDiagnostic('activity.totals', Object.fromEntries([...activity].map(([key, value]) => [key, value.count])))
 }
 
-export function logPythonStderr(input: Readable, source: 'backend' | 'engine',
-  onOutput?: (level: string, bytes: number) => void): void {
+export function logPythonStderr(input: Readable, source: 'backend' | 'engine' | 'gateway' | 'offline',
+  onOutput?: (level: string, bytes: number) => void, context?: Record<string, unknown>): void {
   const prefix = 'NOLA_DIAGNOSTIC '
   createInterface({ input, crlfDelay: Infinity }).on('line', (line: string) => {
     if (!line) return
@@ -47,48 +47,52 @@ export function logPythonStderr(input: Readable, source: 'backend' | 'engine',
           const frequent = (layer === 'engine' && (event === 'engine.update' || event === 'engine.caption'))
             || (layer === 'ext' && (event === 'ext.chunk' || event === 'ext.silent'))
           const record = frequent ? logActivity : logDiagnostic
-          record(`pipeline.${layer}.${event}`, { ...observation, source })
+          record(`pipeline.${layer}.${event}`, { ...observation, source, ...context })
           return
         }
       } catch { /* A partial structured record can contain private payloads. */ }
-      logDiagnostic(`${source}.stderr.diagnostic-invalid`, { bytes })
+      logDiagnostic(`${source}.stderr.diagnostic-invalid`, { bytes, ...context })
       return
     }
     const level = /\b(error|exception|failed|fatal)\b/i.test(line) ? 'error'
       : /\b(warn|warning)\b/i.test(line) ? 'warning' : 'info'
-    logDiagnostic(`${source}.stderr.${level}`, { message: line, bytes })
+    logDiagnostic(`${source}.stderr.${level}`, { message: line, bytes, ...context })
     onOutput?.(level, bytes)
   })
 }
 
 function diagnosticText(value: string): string {
-  return redactLog(value).slice(-16000)
+  return redactLog(value)
 }
 
-export function sanitizeLogData(value: unknown, depth = 0): unknown {
-  if (depth > 6) return '[depth limit]'
+export function sanitizeLogData(value: unknown, depth = 0, ancestors = new Set<object>()): unknown {
   if (value === null || value === undefined || typeof value === 'number' || typeof value === 'boolean') return value
   if (typeof value === 'string') return diagnosticText(value)
   if (Buffer.isBuffer(value)) return { bytes: value.length }
+  if (typeof value === 'object') {
+    if (ancestors.has(value)) return '[circular]'
+    ancestors = new Set(ancestors).add(value)
+  }
   if (value instanceof Error) {
-    const frames = value.stack?.split(/\r?\n/).slice(1, 13).join('\n')
+    const frames = value.stack?.split(/\r?\n/).slice(1).join('\n')
     const name = /^[A-Za-z][A-Za-z0-9_.]{0,63}$/.test(value.name) ? value.name : 'Error'
-    const failureData = sanitizeLogData(processFailure(value), depth + 1)
+    const failureData = sanitizeLogData(processFailure(value), depth + 1, ancestors)
     const failureRecord = typeof failureData === 'object' && failureData !== null && !Array.isArray(failureData)
       ? failureData as Record<string, unknown>
       : {}
     return { name, ...failureRecord, stackFrames: frames ? diagnosticText(frames) : undefined,
-      cause: value.cause === undefined ? undefined : sanitizeLogData(value.cause, depth + 1) }
+      cause: value.cause === undefined ? undefined : sanitizeLogData(value.cause, depth, ancestors),
+      errors: value instanceof AggregateError ? value.errors.map(error => sanitizeLogData(error, depth, ancestors)) : undefined }
   }
-  if (Array.isArray(value)) return value.slice(0, 64).map(item => sanitizeLogData(item, depth + 1))
+  if (Array.isArray(value)) return value.map(item => sanitizeLogData(item, depth + 1, ancestors))
   if (typeof value === 'object') {
     const result: Record<string, unknown> = {}
-    for (const [key, item] of Object.entries(value).slice(0, 64)) {
+    for (const [key, item] of Object.entries(value)) {
       // Separators only: keeping digits is what makes `pcmBase64` and `database64` match, and
       // they carry raw audio into the log.
       const normalizedKey = key.replace(/[^a-z0-9]/gi, '').toLowerCase()
       result[key] = PRIVATE_LOG_KEYS.has(normalizedKey)
-        ? '[omitted]' : sanitizeLogData(item, depth + 1)
+        ? '[omitted]' : sanitizeLogData(item, depth + 1, ancestors)
     }
     return result
   }
@@ -236,15 +240,19 @@ export function relocateSessionLogs(directory: string): void {
 export function logDiagnostic(event: string, data?: unknown): void {
   if (!file) return
   try {
-    let detail = sanitizeLogData(data)
+    const detail = sanitizeLogData(data)
     const detailJson = JSON.stringify(detail ?? null)
-    if (Buffer.byteLength(detailJson) > MAX_ENTRY_BYTES) {
-      detail = { truncated: true, reason: 'Entry exceeded diagnostic size limit', originalBytes: Buffer.byteLength(detailJson) }
+    const parts = Buffer.byteLength(detailJson) > MAX_ENTRY_BYTES
+      ? Math.ceil(detailJson.length / (MAX_ENTRY_BYTES / 8)) : 1
+    const entryId = parts > 1 ? randomUUID() : undefined
+    for (let part = 0; part < parts; part++) {
+      const line = JSON.stringify({ at: new Date().toISOString(), sequence: ++sequence,
+        level: /fail|crash|exception|error/.test(event) ? 'error' : /warn/.test(event) ? 'warning' : 'info',
+        event, message: event.replace(/[.-]/g, ' '), data: parts === 1 ? detail : {
+          entryId, part, parts, serializedData: detailJson.slice(part * (MAX_ENTRY_BYTES / 8), (part + 1) * (MAX_ENTRY_BYTES / 8)),
+        } }) + '\n'
+      appendFileSync(file, line, 'utf8')
     }
-    const line = JSON.stringify({ at: new Date().toISOString(), sequence: ++sequence,
-      level: /fail|crash|exception|error/.test(event) ? 'error' : /warn/.test(event) ? 'warning' : 'info',
-      event, message: event.replace(/[.-]/g, ' '), data: detail }) + '\n'
-    appendFileSync(file, line, 'utf8')
   } catch { /* Diagnostics must remain usable on read-only or full disks. */ }
 }
 

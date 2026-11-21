@@ -15,6 +15,37 @@ async function directory(): Promise<string> {
 }
 afterEach(async () => { for (const path of directories.splice(0)) await rm(path, { recursive: true, force: true }) })
 
+it('preserves oversized original errors in reconstructable bounded records', async () => {
+  await initializeSessionLog(await directory(), {})
+  const message = 'HEAD-' + '原始报错'.repeat(40000) + '-TAIL api_key=private-value'
+  logDiagnostic('native.failed', new Error(message))
+  const lines = (await readFile(sessionLogPath(), 'utf8')).trim().split('\n').filter(line => JSON.parse(line).event === 'native.failed')
+  expect(lines.length).toBeGreaterThan(1)
+  expect(lines.every(line => Buffer.byteLength(line) < 256 * 1024)).toBe(true)
+  const parts = lines.map(line => JSON.parse(line).data)
+  expect(new Set(parts.map(part => part.entryId)).size).toBe(1)
+  expect(parts.map(part => part.part)).toEqual(parts.map((_, index) => index))
+  const data = JSON.parse(parts.map(part => part.serializedData).join(''))
+  expect(data.message).toBe(message.replace('private-value', '[redacted]'))
+  expect(lines.join('')).not.toContain('private-value')
+})
+
+it('preserves aggregate and deep original causes without looping on circular errors', async () => {
+  await initializeSessionLog(await directory(), {})
+  let cause = new Error('native root')
+  for (let index = 0; index < 10; index++) cause = new Error(`wrapper-${index}`, { cause })
+  const circular = new Error('circular failure')
+  circular.cause = circular
+  logDiagnostic('aggregate.failed', new AggregateError([cause, circular], 'multiple failures'))
+  let pythonCause: Record<string, unknown> = { message: 'original Python root' }
+  for (let index = 0; index < 10; index++) pythonCause = { cause: pythonCause }
+  logDiagnostic('python.failed', pythonCause)
+  const contents = await readFile(sessionLogPath(), 'utf8')
+  expect(contents).toContain('native root')
+  expect(contents).toContain('[circular]')
+  expect(contents).toContain('original Python root')
+})
+
 it('records the classified v2 failure and its safe Python metadata in the same log entry', async () => {
   await initializeSessionLog(await directory(), {})
   const error = await readBackendFailure(Response.json({ error: {

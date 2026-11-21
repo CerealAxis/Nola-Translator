@@ -30,28 +30,62 @@ async def test_scheduler_translates_targets_concurrently_and_caches_in_memory() 
     assert provider.calls == 2
 
 
-class SlowProvider:
-    name = "slow"
+@pytest.mark.asyncio
+async def test_timeout_is_reported_per_target_without_discarding_success() -> None:
+    class Provider:
+        name = "partly-slow"
 
-    async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
-        del text, source, target
-        await asyncio.sleep(1)
-        return ProviderTranslation("late", ("en", "zh"))
+        async def translate(self, text, source, target):
+            if target == "zh":
+                await asyncio.Event().wait()
+            return ProviderTranslation("ready", (source, target))
+
+    scheduler = TranslationScheduler(Provider(), timeout_seconds=0.01)
+    try:
+        results = await scheduler.translate("segment-1", 1, "hello", "en", ["zh", "ja"])
+        assert results[0].state == "failed"
+        assert results[0].error_code == "translationTimeout"
+        assert results[1].state == "complete"
+        assert results[1].text == "ready"
+    finally:
+        await scheduler.close()
 
 
 @pytest.mark.asyncio
-async def test_new_revision_invalidates_old_results_and_timeout_is_per_target() -> None:
-    scheduler = TranslationScheduler(SlowProvider(), timeout_seconds=0.01)
-    old_task = asyncio.create_task(
-        scheduler.translate("segment-1", 1, "old", "en", ["zh"])
-    )
-    await asyncio.sleep(0)
-    current = await scheduler.translate("segment-1", 2, "new", "en", ["zh"])
-    old = await old_task
+async def test_concurrent_revisions_return_results_for_runtime_arbitration() -> None:
+    started = {text: asyncio.Event() for text in ("old", "new")}
+    release = {text: asyncio.Event() for text in ("old", "new")}
 
-    assert current[0].state == "failed"
-    assert current[0].error_code == "translationTimeout"
-    assert old == []
+    class Provider:
+        name = "controlled-revisions"
+
+        async def translate(self, text, source, target):
+            started[text].set()
+            await release[text].wait()
+            return ProviderTranslation(text, (source, target))
+
+    scheduler = TranslationScheduler(Provider())
+    tasks, old_updates, new_updates = [], [], []
+    try:
+        old = asyncio.create_task(scheduler.translate("segment", 1, "old", "en", ["zh"], old_updates.append))
+        tasks.append(old)
+        await asyncio.wait_for(started["old"].wait(), 1)
+        new = asyncio.create_task(scheduler.translate("segment", 2, "new", "en", ["zh"], new_updates.append))
+        tasks.append(new)
+        await asyncio.wait_for(started["new"].wait(), 1)
+        release["new"].set()
+        assert (await new)[0].text == "new"
+        assert not old.done()
+        release["old"].set()
+        assert (await old)[0].text == "old"
+        assert [result.text for result in old_updates] == ["old"]
+        assert [result.text for result in new_updates] == ["new"]
+        assert scheduler.current_revision["segment"] == 2
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await scheduler.close()
 
 @pytest.mark.asyncio
 async def test_inflight_requests_are_shared_and_concurrency_is_bounded() -> None:

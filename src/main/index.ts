@@ -423,7 +423,7 @@ if (!hasSingleInstanceLock) {
       contents.on('destroyed', () => logDiagnostic('ui.window.closed'))
       contents.on('console-message', details => {
         if (details.level !== 'error' && details.level !== 'warning') return
-        logDiagnostic('renderer.console', { level: details.level, message: details.message, messageBytes: Buffer.byteLength(details.message), source: details.sourceId, line: details.lineNumber })
+        logDiagnostic(`renderer.console.${details.level}`, { level: details.level, message: details.message, messageBytes: Buffer.byteLength(details.message), source: details.sourceId, line: details.lineNumber })
       })
       contents.on('did-fail-load', (_event, code, description, _url, isMainFrame) => {
         if (isMainFrame) logDiagnostic('renderer.load-failed', { code, description })

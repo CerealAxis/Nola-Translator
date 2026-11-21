@@ -57,6 +57,7 @@ describe('BackendSupervisor', () => {
     expect(args.join(' ')).not.toContain(supervisor.controlToken)
     expect(options.env.NOLA_BACKEND_CONTROL_TOKEN).toBe(supervisor.controlToken)
     expect(options.env.NOLA_BACKEND_INSTANCE_ID).toBe(supervisor.instanceId)
+    expect(options.env.NOLA_TRANSLATOR_RUN_LOG_STDERR).toBe('1')
     expect(supervisor.authorizationHeader().Authorization).toBe(`Bearer ${supervisor.controlToken}`)
   })
 
