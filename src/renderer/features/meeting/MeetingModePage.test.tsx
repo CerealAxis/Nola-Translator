@@ -130,6 +130,18 @@ it('keeps meeting preferences on the page and links to centralized shortcuts', a
   expect(screen.queryByRole('combobox', { name: '按住说原声' })).not.toBeInTheDocument()
 })
 
+it('restores a meeting preference when saving fails', async () => {
+  let fail!: (error: Error) => void
+  vi.mocked(store.actions.settings.updateSettings).mockImplementation(() => new Promise<void>((_resolve, reject) => { fail = reject }))
+  await ready()
+  const toggle = screen.getByRole('switch', { name: '说话人标签' })
+  const initial = toggle.getAttribute('aria-checked')
+  fireEvent.click(toggle)
+  expect(toggle).not.toHaveAttribute('aria-checked', initial)
+  await act(async () => fail(new Error('write failed')))
+  expect(toggle).toHaveAttribute('aria-checked', initial)
+})
+
 it('supports receive-only application audio without a cable or microphone', async () => {
   const receive = { ...mode, uplinkEnabled: false, downlinkSource: 'application' as const, applicationId: 'process:call', microphoneId: '', uplinkOutputId: '', downlinkInputId: '' }
   store.stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, uiLanguage: 'zh-CN', meetingMode: receive } })

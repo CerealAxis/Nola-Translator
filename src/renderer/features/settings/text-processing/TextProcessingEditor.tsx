@@ -454,11 +454,11 @@ function RuleEntries({
                 <TableRow>
                   <TableHead scope="col" className="processing-fit"><span className="sr-only">{t('suite.textReorderHint')}</span></TableHead>
                   <TableHead scope="col">
-                    <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1">
                       <span>{t('suite.textPattern')}</span>
                       <Tooltip>
                         <TooltipTrigger render={
-                          <Button type="button" variant="bare" size="icon-xs" aria-label={t('suite.textPatternRegexHint')}>
+                          <Button type="button" variant="bare" size="icon-xs" className="-ms-1.5" aria-label={t('suite.textPatternRegexHint')}>
                             <CircleHelp aria-hidden="true" />
                           </Button>
                         } />

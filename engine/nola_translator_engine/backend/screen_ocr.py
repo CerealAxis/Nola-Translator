@@ -119,7 +119,7 @@ class OcrRequest(BaseModel):
     image: str = Field(min_length=24, max_length=MAX_IMAGE_BYTES * 4 // 3 + 64)
     overlay: bool = False
     task_mode: Literal["realtime", "offline"] = "realtime"
-    max_concurrency: int = Field(default=1, ge=1, le=5)
+    max_concurrency: int = Field(default=1, ge=1)
     language: str = Field(default="auto", min_length=1, max_length=32, pattern=r"^[a-zA-Z][a-zA-Z0-9-]*$")
 
 

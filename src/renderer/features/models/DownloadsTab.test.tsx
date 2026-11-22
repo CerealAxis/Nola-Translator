@@ -7,7 +7,7 @@ import { DownloadsTab } from './DownloadsTab'
 const initial = stores.models.getState()
 afterEach(() => { cleanup(); stores.models.setState(initial); vi.restoreAllMocks() })
 
-it('keeps size numeric and offers both retry and cancel for a failed download', () => {
+it('shows the failed download and offers both retry and cancel', () => {
   const record: ResourceRecord = {
     resourceId: 'index-translate-2b-q4-k-m', kind: 'translationModel', provider: 'index-translate',
     name: 'Index-Translate 2B', description: '', languages: [], installed: false,
@@ -17,13 +17,25 @@ it('keeps size numeric and offers both retry and cancel for a failed download', 
   stores.models.setState({ resources: [record], error: null })
   const cancel = vi.spyOn(actions.models, 'manageResource').mockResolvedValue(record)
   render(<DownloadsTab />)
-  const row = screen.getByText(record.name).closest('tr')!
-  const cells = row.querySelectorAll('td')
-  expect(cells[1]).toHaveTextContent('1.2 GB')
-  expect(cells[1]).not.toHaveTextContent('下载失败')
-  expect(within(row).getByRole('button', { name: '重试' })).toBeEnabled()
-  fireEvent.click(within(row).getByRole('button', { name: '取消任务' }))
+  const card = screen.getByRole('listitem')
+  expect(within(card).getByText(record.name)).toBeInTheDocument()
+  expect(within(card).getByText('未安装')).toBeInTheDocument()
+  expect(within(card).getByRole('button', { name: '重试' })).toBeEnabled()
+  fireEvent.click(within(card).getByRole('button', { name: '取消任务' }))
   expect(cancel).toHaveBeenCalledWith(record.resourceId, 'cancel')
+})
+
+it('shows numeric downloaded and total sizes for an active download', () => {
+  stores.models.setState({ resources: [{
+    resourceId: 'index-translate-2b-q4-k-m', kind: 'translationModel', provider: 'index-translate',
+    name: 'Index-Translate 2B', description: '', languages: [], installed: false,
+    installedBytes: 0, downloadBytes: 1312164352, state: 'running', phase: 'download',
+    progress: 0.25, cancellable: true,
+  }], error: null })
+  render(<DownloadsTab />)
+  const card = screen.getByRole('listitem')
+  expect(within(card).getByText(/313.*MB.*1\.2 GB/)).toBeInTheDocument()
+  expect(within(card).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0.25')
 })
 
 it('passes the chosen source when retrying a task', async () => {

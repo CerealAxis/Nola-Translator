@@ -30,9 +30,10 @@ class TtsWorker(LocalModelWorker):
     async def request(self, request, **kwargs):
         assert request.kind == "tts"
         assert request.resource_id == MODEL
-        if request.payload == {"inspect": True, "max_concurrency": 1}:
+        payload = {key: value for key, value in request.payload.items() if key not in ('correlationId', 'taskId')}
+        if payload == {"inspect": True, "max_concurrency": 1}:
             return {"voices": ["cori"]}
-        assert request.payload == {"text": "Hello", "voice": "cori", "max_concurrency": 1}
+        assert payload == {"text": "Hello", "voice": "cori", "max_concurrency": 1}
         return self.response
 
 

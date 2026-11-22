@@ -65,6 +65,7 @@ PADDLEOCR_VL = ModelSpec(
         FileEntry("onnx/embedding.onnx", 423_624_912, "a3cd4e685f455c9c634f1d62e4ead57eb2965de5cd6cd2b291407b61d5cfdd91"),
         FileEntry("tokenizer.json", 11_189_060, "c8a215a59183d0d0781adc33bacd3ce6162716f7fd568fb30234a74d69803a7d"),
         FileEntry("preprocessor_config.json", 641, blob_sha1="d873cd63d04d9e6243999759fc30f7752dab3222"),
+        FileEntry("generation_config.json", 133, "a6701d78ab3b4d972307cdec3b69d4c13f46e0d5140514f50ab7d84259324b94"),
         FileEntry("config.json", 2_059, blob_sha1="c54711466ae75457f8e57b909a49dae570bfa5c5"),
     ),
 )

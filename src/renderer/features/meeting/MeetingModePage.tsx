@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Captions, CircleHelp, MessagesSquare, RefreshCw, Keyboard } from 'lucide-react'
 import { ALIYUN_LANGUAGES, ALIYUN_S2S_SPEECH_LANGUAGES } from '../../../shared/cloud-config'
 import { appendSupportCode, SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
@@ -56,6 +56,7 @@ export function MeetingModePage() {
   const ttsBinding = resolveModelBinding('tts', sceneModelBinding(settings, 'tts') || settings.synthesis.modelId, catalog.tts).binding
   const speechLanguages = catalog.tts.find(model => model.binding === ttsBinding)?.targetLanguages ?? []
   const [draft, setDraft] = useState<MeetingModeSettings>()
+  const preferenceRevision = useRef({ captionScope: 0, showSpeaker: 0 })
   const [snapshot, setSnapshot] = useState(IDLE)
   const [statusLoading, setStatusLoading] = useState(true)
   const [deviceState, setDeviceState] = useState<'loading' | 'loaded' | 'failed'>('loading')
@@ -119,7 +120,15 @@ export function MeetingModePage() {
   const change = <Key extends keyof MeetingModeSettings>(key: Key, value: MeetingModeSettings[Key]) => {
     setDraft(previous => ({ ...(previous ?? mode), [key]: value }))
     if (key === 'captionScope' || key === 'showSpeaker') {
-      void actions.settings.updateSettings({ meetingMode: { ...mode, [key]: value } }).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
+      const preference = key === 'captionScope' ? 'captionScope' : 'showSpeaker'
+      const revision = ++preferenceRevision.current[preference]
+      void actions.settings.updateSettings({ meetingMode: { ...mode, [key]: value } }).catch(error => {
+        if (preferenceRevision.current[preference] === revision) {
+          const restored = stores.settings.getState().settings?.meetingMode?.[preference] ?? mode[preference]
+          setDraft(previous => previous ? { ...previous, [preference]: restored } : previous)
+        }
+        notifyError(t('errors.settingsSaveFailed'), { cause: error })
+      })
     }
   }
   const select = (key: keyof MeetingModeSettings, label: TranslationKey, value: string, options: readonly PickerOption[], onChange: (value: string) => void) =>

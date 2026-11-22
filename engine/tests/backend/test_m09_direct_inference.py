@@ -187,13 +187,13 @@ def test_direct_request_rejects_private_and_unsupported_fields(fields):
 async def test_direct_call_passes_explicit_task_mode_and_concurrency_to_gateway(mode):
     gateway = AsyncMock(spec=ModelGateway)
     gateway.transcribe.return_value = AsrObservation("hello")
-    await run_direct_inference(gateway, request("asr", audio=wav(), task_mode=mode, max_concurrency=5))
+    await run_direct_inference(gateway, request("asr", audio=wav(), task_mode=mode, max_concurrency=17))
     ctx, = gateway.transcribe.await_args.args
     assert ctx.task_mode == mode
-    assert ctx.max_concurrency == 5
+    assert ctx.max_concurrency == 17
 
 
-@pytest.mark.parametrize("fields", [{"max_concurrency": 0}, {"max_concurrency": 11}, {"task_mode": "unknown"}])
+@pytest.mark.parametrize("fields", [{"max_concurrency": 0}, {"task_mode": "unknown"}])
 def test_direct_call_rejects_invalid_scheduling_options(fields):
     with pytest.raises(ValidationError):
         request("mt", text="hello", source="en", target="zh", **fields)

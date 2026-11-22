@@ -31,6 +31,7 @@ const MAX_TEXT = 64_000
 const PUBLIC_HTTP_PATHS = new Set(['/v2/models', '/v2/realtime/sessions', '/v2/chat/completions', '/v2/audio/speech', '/v2/audio/transcriptions'])
 /** A cloud instance costs no weights, so it is kept warm for a while after its last request. */
 const LAZY_IDLE_MS = 10 * 60_000
+const LOCAL_IDLE_MS = 5 * 60_000
 interface WorkerSlot {
   worker: GatewayWorker
   kind: WorkerKind
@@ -53,6 +54,9 @@ interface WorkerPlan {
   signature: string
 }
 export interface ModelGatewayOptions {
+  configureBackendLoading?(mode: 'on-demand' | 'direct', models: string[], signal: AbortSignal): Promise<void>
+  loadBackend?(kind: WorkerKind, binding: string, signal: AbortSignal): Promise<void>
+  backendInstances?(): Promise<{ model_id: string; state: string }[]>
   ocr?: { load(resourceId: string): Promise<void>; release(): Promise<void>; infer(request: ScreenOcrRequest, signal: AbortSignal): Promise<ScreenOcrResult> }
   getSettings(): AppSettings
   directLaunch(model: string): Promise<EngineLaunchSpec>
@@ -88,15 +92,7 @@ const cloudTranslationProvider = (binding: string): TranslationProvider | undefi
   return ['microsoft', 'google', 'mymemory', 'index-translate', 'recognition'].includes(provider) ? provider as TranslationProvider : undefined
 }
 
-/**
- * One authenticated listener per capability binding.
- *
- * The gateway page binds exactly one model per capability, which is loaded eagerly and owns the
- * public `nola-*` id. Business consumers may instead name a configured cloud interface: those
- * instances carry no weights, so they are created on first use and retired after an idle period.
- * A local model that the gateway has not loaded is never started on demand, because that would
- * allocate memory nobody asked for.
- */
+/** The selected loading mode applies to the shared models behind the public `nola-*` aliases. */
 export class ModelGateway {
   private state: ModelGatewaySnapshot['state'] = 'stopped'
   private error?: string
@@ -132,6 +128,12 @@ export class ModelGateway {
   private stopping = false
   private externalStopping = 0
   private stopVersion = 0
+  private loadingController = new AbortController()
+  private backendPolling?: ReturnType<typeof setInterval>
+  private polling = false
+  private readonly modelIdle = new Map<'llm' | 'ocr', ReturnType<typeof setTimeout>>()
+  private languageOpening?: Promise<void>
+  private ocrOpening?: Promise<void>
 
   constructor(private readonly options: ModelGatewayOptions) {}
 
@@ -140,15 +142,18 @@ export class ModelGateway {
    * `native` means the ASR service itself translates, so no text translation model is involved.
    */
   requireCapabilities(translation: boolean, native = false): void {
-    if (this.state !== 'running' || this.services.asr.state !== 'ready') throw new Error('ASR service is not ready. Start it in Model Gateway.')
+    const usable = (kind: WorkerKind) => ['pending', 'loading', 'ready'].includes(this.services[kind].state)
+    if (this.state !== 'running' || !usable('asr')) throw new Error('ASR service is not ready. Start it in Model Gateway.')
     if (!translation) return
     if (native) {
       if (!this.services.asr.nativeTranslation) throw new Error('The active ASR service does not provide native translation')
-    } else if (this.services.mt.state !== 'ready') throw new Error('MT service is not ready. Start it in Model Gateway.')
+    } else if (!usable('mt')) throw new Error('MT service is not ready. Start it in Model Gateway.')
   }
 
   resourceInUse(resourceId: string): boolean {
     return (this.ocrLoaded || this.services.ocr.state === 'loading') && this.services.ocr.model === `resource:${resourceId}`
+      || WORKER_KINDS.some(kind => this.services[kind].model === `resource:${resourceId}`
+        && this.usesBackend(kind, this.services[kind].model) && ['ready', 'loading'].includes(this.services[kind].state))
       || this.requests.some(request => request.status === 'running' && request.model === `resource:${resourceId}`)
       || [...this.slots.values(), ...this.retiring].some(slot => slot.resources.includes(resourceId) || slot.binding === `resource:${resourceId}`)
       || [...this.retiredLanguageModels, ...(this.llm ? [this.llm] : [])].some(slot => slot.runtime.profile.id === `resource:${resourceId}`)
@@ -177,18 +182,23 @@ export class ModelGateway {
     }
   }
 
-  acquireOcr(language = 'auto'): () => void {
+  async acquireOcr(language = 'auto'): Promise<() => void> {
+    if (this.state === 'running' && !this.stopping && ['pending', 'loading'].includes(this.services.ocr.state)) {
+      this.ocrOpening ??= this.configureOcr(this.inventory, true).finally(() => { this.ocrOpening = undefined })
+      await this.ocrOpening
+    }
     if (this.state !== 'running' || this.stopping || !this.ocrLoaded || this.services.ocr.state !== 'ready'
       || !isModelEnabled(this.options.getSettings(), 'ocr', this.services.ocr.model)) throw new Error('ocrNotReady')
     const resource = this.inventory.find(item => `resource:${item.resourceId}` === this.services.ocr.model)
     if (language !== 'auto' && !resource?.languages.includes(language)) throw new Error('invalidConfig')
     this.ocrRefs++
+    this.clearModelIdle('ocr')
     let released = false
-    return () => { if (!released) { released = true; this.ocrRefs-- } }
+    return () => { if (!released) { released = true; this.ocrRefs--; this.scheduleModelIdle('ocr') } }
   }
 
   async inferOcr(request: ScreenOcrRequest, signal: AbortSignal): Promise<ScreenOcrResult> {
-    const release = this.acquireOcr(request.language)
+    const release = await this.acquireOcr(request.language)
     const controller = new AbortController()
     this.controllers.add(controller)
     let entry: GatewayRequestSnapshot | undefined
@@ -314,10 +324,12 @@ export class ModelGateway {
     if (wanted && wanted !== this.services.llm.model) throw new Error('Select the LLM service enabled in Model Gateway')
     const entry = this.begin('llm', this.services.llm.model)
     slot.refs++
+    this.clearModelIdle('llm')
     let released = false
     return { ...slot.runtime, signal: slot.controller.signal, release: (error?: unknown) => {
       if (released) return
       released = true; slot.refs--; this.finish(entry, error)
+      if (!slot.retired) this.scheduleModelIdle('llm')
       if (slot.retired && !slot.refs) { this.retiredLanguageModels.delete(slot); void slot.runtime.close() }
     } }
   }
@@ -338,7 +350,7 @@ export class ModelGateway {
     return Object.fromEntries(KINDS.map(kind => {
       const service = this.services[kind]
       const local: AvailableGatewayModel[] = []
-      if (this.state === 'running' && service.state === 'ready' && bindingIsLocal(service.model) && isModelEnabled(settings, kind, service.model)) {
+      if (this.state === 'running' && ['pending', 'loading', 'ready'].includes(service.state) && bindingIsLocal(service.model) && isModelEnabled(settings, kind, service.model)) {
         const resource = this.inventory.find(item => `resource:${item.resourceId}` === service.model)
         const configuration = resource && configurationOf(resource)
         local.push({ binding: service.model, name: service.name, kind, origin: 'gateway', free: true,
@@ -354,7 +366,28 @@ export class ModelGateway {
     const credentials = await this.credentialPresence(settings)
     // A settings update wins over a slow credential read. Its next refresh supplies the new catalog.
     if (JSON.stringify(settings) === JSON.stringify(this.options.getSettings())) this.cloudCatalog = buildConfiguredCloudModels(settings, credentials)
+    await this.refreshBackendStates()
     return this.snapshot()
+  }
+  private async refreshBackendStates(): Promise<void> {
+    if (!this.options.backendInstances || this.polling || this.stopping || !['starting', 'running'].includes(this.state)) return
+    this.polling = true
+    const version = this.stopVersion
+    try {
+      const instances = await this.options.backendInstances()
+      if (this.stopping || version !== this.stopVersion) return
+      let changed = false
+      for (const kind of WORKER_KINDS) {
+        const service = this.services[kind]
+        if (!bindingIsLocal(service.model) || service.state === 'stopped' || !this.usesBackend(kind, service.model)) continue
+        const instance = instances.find(item => item.model_id === service.model.slice(9) && ['loading', 'ready', 'busy', 'failed'].includes(item.state))
+        const state = instance ? instance.state === 'busy' ? 'ready' : instance.state as 'loading' | 'ready' | 'failed'
+          : service.state === 'ready' ? 'pending' : service.state
+        if (state !== service.state) { service.state = state; changed = true }
+      }
+      if (changed) this.changed()
+    } catch (error) { console.error('[gateway.instances]', error) }
+    finally { this.polling = false }
   }
   private async credentialPresence(settings: AppSettings): Promise<Record<CredentialProvider, boolean>> {
     const slots: CredentialProvider[] = ['aliyun-asr', 'minimax-asr', 'cloud',
@@ -399,6 +432,7 @@ export class ModelGateway {
     this.stopping = true
     this.externalStopping++
     this.stopVersion++
+    this.loadingController.abort()
     this.loadingLanguageModel?.abort()
     for (const controller of this.onDemandLocalLanguageControllers) controller.abort()
     for (const release of this.onDemandLocalLanguageLeases) release()
@@ -422,6 +456,11 @@ export class ModelGateway {
     const wanted = normalizeModelBinding('llm', binding) || defaultModelBinding(settings, 'llm')
     if (!wanted || (bindingIsLocal(wanted) && !isModelEnabled(settings, 'llm', wanted))) throw new GatewayError(503, 'The language model is not enabled in Model Management', 'model_disabled')
     const local = bindingIsLocal(wanted)
+    if (local && this.state === 'running' && this.services.llm.model === wanted && ['pending', 'loading'].includes(this.services.llm.state)) {
+      this.languageOpening ??= this.configureLanguageModel(true).finally(() => { this.languageOpening = undefined })
+      await this.languageOpening
+      if (this.services.llm.state !== 'ready') throw new Error(this.services.llm.error ?? 'Language model load failed')
+    }
     if (local && this.services.llm.state === 'ready' && this.services.llm.model === wanted) return this.languageModel(wanted)
     const controller = new AbortController()
     this.cloudLanguageControllers.add(controller)
@@ -452,6 +491,7 @@ export class ModelGateway {
     if (version !== this.stopVersion) return this.snapshot()
     if (this.state === 'running') return this.snapshot()
     this.stopping = false; this.state = 'starting'; this.error = undefined; this.changed()
+    this.loadingController = new AbortController()
     try {
       await this.revealKey()
       const config = modelGatewaySettingsSchema.parse(this.options.getSettings().modelGateway)
@@ -461,7 +501,12 @@ export class ModelGateway {
       await this.configureWorkers()
       if (this.stopping) return this.snapshot()
       this.state = 'running'; this.changed()
-    } catch {
+      if (this.options.backendInstances) {
+        this.backendPolling = setInterval(() => { void this.refreshBackendStates() }, 500)
+        this.backendPolling.unref?.()
+      }
+    } catch (error) {
+      console.error('[gateway.start]', error)
       if (this.stopping || version !== this.stopVersion) return this.snapshot()
       await this.stopInternal(); this.state = 'failed'; this.error = 'Gateway could not start. Check the address, port and installed runtime.'; this.changed()
     }
@@ -641,14 +686,17 @@ export class ModelGateway {
   private async configureWorkers(): Promise<void> {
     const stored = this.options.getSettings()
     const config = modelGatewaySettingsSchema.parse(stored.modelGateway)
-    const needsInventory = config.ocr || WORKER_KINDS.some(kind => config[kind] && (bindingIsLocal(this.bindingFor(kind, config, stored))
+    const needsInventory = config.ocr || config.llm || WORKER_KINDS.some(kind => config[kind] && (bindingIsLocal(this.bindingFor(kind, config, stored))
       || (kind === 'mt' && (bindingIsLocal(this.fallbackBindingFor(config)) || stored.translation.fallback.provider === 'local'))))
     const resources = needsInventory ? await this.options.listResources().catch(() => []) : []
     this.inventory = resources
+    await this.options.configureBackendLoading?.(config.loadMode ?? 'on-demand', WORKER_KINDS
+      .filter(kind => config[kind] && bindingIsLocal(this.bindingFor(kind, config, stored)))
+      .map(kind => this.bindingFor(kind, config, stored).slice(9)), this.loadingController.signal)
     await Promise.all([...WORKER_KINDS.map(kind => this.configureCapability(kind, config, stored, resources)), this.configureLanguageModel(), this.configureOcr(resources)])
   }
 
-  private async configureOcr(resources: ResourceRecord[]): Promise<void> {
+  private async configureOcr(resources: ResourceRecord[], force = false): Promise<void> {
     const settings = this.options.getSettings()
     const binding = normalizeModelBinding('ocr', settings.modelGateway.ocrModel) || defaultModelBinding(settings, 'ocr')
     if (!settings.modelGateway.ocr) {
@@ -657,18 +705,22 @@ export class ModelGateway {
       this.services.ocr = { state: 'stopped', model: '', name: '' }; this.changed(); return
     }
     if (this.ocrLoaded && this.services.ocr.model === binding && this.services.ocr.state === 'ready'
-      && isModelEnabled(settings, 'ocr', binding) && resources.some(item => item.installed && `resource:${item.resourceId}` === binding)) return
+      && isModelEnabled(settings, 'ocr', binding) && resources.some(item => item.installed && `resource:${item.resourceId}` === binding)) { this.scheduleModelIdle('ocr'); return }
     if (this.ocrLoaded) { await this.options.ocr?.release(); this.ocrLoaded = false }
     const resource = resources.find(item => `resource:${item.resourceId}` === binding && item.kind === 'ocrModel')
-    this.services.ocr = { state: 'loading', model: binding, name: resource?.name ?? '' }; this.changed()
     let attemptedLoad = false
     try {
       if (!resource?.installed || !this.options.ocr) throw new Error('ocrMissing')
       if (!isModelEnabled(settings, 'ocr', binding)) throw new Error('model_disabled')
+      if (!force && settings.modelGateway.loadMode !== 'direct') {
+        this.services.ocr = { state: 'pending', model: binding, name: resource.name }; this.changed(); return
+      }
+      this.services.ocr = { state: 'loading', model: binding, name: resource.name }; this.changed()
       attemptedLoad = true
       await this.options.ocr.load(resource.resourceId)
       this.ocrLoaded = true
       if (!this.stopping) this.services.ocr = { state: 'ready', model: binding, name: resource.name }
+      this.scheduleModelIdle('ocr')
     } catch (error) {
       if (attemptedLoad) {
         // A timed-out HTTP load can still finish natively; release it before allowing another owner.
@@ -715,19 +767,41 @@ export class ModelGateway {
         if (stale) { this.slots.delete(`${kind}:${previous}`); this.retire(stale) }
       }
       if (this.stopping) return
-      this.services[kind] = { state: 'ready', model: binding, name: plan.name,
+      this.services[kind] = { state: bindingIsLocal(binding) ? 'pending' : 'ready', model: binding, name: plan.name,
         ...(bindingIsLocal(binding) ? { providerName: 'local' } : {}),
         ...(kind === 'asr' ? { nativeTranslation: binding === 'cloud:aliyun' && supportsRecognitionNativeTranslation({ ...stored.recognition, provider: 'aliyun' }) } : {}) }
-      this.changed(); return
+      this.changed()
+      if (bindingIsLocal(binding) && config.loadMode === 'direct' && this.options.loadBackend) {
+        this.services[kind].state = 'loading'; this.changed()
+        try {
+          await this.options.loadBackend(kind, binding, this.loadingController.signal)
+          if (!this.stopping) this.services[kind].state = 'ready'
+        } catch (error) {
+          console.error('[gateway.load]', error)
+          if (!this.stopping) this.services[kind] = { ...this.services[kind], state: 'failed',
+            error: error instanceof Error ? error.message : 'Model load failed',
+            errorCode: error instanceof BackendModelError ? error.engineCode : 'inference_failed' }
+        }
+        this.changed()
+      } else await this.refreshBackendStates()
+      return
     }
     const existing = this.slots.get(`${kind}:${binding}`)
-    if (existing && !existing.retired && !existing.lazy && existing.signature === plan.signature && this.services[kind].state === 'ready') return
+    if (existing && !existing.retired && existing.signature === plan.signature && this.services[kind].state === 'ready') {
+      existing.lazy = config.loadMode !== 'direct'
+      this.clearIdle(existing)
+      if (!existing.refs && existing.lazy) { existing.refs++; this.unhold(existing) }
+      return
+    }
     if (existing && !existing.retired) { this.slots.delete(`${kind}:${binding}`); this.retire(existing) }
     if (previous && previous !== binding) {
       const stale = this.slots.get(`${kind}:${previous}`)
       if (stale) { this.slots.delete(`${kind}:${previous}`); this.retire(stale) }
     }
     if (this.stopping) return
+    if (config.loadMode !== 'direct') {
+      this.services[kind] = { state: 'pending', model: binding, name: plan.name }; this.changed(); return
+    }
     this.services[kind] = { state: 'loading', model: binding, name: plan.name }
     this.changed()
     try {
@@ -772,7 +846,7 @@ export class ModelGateway {
       config: plan.workerConfig, ...(plan.fallbackConfig ? { fallbackConfig: plan.fallbackConfig, fallbackResourceId: plan.fallbackResourceId } : {}),
       ...(plan.fallbackUsesPrimary ? { fallbackUsesPrimary: true } : {}) }, message => {
       // Only the bound instance reports through the service state; a warm cloud failure is per-request.
-      if (slot.lazy || this.slots.get(key) !== slot || this.eager.get(kind) !== binding || this.stopping) return
+      if (this.slots.get(key) !== slot || this.eager.get(kind) !== binding || this.stopping) return
       this.services[kind].state = 'failed'; this.services[kind].error = message; this.changed()
     })
     this.slots.set(key, slot)
@@ -802,13 +876,17 @@ export class ModelGateway {
       if (JSON.stringify(stored) !== JSON.stringify(this.options.getSettings())) throw new GatewayError(409, 'Model configuration changed during initialization. Retry the request.', 'configuration_changed')
       if (found && !found.retired && found.signature === plan.signature) return found
       if (found) { this.slots.delete(key); this.retire(found) }
-      const slot = await this.createSlot(kind, wanted, plan, !bindingIsLocal(wanted) || this.usesBackend(kind, wanted))
+      const selected = bindingIsLocal(wanted) && this.services[kind].model === wanted
+      if (selected) { this.services[kind].state = 'loading'; this.changed() }
+      const slot = await this.createSlot(kind, wanted, plan, !bindingIsLocal(wanted) || this.usesBackend(kind, wanted) || config.loadMode !== 'direct')
       try { await slot.worker.ready }
       catch (error) {
+        if (selected && !this.stopping) { this.services[kind] = { ...this.services[kind], state: 'failed', error: error instanceof Error ? error.message : 'Model load failed' }; this.changed() }
         if (this.slots.get(key) === slot) { this.slots.delete(key); await this.closeSlot(slot) }
         throw error
       }
       if ((bindingIsLocal(wanted) && this.stopping) || this.slots.get(key) !== slot) throw new GatewayError(503, `${kind.toUpperCase()} instance stopped.`, 'model_unavailable')
+      if (selected) { this.services[kind].state = 'ready'; this.changed() }
       slot.refs++
       this.unhold(slot)
       return slot
@@ -832,7 +910,7 @@ export class ModelGateway {
     if (!settings.modelGateway[kind]) throw new GatewayError(503, `${kind.toUpperCase()} is not loaded in Model Gateway.`, 'model_not_loaded')
     if (binding !== this.eager.get(kind)) throw new GatewayError(404, 'This local model is not loaded in Model Gateway. Load it there or pick a cloud interface.', 'model_not_found')
     const service = this.services[kind]
-    if (this.usesBackend(kind, binding) && (service.model !== binding || service.state !== 'ready')) {
+    if (this.usesBackend(kind, binding) && (service.model !== binding || service.state === 'failed' || service.state === 'stopped')) {
       throw new GatewayError(503, service.error ?? 'Model configuration is unavailable.', service.errorCode ?? 'model_unavailable')
     }
   }
@@ -848,7 +926,10 @@ export class ModelGateway {
         if (slot.refs || slot.retired) return
         if (this.slots.get(`${slot.kind}:${slot.binding}`) === slot) this.slots.delete(`${slot.kind}:${slot.binding}`)
         void this.closeSlot(slot)
-      }, LAZY_IDLE_MS)
+        if (bindingIsLocal(slot.binding) && this.services[slot.kind].model === slot.binding && !this.stopping) {
+          this.services[slot.kind].state = 'pending'; this.changed()
+        }
+      }, bindingIsLocal(slot.binding) ? LOCAL_IDLE_MS : LAZY_IDLE_MS)
       slot.idle.unref?.()
     }
   }
@@ -861,6 +942,10 @@ export class ModelGateway {
   }
   private async stopInternal(): Promise<ModelGatewaySnapshot> {
     this.stopping = true; this.state = 'stopping'; this.changed()
+    if (this.backendPolling) clearInterval(this.backendPolling)
+    this.backendPolling = undefined
+    for (const timer of this.modelIdle.values()) clearTimeout(timer)
+    this.modelIdle.clear()
     const external = [...this.externalMt.values()]
     await Promise.all(external.map(lease => lease.cancel()))
     await Promise.all(external.map(lease => lease.done))
@@ -868,6 +953,7 @@ export class ModelGateway {
     this.loadingLanguageModel?.abort()
     for (const controller of this.onDemandLocalLanguageControllers) controller.abort()
     for (const release of this.onDemandLocalLanguageLeases) release()
+    await Promise.all([this.ocrOpening, this.languageOpening].map(task => task?.catch(() => undefined)))
     await Promise.all(this.cloudLanguageClosing)
     const languageModels = [...this.retiredLanguageModels, ...(this.llm ? [this.llm] : [])]
     for (const slot of languageModels) slot.controller.abort()
@@ -877,12 +963,13 @@ export class ModelGateway {
     this.llm = undefined; this.retiredLanguageModels.clear()
     for (const slot of workers) { this.slots.delete(`${slot.kind}:${slot.binding}`); this.retiring.delete(slot) }
     this.eager.clear()
+    await this.options.configureBackendLoading?.('on-demand', [], AbortSignal.timeout(10000))
     this.tickets.clear()
     for (const kind of KINDS) this.services[kind] = { ...this.services[kind], state: 'stopped', error: undefined }
     this.state = 'stopped'; this.error = undefined; this.changed(); return this.snapshot()
   }
 
-  private async configureLanguageModel(): Promise<void> {
+  private async configureLanguageModel(force = false): Promise<void> {
     if (this.stopping) return
     const settings = this.options.getSettings()
     const binding = normalizeModelBinding('llm', settings.modelGateway.llmModel)
@@ -917,15 +1004,13 @@ export class ModelGateway {
       this.services.llm = { state: 'failed', model: binding, name: '', error: 'LLM credentials are unavailable' }
       this.changed(); return
     }
-    if (previous?.signature === signature && this.services.llm.state === 'ready') return
+    if (previous?.signature === signature && this.services.llm.state === 'ready') { this.scheduleModelIdle('llm'); return }
     this.llm = undefined
     if (previous) {
       previous.retired = true
       if (previous.refs) this.retiredLanguageModels.add(previous)
       else await previous.runtime.close()
     }
-    this.services.llm = { state: 'loading', model: binding, name: '' }
-    this.changed()
     if (this.stopping) return
     if (bindingIsLocal(binding) && !isModelEnabled(settings, 'llm', binding)) {
       this.services.llm = { state: 'failed', model: binding, name: '', error: 'Enable this model in Model Management before loading it.', errorCode: 'model_disabled' }
@@ -935,6 +1020,11 @@ export class ModelGateway {
       this.services.llm = { state: 'ready', model: binding, name: cloudName }
       this.changed(); return
     }
+    if (!force && settings.modelGateway.loadMode !== 'direct') {
+      this.services.llm = { state: 'pending', model: binding, name: this.inventory.find(item => `resource:${item.resourceId}` === binding)?.name ?? binding.slice(9) }
+      this.changed(); return
+    }
+    this.services.llm = { state: 'loading', model: binding, name: '' }; this.changed()
     const controller = new AbortController()
     this.loadingLanguageModel = controller
     try {
@@ -943,6 +1033,7 @@ export class ModelGateway {
       const slot = { runtime, signature, refs: 0, retired: false, controller }
       this.llm = slot
       this.services.llm = { state: 'ready', model: binding, name: runtime.name }
+      this.scheduleModelIdle('llm')
       runtime.onFailed?.(() => {
         controller.abort()
         if (this.llm === slot && !this.stopping) {
@@ -950,9 +1041,33 @@ export class ModelGateway {
           this.changed()
         }
       })
-    } catch {
+    } catch (error) {
+      console.error('[gateway.llm.load]', error)
       if (!this.stopping) this.services.llm = { state: 'failed', model: binding, name: '', error: 'LLM could not initialize. Check the selected model, protocol and runtime.' }
     } finally { if (this.loadingLanguageModel === controller) this.loadingLanguageModel = undefined; this.changed() }
+  }
+
+  private clearModelIdle(kind: 'llm' | 'ocr'): void {
+    const timer = this.modelIdle.get(kind)
+    if (timer) clearTimeout(timer)
+    this.modelIdle.delete(kind)
+  }
+  private scheduleModelIdle(kind: 'llm' | 'ocr'): void {
+    this.clearModelIdle(kind)
+    if (this.stopping || this.options.getSettings().modelGateway.loadMode === 'direct'
+      || (kind === 'llm' ? this.llm?.refs : this.ocrRefs)) return
+    const timer = setTimeout(() => {
+      this.modelIdle.delete(kind)
+      void this.serialize(async () => {
+        if (this.stopping || this.options.getSettings().modelGateway.loadMode === 'direct'
+          || (kind === 'llm' ? this.llm?.refs : this.ocrRefs)) return
+        if (kind === 'llm') { const slot = this.llm; this.llm = undefined; await slot?.runtime.close() }
+        else { await this.options.ocr?.release(); this.ocrLoaded = false }
+        this.services[kind].state = 'pending'; this.changed()
+      }).catch(error => console.error('[gateway.idle]', error))
+    }, LOCAL_IDLE_MS)
+    timer.unref?.()
+    this.modelIdle.set(kind, timer)
   }
 
   private authorize(request: IncomingMessage): void {

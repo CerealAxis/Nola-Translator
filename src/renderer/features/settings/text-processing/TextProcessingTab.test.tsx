@@ -1,12 +1,17 @@
 import { EditorView } from '@codemirror/view'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
+import * as store from '@/store'
+import type { NolaBridge } from '@/bridge'
+import { emptyGlossary } from '../../../../shared/glossary'
+import { emptyWordRules } from '../../../../shared/word-rules'
 import { parseRoute, useRoute } from '@/routes'
 import { TextProcessingSceneField } from './TextProcessingSceneField'
 import { TextProcessingTab } from './TextProcessingTab'
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
   localStorage.clear()
   history.replaceState(null, '', '#/')
 })
@@ -51,6 +56,27 @@ it('uses the same settings rows for translation optimization and library links',
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
   const row = screen.getByRole('switch', { name: '术语表' }).closest('.settings-row')
   expect(row).toContainElement(screen.getByRole('link', { name: '配置 术语表' }))
+})
+
+it('keeps word-rule switches available while the glossary switch is saving', async () => {
+  let finish!: (value: ReturnType<typeof emptyGlossary>) => void
+  const glossary = emptyGlossary()
+  vi.spyOn(store, 'getBridge').mockReturnValue({
+    glossary: { snapshot: async () => glossary, onChanged: () => () => {},
+      command: () => new Promise(resolve => { finish = resolve }) },
+    wordRules: { snapshot: async () => emptyWordRules(), onChanged: () => () => {} },
+  } as unknown as NolaBridge)
+  render(<TextProcessingTab route={parseRoute(base + '/optimization')} />)
+  const toggle = await screen.findByRole('switch', { name: '术语表' })
+  await waitFor(() => expect(toggle).not.toHaveAttribute('aria-disabled', 'true'))
+  fireEvent.click(toggle)
+  expect(toggle).toHaveAttribute('aria-disabled', 'true')
+  const switches = screen.getAllByRole('switch')
+  const wordSwitches = switches.filter(item => item !== toggle && item.closest('.settings-row')?.querySelector('a[href*="words"]'))
+  expect(wordSwitches).toHaveLength(2)
+  wordSwitches.forEach(item => expect(item).not.toHaveAttribute('aria-disabled', 'true'))
+  await act(async () => finish({ ...glossary, revision: 1, enabled: false }))
+  expect(toggle).not.toHaveAttribute('aria-disabled', 'true')
 })
 
 it('opens a named table in the content area and edits rules inline in the table', async () => {

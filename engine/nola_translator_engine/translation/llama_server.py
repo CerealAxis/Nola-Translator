@@ -130,7 +130,7 @@ class LlamaServerManager:
         self.mmproj_path: Path | None = None
 
     def configure_parallel(self, count: int) -> None:
-        count = max(1, min(5, count))
+        count = max(1, count)
         if count > self.parallel_requests:
             self.parallel_requests = count
             self._ready = False

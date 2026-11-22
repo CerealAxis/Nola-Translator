@@ -156,7 +156,7 @@ export function SessionSetupDialog({
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-1">
               <Label htmlFor="session-name">{t('session.name')}</Label>
-              <Tooltip><TooltipTrigger render={<Button variant="secondary" size="icon-xs" aria-label={t('session.nameHelpAria')} className="min-h-6 shrink-0 border-transparent bg-transparent text-muted hover:bg-surface-secondary" />}><CircleHelp aria-hidden="true" /></TooltipTrigger><TooltipContent className="max-w-96 whitespace-normal">{t('session.nameHint')}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger render={<Button variant="secondary" size="icon-xs" aria-label={t('session.nameHelpAria')} className="-ms-1.5 min-h-6 shrink-0 border-transparent bg-transparent text-muted hover:bg-surface-secondary" />}><CircleHelp aria-hidden="true" /></TooltipTrigger><TooltipContent className="max-w-96 whitespace-normal">{t('session.nameHint')}</TooltipContent></Tooltip>
             </div>
             <Input id="session-name" value={draft.title || previewName} onChange={event => onDraftChange({ ...draft, title: event.target.value })} />
           </div>

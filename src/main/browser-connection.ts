@@ -37,7 +37,7 @@ async function publishNativeFile(path: string, data: object): Promise<void> {
 
 export function browserTextModel(settings: AppSettings, gateway?: { state: ModelGatewaySnapshot['state']; services: Pick<ModelGatewaySnapshot['services'], 'mt'> }): string {
   const service = gateway?.services.mt
-  const active = gateway?.state === 'running' && service?.state === 'ready' ? service.model : ''
+  const active = gateway?.state === 'running' && service && ['pending', 'loading', 'ready'].includes(service.state) ? service.model : ''
   const scene = sceneModelBinding(settings, 'mt')
   return [active, scene].find(model => model && model !== 'cloud:recognition' && isModelEnabled(settings, 'mt', model)) ?? ''
 }

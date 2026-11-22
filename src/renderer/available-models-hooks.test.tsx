@@ -102,7 +102,7 @@ it('removes stale local models from business and callable gateway options on run
     expect(result.result.current.asr[0].origin).toBe('gateway')
     for (const value of [
       { ...ready, state: 'stopped' as const },
-      { ...ready, services: { ...ready.services, asr: { ...ready.services.asr, state: 'loading' as const } } },
+      { ...ready, services: { ...ready.services, asr: { ...ready.services.asr, state: 'failed' as const } } },
       { ...ready, services: { ...ready.services, asr: { ...ready.services.asr, model: 'resource:another' } } },
     ]) {
       act(() => change(value))

@@ -190,8 +190,15 @@ it.each(['stopped', 'starting', 'stopping', 'failed'] as const)('hides local mod
   expect(catalog.asr).toEqual([])
 })
 
-it.each(['stopped', 'loading', 'failed'] as const)('hides a local model whose service is %s while the gateway runs', state => {
+it.each(['stopped', 'failed'] as const)('hides a local model whose service is %s while the gateway runs', state => {
   const snapshot = snapshotWith('asr', 'resource:sense-voice-small', 'SenseVoice')
   snapshot.services.asr.state = state
   expect(buildAvailableModels({ settings: settings(), resources: [asrRecord], credentials: credentials([]), snapshot }).asr).toEqual([])
+})
+
+it.each(['pending', 'loading'] as const)('keeps an on-demand local model selectable while %s', state => {
+  const snapshot = snapshotWith('asr', 'resource:sense-voice-small', 'SenseVoice')
+  snapshot.services.asr.state = state
+  expect(buildAvailableModels({ settings: settings(), resources: [asrRecord], credentials: credentials([]), snapshot }).asr)
+    .toEqual([expect.objectContaining({ binding: 'resource:sense-voice-small' })])
 })

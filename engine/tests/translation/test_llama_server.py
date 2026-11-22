@@ -456,6 +456,9 @@ async def test_openvino_passes_native_device_to_child(tmp_path):
 async def test_parallel_slots_preserve_each_requests_context_budget(tmp_path, monkeypatch):
     popen = FakePopen()
     manager, _, _ = make_manager(tmp_path, popen, health=lambda *_args, **_kwargs: 200)
+    manager.configure_parallel(17)
+    assert manager.parallel_requests == 17
+    manager.parallel_requests = 1
     manager.configure_parallel(5)
     await manager.start()
     args = popen.calls[0]["args"]

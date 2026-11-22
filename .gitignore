@@ -48,6 +48,7 @@ __pycache__/
 /data-migration-pending.json
 /workspace-window.json
 /settings.json
+/text-processing.json
 /credentials.json
 /history.jsonl
 /session-journal/

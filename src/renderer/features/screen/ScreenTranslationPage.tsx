@@ -63,6 +63,7 @@ export function ScreenTranslationPage() {
   const [presetDialog, setPresetDialog] = useState<'save' | 'rename' | 'delete'>()
   const [presetName, setPresetName] = useState('')
   const [busy, setBusy] = useState(false)
+  const [ocrSaving, setOcrSaving] = useState(false)
   const [intervalInput, setIntervalInput] = useState<string>()
   const [thresholdInput, setThresholdInput] = useState<string>()
   const [opacityPreview, setOpacityPreview] = useState<number>()
@@ -147,7 +148,7 @@ export function ScreenTranslationPage() {
   }
   const patch = <K extends keyof ScreenConfig>(key: K, value: ScreenConfig[K]) => saveChanges({ [key]: value })
   const run = async (command: ScreenCommand, save = false) => {
-    if (!api || busy || commandPending.current || command.action === 'start' && incompatible) return
+    if (!api || busy || commandPending.current || command.action === 'start' && (incompatible || ocrSaving)) return
     commandPending.current = true
     setBusy(true)
     try {
@@ -162,11 +163,11 @@ export function ScreenTranslationPage() {
     finally { commandPending.current = false; setBusy(false) }
   }
   const selectOcr = async (binding: string) => {
-    if (busy || !ocrModels.some(model => model.value === binding)) return
-    setBusy(true)
+    if (busy || ocrSaving || !ocrModels.some(model => model.value === binding)) return
+    setOcrSaving(true)
     try { await updateSettings({ modelGateway: { ocrModel: binding, ocr: true } }) }
     catch (error) { notifyError(t('gateway.actionFailed'), { cause: error }) }
-    finally { setBusy(false) }
+    finally { setOcrSaving(false) }
   }
   const running = snapshot?.status === 'running' || snapshot?.status === 'waiting'
   const active = running || snapshot?.status === 'starting' || snapshot?.status === 'editing'
@@ -195,7 +196,7 @@ export function ScreenTranslationPage() {
       (text, size) => { context.font = `${size}px ${font}`; return context.measureText(text).width }, padding, config.regions).some(block => block.overflow)
   }, [snapshot?.blocks, snapshot?.config.display, config.fontSize, config.showSource, config.regions])
   const select = (id: string, label: string, value: string, options: Array<{ value: string; label: string }>, onChange: (value: string) => void, action?: ReactNode) => (
-    <Field className="nola-settings-field"><FieldLabel htmlFor={id}>{label}</FieldLabel><div className="nola-inline-field-controls"><Select value={value || null} onValueChange={value => { if (value) onChange(value) }} disabled={settingsDisabled || !options.length}>
+    <Field className="nola-settings-field"><FieldLabel htmlFor={id}>{label}</FieldLabel><div className="nola-inline-field-controls"><Select value={value || null} onValueChange={value => { if (value) onChange(value) }} disabled={settingsDisabled || id === 'screen-ocr-model' && ocrSaving || !options.length}>
       <SelectTrigger id={id}><SelectValue placeholder={t('screen.select')}>{options.find(option => option.value === value)?.label}</SelectValue></SelectTrigger>
       <SelectContent><SelectGroup>{options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
     </Select>{action}</div></Field>
@@ -210,7 +211,7 @@ export function ScreenTranslationPage() {
     <PageHeader title={t('screen.title')} warning={t('suite.experimentalInDevelopment')} subtitle={t('screen.description')} actions={<div className="screen-page__actions">
       {canStop && <Button variant="outline" disabled={busy || !api} onClick={() => void run({ action: 'showToolbar' })}>{t('suite.showToolbar')}</Button>}
       <Button variant={canStop ? 'destructive' : 'default'}
-        disabled={!snapshot || busy || !api || !canStop && incompatible}
+        disabled={!snapshot || busy || !api || !canStop && (incompatible || ocrSaving)}
         onClick={() => void run({ action: canStop ? 'stop' : 'start' }, !canStop)}>
         {busy ? <Spinner data-icon="inline-start" /> : canStop ? <Square data-icon="inline-start" /> : <Play data-icon="inline-start" />}
         {t(canStop ? 'screen.stop' : 'screen.start')}

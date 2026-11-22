@@ -64,7 +64,7 @@ export interface NativeAgentSurfaceProps extends WorkbenchPageProps {
   onVoices: (names: string[]) => void
   onConfigure: () => void
   snapshot: AgentWorkspaceSnapshot | null
-  onAction: (action: WorkspaceAction) => Promise<void>
+  onAction: (action: WorkspaceAction) => Promise<boolean>
   busy: boolean
   placeholder: string
   memories: readonly string[]

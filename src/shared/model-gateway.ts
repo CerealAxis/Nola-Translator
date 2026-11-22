@@ -3,23 +3,15 @@ import type { SessionConfig } from './contracts'
 import type { ResourceRecord } from './contracts'
 
 export type GatewayCapability = 'asr' | 'mt' | 'tts' | 'llm' | 'ocr'
-export const MAX_GATEWAY_REQUESTS = 16
-export const MAX_LOCAL_CONCURRENCY = 5
-export const MAX_API_CONCURRENCY = 10
-
-export function gatewayConcurrencyMaximum(binding: string, resource?: Pick<ResourceRecord, 'provider'>): number {
-  if (binding && !binding.startsWith('resource:')) return MAX_API_CONCURRENCY
-  return resource?.provider === 'crisp-asr' || resource?.provider === 'crisp-tts' ? 1 : MAX_LOCAL_CONCURRENCY
-}
-
 export function gatewayConcurrency(binding: string, saved: number | undefined, resource?: Pick<ResourceRecord, 'provider'>): number {
-  const maximum = gatewayConcurrencyMaximum(binding, resource)
-  const fallback = !binding || binding.startsWith('resource:') ? 1 : MAX_API_CONCURRENCY
-  return saved !== undefined && Number.isInteger(saved) && saved >= 1 && saved <= maximum ? saved : fallback
+  if (binding.startsWith('resource:') && (resource?.provider === 'crisp-asr' || resource?.provider === 'crisp-tts')) return 1
+  const fallback = !binding || binding.startsWith('resource:') ? 1 : 10
+  return saved !== undefined && Number.isSafeInteger(saved) && saved >= 1 ? saved : fallback
 }
 type PublicGatewayCapability = Exclude<GatewayCapability, 'llm' | 'ocr'>
-export type GatewayServiceState = 'stopped' | 'loading' | 'ready' | 'failed'
+export type GatewayServiceState = 'stopped' | 'pending' | 'loading' | 'ready' | 'failed'
 export interface ModelGatewaySettings {
+  loadMode?: 'on-demand' | 'direct'
   host: '127.0.0.1' | '0.0.0.0'
   port: number
   asr: boolean
@@ -47,18 +39,20 @@ export interface ModelGatewaySettings {
   concurrency?: Partial<Record<GatewayCapability, number>>
 }
 export const DEFAULT_MODEL_GATEWAY: ModelGatewaySettings = {
+  loadMode: 'on-demand',
   host: '127.0.0.1', port: 17860, asr: false, mt: true, tts: false, llm: false, ocr: false,
   asrModel: '', mtModel: '', ttsModel: '', llmModel: '', ocrModel: '', mtFallbackModel: '', externalEnabled: true, targetLanguage: 'zh',
 }
 const binding = z.string().max(512).optional()
 export const modelGatewaySettingsSchema = z.object({
+  loadMode: z.enum(['on-demand', 'direct']).optional(),
   host: z.enum(['127.0.0.1', '0.0.0.0']), port: z.number().int().min(1024).max(65535),
   asr: z.boolean(), mt: z.boolean(), tts: z.boolean(), targetLanguage: z.string().min(1).max(32),
   llm: z.boolean().optional(), ocr: z.boolean().optional(), externalEnabled: z.boolean().optional(),
   externalModels: z.object({ asr: binding, mt: binding, tts: binding }).optional(),
   externalCapabilities: z.object({ asr: z.boolean().optional(), mt: z.boolean().optional(), tts: z.boolean().optional() }).optional(),
   asrModel: binding, mtModel: binding, ttsModel: binding, llmModel: binding, ocrModel: binding, mtFallbackModel: binding,
-  concurrency: z.partialRecord(z.enum(['asr', 'mt', 'tts', 'llm', 'ocr']), z.number().int().min(1).max(MAX_GATEWAY_REQUESTS)).optional(),
+  concurrency: z.partialRecord(z.enum(['asr', 'mt', 'tts', 'llm', 'ocr']), z.number().int().min(1)).optional(),
 })
 
 /**

@@ -3418,16 +3418,6 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
   gap: var(--space-1);
 }
 
-.model-gateway-example {
-  overflow-x: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  background: var(--surface-secondary);
-  padding: var(--space-2);
-  border-radius: var(--radius-lg);
-  margin-block: var(--space-2);
-}
-
 /* models */
 
 .models-page {
@@ -3806,7 +3796,7 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
 .models-section-title {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: calc(var(--space-1) / 2);
   @apply type-h4;
   margin: 0;
 }
@@ -4226,7 +4216,7 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
 .model-import-heading {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: calc(var(--space-1) / 2);
   padding-inline-end: var(--space-5);
 }
 
@@ -4275,7 +4265,7 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
 .model-import-section-heading {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: calc(var(--space-1) / 2);
   @apply type-h4;
   color: var(--foreground);
 }
@@ -6037,12 +6027,27 @@ td .text-processing-actions {
 .settings-row__title {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .settings-group__hint {
   display: inline-flex;
   align-items: center;
+}
+
+.settings-group__hint:has(> .settings-row__help) {
+  margin-inline-start: -0.25rem;
+}
+
+.settings-row__title > .settings-row__help,
+.settings-group__hint > .settings-row__help,
+.model-import-heading > .settings-row__help,
+.model-import-section-heading > .settings-row__help {
+  margin-inline-start: -0.25rem;
+}
+
+.settings-row__title > .settings-row__help[data-size="sm"] {
+  margin-inline-start: -0.3125rem;
 }
 
 .settings-row__help {

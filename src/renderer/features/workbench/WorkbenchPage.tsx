@@ -147,22 +147,22 @@ export function WorkbenchPage(props: WorkbenchPageProps) {
   const { t } = useI18n()
   const [snapshot, setSnapshot] = useState<AgentWorkspaceSnapshot | null>(null)
   useGatewaySnapshot()
-  const [busy, setBusy] = useState(false)
+  const [pendingActions, setPendingActions] = useState(0)
   const onAction = useCallback(async (action: WorkspaceAction) => {
     const api = getBridge()?.app.agentWorkspace
-    if (!api) return
-    setBusy(true)
-    try { setSnapshot(await api(action)) }
-    catch (error) { notifyError(t('workbench.workspaceActionFailed'), { cause: error }) }
-    finally { setBusy(false) }
+    if (!api) return false
+    setPendingActions(count => count + 1)
+    try { setSnapshot(await api(action)); return true }
+    catch (error) { notifyError(t('workbench.workspaceActionFailed'), { cause: error }); return false }
+    finally { setPendingActions(count => count - 1) }
   }, [t])
   useEffect(() => { void onAction({ action: 'snapshot' }) }, [onAction])
-  return <WorkbenchChat {...props} key={snapshot?.selectedProject ?? 'standalone'} snapshot={snapshot} onAction={onAction} busy={busy} />
+  return <WorkbenchChat {...props} key={snapshot?.selectedProject ?? 'standalone'} snapshot={snapshot} onAction={onAction} busy={pendingActions > 0} />
 }
 
 export interface WorkbenchChatProps extends WorkbenchPageProps {
   snapshot: AgentWorkspaceSnapshot | null
-  onAction: (action: WorkspaceAction) => Promise<void>
+  onAction: (action: WorkspaceAction) => Promise<boolean>
   busy: boolean
 }
 function WorkbenchChat({ snapshot, onAction, busy, ...page }: WorkbenchChatProps) {

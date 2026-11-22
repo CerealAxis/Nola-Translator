@@ -224,13 +224,14 @@ class LocalWorkerAdapter(Adapter):
             raise GatewayError(GatewayErrorCode.WORKER_EXITED, stage=stage, message="local worker unavailable")
         if instance.configuration.device != "auto":
             request.gateway_device = instance.configuration.device
-        limit = 1 if ctx.task_mode == "realtime" else min(5, instance.definition.capabilities.concurrency.max_active_requests, max(1, ctx.max_concurrency))
+        crisp = instance.configuration.runtime in ("crisp", "crisp-asr", "crisp-tts")
+        limit = 1 if ctx.task_mode == "realtime" or crisp else max(1, ctx.max_concurrency)
         request.payload["max_concurrency"] = limit
         request.payload["correlationId"] = ctx.request_id
         request.payload["taskId"] = ctx.task_id
         try:
             if ctx.task_mode == "offline" and instance.definition.capabilities.concurrency.batching and limit > 1 and request.kind != "llm" and not request.payload.get("inspect"):
-                response = await worker.request_batch(request, limit=limit, timeout=timeout)
+                response = await worker.request_batch(request, limit=min(5, limit), timeout=timeout)
             else:
                 response = await worker.request(request, timeout=timeout)
         except GatewayError as error:

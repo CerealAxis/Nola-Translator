@@ -1,130 +1,94 @@
-"""RecResizeImg + line splitting."""
+"""Image preparation and projected text rows for PP-OCR recognition."""
 from __future__ import annotations
 
-import math
-
+import cv2
 import numpy as np
 
 from .config import MAX_IMG_W, REC_IMAGE_SHAPE
 
 
 def to_bgr(crop) -> np.ndarray:
-    """PIL RGB crop -> BGR ndarray (the model was trained on BGR)."""
-    return np.asarray(crop)[:, :, ::-1]
+    return cv2.cvtColor(np.asarray(crop.convert("RGB")), cv2.COLOR_RGB2BGR)
+
+
+def _ink(image: np.ndarray) -> np.ndarray:
+    if image.ndim != 3 or image.shape[2] != 3 or min(image.shape[:2]) == 0:
+        raise ValueError("invalidImage")
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    mask = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV)[1]
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    left_margin, right_margin = 0, mask.shape[1]
+    for index in range(1, count):
+        left, top, width, height, _ = stats[index]
+        clipped_side = (left <= mask.shape[1] * 0.02 or left + width >= mask.shape[1] * 0.98)
+        clipped_end = top == 0 or top + height == mask.shape[0]
+        border_fragment = (clipped_side and clipped_end and width < mask.shape[1] * 0.15
+                           and height > mask.shape[0] * 0.2 and height > width * 2.5)
+        if border_fragment:
+            if left <= mask.shape[1] * 0.02:
+                left_margin = max(left_margin, int(left + width))
+            else:
+                right_margin = min(right_margin, int(left))
+        if (border_fragment or (height > mask.shape[0] * 0.7 and height > width * 8)
+                or (width > mask.shape[1] * 0.7 and width > height * 8)):
+            mask[labels == index] = 0
+    mask[:, :left_margin] = 0
+    mask[:, right_margin:] = 0
+    return mask
+
+
+def _runs(occupied: np.ndarray, gap: int = 0):
+    positions = np.flatnonzero(occupied)
+    return [part for part in np.split(positions, np.flatnonzero(np.diff(positions) > gap + 1) + 1)
+            if part.size]
+
+
+def _glyph_size(mask: np.ndarray) -> float:
+    count, _, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    sizes = [max(w, h) for _, _, w, h, area in stats[1:count] if area >= 9]
+    return float(np.percentile(sizes, 75)) if sizes else 12.0
 
 
 def _looks_vertical(img: np.ndarray) -> bool:
-    """True if crop is vertical columns (row-band coverage < 0.5)."""
-    h, w = img.shape[:2]
-    if h <= w:
-        return False  # wide crop -> horizontal
-    import cv2
-
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, bin_ = cv2.threshold(
-        gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-    )
-    ink = bin_ > 0
-    rows = ink.any(axis=1)
-
-    # Per row band, measure the fraction of columns the band's ink spans
-    # (union of touched columns over all rows in the band).
-    covs: list[float] = []
-    run = 0
-    band = np.zeros(w, dtype=bool)
-    for i, v in enumerate(rows):
-        if v:
-            band |= ink[i]
-            run += 1
-        else:
-            if run >= 3:
-                covs.append(float(band.mean()))
-            band[:] = False
-            run = 0
-    if run >= 3:
-        covs.append(float(band.mean()))
-
-    # Multi-line horizontal text: several row bands, each spanning most of
-    # the crop width (0.65 vs 0.35 measured on real vs vertical samples).
-    if len(covs) >= 2 and np.mean(covs) >= 0.5:
+    if img.shape[0] <= img.shape[1]:
         return False
-    return True
+    mask = _ink(img)
+    rows, columns = _runs(mask.any(axis=1)), _runs(mask.any(axis=0))
+    row_gap = max((int(b[0] - a[-1] - 1) for a, b in zip(rows, rows[1:])), default=0)
+    column_gap = max((int(b[0] - a[-1] - 1) for a, b in zip(columns, columns[1:])), default=0)
+    return not (row_gap >= _glyph_size(mask) * 0.5 and row_gap > column_gap * 1.25)
 
 
 def split_lines(img: np.ndarray) -> tuple[list[np.ndarray], bool]:
-    """Split bubble crop into line-level crops. Returns (lines, vertical)."""
-    import cv2
-
     vertical = _looks_vertical(img)
-    if vertical:
-        img = np.rot90(img)  # CCW
-    h, w = img.shape[:2]
-
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, bin_ = cv2.threshold(
-        gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-    )
-    contours, _ = cv2.findContours(
-        bin_, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    )
-
-    min_area = max(9, (w * h) * 0.0002)
-    boxes: list[tuple[int, int, int, int]] = []
-    for cnt in contours:
-        x, y, bw, bh = cv2.boundingRect(cnt)
-        if bw < 6 or bh < 6 or bw * bh < min_area:
+    canvas = np.rot90(img) if vertical else img
+    source_mask = _ink(img)
+    mask = np.rot90(source_mask) if vertical else source_mask
+    height, width = mask.shape
+    # Detached radicals belong to the same text row; interline gaps remain separate.
+    gap = max(2, round(_glyph_size(mask) * 0.18))
+    crops = []
+    for rows in _runs(mask.any(axis=1), gap):
+        y0, y1 = int(rows[0]), int(rows[-1]) + 1
+        columns = np.flatnonzero(mask[y0:y1].any(axis=0))
+        if not columns.size or y1 - y0 < 6:
             continue
-        boxes.append((x, y, x + bw, y + bh))
-
-    # Join a box to a group when >=60% of its height overlaps the group;
-    # plain any-overlap chains separate lines via thin crossings.
-    boxes.sort(key=lambda b: b[1])
-    groups: list[list[tuple[int, int, int, int]]] = []
-    for b in boxes:
-        for g in groups:
-            g_y0 = min(bx[1] for bx in g)
-            g_y1 = max(bx[3] for bx in g)
-            overlap = min(b[3], g_y1) - max(b[1], g_y0)
-            if overlap / (b[3] - b[1]) >= 0.6:
-                g.append(b)
-                break
-        else:
-            groups.append([b])
-
-    lines: list[np.ndarray] = []
-    for g in sorted(groups, key=lambda g: min(b[1] for b in g)):
-        x0 = max(0, min(b[0] for b in g) - 4)
-        x1 = min(w, max(b[2] for b in g) + 4)
-        y0 = max(0, min(b[1] for b in g) - 4)
-        y1 = min(h, max(b[3] for b in g) + 4)
-        lines.append(img[y0:y1, x0:x1])
-    return (lines or [img]), vertical
+        x0, x1 = int(columns[0]), int(columns[-1]) + 1
+        crops.append(canvas[max(0, y0 - 4):min(height, y1 + 4),
+                            max(0, x0 - 4):min(width, x1 + 4)])
+    return crops or [canvas], vertical
 
 
 def preprocess(img: np.ndarray) -> np.ndarray:
-    """RecResizeImg -> [3, 48, W] float32 in [-1, 1]."""
-    import cv2
-
-    img_c, img_h, base_img_w = REC_IMAGE_SHAPE
-    h, w = img.shape[:2]
-    if h > w:
-        img = np.rot90(img)  # CCW
-        h, w = w, h
-    max_wh_ratio = max(base_img_w / img_h, w / h)
-    img_w = int(img_h * max_wh_ratio)
-    if img_w > MAX_IMG_W:
-        img_w = MAX_IMG_W
-        resized_w = MAX_IMG_W
-    else:
-        ratio = w / float(h)
-        if math.ceil(img_h * ratio) > img_w:
-            resized_w = img_w
-        else:
-            resized_w = int(math.ceil(img_h * ratio))
-    resized = cv2.resize(img, (resized_w, img_h))
-    resized = resized.astype("float32").transpose((2, 0, 1)) / 255
-    resized -= 0.5
-    resized /= 0.5
-    out = np.zeros((img_c, img_h, img_w), dtype=np.float32)
-    out[:, :, :resized_w] = resized
-    return out
+    if img.ndim != 3 or img.shape[2] != 3 or min(img.shape[:2]) == 0:
+        raise ValueError("invalidImage")
+    channels, height, minimum_width = REC_IMAGE_SHAPE
+    source = np.rot90(img) if img.shape[0] > img.shape[1] else img
+    scaled_width = height * source.shape[1] / source.shape[0]
+    content_width = min(MAX_IMG_W, max(1, int(np.ceil(scaled_width))))
+    canvas_width = min(MAX_IMG_W, max(minimum_width, int(scaled_width)))
+    content_width = min(content_width, canvas_width)
+    pixels = cv2.resize(source, (content_width, height)).transpose(2, 0, 1)
+    tensor = np.zeros((channels, height, canvas_width), dtype=np.float32)
+    tensor[:, :, :content_width] = pixels.astype(np.float32) * (2 / 255) - 1
+    return tensor

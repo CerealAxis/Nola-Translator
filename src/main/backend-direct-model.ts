@@ -25,6 +25,22 @@ const catalog = z.object({ models: z.array(z.object({
 const result = z.object({ text: z.string(), audio: z.string().optional(), voices: z.array(z.string()).optional() })
 const operations = { asr: 'transcribe', mt: 'translate', tts: 'synthesize' } as const
 type BackendConnection = Pick<BackendSupervisor, 'baseUrl' | 'authorizationHeader'>
+export async function backendGatewayControl(backend: BackendConnection, route: string, body: unknown, signal: AbortSignal): Promise<void> {
+  const response = await fetch(new URL(`/api/v2/gateway/${route}`, backend.baseUrl), {
+    method: route === 'loading-policy' ? 'PUT' : 'POST',
+    headers: { ...backend.authorizationHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body), signal,
+  })
+  if (!response.ok) await rejectBackendModel(response)
+}
+
+export async function backendGatewayInstances(backend: BackendConnection, signal: AbortSignal) {
+  const response = await fetch(new URL('/api/v2/gateway/instances', backend.baseUrl), {
+    headers: backend.authorizationHeader(), signal,
+  })
+  if (!response.ok) await rejectBackendModel(response)
+  return z.object({ instances: z.array(z.object({ model_id: z.string(), state: z.string() })) }).parse(await response.json()).instances
+}
 export class BackendModelError extends Error {
   constructor(readonly status: number, readonly engineCode: string, readonly correlationId?: string) {
     super(engineCode)

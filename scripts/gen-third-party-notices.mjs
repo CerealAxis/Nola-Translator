@@ -1,36 +1,18 @@
 /**
  * 生成 THIRD_PARTY_NOTICES.md（`npm run gen:notices`）。
- *
- * 归属声明里的每一条都必须是**从依赖元数据派生出来的事实**，不是人手抄的文本。
- * 本仓库已经吃过这个亏：手写 notices 里的 PyInstaller 条目是假的（引擎并非 PyInstaller 打包），
- * Fluent UI 条目早已过时，而 engine/requirements.lock 相对真实发布集早已过期。
- * 手写文件会把这些错误永久沉淀，且没有任何机制能发现。
- *
- * 三棵依赖树，各自的判定依据不同：
- *
- *   1. 渲染进程 JS —— electron.vite.config.ts 的 renderer 段既没有 externalizeDepsPlugin()
- *      也没有 rollupOptions.external，所以 Vite 会把 node_modules 全量 bundle 进 out/renderer；
- *      而 build.files 只含 out 目录与 package.json，node_modules 不进 asar。
- *      起点是 package.json 的 dependencies，递归展开已安装包的 dependencies/optionalDependencies。
- *
- *   2. 平台运行时 —— build.electronDist 指向 node_modules/electron/dist，Electron 随安装包分发。
- *      Chromium 与 Node.js 随 Electron 一同分发，各自单列。
- *
- *   3. Python 引擎 —— scripts/build-python-runtime.py 是 shutil.copytree 整份私有 CPython +
- *      site-packages 随包分发，**不是** PyInstaller 打包，所以 PyInstaller 及其 bootloader
- *      exception 不在本文件里。起点是 engine/pyproject.toml 的 [project].dependencies，
- *      闭包从 .venv 的 dist-info/METADATA 的 Requires-Dist 递归展开。
- *
- * 幂等：输出只依赖磁盘上的依赖元数据，同一状态下连续运行两次字节完全一致。
+ * 渲染构建及 electron-builder 提供 JS 清单；Python 以已构建运行时和可选依赖为依据。
+ * 平台运行时及游戏 Hook 根据发布目录和配置收集。
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { createRequire } from 'node:module'
 import process from 'node:process'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const SITE_PACKAGES = resolve(process.env.NOLA_NOTICES_SITE_PACKAGES ?? join(ROOT, '.venv', 'Lib', 'site-packages'))
 const PYINSTALLER_SITE_PACKAGES = resolve(process.env.NOLA_NOTICES_PYINSTALLER_SITE_PACKAGES ?? SITE_PACKAGES)
 const OUTPUT = join(ROOT, 'THIRD_PARTY_NOTICES.md')
+const JS_SNAPSHOT = join(ROOT, 'scripts', 'third-party-js-notices.json')
 
 /**
  * `--check` reports whether the committed file still matches the dependencies and exits
@@ -98,6 +80,8 @@ const isLicenseName = (name) => /^(LICEN[CS]E|COPYING|NOTICE)/i.test(name)
 // 内嵌常量：分发物里没有独立许可证文件、但确实随包分发的组件正文。
 // 每段文本都注明了出处 URL 与对应版本，正文逐字照抄自该出处。
 // ---------------------------------------------------------------------------
+
+const LLAMA_CPP_LICENSE = "MIT License\n\nCopyright (c) 2023-2026 The ggml authors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE."
 
 const CHROMIUM_VERSION = '150.0.7871.114'
 const NODE_VERSION = '24.18.0'
@@ -1153,76 +1137,80 @@ function addEntry(name, version, licenseText, origin) {
   entries.set(key, { name, version, licenseText: alignLeft(licenseText), origin, merged: [] })
 }
 
-function collectRendererTree() {
-  const roots = Object.keys(manifest.dependencies ?? {})
-  const rootSet = new Set(roots)
-  const devSet = new Set(Object.keys(manifest.devDependencies ?? {}))
-  const included = new Set()
+async function collectRendererTree() {
+  const { build, loadConfigFromFile, mergeConfig } = await import('vite')
+  const loaded = await loadConfigFromFile({ command: 'build', mode: 'production' }, join(ROOT, 'electron.vite.config.ts'))
+  if (!loaded?.config.renderer) throw new Error('renderer build configuration is unavailable')
+  const directories = new Set()
+  await build(mergeConfig(loaded.config.renderer, {
+    configFile: false,
+    root: join(ROOT, 'src', 'renderer'),
+    logLevel: 'error',
+    build: { write: false },
+    plugins: [{
+      name: 'collect-notice-modules',
+      generateBundle(_options, bundle) {
+        for (const chunk of Object.values(bundle)) {
+          if (chunk.type !== 'chunk') continue
+          for (const [id, info] of Object.entries(chunk.modules)) {
+            if (!info.renderedLength) continue
+            const cleanId = id.split('?')[0].replaceAll('\0', '').replaceAll('\\', '/')
+            const marker = '/node_modules/'
+            const index = cleanId.lastIndexOf(marker)
+            if (index < 0) continue
+            const parts = cleanId.slice(index + marker.length).split('/')
+            const name = parts[0].startsWith('@') ? `${parts[0]}/${parts[1]}` : parts[0]
+            directories.add(`${cleanId.slice(0, index + marker.length)}${name}`)
+          }
+        }
+      },
+    }],
+  }))
+  for (const directory of directories) {
+    const pkg = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))
+    addNodePackage(pkg.name, pkg.version, directory)
+  }
+}
 
-  const queue = [...roots]
-  while (queue.length > 0) {
-    const name = queue.shift()
-    if (included.has(name)) continue
-    included.add(name)
+function addNodePackage(name, version, directory) {
+  if (entries.has(`${name}\0${version}`)) return
+  const found = findLicenseFile(directory, [
+    (file) => file === 'LICENSE',
+    (file) => file === 'LICENSE.md',
+    (file) => file === 'LICENSE.txt',
+    (file) => /^LICEN[CS]E/i.test(file),
+    (file) => /^COPYING/i.test(file),
+  ])
+  let licenseText = found ? readText(found.path) : null
+  if (licenseText === null) {
+    const pkg = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))
+    licenseText = pkg.license ?? null
+    report('manifest', name, `未找到许可证文件，使用 package.json 的 license 字段 "${licenseText ?? '(缺失)'}"`)
+  }
+  if (licenseText === null) {
+    report('unresolved', name, '既没有许可证文件，package.json 也没有 license 字段')
+    return
+  }
+  addEntry(name, version, licenseText, 'renderer')
+}
 
-    const packageDir = join(ROOT, 'node_modules', name)
-    let pkg
-    try {
-      pkg = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8'))
-    } catch (error) {
-      // 依赖声明里存在、磁盘上并未安装的包只出现在构建期链路，Vite 不会把它们打进产物。
-      if (error.code === 'ENOENT' && !exists(packageDir)) {
-        report('excluded', name, '仅出现在依赖声明里，磁盘上未安装，不进入产物')
-      } else {
-        report('unresolved', name, 'node_modules 下没有可读的 package.json，无法确认版本')
-      }
-      continue
+async function collectPackagedNodeModules() {
+  const require = createRequire(import.meta.url)
+  const { getCollectorByPackageManager, PM } = require('app-builder-lib/out/node-module-collector')
+  const { TmpDir } = require('temp-file')
+  const temp = new TmpDir()
+  try {
+    const { nodeModules } = await getCollectorByPackageManager(PM.NPM, ROOT, temp)
+      .getNodeModules({ packageName: manifest.name })
+    if (nodeModules.length === 0) throw new Error('electron-builder did not find production dependencies')
+    const queue = [...nodeModules]
+    while (queue.length > 0) {
+      const item = queue.shift()
+      queue.push(...(item.dependencies ?? []))
+      addNodePackage(item.name, item.version, item.dir)
     }
-
-    if (devSet.has(name)) {
-      report('excluded', name, '同时出现在 devDependencies 中，产物内不存在')
-      continue
-    }
-
-    const found = findLicenseFile(packageDir, [
-      (file) => file === 'LICENSE',
-      (file) => file === 'LICENSE.md',
-      (file) => file === 'LICENSE.txt',
-      (file) => /^LICEN[CS]E/i.test(file),
-      (file) => /^COPYING/i.test(file),
-    ])
-
-    let licenseText = null
-    if (found) {
-      licenseText = readText(found.path)
-    }
-    if (licenseText === null) {
-      // 退化到 manifest 的 license 字段：只有标识符，没有正文，必须单独报出来。
-      report('manifest', name, `未找到许可证文件，退化到 package.json 的 license 字段 "${pkg.license ?? '(缺失)'}"`)
-      licenseText = pkg.license ?? null
-    }
-    if (licenseText === null) {
-      report('unresolved', name, '既没有许可证文件，package.json 也没有 license 字段')
-      continue
-    }
-
-    addEntry(name, pkg.version ?? '(未知版本)', licenseText, 'renderer')
-
-    for (const dependency of Object.keys(pkg.dependencies ?? {})) {
-      queue.push(dependency)
-    }
-    for (const dependency of Object.keys(pkg.optionalDependencies ?? {})) {
-      queue.push(dependency)
-    }
-    // peerDependencies 保守处理：只在它已进闭包、或本项目直接依赖它时才纳入，
-    // 否则会收进 tailwindcss 这类只参与构建、产物里根本不存在的包。
-    for (const peer of Object.keys(pkg.peerDependencies ?? {})) {
-      if (!included.has(peer) && !rootSet.has(peer)) {
-        report('excluded', peer, `${name} 的 peerDependency，但既不在运行时闭包内也不是本项目直接依赖（仅构建期需要）`)
-        continue
-      }
-      queue.push(peer)
-    }
+  } finally {
+    await temp.cleanup()
   }
 }
 
@@ -1256,6 +1244,35 @@ function collectPlatformRuntime() {
     report('embedded', `PyInstaller ${pyinstallerVersion}`, 'COPYING.txt 正文内嵌，取自 https://raw.githubusercontent.com/pyinstaller/pyinstaller/v6.21.0/COPYING.txt（wheel 内不带许可证文件）')
   } else {
     report('unresolved', 'PyInstaller', '.venv 里没有可读的 pyinstaller METADATA，无法确认版本；浏览器宿主构建需要它')
+  }
+}
+
+function collectLlamaRuntime() {
+  const catalog = JSON.parse(readFileSync(join(ROOT, 'build', 'runtime-catalog.json'), 'utf8'))
+  const packages = catalog.packages.filter(item => item.kind === 'llama' && item.architecture === 'x64' && item.backend === 'vulkan')
+  if (packages.length !== 1 || packages[0].version !== 'b11532') {
+    report('unresolved', 'llama.cpp', 'verify the license for the configured Vulkan runtime version')
+    return
+  }
+  addEntry('llama.cpp', packages[0].version, LLAMA_CPP_LICENSE, 'platform')
+}
+
+function collectGameHook() {
+  const directory = join(ROOT, 'build', 'game-hook')
+  const manifestText = readText(join(directory, 'manifest.json'))
+  if (manifestText === null) {
+    report('unresolved', 'LunaHook', 'build/game-hook/manifest.json is missing')
+    return
+  }
+  const hookManifest = JSON.parse(manifestText)
+  for (const [name, version, file] of [
+    ['LunaHook', hookManifest.revision, 'LunaTranslator-GPL-3.0.txt'],
+    ['MinHook', hookManifest.minhookRevision, 'MinHook-BSD.txt'],
+    ['uchardet', hookManifest.uchardetRevision, 'uchardet-MPL-1.1.txt'],
+  ]) {
+    const license = readText(join(directory, 'licenses', file))
+    if (!version || license === null) report('unresolved', name, 'packaged game-hook version or license is missing')
+    else addEntry(name, version, license, 'platform')
   }
 }
 
@@ -1368,6 +1385,7 @@ function readDistInfo(name, sitePackages = SITE_PACKAGES) {
 }
 
 function collectPythonTree() {
+  const baseSitePackages = join(CPYTHON_ENGINE_DIR, 'Lib', 'site-packages')
   const pyproject = readFileSync(join(ROOT, 'engine', 'pyproject.toml'), 'utf8')
   // 只取 [project].dependencies 这一段；[project.optional-dependencies] 下的 extra 不参与发布安装。
   const projectSection = pyproject.split('[project.optional-dependencies]')[0]
@@ -1381,6 +1399,13 @@ function collectPythonTree() {
     .map((requirement) => parseRequirementName(requirement))
     .filter((name) => name !== null)
 
+  for (const entry of readdirSync(baseSitePackages, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.endsWith('.dist-info')) continue
+    const metadata = readText(join(baseSitePackages, entry.name, 'METADATA'))
+    const name = metadata?.match(/^Name:\s*(.+)$/m)?.[1]?.trim()
+    if (name) roots.push(name)
+  }
+
   const seen = new Map()
   const queue = roots
   while (queue.length > 0) {
@@ -1389,7 +1414,7 @@ function collectPythonTree() {
     if (seen.has(key)) continue
     seen.set(key, name)
 
-    const distInfo = readDistInfo(name)
+    const distInfo = readDistInfo(name, baseSitePackages) ?? readDistInfo(name)
     if (!distInfo) {
       report('unresolved', name, '运行时依赖闭包里的包在 .venv 中没有安装，取不到许可证正文')
       continue
@@ -1417,28 +1442,34 @@ function collectPythonTree() {
       ?? metadata.match(/^License:\s*(.+)$/m)?.[1] ?? '').trim()
     const licenseFiles = [...metadata.matchAll(/^License-File:\s*(.+)$/gm)].map((match) => match[1].trim())
 
+    const licenseIndexText = readText(join(distInfo.dir, 'licenses', 'original-paths.json'))
+    const licenseIndex = licenseIndexText ? JSON.parse(licenseIndexText) : {}
+    const licenseTexts = []
     for (const relative of licenseFiles) {
       // License-File 允许登记非许可证文件（若干包把 AUTHORS/COPYING 也登记进去）。
       // 贡献者名单不是许可证条款，拿它当正文会让输出丢掉真正的授权条件。
-      if (!/\.(md|txt|rst)?$/i.test(relative) || /^(AUTHORS?|CONTRIBUTORS?|THANKS?|CODEOWNERS)/i.test(relative)) {
+      if (/^(AUTHORS?|CONTRIBUTORS?|THANKS?|CODEOWNERS)/i.test(relative)) {
         continue
       }
       // 同一个 License-File 在四种布局下都可能出现：PEP 639 的 licenses/ 子目录、
       // dist-info 根（老 wheel）、包目录本身，以及 flatten 之后的散落路径。
+      const packageDirectory = distInfo.dir.startsWith(baseSitePackages) ? baseSitePackages : SITE_PACKAGES
+      const flattened = Object.entries(licenseIndex).find(([, original]) => original === relative)?.[0]
       for (const candidate of [
+        ...(flattened ? [join(distInfo.dir, 'licenses', flattened)] : []),
         join(distInfo.dir, 'licenses', relative),
         join(distInfo.dir, relative),
-        join(SITE_PACKAGES, relative),
-        join(SITE_PACKAGES, declaredName, relative),
+        join(packageDirectory, relative),
+        join(packageDirectory, declaredName, relative),
       ]) {
         const content = readText(candidate)
-        if (content !== null) {
-          licenseText = content
+        if (content !== null && !content.includes('.. literalinclude::')) {
+          licenseTexts.push(`${relative}\n\n${content}`)
           break
         }
       }
-      if (licenseText !== null) break
     }
+    if (licenseTexts.length > 0) licenseText = licenseTexts.join('\n\n---\n\n')
 
     // 并非每个 wheel 都在 METADATA 里登记 License-File（httpx / RapidFuzz / soxr 就没有），
     // 所以还要在 dist-info 根、dist-info/licenses/ 与包目录里直接找。
@@ -1446,8 +1477,8 @@ function collectPythonTree() {
       for (const directory of [
         distInfo.dir,
         join(distInfo.dir, 'licenses'),
-        join(SITE_PACKAGES, declaredName),
-        join(SITE_PACKAGES, declaredName, 'licenses'),
+        join(distInfo.dir.startsWith(baseSitePackages) ? baseSitePackages : SITE_PACKAGES, declaredName),
+        join(distInfo.dir.startsWith(baseSitePackages) ? baseSitePackages : SITE_PACKAGES, declaredName, 'licenses'),
       ]) {
         const found = findLicenseFile(directory, [
           (file) => file === 'LICENSE',
@@ -1526,14 +1557,8 @@ function collectPythonTree() {
 
 // ---------------------------------------------------------------------------
 
-collectRendererTree()
-const luminaLicense = readText(join(ROOT, 'engine', 'nola_translator_engine', 'backend', 'lumina-upstream.LICENSE'))
-if (luminaLicense === null) {
-  report('unresolved', 'Lumina', 'vendored Lumina source license is missing')
-} else {
-  addEntry('Lumina', 'b19fb886abc474b39b217d80806ecc1297876f61', luminaLicense, 'renderer')
-  report('embedded', 'Lumina', 'MIT notice from the vendored OCR, canvas typography, and PSD source adaptation')
-}
+await collectRendererTree()
+await collectPackagedNodeModules()
 const NOTO_CJK_REVISION = 'f8d157532fbfaeda587e826d4cd5b21a49186f7c'
 const notoCjkLicense = readText(join(ROOT, 'src', 'renderer', 'assets', 'fonts', 'OFL-Noto-CJK.txt'))
 if (notoCjkLicense === null) {
@@ -1543,6 +1568,8 @@ if (notoCjkLicense === null) {
   report('embedded', `Noto Sans CJK ${NOTO_CJK_REVISION}`, 'OFL-1.1 text is bundled from src/renderer/assets/fonts/OFL-Noto-CJK.txt; font sources are pinned to https://github.com/notofonts/noto-cjk/tree/f8d157532fbfaeda587e826d4cd5b21a49186f7c')
 }
 collectPlatformRuntime()
+if (!CHECK_RENDERER) collectGameHook()
+if (!CHECK_RENDERER) collectLlamaRuntime()
 if (!CHECK_RENDERER) collectPythonTree()
 
 // 字母序；`@` 前缀的包按原样参与排序。同名同版本已按 name+version 去重，
@@ -1562,11 +1589,11 @@ const blocks = sorted.map((entry) => [
   'This software contains the following license and notice below:',
   '',
   entry.licenseText,
-  '---',
 ].join('\n'))
 
-const javascriptEntries = sorted.filter(entry => entry.origin !== 'python' && entry.name !== 'PyInstaller').map(entry => `${entry.name}@${entry.version}`)
-const document = `${HEADER}\n\n${blocks.join('\n\n')}\n\n<!-- nola-js-notices: ${JSON.stringify(javascriptEntries)} -->\n`
+const javascriptEntries = sorted.filter(entry => entry.origin === 'renderer' || ['Electron', 'Chromium', 'Node.js'].includes(entry.name)).map(entry => `${entry.name}@${entry.version}`)
+const document = `${HEADER}\n\n${blocks.join('\n---\n\n').trimEnd()}\n`
+const javascriptSnapshot = `${JSON.stringify(javascriptEntries, null, 2)}\n`
 
 const counts = { renderer: 0, platform: 0, python: 0 }
 for (const entry of sorted) counts[entry.origin] += 1
@@ -1610,8 +1637,8 @@ if (unresolved.length > 0) {
 
 if (CHECK_ONLY) {
   const current = readText(OUTPUT)
-  const javascriptMatch = CHECK_RENDERER && current?.match(/<!-- nola-js-notices: (.+) -->/)
-  if (CHECK_RENDERER ? javascriptMatch?.[1] === JSON.stringify(javascriptEntries) && blocks.every(block => current.includes(block + '\n')) : current === document) {
+  const snapshotMatches = readText(JS_SNAPSHOT) === javascriptSnapshot
+  if (snapshotMatches && (CHECK_RENDERER ? current && blocks.every(block => current.includes(block.trimEnd() + '\n')) : current === document)) {
     process.stdout.write([
       `OK ${OUTPUT} matches the current dependencies`,
       `  bytes: ${Buffer.byteLength(document, 'utf8')}, lines: ${lineCount}, entries: ${sorted.length}`,
@@ -1650,6 +1677,7 @@ if (CHECK_ONLY) {
 }
 
 writeFileSync(OUTPUT, document, 'utf8')
+writeFileSync(JS_SNAPSHOT, javascriptSnapshot, 'utf8')
 
 process.stdout.write([
   `Wrote ${OUTPUT}`,

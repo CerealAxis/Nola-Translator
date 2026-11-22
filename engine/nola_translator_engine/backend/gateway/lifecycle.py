@@ -70,6 +70,10 @@ class InstanceManager:
         self._locks: dict[str, asyncio.Lock] = {}
         self._global_lock = asyncio.Lock()
         self._leases: dict[str, Lease] = {}
+        self.pinned_models: set[str] = set()
+        self.configured_models: set[str] = set()
+        self.idle_seconds = 300.0
+        self._idle: dict[str, asyncio.TimerHandle] = {}
 
     # -- introspection ------------------------------------------------------
 
@@ -100,6 +104,14 @@ class InstanceManager:
             return lock
 
     # -- acquire / load -----------------------------------------------------
+
+    async def retire_other_configurations(self, model_id: str, identity_key: str) -> None:
+        for instance in self.instances():
+            if instance.definition.model_id != model_id or instance.identity_key == identity_key:
+                continue
+            lock = await self._lock_for(instance.identity_key)
+            async with lock:
+                await self.retire(instance)
 
     async def acquire(
         self, definition: ModelDefinition, configuration: ProviderConfiguration
@@ -184,10 +196,12 @@ class InstanceManager:
                 ) from error
         try:
             result = await self._loader.load(instance)
-        except (GatewayError, asyncio.CancelledError):
+        except (GatewayError, asyncio.CancelledError) as error:
+            instance.last_error = str(error)
             await self._fail(instance, device)
             raise
         except Exception as error:  # weights/runtime/OOM during load
+            instance.last_error = str(error)
             await self._fail(instance, device)
             raise GatewayError(
                 GatewayErrorCode.LOAD_FAILED,
@@ -223,6 +237,9 @@ class InstanceManager:
         self._by_id.pop(instance.instance_id, None)
 
     def _grant(self, instance: ModelInstance) -> Lease:
+        timer = self._idle.pop(instance.instance_id, None)
+        if timer:
+            timer.cancel()
         lease = Lease(
             lease_id=Lease.new_id(),
             instance_id=instance.instance_id,
@@ -251,10 +268,32 @@ class InstanceManager:
                 instance.transition(InstanceState.READY)
             if instance.state is InstanceState.RETIRING:
                 await self._unload(instance)
+            elif instance.state is InstanceState.READY and not instance.configuration.is_cloud:
+                self.schedule_idle(instance)
+
+    def schedule_idle(self, instance: ModelInstance) -> None:
+        timer = self._idle.pop(instance.instance_id, None)
+        if timer:
+            timer.cancel()
+        if instance.active_leases or instance.definition.model_id in self.pinned_models:
+            return
+        async def expire():
+            lock = await self._lock_for(instance.identity_key)
+            async with lock:
+                if (self._instances.get(instance.identity_key) is instance
+                        and not instance.active_leases
+                        and instance.definition.model_id not in self.pinned_models):
+                    await self.retire(instance)
+        self._idle[instance.instance_id] = asyncio.get_running_loop().call_later(
+            self.idle_seconds, lambda: asyncio.create_task(expire()),
+        )
 
     async def retire(self, instance: ModelInstance) -> None:
         """Stop accepting new leases; unload once in-flight work actually ends."""
 
+        timer = self._idle.pop(instance.instance_id, None)
+        if timer:
+            timer.cancel()
         if self._instances.get(instance.identity_key) is instance:
             self._instances.pop(instance.identity_key)
         if instance.state is InstanceState.READY:
@@ -296,6 +335,9 @@ class InstanceManager:
     async def shutdown(self) -> None:
         """Unload every instance; bounded and idempotent."""
 
+        for timer in self._idle.values():
+            timer.cancel()
+        self._idle.clear()
         for instance in list(self._by_id.values()):
             device = self._device_for(instance)
             try:

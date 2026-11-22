@@ -53,7 +53,7 @@ import { BackendSupervisor, backendLaunchSpec } from './backend-supervisor'
 import { BackendSession, mapBrowserSessionConfig, mapSessionConfig, type BackendSessionConfig } from './backend-session'
 import { captionPaint, latencyMeta, LatencySession, latencyWavePoint } from './latency-session'
 import { LatencyWindow } from './latency-window'
-import { BackendScreenOcr, backendAsrHeaders, backendMtHeaders, backendCloudAsr, gatewayMtBackup, inferBackendModel, inferBackendMt, openBackendAsrStream, openBackendLanguageModel } from './backend-direct-model'
+import { BackendScreenOcr, backendAsrHeaders, backendMtHeaders, backendCloudAsr, gatewayMtBackup, inferBackendModel, inferBackendMt, openBackendAsrStream, openBackendLanguageModel, backendGatewayControl, backendGatewayInstances } from './backend-direct-model'
 import { createGatewayLanguageModel } from './gateway-language-model'
 import { ALIYUN_S2S_SPEECH_LANGUAGES, fallbackTranslationFieldsOf, recognitionFieldsOf, remoteSourceLanguages, translationOptionsFor } from '../shared/cloud-config'
 import { aliyunConnectionReady } from '../shared/cloud-models'
@@ -1384,6 +1384,18 @@ if (!hasSingleInstanceLock) {
     }
     gateway = new ModelGateway({
       ocr: screenOcr,
+      configureBackendLoading: async (mode, models, signal) => {
+        if (!models.length && !backend?.ready) return
+        await ensureRealtimeBackend()
+        if (!backend?.ready) throw new Error('realtimeBackendUnavailable')
+        await backendGatewayControl(backend, 'loading-policy', { mode, models }, signal)
+      },
+      loadBackend: async (kind, binding, signal) => {
+        await ensureRealtimeBackend()
+        if (!backend?.ready) throw new Error('realtimeBackendUnavailable')
+        await backendGatewayControl(backend, 'load', { kind, model: binding.slice(9) }, signal)
+      },
+      backendInstances: async () => backend?.ready ? backendGatewayInstances(backend, AbortSignal.timeout(2000)) : [],
       openBackendAsr: async (binding, signal, emit) => {
         await ensureRealtimeBackend()
         if (!backend?.ready) return

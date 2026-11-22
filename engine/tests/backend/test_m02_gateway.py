@@ -501,7 +501,7 @@ async def test_adapter_worker_timeout_preserves_operation_stage_and_correlation(
 
     from types import SimpleNamespace
     from nola_translator_engine.backend.gateway.worker import WorkerRequest
-    instance = SimpleNamespace(handle=TimeoutWorker(), configuration=SimpleNamespace(device="auto"))
+    instance = SimpleNamespace(handle=TimeoutWorker(), configuration=SimpleNamespace(device="auto", runtime="pytorch"))
     with pytest.raises(GatewayError) as caught:
         await LocalWorkerAdapter()._call(instance, WorkerRequest("mt", {}), CallContext(Operation.TRANSLATE, "task", request_id="worker-id"), stage="mt")
     assert caught.value.stage == "mt"
@@ -784,6 +784,63 @@ def test_management_endpoints_are_private_and_report_state() -> None:
         assert instances.status_code == 200
         assert instances.json()["instances"] == []  # nothing loaded yet
 
+        assert client.put('/api/v2/gateway/loading-policy', json={'mode': 'direct', 'models': ['sensevoice-small']}).status_code == 401
+        assert client.post('/api/v2/gateway/load', json={'kind': 'asr', 'model': 'sensevoice-small'}).status_code == 401
+        assert client.put('/api/v2/gateway/loading-policy', headers=headers,
+                          json={'mode': 'direct', 'models': ['sensevoice-small']}).status_code == 200
+        for _ in range(2):
+            assert client.post('/api/v2/gateway/load', headers=headers,
+                               json={'kind': 'asr', 'model': 'sensevoice-small'}).status_code == 200
+        loaded = client.get('/api/v2/gateway/instances', headers=headers).json()['instances']
+        assert len(loaded) == 1 and loaded[0]['state'] == 'ready'
+        assert loaded[0]['active_leases'] == 0
+        assert client.put('/api/v2/gateway/loading-policy', headers=headers,
+                          json={'mode': 'on-demand', 'models': []}).status_code == 200
+        assert client.get('/api/v2/gateway/instances', headers=headers).json()['instances'] == []
+
+
+async def test_idle_unload_reuses_instance_and_never_unloads_an_active_lease():
+    loader = FakeLoader()
+    gw, _ = gateway_with(loader)
+    gw.manager.idle_seconds = 0.01
+    request = MatchRequest(Operation.TRANSCRIBE)
+    first, lease, _, _ = await gw.acquire(request)
+    await gw.release(first, lease)
+    second, active, _, _ = await gw.acquire(request)
+    assert first is second and loader.loads == 1
+    await asyncio.sleep(0.03)
+    assert loader.unloads == 0
+    await gw.release(second, active)
+    async with asyncio.timeout(2):
+        while not loader.unloads:
+            await asyncio.sleep(0.005)
+    assert first.state is InstanceState.UNLOADED
+    third, lease, _, _ = await gw.acquire(request)
+    assert third is not first and loader.loads == 2
+    gw.manager.pinned_models.add(third.definition.model_id)
+    await gw.release(third, lease)
+    assert third.instance_id not in gw.manager._idle
+    await gw.shutdown()
+
+
+async def test_direct_loading_retires_previous_compute_configuration_after_its_lease_drains():
+    loader = FakeLoader()
+    gw, _ = gateway_with(loader)
+    request = MatchRequest(Operation.TRANSCRIBE)
+    old, old_lease, _, _ = await gw.acquire(request)
+    gw.manager.pinned_models.add(old.definition.model_id)
+    entry = gw.registry.get(old.definition.model_id)
+    entry.configuration = entry.configuration.rotated(credential_ref=None)
+    entry.configuration.compute_options = {**entry.configuration.compute_options, 'changed': True}
+    current, current_lease, _, _ = await gw.acquire(request)
+    assert current is not old and old.state is InstanceState.RETIRING
+    assert loader.unloads == 0
+    await gw.release(old, old_lease)
+    assert loader.unloads == 1 and old.state is InstanceState.UNLOADED
+    await gw.release(current, current_lease)
+    assert current.instance_id not in gw.manager._idle
+    await gw.shutdown()
+
 
 async def test_realtime_admission_is_exclusive_and_precedes_waiting_offline_calls():
     from nola_translator_engine.backend.gateway.resources import ConcurrencyGate
@@ -811,15 +868,15 @@ async def test_realtime_admission_is_exclusive_and_precedes_waiting_offline_call
 
 @pytest.mark.parametrize("runtime,cloud,mode,maximum", [
     ("crisp", False, "offline", 1), ("crisp-tts", False, "offline", 1),
-    ("pytorch", False, "offline", 5), ("llama", False, "realtime", 1),
-    (None, True, "offline", 10),
+    ("pytorch", False, "offline", 17), ("llama", False, "realtime", 1),
+    (None, True, "offline", 17),
 ])
-async def test_gateway_enforces_runtime_caps_at_the_backend(runtime, cloud, mode, maximum):
+async def test_gateway_uses_requested_concurrency_for_offline_tasks(runtime, cloud, mode, maximum):
     gw, _ = gateway_with()
     instance, lease, _, _ = await gw.acquire(MatchRequest(Operation.TRANSCRIBE))
     instance.configuration.runtime = runtime
     instance.configuration.is_cloud = cloud
-    ctx = CallContext(Operation.TRANSCRIBE, "limit", task_mode=mode, max_concurrency=10)
+    ctx = CallContext(Operation.TRANSCRIBE, "limit", task_mode=mode, max_concurrency=17)
     peak = 0
 
     async def call():
@@ -830,7 +887,7 @@ async def test_gateway_enforces_runtime_caps_at_the_backend(runtime, cloud, mode
         gw._exit(instance)
 
     try:
-        await asyncio.gather(*(call() for _ in range(12)))
+        await asyncio.gather(*(call() for _ in range(20)))
         assert peak == maximum
     finally:
         await gw.release(instance, lease)

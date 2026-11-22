@@ -81,7 +81,17 @@ API_PREFIX = "/api/v2"
 class LanguageModelOpenRequest(BaseModel):
     lease_id: UUID
     model: str = Field(min_length=1, max_length=256)
-    max_concurrency: int = Field(default=1, ge=1, le=5)
+    max_concurrency: int = Field(default=1, ge=1)
+
+
+class GatewayLoadingPolicy(BaseModel):
+    mode: Literal['on-demand', 'direct']
+    models: list[Annotated[str, Field(min_length=1, max_length=256)]] = Field(default_factory=list, max_length=5)
+
+
+class GatewayModelLoad(BaseModel):
+    model: str = Field(min_length=1, max_length=256)
+    kind: Literal['asr', 'mt', 'tts']
 
 
 def cloud_asr_options(headers):
@@ -569,6 +579,48 @@ def build_router() -> APIRouter:
         if lease is not None:
             await lease.release()
         return {"ok": True}
+
+    @router.put("/gateway/loading-policy")
+    async def gateway_loading_policy(request: Request, body: GatewayLoadingPolicy):
+        ctx = backend(request)
+        if ctx.gateway is None:
+            return _error_response(503, ErrorPayload(
+                code="RESOURCE_BUSY", stage="gateway", message_key="backend.gatewayDisabled",
+            ), ctx.server_instance_id)
+        manager = ctx.gateway.manager
+        previous = manager.configured_models
+        manager.configured_models = set(body.models)
+        manager.pinned_models = set(body.models) if body.mode == 'direct' else set()
+        for instance in manager.instances():
+            if instance.configuration.is_cloud:
+                continue
+            if instance.definition.model_id in previous - set(body.models) and not instance.active_leases:
+                await manager.retire(instance)
+            elif not instance.active_leases:
+                manager.schedule_idle(instance)
+        return {"ok": True}
+
+    @router.post("/gateway/load")
+    async def gateway_load(request: Request, body: GatewayModelLoad):
+        from .gateway.bootstrap import refresh_local_models
+
+        ctx = backend(request)
+        if ctx.gateway is None:
+            return _error_response(503, ErrorPayload(
+                code="RESOURCE_BUSY", stage="gateway", message_key="backend.gatewayDisabled",
+            ), ctx.server_instance_id)
+        if ctx.refresh_installed_models:
+            refresh_local_models(ctx.gateway.registry)
+        async def load():
+            operation = {'asr': Operation.TRANSCRIBE, 'mt': Operation.TRANSLATE, 'tts': Operation.SYNTHESIZE}[body.kind]
+            instance, lease, _, _ = await ctx.gateway.acquire(MatchRequest(operation=operation, model_id=body.model))
+            await ctx.gateway.release(instance, lease)
+            return {"instance_id": instance.instance_id}
+        try:
+            result = await _run_while_connected(request, load())
+            return result if result is not None else JSONResponse(status_code=499, content={})
+        except GatewayError as error:
+            return _gateway_error_response(error, ctx.server_instance_id)
 
     @router.get("/gateway/instances")
     async def gateway_instances(request: Request) -> dict:

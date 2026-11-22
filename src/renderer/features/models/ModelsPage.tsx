@@ -487,7 +487,7 @@ function ModelSectionHeading({ title, hint }: { title: string; hint: string }) {
     <h2 className="models-section-title" aria-labelledby={titleId}>
       <span id={titleId}>{title}</span>
       <Tooltip>
-        <TooltipTrigger delay={300} render={<Button variant="tertiary" size="icon-xs" className="border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('common.info')}><CircleHelp aria-hidden="true" className="size-3.5" /></Button>} />
+        <TooltipTrigger delay={300} render={<Button variant="tertiary" size="icon-xs" className="-ms-[5px] border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('common.info')}><CircleHelp aria-hidden="true" className="size-3.5" /></Button>} />
         <TooltipContent sideOffset={3} className="settings-row__tooltip z-popup max-w-96 whitespace-normal">{hint}</TooltipContent>
       </Tooltip>
     </h2>

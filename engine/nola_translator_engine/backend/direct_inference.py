@@ -31,7 +31,7 @@ class _DirectRequest(BaseModel):
     id: UUID
     model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=512)]
     task_mode: Literal["realtime", "offline"] = "offline"
-    max_concurrency: int = Field(default=1, ge=1, le=10)
+    max_concurrency: int = Field(default=1, ge=1)
 
 
 class DirectAsrRequest(_DirectRequest):
@@ -180,7 +180,7 @@ async def run_direct_inference(
                 if not segments:
                     gateway.match(match)
                 transcript = []
-                batch_size = min(5, request.max_concurrency) if request.task_mode == "offline" else 1
+                batch_size = request.max_concurrency if request.task_mode == "offline" else 1
                 for offset in range(0, len(segments), batch_size):
                     tasks = [asyncio.create_task(gateway.transcribe(ctx, audio=pcm, language=request.source, request=match))
                         for pcm in segments[offset:offset + batch_size]]

@@ -558,7 +558,7 @@ export class ScreenTranslation {
     const gateway = this.options.gatewaySnapshot()
     if (!this.checkGateway('resume', gateway)) return
     if (!this.overlay || !this.lease && this.options.activity) { await this.stop(); await this.start(); return }
-    if (gateway.services?.ocr && gateway.services.ocr.state !== 'ready') {
+    if (gateway.services?.ocr && !['pending', 'loading', 'ready'].includes(gateway.services.ocr.state)) {
       this.fail('ocrNotReady', 'resume', undefined, gateway)
       return
     }

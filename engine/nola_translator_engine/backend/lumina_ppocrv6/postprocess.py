@@ -1,20 +1,10 @@
-"""CTC greedy decoding."""
+"""Use the application's validated CTC decoder for PP-OCRv6 outputs."""
 from __future__ import annotations
 
 import numpy as np
+from ..screen_ocr import ctc_decode as _decode_batch
 
 
 def ctc_decode(chars: list[str], pred: np.ndarray) -> tuple[str, float]:
-    """CTC greedy decode: argmax -> collapse repeats -> drop blank.
-
-    `chars` is the full vocab list (index 0 = CTC blank, last = space).
-    Returns (text, mean confidence).
-    """
-    idx = pred.argmax(axis=-1)
-    prob = pred.max(axis=-1)
-    keep = np.ones(len(idx), dtype=bool)
-    keep[1:] = idx[1:] != idx[:-1]
-    keep &= idx != 0  # index 0 is the CTC blank
-    text = "".join(chars[i] for i in idx[keep])
-    score = float(prob[keep].mean()) if keep.any() else 0.0
-    return text, score
+    values = np.asarray(pred)
+    return _decode_batch(values[None], chars)

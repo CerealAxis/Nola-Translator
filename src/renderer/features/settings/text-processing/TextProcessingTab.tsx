@@ -73,7 +73,7 @@ function LibraryRows() {
   const glossary = getBridge()?.glossary
   const [document, setDocument] = useState<GlossaryDocument>()
   const { api, document: words, failed, refresh } = useWordRules()
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState({ glossary: false, words: false })
 
   useEffect(() => {
     if (!glossary) return
@@ -89,13 +89,15 @@ function LibraryRows() {
   }, [glossary])
 
   async function toggle(library: TextProcessingLibrary, enabled: boolean) {
-    setBusy(true)
+    const group = library === 'glossary' ? 'glossary' : 'words'
+    setBusy(current => ({ ...current, [group]: true }))
     const operationId = crypto.randomUUID()
     try {
       if (library === 'glossary' && glossary && document) {
-        setDocument(await glossary.command({
+        const updated = await glossary.command({
           operationId, expectedRevision: document.revision, command: { action: 'setEnabled', enabled },
-        }))
+        })
+        setDocument(current => !current || updated.revision >= current.revision ? updated : current)
       } else if (api) {
         await api.command({
           operationId, expectedRevision: words.revision,
@@ -106,7 +108,7 @@ function LibraryRows() {
     } catch (cause) {
       notifyError(t('suite.actionFailed'), { cause })
     } finally {
-      setBusy(false)
+      setBusy(current => ({ ...current, [group]: false }))
     }
   }
 
@@ -130,7 +132,7 @@ function LibraryRows() {
           <Settings2 />
         </ProcessingIconButton>
         <SettingSwitch ariaLabel={label} isSelected={checked ?? false}
-          isDisabled={busy || (library === 'glossary' ? !document : !api || failed)}
+          isDisabled={busy[library === 'glossary' ? 'glossary' : 'words'] || (library === 'glossary' ? !document : !api || failed)}
           onChange={value => void toggle(library, value)} />
       </SettingsRow>
     )

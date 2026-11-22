@@ -283,6 +283,27 @@ it('selects only installed enabled OCR models and passes the selection to the ga
   await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { ocrModel: 'resource:second', ocr: true } }))
 })
 
+it('keeps unrelated controls available while saving the OCR model', async () => {
+  const user = userEvent.setup()
+  let finish!: () => void
+  vi.spyOn(store, 'updateSettings').mockImplementation(() => new Promise<void>(resolve => { finish = resolve }))
+  store.stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, uiLanguage: 'zh-CN',
+    modelPolicy: { enabled: { 'ocr:resource:first': true, 'ocr:resource:second': true }, defaults: {}, selections: {} } } })
+  store.stores.models.setState({ resources: ['first', 'second'].map(id => ({
+    resourceId: id, name: id, kind: 'ocrModel', provider: 'pp-ocrv5', description: '', languages: ['en', 'zh'],
+    installed: true, installedBytes: 0, state: 'idle', cancellable: false,
+  })) })
+  render(<ScreenTranslationPage />)
+  await user.click(await screen.findByRole('combobox', { name: 'OCR 模型' }))
+  await user.click(await screen.findByRole('option', { name: 'second' }))
+  expect(screen.getByRole('combobox', { name: 'OCR 模型' })).toBeDisabled()
+  expect(screen.getByRole('combobox', { name: '处理方式' })).toBeEnabled()
+  expect(screen.getByRole('switch', { name: '显示原文' })).not.toHaveAttribute('aria-disabled', 'true')
+  expect(screen.getByRole('button', { name: '开始翻译' })).toBeDisabled()
+  await act(async () => finish())
+  expect(screen.getByRole('combobox', { name: 'OCR 模型' })).toBeEnabled()
+})
+
 
 it('offers two processing modes, hides inherited model selectors and saves the mode', async () => {
   render(<ScreenTranslationPage />)
@@ -349,7 +370,7 @@ it.each([
   await waitFor(() => expect(command).toHaveBeenCalledWith({ action: 'start' }))
   await waitFor(() => expect(notice).toHaveBeenCalledOnce())
   expect(notice).toHaveBeenCalledWith(expect.objectContaining({
-    ...(error === 'regionsMissing' ? { description: `${message}${supportCode}` } : { title: message, description: expect.stringMatching(new RegExp(`\\S${supportCode}$`)) }),
+    ...(error === 'regionsMissing' ? { description: `${message} (${supportCode})` } : { title: message, description: expect.stringMatching(new RegExp(`\\S.* \\(${supportCode}\\)$`)) }),
     ...(error !== 'regionsMissing' ? { actionProps: { children: error === 'translationModelNotReady' ? '模型管理' : '模型网关', onClick: expect.any(Function) } } : {}),
   }))
   expect(gatewaySnapshot).not.toHaveBeenCalled()

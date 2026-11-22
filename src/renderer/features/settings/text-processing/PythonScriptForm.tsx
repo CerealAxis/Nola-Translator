@@ -121,7 +121,7 @@ export default function PythonScriptForm({
             </Badge>
             <Tooltip>
               <TooltipTrigger render={
-                <Button type="button" variant="bare" size="icon-xs" aria-label={signature}>
+                <Button type="button" variant="bare" size="icon-xs" className="-ms-2.5" aria-label={signature}>
                   <CircleHelp aria-hidden="true" />
                 </Button>
               } />

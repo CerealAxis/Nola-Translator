@@ -82,16 +82,9 @@ export interface CatalogInput {
 }
 
 const readyService = (snapshot: ModelGatewaySnapshot | null, kind: GatewayCapability) =>
-  snapshot?.state === 'running' && snapshot.services[kind]?.state === 'ready' ? snapshot.services[kind] : undefined
+  snapshot?.state === 'running' && ['pending', 'loading', 'ready'].includes(snapshot.services[kind]?.state ?? '') ? snapshot.services[kind] : undefined
 
-/**
- * What a consumer may select right now: the local model the gateway has loaded for that capability,
- * plus every cloud interface the user already configured enough to call.
- *
- * An installed local model that is not loaded deliberately stays out of the list. Starting it means
- * allocating memory the user did not ask for, so the gateway page owns that choice and the business
- * pages report it instead of triggering it.
- */
+/** Gateway selections remain callable while awaiting their first load; failed services are excluded. */
 export function buildAvailableModels({ settings, resources, credentials, snapshot, names = {} }: CatalogInput): AvailableModels {
   const empty: AvailableModels = { asr: [], mt: [], tts: [], llm: [], ocr: [] }
   const displayName = (binding: string, fallback: string) => names[binding] || fallback || binding

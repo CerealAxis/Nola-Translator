@@ -1,4 +1,4 @@
-"""Installed AngleNet orientation model, adapted from Lumina (see lumina-upstream.LICENSE)."""
+"""Installed AngleNet orientation model, adapted from Lumina."""
 from __future__ import annotations
 
 import asyncio

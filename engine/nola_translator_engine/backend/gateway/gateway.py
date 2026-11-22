@@ -180,13 +180,15 @@ class ModelGateway:
         matched = self.match(request)
         definition = matched.entry.definition
         adapter = self.adapters.require(request.operation, definition.capabilities.adapter_id)
-        instance, lease = await self.manager.acquire(definition, self._resolve_configuration(matched.entry))
+        configuration = self._resolve_configuration(matched.entry)
+        await self.manager.retire_other_configurations(definition.model_id, configuration.identity_key())
+        instance, lease = await self.manager.acquire(definition, configuration)
         return instance, lease, adapter, matched
 
     async def _enter(self, instance: ModelInstance, ctx: CallContext | None = None) -> None:
         realtime = ctx is None or ctx.task_mode == "realtime"
-        maximum = 10 if instance.configuration.is_cloud else 1 if instance.configuration.runtime in ("crisp", "crisp-asr", "crisp-tts") else 5
-        limit = 1 if realtime else min(maximum, max(1, ctx.max_concurrency))
+        crisp = not instance.configuration.is_cloud and instance.configuration.runtime in ("crisp", "crisp-asr", "crisp-tts")
+        limit = 1 if realtime or crisp else max(1, ctx.max_concurrency)
         if not instance.configuration.is_cloud and limit > 1:
             compute = instance.configuration.compute_options.get("compute", {})
             slot_mb = compute.get("contextSize", 2048) / 4 if instance.configuration.runtime == "llama" else 1024
@@ -349,6 +351,11 @@ class _WorkerLoader:
                     target = next((language for language in languages.text_output if language != source), "zh")
                     ctx = CallContext(Operation.TRANSLATE, instance.instance_id, deadline=time.monotonic() + 180)
                     await adapter.translate(instance, ctx, text="Hello.", source=source, target=target)
+            elif instance.definition.supports(Operation.SYNTHESIZE):
+                adapter = self._gateway.adapters.require(Operation.SYNTHESIZE, instance.definition.capabilities.adapter_id)
+                if isinstance(adapter, LocalWorkerAdapter):
+                    ctx = CallContext(Operation.SYNTHESIZE, instance.instance_id, deadline=time.monotonic() + 180)
+                    await adapter.tts_voices(instance, ctx)
             if not worker.running:
                 raise GatewayError(GatewayErrorCode.WORKER_EXITED, stage="load", message="local worker exited")
         except BaseException as error:

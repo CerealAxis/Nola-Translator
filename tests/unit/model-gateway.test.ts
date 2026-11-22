@@ -15,6 +15,67 @@ import type { createGatewayLanguageModel } from '../../src/main/gateway-language
 
 const gateways: ModelGateway[] = []
 
+it('loads an on-demand model once for concurrent requests and returns to pending after idle', async () => {
+  const test = await fixture()
+  test.settings.modelGateway.loadMode = 'on-demand'
+  test.settings.modelGateway.concurrency = { mt: 2 }
+  await test.gateway.start()
+  expect(test.workers).toHaveLength(0)
+  expect(test.gateway.snapshot().services.mt.state).toBe('pending')
+  expect(test.gateway.snapshot().availableModels?.mt).toContainEqual(expect.objectContaining({ binding: 'resource:mt-test' }))
+  const [first, second] = await Promise.all([test.gateway.leaseCapability('mt'), test.gateway.leaseCapability('mt')])
+  expect(first.worker).toBe(second.worker)
+  expect(test.gateway.snapshot().services.mt.state).toBe('ready')
+  first.release(); second.release()
+  vi.useFakeTimers()
+  try {
+    // The idle timer was created before fake time; release a new lease under the controlled clock.
+    const again = await test.gateway.leaseCapability('mt'); again.release()
+    test.settings.modelGateway.loadMode = 'direct'
+    await test.gateway.reconfigure()
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
+    expect(first.worker.close).not.toHaveBeenCalled()
+    test.settings.modelGateway.loadMode = 'on-demand'
+    await test.gateway.reconfigure()
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
+    expect(first.worker.close).toHaveBeenCalledOnce()
+    expect(test.gateway.snapshot().services.mt.state).toBe('pending')
+  } finally { vi.useRealTimers() }
+})
+
+it('reports actual backend states and waits for direct loading to succeed', async () => {
+  const test = await fixture(undefined, undefined, undefined, async () => ({ text: 'ok' }))
+  let instances: { model_id: string; state: string }[] = []
+  const pending = deferred<void>()
+  const load = vi.fn(() => pending.promise)
+  const { options } = test
+  options.backendInstances = async () => instances
+  options.loadBackend = load
+  const start = test.gateway.start()
+  await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(3))
+  expect(test.gateway.snapshot().services.mt.state).toBe('loading')
+  pending.resolve()
+  await start
+  expect(test.gateway.snapshot().services.mt.state).toBe('ready')
+  instances = [{ model_id: 'mt-test', state: 'failed' }]
+  await test.gateway.snapshotWithCatalog()
+  expect(test.gateway.snapshot().services.mt.state).toBe('failed')
+  instances = [{ model_id: 'mt-test', state: 'busy' }]
+  await test.gateway.snapshotWithCatalog()
+  expect(test.gateway.snapshot().services.mt.state).toBe('ready')
+  instances = []
+  await test.gateway.snapshotWithCatalog()
+  expect(test.gateway.snapshot().services.mt.state).toBe('pending')
+})
+
+it('keeps a backend load failure visible instead of reporting ready', async () => {
+  const test = await fixture(undefined, undefined, undefined, async () => ({ text: '' }))
+  const { options } = test
+  options.loadBackend = async () => { throw new Error('load failed') }
+  await test.gateway.start()
+  expect(test.gateway.snapshot().services.mt).toMatchObject({ state: 'failed', error: 'load failed' })
+})
+
 it('leases installed comic OCR without starting or changing the realtime gateway', async () => {
   const test = await fixture()
   test.resources.push({ resourceId: 'pp-ocrv5-mobile-ch-onnx', kind: 'ocrModel', provider: 'pp-ocrv5',
@@ -57,7 +118,7 @@ function postTranscription(base: string, authorization: string, audio = wav()) {
 }
 async function fixture(factory?: GatewayWorkerFactory, createLanguageModel?: typeof createGatewayLanguageModel, getCredential?: (provider: CredentialProvider) => Promise<string>, inferBackend?: ModelGatewayOptions['inferBackend'], openBackendAsr?: ModelGatewayOptions['openBackendAsr']) {
   const settings = structuredClone(DEFAULT_SETTINGS)
-  settings.modelGateway = { host: '127.0.0.1', port: await freePort(), asr: true, mt: true, tts: true, targetLanguage: 'zh' }
+  settings.modelGateway = { loadMode: 'direct', host: '127.0.0.1', port: await freePort(), asr: true, mt: true, tts: true, targetLanguage: 'zh' }
   settings.recognition.provider = 'local'; settings.recognition.modelId = 'asr-test'; settings.translation.provider = 'local'; settings.translation.localModelId = 'mt-test'; settings.synthesis = { modelId: 'tts-test', voice: 'Voice' }
   const resources = ['asr', 'mt', 'tts'].map(kind => ({ resourceId: `${kind}-test`, kind: kind === 'asr' ? 'recognitionModel' : kind === 'mt' ? 'translationModel' : 'ttsModel', name: kind, installed: true } as ResourceRecord))
   const workers: Array<GatewayWorker & { kind: string; fail(message: string): void }> = []
@@ -75,11 +136,12 @@ async function fixture(factory?: GatewayWorkerFactory, createLanguageModel?: typ
     }
     workers.push(worker); return worker
   })
-  const gateway = new ModelGateway({ getSettings: () => settings, listResources: async () => resources, directLaunch: async () => ({ command: 'unused', args: [], cwd: process.cwd() }), getKey: async () => key, setKey: async value => { key = value }, createWorker: create, createLanguageModel, getCredential, inferBackend, openBackendAsr })
+  const options: ModelGatewayOptions = { getSettings: () => settings, listResources: async () => resources, directLaunch: async () => ({ command: 'unused', args: [], cwd: process.cwd() }), getKey: async () => key, setKey: async value => { key = value }, createWorker: create, createLanguageModel, getCredential, inferBackend, openBackendAsr, loadBackend: async () => {} }
+  const gateway = new ModelGateway(options)
   gateways.push(gateway)
   const base = `http://127.0.0.1:${settings.modelGateway.port}`
   const headers = async () => ({ Authorization: `Bearer ${await gateway.revealKey()}`, 'Content-Type': 'application/json' })
-  return { gateway, settings, resources, workers, base, headers }
+  return { gateway, settings, resources, workers, base, headers, options }
 }
 
 it('routes public realtime PCM through the backend without a legacy ASR worker', async () => {
@@ -488,7 +550,7 @@ describe('local gateway', () => {
     expect(test.workers).toHaveLength(0)
   })
 
-  it('owns loaded local LLM lifecycle independently and keeps active requests pinned until released', async () => {
+  it.each(['direct', 'on-demand'] as const)('owns local LLM lifecycle in %s mode and keeps active requests pinned until released', async loadMode => {
     const runtimes: Array<{ close: ReturnType<typeof vi.fn> }> = []
     const test = await fixture(undefined, async (_services, binding) => {
       const runtime = { close: vi.fn(async () => {}), local: true, name: binding,
@@ -502,14 +564,16 @@ describe('local gateway', () => {
       enable(test.settings, 'llm', `resource:${id}`)
     }
     test.settings.modelGateway.llm = true
+    test.settings.modelGateway.loadMode = loadMode
     test.settings.modelGateway.llmModel = 'resource:first'
     await test.gateway.start()
-    const first = test.gateway.languageModel('resource:first')
+    if (loadMode === 'on-demand') expect(runtimes).toHaveLength(0)
+    const first = await test.gateway.acquireLanguageModel('resource:first')
     test.settings.modelGateway.llmModel = 'resource:second'
     await test.gateway.reconfigure()
     expect(runtimes[0].close).not.toHaveBeenCalled()
     expect(first.signal.aborted).toBe(false)
-    const second = test.gateway.languageModel('resource:second')
+    const second = await test.gateway.acquireLanguageModel('resource:second')
     test.settings.modelGateway.llm = false
     await test.gateway.reconfigure()
     expect(first.signal.aborted).toBe(true)
@@ -517,7 +581,7 @@ describe('local gateway', () => {
     expect(() => test.gateway.languageModel()).toThrow('LLM service is not ready')
     first.release(); second.release()
     await vi.waitFor(() => { expect(runtimes[0].close).toHaveBeenCalledOnce(); expect(runtimes[1].close).toHaveBeenCalledOnce() })
-    expect(test.gateway.snapshot().services.mt.state).toBe('ready')
+    expect(test.gateway.snapshot().services.mt.state).toBe(loadMode === 'direct' ? 'ready' : 'pending')
   })
 
   it('does not validate or fail an unconfigured LLM capability while it is disabled', async () => {
@@ -578,7 +642,7 @@ describe('local gateway', () => {
 
   it('marks a stopped local LLM failed and can restart the same binding', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.modelGateway = { ...settings.modelGateway, externalEnabled: false, asr: false, mt: false, tts: false, llm: true, llmModel: 'resource:qwen35-fixture' }
+    settings.modelGateway = { ...settings.modelGateway, loadMode: 'direct', externalEnabled: false, asr: false, mt: false, tts: false, llm: true, llmModel: 'resource:qwen35-fixture' }
     let fail: (() => void) | undefined
     const createLanguageModel = vi.fn(async () => ({
       profile: { id: 'resource:qwen35-fixture', model: 'local', endpoint: 'http://127.0.0.1:12345/api/v2/gateway/language-models/fixture',
@@ -862,6 +926,25 @@ describe('OCR capability ownership', () => {
     gateways.push(gateway)
     return { ...test, gateway, runtime }
   }
+  it('loads on demand, shares concurrent OCR leases and unloads only after the last lease is idle', async () => {
+    const { gateway, runtime, settings } = await ocrFixture()
+    settings.modelGateway.loadMode = 'on-demand'
+    await gateway.start()
+    expect(runtime.load).not.toHaveBeenCalled()
+    expect(gateway.snapshot().services.ocr?.state).toBe('pending')
+    const releases = await Promise.all([gateway.acquireOcr(), gateway.acquireOcr()])
+    expect(runtime.load).toHaveBeenCalledOnce()
+    vi.useFakeTimers()
+    try {
+      releases[0]()
+      await vi.advanceTimersByTimeAsync(5 * 60_000)
+      expect(runtime.release).not.toHaveBeenCalled()
+      releases[1]()
+      await vi.advanceTimersByTimeAsync(5 * 60_000)
+      expect(runtime.release).toHaveBeenCalledOnce()
+      expect(gateway.snapshot().services.ocr?.state).toBe('pending')
+    } finally { vi.useRealTimers() }
+  })
   const input = { image: 'data:image/png;base64,fixture', language: 'auto' as const }
   it('loads OCR only from the gateway and keeps weights loaded after a screen lease ends', async () => {
     const { gateway, runtime } = await ocrFixture()
@@ -870,7 +953,7 @@ describe('OCR capability ownership', () => {
     await gateway.start()
     expect(gateway.snapshot().services.ocr).toMatchObject({ state: 'ready', name: 'PP-OCRv5 mobile' })
     expect(gateway.snapshot().availableModels?.ocr?.[0].binding).toBe('resource:pp-ocrv5-mobile-onnx')
-    const release = gateway.acquireOcr()
+    const release = await gateway.acquireOcr()
     release(); release()
     expect(runtime.release).not.toHaveBeenCalled()
     await gateway.inferOcr(input, new AbortController().signal)
@@ -885,7 +968,7 @@ describe('OCR capability ownership', () => {
   it('rejects disruptive capability edits while a screen session holds the model', async () => {
     const { gateway } = await ocrFixture()
     await gateway.start()
-    const release = gateway.acquireOcr()
+    const release = await gateway.acquireOcr()
     expect(() => gateway.assertSettingsChange({ modelGateway: { ocr: false } })).toThrow('RESOURCE_IN_USE')
     release()
     expect(() => gateway.assertSettingsChange({ modelGateway: { ocr: false } })).not.toThrow()
