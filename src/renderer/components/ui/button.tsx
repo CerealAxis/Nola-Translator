@@ -1,7 +1,6 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
-import { TooltipHint } from "./tooltip"
 
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-[var(--radius-xl)] border border-transparent bg-clip-padding type-body font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-nola-ui-ring focus-visible:ring-3 focus-visible:ring-nola-ui-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-nola-ui-destructive aria-invalid:ring-3 aria-invalid:ring-nola-ui-destructive/20 dark:aria-invalid:border-nola-ui-destructive/50 dark:aria-invalid:ring-nola-ui-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -41,21 +40,15 @@ const buttonVariants = cva(
 
 export type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>["variant"]> | "danger" | "tertiary"
 export type ButtonSize = NonNullable<VariantProps<typeof buttonVariants>["size"]>
-export interface ButtonProps extends Omit<ButtonPrimitive.Props, "className" | "title"> {
-  className?: string
-  variant?: ButtonVariant
-  size?: ButtonSize
-  tooltip?: string
-}
+export interface ButtonProps extends Omit<ButtonPrimitive.Props, "className"> { className?: string; variant?: ButtonVariant; size?: ButtonSize }
 
 function Button({
   className,
   variant = "default",
   size = "default",
-  tooltip,
   ...props
 }: ButtonProps) {
-  const button = (
+  return (
     <ButtonPrimitive
       data-slot="button"
       data-size={size}
@@ -64,7 +57,6 @@ function Button({
       {...props}
     />
   )
-  return tooltip ? <TooltipHint content={tooltip} disabledTrigger={props.disabled && !props.focusableWhenDisabled}>{button}</TooltipHint> : button
 }
 
 export { Button, buttonVariants }

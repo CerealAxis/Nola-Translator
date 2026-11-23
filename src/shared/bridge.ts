@@ -1,4 +1,3 @@
-import type { RuntimeKind } from './compute'
 import type { ModelConfiguration } from './model-capabilities'
 import type {
   AudioDevice,
@@ -102,9 +101,6 @@ export type NolaTranslatorApi = {
   releaseDirectModel?(): Promise<void>
   agentWorkspace?(action: import('./agent-workspace').WorkspaceAction): Promise<import('./agent-workspace').AgentWorkspaceSnapshot>
   directModel?(request: import('./agent-workspace').DirectModelRequest, inspect?: boolean): Promise<import('./agent-workspace').DirectModelResult>
-  listCloudModels?(request: import('./cloud-model-tools').CloudModelListRequest): Promise<import('./cloud-model-tools').RemoteChatModel[]>
-  probeCloudModel?(request: import('./cloud-model-tools').CloudModelProbeRequest): Promise<{ audio?: string }>
-  chatGptPlan?(request: import('./chatgpt-plan').ChatGptPlanRequest): Promise<import('./chatgpt-plan').ChatGptPlanResult>
   streamLanguageModel?(request: import('./language-model').LanguageModelStreamRequest): Promise<void>
   resolveLanguageModelAudio?(result: import('./language-model').LanguageModelAudioResult): Promise<void>
   onLanguageModelStream?(callback: (event: import('./language-model').LanguageModelStreamEvent) => void): () => void
@@ -127,9 +123,9 @@ export type NolaTranslatorApi = {
   onAudioInputLevel(callback: (id: string, level: number) => void): () => void
   listComputeDevices(): Promise<ComputeSnapshot>
   getRuntimes(): Promise<RuntimeSnapshot>
-  prepareRuntimes(components?: readonly RuntimeKind[]): Promise<RuntimeSnapshot>
+  prepareRuntimes(components?: readonly ('engine' | 'llama' | 'crisp')[]): Promise<RuntimeSnapshot>
   installRuntime(id: string, repair?: boolean): Promise<void>
-  uninstallRuntime(kind: RuntimeKind): Promise<void>
+  uninstallRuntime(kind: 'engine' | 'llama' | 'crisp'): Promise<void>
   importRuntime(): Promise<boolean>
   cancelRuntimeInstall(): Promise<void>
   listResources(): Promise<ResourceSnapshot>

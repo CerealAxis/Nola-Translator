@@ -107,7 +107,6 @@ export function registerAppIpc(options: {
   /** Base of the meeting audio protocol, including the trailing `://` (e.g. `nola-audio://`). Concatenate the path directly. */
   audioProtocol: string
   credentials: SecureCredentialStore
-  chatGptPlanPresence?: (provider: CredentialProvider) => Promise<boolean | undefined>
   engine: EngineProcess
   getOverlayWindow: () => BrowserWindow | null
   getMainWindow: () => BrowserWindow | null
@@ -426,10 +425,8 @@ export function registerAppIpc(options: {
     }
     await clipboard.writeText(JSON.stringify(report, null, 2))
   })
-  loggedHandle(channels.hasTranslationCredential, async (_event, provider: unknown) => {
-    const target = assertCredentialProvider(provider)
-    return await options.chatGptPlanPresence?.(target) ?? options.credentials.has(target)
-  })
+  loggedHandle(channels.hasTranslationCredential, (_event, provider: unknown) =>
+    options.credentials.has(assertCredentialProvider(provider)))
   loggedHandle(channels.setTranslationCredential, async (_event, provider: unknown, value: unknown) => {
     const target = assertCredentialProvider(provider)
     if (typeof value !== 'string' || value.length > 4096) throw new Error('INVALID_CREDENTIAL')

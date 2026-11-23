@@ -725,9 +725,6 @@ describe('independent cloud consumers', () => {
     expect(create).toHaveBeenCalledTimes(2)
     second.release()
     expect(close).toHaveBeenCalledTimes(2)
-    test.settings.modelWorkspace = { connections: [], localSources: {}, managedBindings: ['llm:custom:scene'] }
-    await expect(test.gateway.acquireLanguageModel('custom:scene')).rejects.toMatchObject({ code: 'model_disabled' })
-    expect(create).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -1047,59 +1044,4 @@ it('leases an enabled local LLM on demand without starting the public gateway an
   expect(close).toHaveBeenCalledOnce()
   Object.assign(test.settings, modelEnablePatch(test.settings, 'llm', 'resource:local-test', false))
   await expect(test.gateway.acquireLanguageModel('resource:local-test')).rejects.toMatchObject({ code: 'model_disabled' })
-})
-
-it('runs a configured batch cloud speech model without falling through to the realtime backend', async () => {
-  const getCredential = vi.fn(async (slot: CredentialProvider) => slot === 'cloud-model:ASR-whisper-api' ? 'test-key' : '')
-  const inferBackend = vi.fn(async () => ({ text: 'incorrect backend' }))
-  const test = await fixture(undefined, undefined, getCredential, inferBackend)
-  test.settings.modelWorkspace = { localSources: {}, connections: [{
-    id: 'ASR-whisper-api', service: 'whisper-api', capability: 'ASR', name: 'Whisper(API)',
-    endpoint: '', protocol: '', workspace: '', region: '',
-    models: [
-      { id: 'whisper-1', name: 'whisper-1', enabled: true },
-      { id: 'custom-asr', name: 'Custom ASR', enabled: true, profileId: 'second' },
-    ],
-  }] }
-  const fetch = vi.fn<typeof globalThis.fetch>()
-    .mockResolvedValueOnce(Response.json({ text: 'Test transcript' }))
-    .mockResolvedValueOnce(Response.json({ text: 'Custom transcript' }))
-  vi.stubGlobal('fetch', fetch)
-  const request = { id: randomUUID(), kind: 'asr' as const, model: 'cloud:whisper-api', audio: wav().toString('base64') }
-  const signal = new AbortController().signal
-  await expect(test.gateway.batchSpeechModels()).resolves.toEqual([
-    expect.objectContaining({ kind: 'asr', name: 'whisper-1', binding: 'cloud:whisper-api' }),
-    expect.objectContaining({ kind: 'asr', name: 'Custom ASR', binding: 'cloud:whisper-api:second' }),
-  ])
-  await expect(test.gateway.infer(request, signal)).resolves.toEqual({ text: 'Test transcript' })
-  expect(getCredential).toHaveBeenCalledWith('cloud-model:ASR-whisper-api')
-  expect(fetch).toHaveBeenCalledExactlyOnceWith('https://api.openai.com/v1/audio/transcriptions', expect.anything())
-  await expect(test.gateway.infer({ ...request, id: randomUUID(), model: 'cloud:whisper-api:second' }, signal))
-    .resolves.toEqual({ text: 'Custom transcript' })
-  expect((fetch.mock.calls[1][1]?.body as FormData).get('model')).toBe('custom-asr')
-  expect(inferBackend).not.toHaveBeenCalled()
-  test.settings.modelWorkspace.connections[0].models[0].enabled = false
-  await expect(test.gateway.infer(request, signal)).rejects.toThrow('not enabled')
-  expect(fetch).toHaveBeenCalledTimes(2)
-})
-
-it('sends the chosen MiMo model ID and voice from its own saved row', async () => {
-  const test = await fixture(undefined, undefined, async slot => slot === 'mimo-tts' ? 'test-key' : '')
-  test.settings.modelWorkspace = { localSources: {}, connections: [{
-    id: 'TTS-mimo', service: 'mimo', capability: 'TTS', name: 'MiMo TTS(API)',
-    endpoint: 'https://api.xiaomimimo.com/v1', protocol: '', workspace: '', region: '',
-    models: [
-      { id: 'mimo-v2.5-tts', name: 'mimo-v2.5-tts', enabled: false, voice: 'Chloe' },
-      { id: 'custom-tts', name: 'Custom TTS', enabled: true, voice: 'custom-voice', profileId: 'second' },
-    ],
-  }] }
-  const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(Response.json({
-    choices: [{ message: { audio: { data: 'AAAA' } } }],
-  }))
-  vi.stubGlobal('fetch', fetch)
-  const model = 'cloud:mimo-v2.5-tts:second'
-  await expect(test.gateway.batchSpeechModels()).resolves.toEqual([expect.objectContaining({ binding: model })])
-  await expect(test.gateway.infer({ id: randomUUID(), kind: 'tts', text: 'Hello', model },
-    new AbortController().signal)).resolves.toMatchObject({ audio: 'data:audio/wav;base64,AAAA' })
-  expect(JSON.parse(fetch.mock.calls[0][1]!.body as string)).toMatchObject({ model: 'custom-tts', audio: { voice: 'custom-voice' } })
 })

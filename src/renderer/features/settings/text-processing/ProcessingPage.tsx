@@ -23,7 +23,7 @@ export function ProcessingIconButton({
   return (
     <Button variant="bare" size="icon-sm" nativeButton={nativeButton}
       role={nativeButton === false ? 'link' : undefined}
-      type={nativeButton === false ? undefined : 'button'} aria-label={label} tooltip={label} {...props}>
+      type={nativeButton === false ? undefined : 'button'} aria-label={label} title={label} {...props}>
       {children}
     </Button>
   )

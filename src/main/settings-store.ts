@@ -131,19 +131,16 @@ type LegacyTranslation = Record<string, unknown>
 function sanitizeCloudSettings(settings: AppSettings): void {
   const models = settings.translation.customModels
   if (models !== undefined) settings.translation.customModels = Array.isArray(models)
-    ? [...new Map(models.flatMap(stored => {
-      const parsed = customModelSchema.safeParse(stored)
-      if (!parsed.success) return []
-      const model = { ...parsed.data, languages: [...LANGUAGE_CODES], sourceLanguages: [...SOURCE_LANGUAGE_OPTIONS] }
-      return [[model.id, model] as const]
-    })).values()].slice(0, 100)
+    ? [...new Map(models.flatMap(model => { const parsed = customModelSchema.safeParse(model); return parsed.success ? [[parsed.data.id, parsed.data] as const] : [] })).values()].slice(0, 100)
     : []
   if (settings.translation.customModelId && !settings.translation.customModels?.some(model => model.id === settings.translation.customModelId)) settings.translation.customModelId = ''
   if (settings.translation.cloudLanguages !== undefined) {
-    settings.translation.cloudLanguages = [...LANGUAGE_CODES]
+    const languages = Array.isArray(settings.translation.cloudLanguages) ? settings.translation.cloudLanguages.filter(code => LANGUAGE_CODES.includes(code)) : []
+    settings.translation.cloudLanguages = languages.length ? [...new Set(languages)] : [...LANGUAGE_CODES]
   }
   if (settings.translation.cloudSourceLanguages !== undefined) {
-    settings.translation.cloudSourceLanguages = [...SOURCE_LANGUAGE_OPTIONS]
+    const languages = Array.isArray(settings.translation.cloudSourceLanguages) ? settings.translation.cloudSourceLanguages.filter(code => SOURCE_LANGUAGE_OPTIONS.includes(code)) : []
+    settings.translation.cloudSourceLanguages = languages.length ? [...new Set(languages)] : [...SOURCE_LANGUAGE_OPTIONS]
   }
   settings.translation = synchronizeCustomModel(settings.translation)
   const recognition = settings.recognition
@@ -349,7 +346,6 @@ export class SettingsStore {
         onboardingStep: settingsPatchSchema.safeParse({ onboardingStep: raw.onboardingStep }).data?.onboardingStep ?? 'W0',
         onboardingCompletedVersion: settingsPatchSchema.safeParse({ onboardingCompletedVersion: raw.onboardingCompletedVersion }).data?.onboardingCompletedVersion ?? 0,
         modelPolicy: raw.modelPolicy === undefined ? undefined : (modelPolicySchema.safeParse(raw.modelPolicy).data ?? { enabled: {}, defaults: {}, selections: {} }),
-        modelWorkspace: settingsPatchSchema.safeParse({ modelWorkspace: raw.modelWorkspace }).data?.modelWorkspace,
         closeBehavior: raw.closeBehavior === 'quit' ? 'quit' : 'tray',
         synthesis: {
           ...DEFAULT_SETTINGS.synthesis,

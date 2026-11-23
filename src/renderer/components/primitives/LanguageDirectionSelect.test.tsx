@@ -20,15 +20,12 @@ it('labels languages with localized and native names while keeping pseudo-langua
   expect(() => languageOptionLabel('unknown_code', 'en')).not.toThrow()
 })
 
-it('keeps selected names compact and shows the full name in a tooltip', async () => {
+it('keeps selected names compact and complete names available in the picker', () => {
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, uiLanguage: 'zh-CN' } })
   render(<LanguageDirectionSelect source="en" target="zh" sourceCodes={['en']} targetCodes={['zh']}
     onSourceChange={vi.fn()} onTargetChange={vi.fn()} />)
-  const trigger = screen.getByRole('combobox', { name: '原文语言' })
-  expect(trigger).toHaveTextContent(/^英语$/)
-  expect(trigger).not.toHaveAttribute('title')
-  await userEvent.setup().hover(trigger)
-  expect(await screen.findByRole('tooltip')).toHaveTextContent('英语 (English)')
+  expect(screen.getByRole('combobox', { name: '原文语言' })).toHaveTextContent(/^英语$/)
+  expect(screen.getByRole('combobox', { name: '原文语言' })).toHaveAttribute('title', '英语 (English)')
   expect(screen.getByRole('combobox', { name: '译文语言' })).toHaveTextContent(/^简体中文$/)
 })
 

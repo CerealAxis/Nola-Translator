@@ -72,13 +72,12 @@ export function createEngineLaunchSpec(options: {
   resourcesPath: string
   managedEngineDirectory?: string
   managedCrispDirectory?: string
-  managedOnnxDirectory?: string
   module?: 'nola_translator_engine.offline_models' | 'nola_translator_engine.local_call' | 'nola_translator_engine.backend'
 }): EngineLaunchSpec {
   const pythonDirectory = options.isPackaged ? join(options.resourcesPath, 'engine')
     : join(options.appPath, 'engine', 'dist', 'NolaPythonEngine')
   const sourceDirectory = options.isPackaged ? join(pythonDirectory, 'Lib', 'site-packages') : join(options.appPath, 'engine')
-  const paths = [options.managedOnnxDirectory, options.managedCrispDirectory, sourceDirectory, options.managedEngineDirectory].filter((path): path is string => !!path)
+  const paths = [options.managedCrispDirectory, sourceDirectory, options.managedEngineDirectory].filter((path): path is string => !!path)
   // Python is fixed; only component search paths change. App code always comes from this release.
   const bootstrap = `${pythonRuntimePaths(paths, pythonDirectory, options.managedEngineDirectory)}; _nola_dll_handles += [os.add_dll_directory(p) for p in ${JSON.stringify(options.managedCrispDirectory ? [options.managedCrispDirectory, join(options.managedCrispDirectory, 'crispasr', 'vulkan')] : [])} if os.path.isdir(p)]; import runpy; assert sys.version_info[:2] == (3,12), "Python 3.12 required"; runpy.run_module(${JSON.stringify(options.module ?? 'nola_translator_engine')}, run_name="__main__")`
   // `-I` ignores PYTHON* environment variables, so select UTF-8 on the command line for pipes.

@@ -2,6 +2,7 @@
 title: Nola 设计文档
 description: Nola Translator 设计文档，涵盖设计原则、基础样式、组件、页面模板和工程规约。
 pageClass: nola-vis-doc
+editLink: false
 ---
 
 # 设计文档

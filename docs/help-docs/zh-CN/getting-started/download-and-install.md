@@ -19,7 +19,7 @@ description: "查看 Nola Translator 正式版和测试版的下载渠道，按�
 - 正式版
     - [百度网盘](https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2)
     - [夸克网盘](https://pan.quark.cn/s/ef1e11262087)
-    - [官网](https://nolax.org/)
+    - [官网](https://nola.xaviermc.top/)
 
 - 测试版
     - [Github Action](https://github.com/CerealAxis/Nola-Translator/actions)
@@ -28,7 +28,7 @@ description: "查看 Nola Translator 正式版和测试版的下载渠道，按�
 ### （二）其他地区
 
 - 正式版
-    - [官网](https://nolax.org/)
+    - [官网](https://nola.xaviermc.top/)
     - [Github](https://github.com/CerealAxis/Nola-Translator/releases)
 
 - 测试版

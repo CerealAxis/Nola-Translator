@@ -7,7 +7,6 @@ import { safeHref } from "../utils/href";
 import { clamp } from "../utils/range";
 import { useIsomorphicLayoutEffect } from "../utils/useIsomorphicLayoutEffect";
 import { field, mono, paper } from "./surfaces";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../shadcn-base/ui/tooltip";
 
 export type DataTableValue =
   | string
@@ -318,12 +317,7 @@ function Value({
                 },
           ).format(date),
     );
-    return (
-      <Tooltip>
-        <TooltipTrigger render={<span />}>{content}</TooltipTrigger>
-        <TooltipContent>{date.toISOString()}</TooltipContent>
-      </Tooltip>
-    );
+    return <span title={date.toISOString()}>{content}</span>;
   }
 
   if (format.kind === "boolean") {

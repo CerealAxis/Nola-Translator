@@ -13,7 +13,6 @@ import { BROWSER_EXTENSION_VERSION, type BrowserKind, type BrowserIntegrationInf
 import chromeIcon from '@/assets/browsers/chrome.png'
 import edgeIcon from '@/assets/browsers/edge.png'
 import firefoxIcon from '@/assets/browsers/firefox.svg'
-import { TooltipHint } from '@/components/ui/tooltip'
 
 const BROWSERS: readonly BrowserKind[] = ['chrome', 'edge', 'firefox']
 const BROWSER_ICONS: Record<BrowserKind, string> = { chrome: chromeIcon, edge: edgeIcon, firefox: firefoxIcon }
@@ -181,10 +180,10 @@ export interface BrowserSwitchProps {
  */
 function BrowserSwitch({ isSelected, isDisabled, ariaLabel, onChange }: BrowserSwitchProps) {
   return (
-    <TooltipHint content={ariaLabel} disabledTrigger={isDisabled}><Switch nativeButton render={<button type="button" />} className="switch"
-      checked={isSelected} onCheckedChange={onChange} disabled={isDisabled} aria-label={ariaLabel}>
+    <Switch nativeButton render={<button type="button" />} className="switch"
+      checked={isSelected} onCheckedChange={onChange} disabled={isDisabled} aria-label={ariaLabel} title={ariaLabel}>
       <span className="switch__control"><SwitchThumb className="switch__thumb" /></span>
-    </Switch></TooltipHint>
+    </Switch>
   )
 }
 

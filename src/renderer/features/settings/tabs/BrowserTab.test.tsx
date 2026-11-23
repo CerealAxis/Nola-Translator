@@ -167,7 +167,7 @@ it('lets an available browser recover its denied Nola connection without claimin
   const permission = within(row).getByRole('switch', { name: '允许 Mozilla Firefox 连接' })
   expect(permission).not.toBeChecked()
   expect(permission).toBeEnabled()
-  expect(permission).not.toHaveAttribute('title')
+  expect(permission).toHaveAttribute('title', '允许 Mozilla Firefox 连接')
   fireEvent.click(permission)
   expect(settingsActions.browserConnectionAction).toHaveBeenCalledWith('browserEnable', true, 'firefox')
 })

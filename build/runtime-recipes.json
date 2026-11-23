@@ -2,78 +2,6 @@
   "version": 1,
   "recipes": [
     {
-      "id": "torch-2-15-0-cu132",
-      "name": "Torch 2.15.0 (CUDA 13.2)",
-      "backend": "cuda",
-      "pythonAbi": "cp312-win_amd64",
-      "torchVersion": "2.15.0",
-      "indexUrl": "https://download.pytorch.org/whl/cu132",
-      "wheel": {
-        "url": "https://download-r2.pytorch.org/whl/cu132/torch-2.15.0%2Bcu132-cp312-cp312-win_amd64.whl",
-        "filename": "torch-2.15.0+cu132-cp312-cp312-win_amd64.whl",
-        "sha256": "14424b1514fc10a8a2352710234869c9af86a9223b582c3767b7512ec038f979",
-        "bytes": 2108273925
-      },
-      "companions": [],
-      "requirements": [
-        "numpy==1.26.4",
-        "accelerate==1.15.0",
-        "bitsandbytes==0.50.2",
-        "funasr==1.4.16",
-        "sentencepiece==0.2.1",
-        "transformers==5.17.0",
-        "compressed-tensors==0.19.0"
-      ]
-    },
-    {
-      "id": "torch-2-15-0-xpu",
-      "name": "Torch 2.15.0 (Intel XPU)",
-      "backend": "xpu",
-      "pythonAbi": "cp312-win_amd64",
-      "torchVersion": "2.15.0",
-      "indexUrl": "https://download.pytorch.org/whl/xpu",
-      "wheel": {
-        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.15.0%2Bxpu-cp312-cp312-win_amd64.whl",
-        "filename": "torch-2.15.0+xpu-cp312-cp312-win_amd64.whl",
-        "sha256": "021dcbb1e2fdb0aecfe0783ce1b738bbc2a2a1b40957a2f97e3efa99d1cf0e6e",
-        "bytes": 781337330
-      },
-      "companions": [],
-      "requirements": [
-        "numpy==1.26.4",
-        "accelerate==1.15.0",
-        "bitsandbytes==0.50.2",
-        "funasr==1.4.16",
-        "sentencepiece==0.2.1",
-        "transformers==5.17.0",
-        "compressed-tensors==0.19.0"
-      ]
-    },
-    {
-      "id": "torch-2-15-0-cpu",
-      "name": "Torch 2.15.0 (CPU)",
-      "backend": "cpu",
-      "pythonAbi": "cp312-win_amd64",
-      "torchVersion": "2.15.0",
-      "indexUrl": "https://download.pytorch.org/whl/cpu",
-      "wheel": {
-        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp312-cp312-win_amd64.whl",
-        "filename": "torch-2.15.0+cpu-cp312-cp312-win_amd64.whl",
-        "sha256": "5af9fb357790db09e62484b12032304f046c22c4b1895ca88c4cf5987ea369ca",
-        "bytes": 126627285
-      },
-      "companions": [],
-      "requirements": [
-        "numpy==1.26.4",
-        "accelerate==1.15.0",
-        "bitsandbytes==0.50.2",
-        "funasr==1.4.16",
-        "sentencepiece==0.2.1",
-        "transformers==5.17.0",
-        "compressed-tensors==0.19.0"
-      ]
-    },
-    {
       "id": "torch-2-14-1-cu132",
       "name": "Torch 2.14.1 (CUDA 13.2)",
       "backend": "cuda",
@@ -3205,43 +3133,6 @@
         "sentencepiece==0.2.1",
         "transformers==4.46.3"
       ]
-    },
-    {
-      "id": "torch-2-4-1-directml",
-      "name": "Torch 2.4.1 (DirectML)",
-      "backend": "directml",
-      "pythonAbi": "cp312-win_amd64",
-      "torchVersion": "2.4.1",
-      "indexUrl": "https://download.pytorch.org/whl/cpu",
-      "wheel": {
-        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.4.1%2Bcpu-cp312-cp312-win_amd64.whl",
-        "filename": "torch-2.4.1+cpu-cp312-cp312-win_amd64.whl",
-        "sha256": "3a570e5c553415cdbddfe679207327b3a3806b21c6adea14fba77684d1619e97",
-        "bytes": 201717875
-      },
-      "companions": [
-        {
-          "url": "https://files.pythonhosted.org/packages/71/f2/eb7d3c601310c758f6aef891773e4a00f7388eeb613d536c0d2681fcb105/torch_directml-0.2.5.dev240914-cp312-cp312-win_amd64.whl",
-          "filename": "torch_directml-0.2.5.dev240914-cp312-cp312-win_amd64.whl",
-          "sha256": "ea19d11e33e9450b290311c06f7eb10924dd25c555e504d367b7b437d3eb24d0",
-          "bytes": 8956338
-        },
-        {
-          "url": "https://download-r2.pytorch.org/whl/cpu/torchvision-0.19.1%2Bcpu-cp312-cp312-win_amd64.whl",
-          "filename": "torchvision-0.19.1+cpu-cp312-cp312-win_amd64.whl",
-          "sha256": "8c826a6bd5aca0ec09f1d7122a5491527ad3eb7d733fc81281be6f0c75f9783c",
-          "bytes": 1282668
-        }
-      ],
-      "requirements": [
-        "numpy==1.26.4",
-        "accelerate==1.15.0",
-        "bitsandbytes==0.50.2",
-        "funasr==1.4.16",
-        "sentencepiece==0.2.1",
-        "transformers==4.46.3"
-      ],
-      "directmlVersion": "0.2.5.dev240914"
     },
     {
       "id": "torch-2-3-1-directml",

@@ -224,8 +224,8 @@ class RealtimePipelines:
                         Operation.SYNTHESIZE, model_id=config.tts_model,
                         target_language=speech_language, required_outputs=["speech"],
                     ))
-                    tts_options = connection.get("tts_options", {})
-                    if config.tts_model == MIMO_TTS_MODEL and not tts_options.get("api_key"):
+                    tts_key = connection.get("tts_api_key", "")
+                    if config.tts_model == MIMO_TTS_MODEL and not tts_key:
                         raise ValueError("Speech provider credential is missing")
                     playback = TtsPipeline(
                         self.gateway, PlaybackQueue(
@@ -234,7 +234,7 @@ class RealtimePipelines:
                         ),
                         pipeline_id=str(session.pipeline_id), epoch=session.epoch,
                         model_id=config.tts_model, voice=config.tts_voice, event_sink=emit_playback,
-                        provider_options=tts_options,
+                        provider_options={"api_key": tts_key} if tts_key else None,
                         latency_detection=latency_detection,
                     )
                     self.playbacks[key] = playback

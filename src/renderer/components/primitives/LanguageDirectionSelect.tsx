@@ -4,7 +4,7 @@ import { useI18n } from '@/i18n'
 import { languageName, normalizeLanguage, type UiLanguage } from '../../../shared/languages'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { TooltipHint, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function languageOptionLabel(code: string, locale: UiLanguage, includeNative = true): string {
   const normalized = normalizeLanguage(code)
@@ -26,9 +26,9 @@ export function LanguageSelect({ value, codes, label, onChange, disabled }: {
   const name = (code: string) => languageOptionLabel(code, language)
   return <Combobox.Root items={codes} itemToStringLabel={name} value={value} disabled={disabled || !codes.length} modal={false}
     onValueChange={next => { if (next) onChange(next) }}>
-    <TooltipHint content={name(value)}><Combobox.Trigger className="select__trigger nola-language-trigger" aria-label={label}>
+    <Combobox.Trigger className="select__trigger nola-language-trigger" aria-label={label} title={name(value)}>
       <span className="select__value">{languageOptionLabel(value, language, false)}</span><ChevronDown aria-hidden="true" />
-    </Combobox.Trigger></TooltipHint>
+    </Combobox.Trigger>
     <Combobox.Portal><Combobox.Positioner className="z-popup" sideOffset={4}>
       <Combobox.Popup className="select__popover nola-language-popup" initialFocus={false}>
         <Combobox.Input render={<Input />} placeholder={t('modelConfig.searchLanguages')} aria-label={t('modelConfig.searchLanguages')} />

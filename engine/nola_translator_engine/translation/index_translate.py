@@ -43,13 +43,13 @@ def prompt_header(source: str, target: str, *, include_glossary: bool = True) ->
 
 
 class IndexTranslatePublicProvider(OpenAICompatibleProvider):
-    """Index-Translate protocol with no cloud API credential."""
+    """Fixed public service; it never accepts or forwards a user's cloud credential."""
 
     name = "index-translate"
     label = "Index-Translate"
 
-    def __init__(self, *, requester: JsonRequester = _post_json, endpoint: str = PUBLIC_ENDPOINT, model: str = PUBLIC_MODEL) -> None:
-        super().__init__(endpoint=endpoint, model=model,
+    def __init__(self, *, requester: JsonRequester = _post_json) -> None:
+        super().__init__(endpoint=PUBLIC_ENDPOINT, model=PUBLIC_MODEL,
                          context_window=32768, max_output_tokens=1024, requester=requester)
 
     def _system_prompt(self, source: str, target: str) -> str:

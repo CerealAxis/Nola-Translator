@@ -285,7 +285,7 @@ html[data-overlay-toast="true"] #splash {
     flex: none;
     margin-block-start: var(--space-2);
   }
-  .nola-sidebar-account {
+  .nola-sidebar-account.button {
     display: flex;
     width: 100%;
     height: auto;
@@ -293,7 +293,7 @@ html[data-overlay-toast="true"] #splash {
     color: var(--sidebar-foreground);
     text-align: start;
     align-items: center;
-    min-height: max(var(--space-5), calc(var(--leading-body) + var(--leading-muted) + 2px));
+    min-height: var(--space-5);
     gap: var(--space-1);
     padding-inline: var(--space-1);
     @apply type-body font-medium;
@@ -579,9 +579,6 @@ html[data-overlay-toast="true"] #splash {
     padding-inline: 0;
   }
   .nola-sidebar[data-collapsible="icon"] .nola-sidebar-account__action {
-    display: flex;
-  }
-  .nola-sidebar[data-collapsible="icon"] .nola-sidebar-account > [data-slot="avatar"] {
     display: none;
   }
   .toast {
@@ -3257,139 +3254,6 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
   min-width: 0;
 }
 
-.performance-monitor {
-  display: grid;
-  container-type: inline-size;
-  min-width: 0;
-  gap: var(--panel-gap);
-}
-
-.performance-monitor-switch,
-.performance-monitor-controls,
-.performance-monitor-toolbar,
-.performance-monitor-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--label-gap);
-}
-
-.performance-monitor-switch { white-space: nowrap; }
-.performance-monitor-switch label { cursor: pointer; }
-
-.performance-monitor-controls,
-.performance-monitor-toolbar {
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.model-gateway-page .nola-page-heading > div > div:has(> .performance-monitor-controls) {
-  flex-shrink: 1;
-}
-
-.performance-monitor-toolbar,
-.performance-monitor-summary {
-  justify-content: space-between;
-}
-
-.performance-monitor-toolbar [data-slot="select-trigger"] { width: auto; }
-
-.performance-monitor-table th:not(:first-child),
-.performance-monitor-table td:not(:first-child) {
-  padding-inline: var(--label-gap);
-}
-
-.performance-monitor-table .performance-monitor-model-cell {
-  white-space: normal;
-  padding-block: var(--label-gap);
-}
-
-.performance-monitor-model-link.button {
-  justify-content: flex-start;
-  min-height: max(var(--space-6), 1.5em);
-  height: auto;
-  padding-inline: 0;
-  border-color: transparent;
-  background: transparent;
-  font-weight: 600;
-}
-
-.performance-monitor-model-link.button:hover { color: var(--primary); }
-
-.performance-monitor-stack,
-.performance-monitor-instance {
-  display: grid;
-  min-width: 0;
-  gap: var(--panel-gap);
-}
-
-.performance-monitor-instance,
-.performance-monitor-stage-body {
-  padding: var(--field-gap);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
-
-.performance-monitor-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
-  gap: var(--field-gap);
-}
-
-.performance-monitor-metrics dt { color: var(--muted-foreground); }
-.performance-monitor-metrics dd { font-weight: 600; font-variant-numeric: tabular-nums; }
-.performance-monitor-metrics small { color: var(--muted-foreground); }
-
-.performance-monitor-stages {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--label-gap);
-}
-
-.performance-monitor-stage {
-  display: flex;
-  flex: 1 1 9rem;
-  align-items: center;
-  gap: var(--label-gap);
-}
-
-.performance-monitor-stage-body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-self: stretch;
-  align-items: flex-start;
-  gap: var(--label-gap);
-  min-width: 0;
-}
-
-.performance-monitor-stage-arrow {
-  flex: none;
-  width: var(--space-4);
-  color: var(--muted-foreground);
-}
-
-.performance-monitor-detail.model-detail-drawer.nola-dialog-content {
-  inset: 0 0 0 auto;
-  width: min(calc(var(--space-8) * 9), 100vw);
-  border-radius: var(--radius-xl) 0 0 var(--radius-xl);
-  overflow-y: auto;
-}
-
-.performance-monitor-detail.model-detail-drawer.nola-dialog-content:is([data-starting-style], [data-ending-style]) {
-  transform: translateX(100%);
-}
-
-@container (max-width: 58rem) {
-  .performance-monitor-table .performance-monitor-wide { display: none; }
-}
-
-@container (max-width: 38rem) {
-  .performance-monitor-stages { flex-direction: column; }
-  .performance-monitor-stage { flex: auto; flex-direction: column; }
-  .performance-monitor-stage-arrow { rotate: 90deg; }
-  .performance-monitor-toolbar [data-slot="select-trigger"] { max-width: 100%; }
-}
-
 .model-gateway-capability {
   display: flex;
   align-items: center;
@@ -3632,6 +3496,13 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
 .model-api-key-field__toggle svg {
   width: var(--space-2);
   height: var(--space-2);
+}
+
+.models-language-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
 }
 
 /* The body is a flex column inside a height-capped dialog. Its rows keep their natural height:
@@ -6242,12 +6113,11 @@ td .text-processing-actions {
 .runtime-picker__group {
   display: flex;
   width: 100%;
-  max-width: calc(var(--space-8) * 9);
+  max-width: calc(var(--space-8) * 6);
 }
 
 .runtime-picker .runtime-picker__option {
-  flex: 1 1 auto;
-  white-space: nowrap;
+  flex: 1 1 0;
   justify-content: center;
   gap: var(--space-1);
   padding: 0 var(--space-2);
@@ -6318,7 +6188,7 @@ td .text-processing-actions {
   color: var(--nola-ui-muted-foreground);
 }
 
-@container (max-width: 620px) {
+@container (max-width: 460px) {
   .runtime-picker__group {
     flex-direction: column;
     max-width: none;

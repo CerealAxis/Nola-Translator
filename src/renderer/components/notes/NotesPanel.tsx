@@ -1,5 +1,4 @@
 /** Inline Markdown editing; persisted notes remain portable Markdown strings. */
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useEffect, useRef } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -92,7 +91,7 @@ export function NotesPanel({ value, onChange, collapsed = false, onToggleCollaps
     <Card role="complementary" aria-label={t('notes.title')} className={['nola-workspace-notes', className].filter(Boolean).join(' ')}>
       <CardHeader className="nola-workspace-notes-heading">
         <CardTitle className="card__title">{t('notes.title')}</CardTitle>
-        <Tooltip><TooltipTrigger render={<span className="nola-workspace-notes-state" />}>{t('workspaceUi.notesLocal')}</TooltipTrigger><TooltipContent>{t('workspaceUi.notesLocalHint')}</TooltipContent></Tooltip>
+        <span className="nola-workspace-notes-state" title={t('workspaceUi.notesLocalHint')}>{t('workspaceUi.notesLocal')}</span>
       </CardHeader>
       <div className="nola-workspace-notes-tools" role="toolbar" aria-label={t('notes.title')}>
         {MARKS.map(({ key, icon: Icon, labelKey }) => (

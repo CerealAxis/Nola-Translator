@@ -312,7 +312,7 @@ function NativeUserAttachment() {
   if (attachment.type === 'image' && src) return <Image.Root className="mb-2 max-w-80"><Image.Preview src={src} alt={attachment.name} /><Image.Filename>{attachment.name}</Image.Filename></Image.Root>
   const part = attachment.content?.find(part => part.type === 'file')
   return <AttachmentPrimitive.Root className="mb-2 w-full min-w-0 max-w-sm">
-    <File.Root className="w-full min-w-0"><File.Icon mimeType={attachment.contentType} /><Tooltip><TooltipTrigger render={<File.Name />}><AttachmentPrimitive.Name /></TooltipTrigger><TooltipContent>{attachment.name}</TooltipContent></Tooltip>{attachment.file && <File.Size bytes={attachment.file.size} />}{part?.type === 'file' && <File.Download data={part.data} mimeType={part.mimeType} filename={attachment.name} />}</File.Root>
+    <File.Root className="w-full min-w-0"><File.Icon mimeType={attachment.contentType} /><File.Name title={attachment.name}><AttachmentPrimitive.Name /></File.Name>{attachment.file && <File.Size bytes={attachment.file.size} />}{part?.type === 'file' && <File.Download data={part.data} mimeType={part.mimeType} filename={attachment.name} />}</File.Root>
     {part?.type === 'file' && <File.Player className="mt-2" data={part.data} mimeType={part.mimeType} filename={attachment.name} />}
   </AttachmentPrimitive.Root>
 }
@@ -323,7 +323,7 @@ function NativeComposerAttachment() {
   const src = useAttachmentSrc()
   return <AttachmentPrimitive.Root className="flex min-w-0 max-w-full flex-col gap-1">
     {src && <img src={src} alt={attachment.name} className="max-h-32 max-w-40 rounded-[var(--radius-md)] object-contain" />}
-    <File.Root className="max-w-full min-w-0"><File.Icon mimeType={attachment.contentType} /><Tooltip><TooltipTrigger render={<File.Name />}><AttachmentPrimitive.Name /></TooltipTrigger><TooltipContent>{attachment.name}</TooltipContent></Tooltip>{attachment.file && <File.Size bytes={attachment.file.size} />}<AttachmentPrimitive.Remove aria-label={t('workbench.removeAttachment', { name: attachment.name })} className={ghostButton}><X className="size-4" aria-hidden="true" /></AttachmentPrimitive.Remove></File.Root>
+    <File.Root className="max-w-full min-w-0"><File.Icon mimeType={attachment.contentType} /><File.Name title={attachment.name}><AttachmentPrimitive.Name /></File.Name>{attachment.file && <File.Size bytes={attachment.file.size} />}<AttachmentPrimitive.Remove aria-label={t('workbench.removeAttachment', { name: attachment.name })} className={ghostButton}><X className="size-4" aria-hidden="true" /></AttachmentPrimitive.Remove></File.Root>
     {attachment.status.type === 'incomplete' && <p role="alert" className="type-body text-destructive">{attachment.status.message || t('workbench.actionFailed')}</p>}
   </AttachmentPrimitive.Root>
 }
@@ -566,11 +566,6 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
   const usage = [...messages].reverse().find(message => message.role === 'assistant' && message.metadata?.custom?.usage)?.metadata.custom.usage as { inputTokens?: number; outputTokens?: number; totalTokens?: number; reasoningTokens?: number } | undefined
   const selected = props.models.find(model => model.id === props.config.model)
   const contextWindow = profile?.contextWindow ?? selected?.contextWindow ?? 0
-  const effortOptions: readonly string[] = selected?.reasoningLevels ?? ['auto', 'low', 'medium', 'high']
-  const requestedEffort = selected?.reasoningLevels && ['medium', 'high'].includes(props.config.effort) ? 'enabled' : props.config.effort
-  const effort = effortOptions.includes(requestedEffort) ? requestedEffort : effortOptions[0]
-  const effortLabel = (key: string) => key === 'disabled' || key === 'enabled' ? key
-    : t(key === 'auto' ? 'modelsSettingsUi.default' : `workbench.${key as 'low' | 'medium' | 'high'}`)
   const send = () => { if (preparing || running) aui.thread.composer().cancel(); else if (props.config.model && (text.trim() || attachments.length)) aui.thread.composer().send() }
   const pick = (change: Partial<PlaygroundConfig>, closeMenu = true) => {
     if (preparing || running) return
@@ -612,7 +607,7 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
       const item = <ComposerMenuItem className="nola-menu-item" active={props.config.model === model.id} aria-disabled={!available} onClick={() => { if (available) pick({ model: model.id, kind: model.kind, images: model.images, voice: '' }) }}><span className="min-w-0 flex-1 truncate text-start">{model.name}</span><Badge variant={available ? 'success' : 'secondary'}>{t(available ? 'workbench.modelAvailable' : 'workbench.modelNotStarted')}</Badge></ComposerMenuItem>
       return available ? <div key={model.id}>{item}</div> : <Tooltip key={model.id}><TooltipTrigger render={item} /><TooltipContent>{t('gateway.modelGatewayStartHint')}</TooltipContent></Tooltip>
     })}</div>)}</TooltipProvider><ComposerMenuItem className="nola-menu-item" onClick={props.onConfigure}><Settings2 className="size-4" aria-hidden="true" />{t('nav.modelGateway')}</ComposerMenuItem></ComposerMenu>}
-    {menu === 'effort' && <ComposerMenu open anchor="effort" className="w-80 gap-3 p-3"><ReasoningEffort variant={selected?.reasoningLevels ? 'segments' : 'slider'} levels={effortOptions.map(key => ({ key, label: effortLabel(key) }))} selectedKey={effort} title={t('workbench.reasoningTokens')} onSelect={effort => pick({ effort }, false)} /></ComposerMenu>}
+    {menu === 'effort' && <ComposerMenu open anchor="effort" className="w-80 gap-3 p-3"><ReasoningEffort variant="slider" levels={(['auto', 'low', 'medium', 'high'] as const).map(key => ({ key, label: t(key === 'auto' ? 'modelsSettingsUi.default' : `workbench.${key}`) }))} selectedKey={props.config.effort} title={t('workbench.reasoningTokens')} onSelect={effort => pick({ effort }, false)} /></ComposerMenu>}
     {menu === 'language' && languageMenuCodes.length > 0 && <ComposerMenu open anchor="language">{languageMenuCodes.map(code => <ComposerMenuItem key={code} active={code === (props.config.kind === 'mt' ? props.config.target : props.config.source)} onClick={() => props.config.kind === 'mt' ? pick({ target: code }) : chooseSource(code)}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'source' && sourceCodes.length > 0 && <ComposerMenu open anchor="source">{sourceCodes.map(code => <ComposerMenuItem key={code} active={code === props.config.source} onClick={() => chooseSource(code)}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'voice' && <ComposerMenu open anchor="voice">{props.voices.map(voice => <ComposerMenuItem key={voice} active={voice === props.config.voice} onClick={() => pick({ voice })}>{voice}</ComposerMenuItem>)}</ComposerMenu>}
@@ -647,7 +642,7 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
       <ComposerToolbar className="flex-wrap gap-2"><ComposerActions className="min-w-0 max-w-full flex-wrap">
         <ComposerAttachButton aria-label={t('workbench.addAttachment')} disabled={props.config.kind === 'tts' || props.config.kind === 'mt' && !props.config.images} onClick={() => inputRef.current?.click()} />
         <ComposerModelTrigger data-menu-anchor="models" model={selected?.name ?? t('workbench.noModels')} open={menu === 'models'} onClick={() => setMenu(menu === 'models' ? '' : 'models')} />
-        {props.config.kind === 'llm' && <ComposerModelTrigger data-menu-anchor="effort" model={effortLabel(effort)} open={menu === 'effort'} onClick={() => setMenu(menu === 'effort' ? '' : 'effort')} />}
+        {props.config.kind === 'llm' && <ComposerModelTrigger data-menu-anchor="effort" model={t(props.config.effort === 'auto' ? 'modelsSettingsUi.default' : `workbench.${props.config.effort as 'low' | 'medium' | 'high'}`)} open={menu === 'effort'} onClick={() => setMenu(menu === 'effort' ? '' : 'effort')} />}
         {props.config.kind === 'llm' && <NativeComicSelector active={props.active} value={props.config.comicProjectId ?? null} disabled={preparing || running} onChange={comicProjectId => { cancelComicReads(); if (comicProjectId === null) props.onChange({ ...props.config, comicProjectId }); else pick({ comicProjectId }) }} />}
         {props.config.kind === 'mt' && languageTrigger('source', props.config.source === 'auto' ? t('workbench.auto') : languageName(props.config.source, language), sourceCodes)}
         {(props.config.kind === 'asr' || props.config.kind === 'mt') && languageTrigger('language', languageName(props.config.kind === 'mt' ? props.config.target : props.config.source, language), languageMenuCodes)}

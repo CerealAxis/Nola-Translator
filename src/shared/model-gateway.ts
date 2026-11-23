@@ -1,4 +1,3 @@
-import { astrBotSpeechPresetForBinding } from './astrbot-speech-presets'
 import { z } from 'zod'
 import type { SessionConfig } from './contracts'
 import type { ResourceRecord } from './contracts'
@@ -81,8 +80,7 @@ export function normalizeModelBinding(kind: GatewayCapability, value: unknown): 
   }
   if (raw.startsWith('cloud:')) {
     const provider = raw.slice(6)
-    if (kind === 'asr') return (CLOUD_RECOGNITION.has(provider)
-      || /^cloud:[^:]+(?::[a-zA-Z0-9_-]{1,64})?$/.test(raw) && astrBotSpeechPresetForBinding(raw)?.capability === 'ASR') ? raw : ''
+    if (kind === 'asr') return CLOUD_RECOGNITION.has(provider) ? raw : ''
     if (kind === 'llm') return ''
     // `cloud:cloud` is how a saved custom connection used to be spelled for translation.
     return provider === 'cloud' ? '' : CLOUD_TRANSLATION.has(provider) ? raw : kind === 'mt' ? '' : raw

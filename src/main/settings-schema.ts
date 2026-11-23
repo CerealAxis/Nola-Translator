@@ -2,7 +2,6 @@ import { ONBOARDING_STEP_IDS } from '../shared/onboarding-tour'
 import { z } from 'zod'
 import { modelGatewaySettingsSchema } from '../shared/model-gateway'
 import { modelPolicySchema } from '../shared/model-policy'
-import { modelWorkspaceSchema } from '../shared/model-workspace'
 import { customModelSchema } from '../shared/custom-models'
 import { LANGUAGE_CODES } from '../shared/languages'
 import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from '../shared/pypi-mirrors'
@@ -69,7 +68,6 @@ export const settingsPatchSchema = z.object({
   }).partial().optional(),
   modelGateway: modelGatewaySettingsSchema.partial().optional(),
   modelPolicy: modelPolicySchema.optional(),
-  modelWorkspace: modelWorkspaceSchema.optional(),
   onboardingSeen: z.boolean().optional(),
   onboardingVersion: z.number().int().min(0).max(2).optional(),
   onboardingStep: z.enum(['W0', ...ONBOARDING_STEP_IDS, 'U3', 'U9', 'B3', 'B4', 'U5', 'Z0']).optional(),
@@ -95,7 +93,6 @@ export const settingsPatchSchema = z.object({
     max_segment_ms: z.number().int().min(3000).max(30000).optional(),
     silence_end_ms: z.number().int().min(300).max(2000).optional(),
     provider: z.enum(['local', 'aliyun', 'minimax']).optional(),
-    aliyunAsrEndpoint: z.string().max(2048).optional(), aliyunS2sEndpoint: z.string().max(2048).optional(),
     aliyunWorkspaceId: z.string().max(128).optional(),
     aliyunRegion: z.enum(['cn-beijing', 'ap-southeast-1']).optional(),
     aliyunModel: z.enum(['qwen3.8-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime', 'qwen3-asr-flash-realtime', 'fun-asr-realtime', 'qwen-audio-3.1-asr-flash-streaming']).optional(),
@@ -155,11 +152,6 @@ export const settingsPatchSchema = z.object({
     mymemoryEndpoint: z.string().max(2048).optional(),
     mymemoryEmail: z.string().max(320).optional(),
     localModelId: localModelIdSchema.optional(),
-    providerOverrides: z.object({
-      google: z.object({ endpoint: z.url({ protocol: /^https?$/ }), model: z.string().max(256).optional() }).optional(),
-      microsoft: z.object({ endpoint: z.url({ protocol: /^https?$/ }), model: z.string().max(256).optional() }).optional(),
-      'index-translate': z.object({ endpoint: z.url({ protocol: /^https?$/ }), model: z.string().max(256).optional() }).optional(),
-    }).strict().optional(),
     microsoftEndpoint: z.string().min(1).max(2048).optional(), microsoftRegion: z.string().max(128).optional(),
     cloudEndpoint: z.string().max(2048).optional(), cloudModel: z.string().max(256).optional(),
     cloudApiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),

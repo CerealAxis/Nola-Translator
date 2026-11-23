@@ -10,7 +10,7 @@ vi.mock('./routes', async importOriginal => ({ ...await importOriginal<typeof im
 it('shows the application sidebar outside settings', () => {
   const { result } = renderHook(useApplicationNavigation)
   expect(result.current.map(item => item.id)).toEqual([
-    'home', 'models', 'model-management', 'model-gateway', 'workspace', 'meeting', 'screen-translation',
+    'home', 'models', 'model-gateway', 'workspace', 'meeting', 'screen-translation',
     'game-translation', 'comic-translation', 'workbench', 'browser', 'settings',
   ])
   expect(result.current.filter(item => item.section === 'features').map(item => item.id)).toEqual([
@@ -26,27 +26,6 @@ it('shows the application sidebar outside settings', () => {
   expect(parseRoute('#/workbench')).toMatchObject({ route: 'workbench', path: '#/workbench' })
   expect(pathOf('workbench')).toBe('#/workbench')
   expect(parseRoute('#/video-captions')).toMatchObject({ route: 'settings', tab: 'browser' })
-})
-
-it('keeps model management and the original catalog on independent sidebar entries', () => {
-  const { result, rerender } = renderHook(useApplicationNavigation)
-  const original = route
-  const oldRoute = { ...original }
-  try {
-    Object.assign(route, parseRoute('#/models/downloads'))
-    rerender()
-    expect(result.current.filter(item => item.active).map(item => item.id)).toEqual(['models'])
-    const entry = result.current.find(item => item.id === 'model-management')!
-    entry.onPress?.()
-    expect(route.navigate).toHaveBeenLastCalledWith('#/model-management')
-    Object.assign(route, parseRoute(entry.path!))
-    rerender()
-    expect(result.current.filter(item => item.active).map(item => item.id)).toEqual(['model-management'])
-    expect(parseRoute('#/models/providers')).toEqual(parseRoute('#/model-management'))
-    expect(parseRoute('#/models')).toEqual({ route: 'models', path: '#/models' })
-  } finally {
-    Object.assign(route, oldRoute)
-  }
 })
 
 it('returns from workbench to the originating page after a round trip through settings', () => {

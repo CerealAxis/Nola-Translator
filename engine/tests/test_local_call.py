@@ -11,30 +11,6 @@ import numpy as np
 import pytest
 
 from nola_translator_engine import local_call
-from nola_translator_engine.recognition import crisp_asr
-
-
-@pytest.mark.parametrize(("device_count", "expected"), [(1, "cuda"), (0, "cpu")])
-def test_crisp_session_loads_the_installed_cuda_library_or_falls_back(monkeypatch, tmp_path, device_count, expected):
-    weights = tmp_path / "model.gguf"
-    weights.touch()
-    library = tmp_path / "crispasr.dll"
-    used_libraries = []
-
-    def open_session(_weights, **kwargs):
-        used_libraries.append(kwargs.get("lib_path"))
-        return SimpleNamespace(backend="sensevoice", close=lambda: None)
-
-    monkeypatch.setitem(sys.modules, "crispasr", SimpleNamespace(Session=open_session))
-    monkeypatch.setattr(crisp_asr, "crisp_acceleration_library", lambda: ("cuda", library))
-    monkeypatch.setattr(crisp_asr, "cuda_device_count", lambda: device_count)
-    runtime = crisp_asr.CrispAsrRuntime(weights, use_acceleration=True)
-    runtime.load()
-    try:
-        assert runtime.execution_backend == expected
-        assert used_libraries == [str(library) if device_count else None]
-    finally:
-        runtime.unload()
 
 
 def wav_data_url(*, rate=16000, channels=1, frames=320):
@@ -140,17 +116,17 @@ def test_crisp_tts_retries_runtime_error_on_cpu_after_unloading_vulkan(monkeypat
             return np.zeros(100, dtype=np.float32)
 
     class FakeCrispRuntime:
-        def __init__(self, _weights, *, threads, use_acceleration, allow_cpu_fallback):
+        def __init__(self, _weights, *, threads, use_vulkan, allow_cpu_fallback):
             assert threads == 2
             assert allow_cpu_fallback
-            self.use_acceleration = use_acceleration
+            self.use_vulkan = use_vulkan
             self._session = FakeSession()
 
         def load(self):
-            events.append("vulkan-loaded" if self.use_acceleration else "cpu-loaded")
+            events.append("vulkan-loaded" if self.use_vulkan else "cpu-loaded")
 
         def unload(self):
-            events.append("vulkan-unloaded" if self.use_acceleration else "cpu-unloaded")
+            events.append("vulkan-unloaded" if self.use_vulkan else "cpu-unloaded")
 
     monkeypatch.setattr(crisp_asr, "CrispAsrRuntime", FakeCrispRuntime)
     monkeypatch.setattr(crisp_asr, "prepare_crisp_synthesis", lambda *_args: None)

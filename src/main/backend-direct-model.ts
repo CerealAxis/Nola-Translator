@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { WebSocket } from 'ws'
 import type { DirectModelRequest, DirectModelResult } from '../shared/agent-workspace'
 import { gatewayConcurrency, normalizeModelBinding } from '../shared/model-gateway'
-import { MIMO_TTS_BINDING, MIMO_TTS_MODEL, type AppSettings, type CredentialProvider, type RecognitionSettings } from '../shared/settings'
+import { MIMO_TTS_BINDING, MIMO_TTS_MODEL, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { ResourceRecord, SessionConfig } from '../shared/contracts'
 import type { BackendSupervisor } from './backend-supervisor'
 import { GatewayWorkerError } from './model-gateway-worker'
@@ -25,17 +25,6 @@ const catalog = z.object({ models: z.array(z.object({
 const result = z.object({ text: z.string(), audio: z.string().optional(), voices: z.array(z.string()).optional() })
 const operations = { asr: 'transcribe', mt: 'translate', tts: 'synthesize' } as const
 type BackendConnection = Pick<BackendSupervisor, 'baseUrl' | 'authorizationHeader'>
-export async function probeBackendS2s(backend: BackendConnection, model: string, recognition: RecognitionSettings, apiKey: string, signal: AbortSignal) {
-  const response = await fetch(new URL('/api/v2/gateway/s2s-probe', backend.baseUrl), {
-    method: 'POST', signal,
-    headers: { ...backend.authorizationHeader(), 'Content-Type': 'application/json',
-      'x-nola-provider-key': apiKey, 'x-nola-provider-workspace': recognition.aliyunWorkspaceId ?? '',
-      'x-nola-provider-region': recognition.aliyunRegion ?? '', 'x-nola-provider-endpoint': recognition.aliyunS2sEndpoint ?? '' },
-    body: JSON.stringify({ model }),
-  })
-  if (!response.ok) await rejectBackendModel(response)
-}
-
 export async function backendGatewayControl(backend: BackendConnection, route: string, body: unknown, signal: AbortSignal): Promise<void> {
   const response = await fetch(new URL(`/api/v2/gateway/${route}`, backend.baseUrl), {
     method: route === 'loading-policy' ? 'PUT' : 'POST',
@@ -79,7 +68,7 @@ function backendModelFailure(status: number, failure?: z.infer<typeof backendErr
   return new BackendModelError(status, 'engineTransportUnavailable')
 }
 
-export interface BackendInferenceOptions { batchAsr?: boolean; mp3?: boolean; inspect?: boolean; concurrency?: number; strictProvider?: boolean }
+export interface BackendInferenceOptions { batchAsr?: boolean; mp3?: boolean; inspect?: boolean; concurrency?: number }
 const CLOUD_MT_MODELS = ['google', 'microsoft', 'mymemory', 'index-translate'] as const
 export function backendCloudMt(binding: string) {
   return binding.startsWith('mt-custom:') && binding !== 'mt-custom:legacy-fallback' ? 'custom-mt'
@@ -97,9 +86,9 @@ export async function gatewayMtBackup(settings: AppSettings, primary: string, ge
     const id = binding.slice('mt-custom:'.length)
     const profile = customModelsOf(settings.translation).find(item => item.id === id)
     if (!customModelSchema.safeParse(profile).success) return
-    const options = translationOptionsFor(settings.translation, 'cloud', id, settings.modelWorkspace)
-    const apiKey = await getCredential(customCredentialSlot(id, settings.modelWorkspace))
-    if (options && (apiKey || !['anthropic', 'google-native', 'azure-openai'].includes(options.apiFormat ?? ''))) return { binding, provider: 'cloud' as const, options: { ...options, apiKey } }
+    const options = translationOptionsFor(settings.translation, 'cloud', id)
+    const apiKey = await getCredential(customCredentialSlot(id))
+    if (options && (options.apiFormat !== 'anthropic' || apiKey)) return { binding, provider: 'cloud' as const, options: { ...options, apiKey } }
     return
   }
   if (model) {
@@ -125,7 +114,7 @@ export function backendAsrHeaders(options: SessionConfig['recognitionOptions']):
 
 export function backendMtHeaders(translation: SessionConfig['translationOptions'], prefix = 'x-nola-provider-'): Record<string, string> {
   if (!translation) return {}
-  const { apiKey, endpoint, region, email, model, apiFormat, apiVersion, apiService, contextWindow, maxOutputTokens } = translation
+  const { apiKey, endpoint, region, email, model, apiFormat, contextWindow, maxOutputTokens } = translation
   return {
     ...(apiKey ? { [prefix + 'key']: apiKey } : {}),
     ...(endpoint ? { [prefix + 'endpoint']: endpoint } : {}),
@@ -133,8 +122,6 @@ export function backendMtHeaders(translation: SessionConfig['translationOptions'
     ...(email ? { [prefix + 'email']: email } : {}),
     ...(model ? { [prefix + 'model']: model } : {}),
     ...(apiFormat ? { [prefix + 'api-format']: apiFormat } : {}),
-    ...(apiVersion ? { [prefix + 'api-version']: apiVersion } : {}),
-    ...(apiService ? { [prefix + 'api-service']: apiService } : {}),
     ...(contextWindow ? { [prefix + 'context-window']: String(contextWindow) } : {}),
     ...(maxOutputTokens ? { [prefix + 'max-output-tokens']: String(maxOutputTokens) } : {}),
   }
@@ -196,7 +183,7 @@ export async function openBackendAsrStream(
   }) }
 }
 
-export async function openBackendLanguageModel(backend: BackendConnection, model: string, signal: AbortSignal, concurrency = 1, contextWindow?: number) {
+export async function openBackendLanguageModel(backend: BackendConnection, model: string, signal: AbortSignal, concurrency = 1) {
   const headers = backend.authorizationHeader()
   const baseUrl = backend.baseUrl
   const list = await fetch(new URL('/api/v2/gateway/capabilities', baseUrl), { headers, signal })
@@ -215,7 +202,7 @@ export async function openBackendLanguageModel(backend: BackendConnection, model
   try {
     const response = await fetch(new URL('/api/v2/gateway/language-models', baseUrl), {
       method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, signal,
-      body: JSON.stringify({ model, lease_id: leaseId, max_concurrency: concurrency, context_window: contextWindow }),
+      body: JSON.stringify({ model, lease_id: leaseId, max_concurrency: concurrency }),
     })
     if (!response.ok) await rejectBackendModel(response)
     lease = schema.parse(await response.json())
@@ -279,10 +266,9 @@ export async function inferBackendMt(
   const provider = backendCloudMt(request.model)
   const customId = provider === 'custom-mt' ? request.model.slice('mt-custom:'.length) : undefined
   if (customId && !customModelsOf(settings.translation).some(profile => profile.id === customId)) return
-  const translation = provider ? translationOptionsFor(settings.translation, provider === 'custom-mt' ? 'cloud' : provider, customId, settings.modelWorkspace) : undefined
+  const translation = provider ? translationOptionsFor(settings.translation, provider === 'custom-mt' ? 'cloud' : provider, customId) : undefined
   if (customId && !translation) return
-  if (customId && translation) translation.apiKey = await getCredential(customCredentialSlot(customId, settings.modelWorkspace))
-  if (options?.strictProvider) return inferBackendModel(backend, request, signal, options, undefined, translation)
+  if (customId && translation) translation.apiKey = await getCredential(customCredentialSlot(customId))
   let primary: DirectModelResult | undefined
   let failure: unknown
   try {

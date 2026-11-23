@@ -138,9 +138,9 @@ it('keeps configured inactive providers installed and excludes providers missing
 it('configures MiMo as a cloud speech synthesis model with its own credential', async () => {
   const credential = vi.spyOn(actions.models, 'setTranslationCredential').mockResolvedValue()
   render(<ModelsPage />)
-  const card = section('TTS 模型').getByText('MiMo TTS(API)').closest<HTMLElement>('[data-slot="card"]')!
+  const card = section('TTS 模型').getByText('MiMo V2.5 TTS').closest<HTMLElement>('[data-slot="card"]')!
   fireEvent.click(within(card).getByRole('button', { name: '开始配置' }))
-  const dialog = within(screen.getByRole('dialog', { name: 'MiMo TTS(API)' }))
+  const dialog = within(screen.getByRole('dialog', { name: 'MiMo V2.5 TTS' }))
   expect(dialog.getByRole('button', { name: '保存配置' })).toBeDisabled()
   fireEvent.change(dialog.getByLabelText('API 密钥', { selector: 'input' }), { target: { value: 'test-mimo-key' } })
   fireEvent.click(dialog.getByRole('button', { name: '保存配置' }))
@@ -153,7 +153,7 @@ it('keeps MiMo configuration separate from the selected speech model', async () 
   stores.models.setState({ credentials: { ...initialModels.credentials, 'mimo-tts': true } })
   render(<ModelsPage />)
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  const card = section('TTS 模型').getByText('MiMo TTS(API)').closest<HTMLElement>('[data-slot="card"]')!
+  const card = section('TTS 模型').getByText('MiMo V2.5 TTS').closest<HTMLElement>('[data-slot="card"]')!
   expect(within(card).queryByRole('button', { name: '设为默认' })).not.toBeInTheDocument()
   fireEvent.click(within(card).getByRole('button', { name: '查看详情' }))
   fireEvent.change(screen.getByLabelText('API 密钥', { selector: 'input' }), { target: { value: 'replacement-key' } })
@@ -290,8 +290,8 @@ it('saves a new independent custom model with every translation language selecte
   const saveKey = vi.spyOn(actions.models, 'setTranslationCredential').mockResolvedValue()
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [customModel] } } })
   render(<CloudModelDialog id="cloud" onClose={() => undefined} />)
-  expect(screen.queryByText(`已选 ${LANGUAGE_CODES.length} 种`)).toBeNull()
-  expect(screen.queryByRole('button', { name: '移除语言 自动检测' })).toBeNull()
+  expect(screen.getByText(`已选 ${LANGUAGE_CODES.length} 种`)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '移除语言 自动检测' })).toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('名称'), { target: { value: 'Second model' } })
   fireEvent.change(screen.getByLabelText('模型 ID'), { target: { value: 'second-model' } })
   fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'second-secret' } })
@@ -318,14 +318,17 @@ it('deletes only the chosen custom model and its key and falls back when it was 
   expect(deleteKey).toHaveBeenCalledExactlyOnceWith('cloud-model:custom-first', '')
 })
 
-it('uses all app languages for a custom chat model and omits language fields', () => {
+// Rendering the complete source and target language inventories needs integration-test headroom in JSDOM.
+it('uses the selected custom model language inventory and blocks an empty selection', () => {
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'cloud', customModelId: customModel.id, customModels: [customModel], cloudLanguages: ['zh', 'en'] } } })
   const options = renderHook(() => useModelOptions())
-  expect(options.result.current.targetLanguages).toEqual(['none', ...LANGUAGE_CODES])
+  expect(options.result.current.targetLanguages).toEqual(['none', 'zh', 'en'])
   render(<CloudModelDialog id={`custom:${customModel.id}`} onClose={() => undefined} />)
-  expect(screen.queryByText('支持的目标语言')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '取消全选' }))
+  expect(screen.getByRole('button', { name: '保存配置' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: '全选语言' }))
   expect(screen.getByRole('button', { name: '保存配置' })).toBeEnabled()
-})
+}, 20_000)
 
 it('opens the OCR family selector and downloads the chosen language variant', async () => {
   const make = (group: string, languages: string[]) => ({ resourceId: `pp-ocrv5-mobile-${group}-onnx`, kind: 'ocrModel' as const,

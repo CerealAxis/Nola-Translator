@@ -6,12 +6,12 @@ import { installedPlaygroundModels } from './features/workbench/installed-models
 import { bindingIsLocal, normalizeModelBinding, type GatewayCapability, type ModelGatewaySnapshot } from '../shared/model-gateway'
 import { ALIYUN_LANGUAGES, recognitionLabel, remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
 import { customModelPatch, customModelsOf } from '../shared/custom-models'
-import { DEFAULT_SETTINGS, MIMO_TTS_BINDING, MIMO_TTS_LANGUAGES, MIMO_TTS_NAME, NO_TRANSLATION_LANGUAGE, type AppSettings, type AppSettingsPatch, type CredentialProvider, type RecognitionModelId, type TranslationProvider } from '../shared/settings'
+import { DEFAULT_SETTINGS, MIMO_TTS_BINDING, MIMO_TTS_NAME, NO_TRANSLATION_LANGUAGE, type AppSettings, type AppSettingsPatch, type CredentialProvider, type RecognitionModelId, type TranslationProvider } from '../shared/settings'
 import type { ResourceRecord } from '../shared/contracts'
 import { configurationOf, recognitionLanguages } from '../shared/model-capabilities'
 import { INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { LANGUAGE_CODES } from '../shared/languages'
-import { defaultModelBinding, isCloudModelDisabled, isModelEnabled, modelEnablePatch, modelPolicyOf, quickGatewayBinding, sceneModelBinding, sceneModelPatch } from '../shared/model-policy'
+import { defaultModelBinding, isModelEnabled, modelEnablePatch, modelPolicyOf, quickGatewayBinding, sceneModelBinding, sceneModelPatch } from '../shared/model-policy'
 import { notifyError, notifyGatewayStartIssue, notifyWarning } from '@/components/primitives/notify'
 import { cloudModelsOf } from '../shared/cloud-models'
 
@@ -129,19 +129,19 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
       sourceLanguages: remoteSourceLanguages({ ...DEFAULT_SETTINGS.recognition, ...settings.recognition, provider: model.id as 'aliyun' | 'minimax' }),
     }
   })
-  const available = (model: AvailableModel) => bindingIsLocal(model.binding) || !isCloudModelDisabled(settings, model.kind, model.binding)
-  const asrOptions = [...(asrLoaded ? [asrLoaded] : []), ...realtime('asr'), ...cloudAsr].filter(available)
+  const asrOptions = [...(asrLoaded ? [asrLoaded] : []), ...realtime('asr'), ...cloudAsr]
   const effectiveAsr = resolveModelBinding('asr', sceneModelBinding(settings, 'asr'), asrOptions)
   const nativeTranslation = !effectiveAsr.unavailable && (effectiveAsr.binding === 'cloud:aliyun'
     ? supportsRecognitionNativeTranslation({ ...settings.recognition, provider: 'aliyun' })
     : effectiveAsr.binding.startsWith('resource:') && readyService(snapshot, 'asr')?.nativeTranslation === true)
-  const cloudMt = clouds.filter(model => model.kind === 'translationModel' && !model.chatOnly && (model.id !== 'recognition' || nativeTranslation)).map(model => {
+  const cloudMt = clouds.filter(model => model.kind === 'translationModel').filter(model => model.id !== 'recognition' || nativeTranslation).map(model => {
     const profile = model.profile
     const binding = profile ? `mt-custom:${profile.id}` : `cloud:${model.id}`
-    const languages = model.id === 'recognition' ? ALIYUN_LANGUAGES : model.id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : LANGUAGE_CODES
+    const languages = model.id === 'recognition' ? ALIYUN_LANGUAGES : model.id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : profile ? profile.languages : [...LANGUAGE_CODES]
     return { binding, name: displayName(binding, profile?.name ?? ''),
       kind: 'mt' as const, origin: 'cloud' as const, free: model.free, images: model.id === 'index-translate',
-      sourceLanguages: model.id === 'recognition' ? ['auto', ...ALIYUN_LANGUAGES]
+      sourceLanguages: profile ? profile.sourceLanguages ?? ['auto', ...profile.languages]
+        : model.id === 'recognition' ? ['auto', ...ALIYUN_LANGUAGES]
           : model.id === 'index-translate' ? ['auto', ...INDEX_TRANSLATE_LANGUAGES]
             : model.id === 'mymemory' ? LANGUAGE_CODES : ['auto', ...LANGUAGE_CODES],
       targetLanguages: languages as readonly string[] }
@@ -150,17 +150,17 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
     const profile = model.profile!
     return { binding: `custom:${profile.id}`, name: displayName(`custom:${profile.id}`, profile.name), kind: 'llm' as const, origin: 'cloud' as const, free: false,
       images: profile.images === true,
-      sourceLanguages: ['auto', ...LANGUAGE_CODES], targetLanguages: LANGUAGE_CODES }
+      sourceLanguages: profile.sourceLanguages, targetLanguages: profile.languages }
   })
   const merge = (kind: GatewayCapability, ...lists: AvailableModel[][]): AvailableModel[] => {
     const seen = new Set<string>()
-    return lists.flat().filter(model => model.kind === kind && available(model) && !seen.has(model.binding) && !!seen.add(model.binding))
+    return lists.flat().filter(model => model.kind === kind && !seen.has(model.binding) && !!seen.add(model.binding))
   }
   return {
     asr: merge('asr', asrOptions),
     mt: merge('mt', loaded('mt') ? [loaded('mt')!] : [], realtime('mt'), cloudMt),
     tts: merge('tts', loaded('tts') ? [loaded('tts')!] : [], realtime('tts'), credentials['mimo-tts'] && isModelEnabled(settings, 'tts', MIMO_TTS_BINDING) ? [
-      { binding: MIMO_TTS_BINDING, name: MIMO_TTS_NAME, kind: 'tts', origin: 'cloud', free: false, targetLanguages: MIMO_TTS_LANGUAGES },
+      { binding: MIMO_TTS_BINDING, name: MIMO_TTS_NAME, kind: 'tts', origin: 'cloud', free: false, targetLanguages: ['zh', 'en'] },
     ] : []),
     llm: merge('llm', loaded('llm') ? [loaded('llm')!] : [], realtime('llm'), llmClouds),
     ocr: loaded('ocr') ? [loaded('ocr')!] : [],

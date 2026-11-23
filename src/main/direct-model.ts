@@ -4,9 +4,8 @@ import type { AppSettings, CredentialProvider } from '../shared/settings'
 export interface DirectModelServices {
   getSettings(): AppSettings
   getCredential(provider: CredentialProvider): Promise<string>
-  getChatGptPlanToken?(sourceId: string): Promise<string>
   inferModel?(request: DirectModelRequest, signal: AbortSignal, inspect?: boolean): Promise<DirectModelResult>
-  openLocalLanguageModel?(resourceId: string, signal: AbortSignal, contextWindow: number): Promise<{
+  openLocalLanguageModel?(resourceId: string, signal: AbortSignal): Promise<{
     endpoint: string; headers: Record<string, string>; contextWindow: number; release(): Promise<void>
   } | undefined>
 }

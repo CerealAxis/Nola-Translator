@@ -130,10 +130,6 @@ function cleanMarkup(source: DocumentFragment, images: ReadonlySet<string>) {
     FORBID_ATTR: ['style', 'srcset', 'ping', 'background', 'poster', 'autofocus', 'data-unit', 'class', 'id', 'name'],
     ADD_URI_SAFE_ATTR: ['src'],
   })
-  for (const item of root.querySelectorAll('[title]')) {
-    item.setAttribute('data-tooltip-text', item.getAttribute('title') ?? '')
-    item.removeAttribute('title')
-  }
   for (const item of root.querySelectorAll('[src]')) {
     const src = item.getAttribute('src') ?? ''
     if (item.localName !== 'img' || !images.has(src)) item.removeAttribute('src')
@@ -410,7 +406,7 @@ async function openPackage(file: File, format: 'epub' | 'docx' | 'xlsx' | 'pptx'
             for (const cell of elements(row, 'c')) {
               const td = html('td')
               td.dataset.cell = attribute(cell, 'r')
-              td.dataset.tooltipText = td.dataset.cell
+              td.title = td.dataset.cell
               const address = /^[A-Z]{1,3}/.exec(td.dataset.cell)?.[0]
               const column = address ? [...address].reduce((n, char) => n * 26 + char.charCodeAt(0) - 64, 0) : previousColumn + 1
               if (column > previousColumn + 1) {

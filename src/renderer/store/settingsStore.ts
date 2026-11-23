@@ -1,4 +1,3 @@
-import type { RuntimeKind } from '../../shared/compute'
 import { recognitionLanguages } from '../../shared/model-capabilities'
 import { modelsStore } from './modelStore'
 import { synchronizeCustomModel } from '../../shared/custom-models'
@@ -136,7 +135,7 @@ export async function completeOnboarding(): Promise<void> {
   settingsStore.setState({ onboardingActive: false, onboardingWelcome: false, onboardingRequired: false })
 }
 
-export async function loadRuntimeComponents(recheck = false, components?: readonly RuntimeKind[]): Promise<RuntimeSnapshot> {
+export async function loadRuntimeComponents(recheck = false, components?: readonly ('engine' | 'llama' | 'crisp')[]): Promise<RuntimeSnapshot> {
   if (!bridge) throw new Error('IPC bridge unavailable')
   if (recheck) settingsStore.setState({ runtimeChecking: true, runtimeError: null })
   try {
@@ -191,7 +190,7 @@ export async function installRuntimeComponent(id: string, reinstall = false): Pr
   }
 }
 
-export async function uninstallRuntimeComponent(kind: RuntimeKind): Promise<void> {
+export async function uninstallRuntimeComponent(kind: 'engine' | 'llama' | 'crisp'): Promise<void> {
   if (!bridge) throw new Error('IPC bridge unavailable')
   if (settingsStore.getState().runtimeBusy) return
   settingsStore.setState({ runtimeBusy: true, runtimeAction: 'uninstall', runtimeError: null })
@@ -326,7 +325,6 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     ...(patch.onboardingCompletedVersion !== undefined ? { onboardingCompletedVersion: patch.onboardingCompletedVersion } : {}),
     ...(patch.closeBehavior !== undefined ? { closeBehavior: patch.closeBehavior } : {}),
     ...(patch.modelPolicy ? { modelPolicy: mergeModelPolicy(base, patch.modelPolicy) } : {}),
-    ...(patch.modelWorkspace ? { modelWorkspace: patch.modelWorkspace } : {}),
     synthesis: { ...base.synthesis, ...patch.synthesis },
     modelGateway: { ...base.modelGateway, ...patch.modelGateway,
       ...(patch.modelGateway?.concurrency ? { concurrency: { ...base.modelGateway.concurrency, ...patch.modelGateway.concurrency } } : {}) },

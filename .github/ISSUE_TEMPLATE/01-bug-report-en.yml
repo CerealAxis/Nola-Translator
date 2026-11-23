@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve Nola Translator. Before submitting, complete the checks below. You can find troubleshooting guides at [nolax.org](https://nolax.org).
+        Thanks for helping improve Nola Translator. Before submitting, complete the checks below. You can find troubleshooting guides at [nola.xaviermc.top](https://nola.xaviermc.top).
   - type: checkboxes
     id: preflight
     attributes:
@@ -14,7 +14,7 @@ body:
       options:
         - label: I searched existing issues and confirmed this has not already been reported.
           required: true
-        - label: I checked the help documentation at [nolax.org](https://nolax.org).
+        - label: I checked the help documentation at [nola.xaviermc.top](https://nola.xaviermc.top).
           required: true
         - label: I updated Nola Translator to the latest stable release.
           required: true

@@ -71,7 +71,7 @@ export function prewarmConfigFrom(settings: AppSettings): PrewarmConfig {
     intermediateTranslationIntervalMs: translation.intermediateTranslationIntervalMs,
     translationProvider: translation.provider,
     translationModelId: translation.localModelId,
-    translationOptions: translationOptionsOf(translation, settings.modelWorkspace),
+    translationOptions: translationOptionsOf(translation),
     ...fallbackTranslationFieldsOf(translation),
   }
 }

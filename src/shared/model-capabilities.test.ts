@@ -3,8 +3,8 @@ import type { ResourceRecord } from './contracts'
 import { parseCommandLine, parseEventLine } from './schemas'
 import { configurationOf, isModelReady, modelConfigurationSchema, recognitionLanguages, supportsTranslation, translationLanguages } from './model-capabilities'
 import type { ModelConfiguration } from './model-capabilities'
-import { LANGUAGE_CODES, LANGUAGE_LABELS, languageName, normalizeLanguage } from './languages'
-import { INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from './index-translate'
+import { LANGUAGE_LABELS, languageName, normalizeLanguage } from './languages'
+import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from './index-translate'
 import { modelEngines } from './model-engines'
 
 function record(id: string, configuration?: ModelConfiguration): ResourceRecord {
@@ -97,18 +97,11 @@ describe('model language capabilities', () => {
     expect(modelConfigurationSchema.safeParse({ ...bilingual, translationPairs: [{ source: 'zh', target: 'en' }] }).success).toBe(false)
   })
   it('carries full capabilities through both protocol boundaries', () => {
-    const translator = record('qwen35-0.8b-q4-k-m')
-    const targetLanguages = [...new Set([...LANGUAGE_CODES, ...INDEX_TRANSLATE_LANGUAGES])]
-    expect(targetLanguages.length).toBeGreaterThan(200)
-    const config: ModelConfiguration = { ...bilingual, sourceLanguages: ['auto', ...targetLanguages], targetLanguages }
-    const event = parseEventLine(JSON.stringify({ protocolVersion: 1, requestId: 'test', type: 'resourceChanged',
-      resource: { ...translator, languages: config.targetLanguages, configuration: config } }))
+    const translator = record('m2m100-418m')
+    const config = configurationOf(translator)!
+    const event = parseEventLine(JSON.stringify({ protocolVersion: 1, requestId: 'test', type: 'resourceChanged', resource: { ...translator, languages: config.sourceLanguages, configuration: config } }))
     expect(event.type).toBe('resourceChanged')
-    if (event.type === 'resourceChanged') {
-      expect(event.resource.languages).toEqual(config.targetLanguages)
-      expect(event.resource.configuration).toEqual(config)
-    }
-    expect(parseCommandLine(JSON.stringify({ protocolVersion: 1, requestId: 'save', type: 'configureModel',
-      resourceId: 'hub:test/model', configuration: config }))).toMatchObject({ type: 'configureModel', configuration: config })
+    if (event.type === 'resourceChanged') expect(event.resource.configuration?.sourceLanguages).toHaveLength(101)
+    expect(parseCommandLine(JSON.stringify({ protocolVersion: 1, requestId: 'save', type: 'configureModel', resourceId: 'hub:test/model', configuration: bilingual })).type).toBe('configureModel')
   })
 })

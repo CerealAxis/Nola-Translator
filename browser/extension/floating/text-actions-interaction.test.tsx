@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 import { TextActions } from '../text-actions'
@@ -6,25 +6,13 @@ import { DEFAULT_PREFERENCES } from '../preferences'
 import { synthesize, translate } from '../provider-client'
 vi.mock('../provider-client', () => ({ translate: vi.fn(), synthesize: vi.fn() }))
 const enabledPreferences = { ...DEFAULT_PREFERENCES, selectionProvider: 'desktop', inputProvider: 'desktop', ttsProvider: 'desktop' }
-afterEach(() => { cleanup(); vi.clearAllMocks(); document.body.replaceChildren() })
+afterEach(() => { vi.clearAllMocks(); document.body.replaceChildren() })
 it('applies action visibility and toolbar opacity', () => {
   const { container } = render(<TextActions preferences={{ ...enabledPreferences, uiLanguage: 'en', selectionTranslate: false, selectionCopy: false, selectionSpeak: true, selectionOpacity: 0.4 }} selection={{ text: 'Hello', x: 0, y: 0 }} dismiss={() => {}} />)
   expect(screen.queryByRole('button', { name: 'Translate selection' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Copy translation' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Read aloud' })).toBeInTheDocument()
   expect(container.firstElementChild).toHaveStyle({ opacity: '0.4' })
-})
-
-it('renders toolbar tooltips inside the extension shadow root', async () => {
-  const host = document.body.appendChild(document.createElement('div'))
-  const shadow = host.attachShadow({ mode: 'open' })
-  const mount = shadow.appendChild(document.createElement('div'))
-  render(<TextActions preferences={{ ...enabledPreferences, uiLanguage: 'en' }} selection={{ text: 'Hello', x: 0, y: 0 }} dismiss={() => {}} />, { container: mount })
-
-  const button = shadow.querySelector<HTMLButtonElement>('button[aria-label="Translate selection"]')!
-  await userEvent.setup().hover(button)
-  await waitFor(() => expect(shadow.querySelector('[role="tooltip"]')).toHaveTextContent('Translate selection'))
-  expect(button).not.toHaveAttribute('title')
 })
 it('triple-space inference consumes the suffix but never overwrites newer edits', async () => {
   let finish!: (text: string) => void
@@ -75,13 +63,9 @@ it('uses a compact icon toolbar and keeps secondary actions in its keyboard-acce
   render(<TextActions preferences={{ ...enabledPreferences, uiLanguage: 'en' }} selection={{ text: 'Hello', x: 0, y: 0 }} dismiss={dismiss} />)
   const toolbar = screen.getByRole('toolbar')
   expect(toolbar.querySelectorAll('button')).toHaveLength(3)
-  const translateButton = screen.getByRole('button', { name: 'Translate selection' })
-  expect(translateButton).not.toHaveAttribute('title')
-  await user.hover(translateButton)
-  expect(await screen.findByRole('tooltip')).toHaveTextContent('Translate selection')
-  await user.unhover(translateButton)
+  expect(screen.getByRole('button', { name: 'Translate selection' })).toHaveAttribute('title', 'Translate selection')
   expect(screen.queryByRole('button', { name: 'Copy translation' })).not.toBeInTheDocument()
-  act(() => translateButton.focus())
+  screen.getByRole('button', { name: 'Translate selection' }).focus()
   await user.keyboard('{ArrowRight}')
   expect(screen.getByRole('button', { name: 'Read aloud' })).toHaveFocus()
   await user.keyboard('{End}{Enter}')

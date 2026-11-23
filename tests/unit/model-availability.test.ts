@@ -30,8 +30,7 @@ describe('configured cloud catalog', () => {
     value.modelPolicy!.enabled['mt:mt-custom:custom'] = true
     expect(buildConfiguredCloudModels(value, credentials).mt.map(model => model.binding)).not.toContain('mt-custom:custom')
     const ready = buildConfiguredCloudModels(value, { ...credentials, 'cloud-model:custom': true })
-    expect(ready.mt).toContainEqual(expect.objectContaining({ binding: 'mt-custom:custom',
-      sourceLanguages: expect.arrayContaining(['auto', 'zh', 'ja']), targetLanguages: expect.arrayContaining(['en', 'zh', 'ja']) }))
+    expect(ready.mt).toContainEqual(expect.objectContaining({ binding: 'mt-custom:custom', sourceLanguages: ['auto', 'zh'], targetLanguages: ['en'] }))
     expect(ready.llm[0].binding).toBe('custom:custom')
     value.modelPolicy!.enabled['llm:custom:custom'] = true
     expect(buildConfiguredCloudModels(value, { ...credentials, 'cloud-model:custom': true }).llm[0].binding).toBe('custom:custom')

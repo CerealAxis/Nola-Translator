@@ -62,12 +62,6 @@ describe('事实格式化（只写事实，不写形容词）', () => {
 
     const plain = record({ resourceId: 'm2m100-418m', kind: 'translationModel', name: 'M2M100 418M' })
     expect(quantizationOf(plain)).toBeNull()
-    expect(paramsOf(plain)).toBe('418M')
-    expect(paramsOf(record({ resourceId: 'sensevoice-small', name: 'SenseVoiceSmall' }))).toBe('234M')
-    expect(paramsOf(record({ resourceId: 'sensevoice-small-crisp-q4-k', name: 'SenseVoiceSmall Q4_K' }))).toBe('234M')
-    expect(paramsOf(record({ resourceId: 'index-translate-35b-a3b-q4-k-m', kind: 'translationModel' }))).toBe('35B-A3B')
-    expect(paramsOf(record({ resourceId: 'tts-piper-crisp-en-gb-cori-medium', kind: 'ttsModel' }))).toBeNull()
-    expect(paramsOf(record({ resourceId: 'hub:custom-7b', name: 'Custom 7B' }))).toBeNull()
 
     expect(paramsOf(record({
       resourceId: 'tts-qwen3-tts-crisp-0.6b-base-q8-0',

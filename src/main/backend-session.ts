@@ -5,11 +5,11 @@ import { z } from 'zod'
 import type { PlaybackAck, PlaybackChunk } from '../renderer/bridge/realtime-playback'
 import type { CaptionSegment, EngineEvent, SessionConfig, Translation } from '../shared/contracts'
 import { MIMO_TTS_BINDING, MIMO_TTS_MODEL, type AppSettings } from '../shared/settings'
+import { INDEX_TRANSLATE_ENDPOINT } from '../shared/index-translate'
 import { BackendPlayback } from './backend-playback'
 import { BackendBrowserInput } from './backend-browser-input'
 import type { BackendSupervisor } from './backend-supervisor'
 import { vbCablePair } from '../shared/virtual-audio'
-import { translationOptionsFor } from '../shared/cloud-config'
 import { backendAsrHeaders, backendMtHeaders } from './backend-direct-model'
 import { backendError, backendErrorCode, backendFailure, readBackendFailure } from './backend-error'
 import { logDiagnostic } from './session-log'
@@ -90,7 +90,6 @@ export function mapSessionConfig(
     headers['x-nola-provider-key'] = credentials.apiKey
     headers['x-nola-provider-workspace'] = credentials.workspaceId
     if (credentials.region) headers['x-nola-provider-region'] = credentials.region
-    if (settings.recognition.aliyunS2sEndpoint) headers['x-nola-provider-endpoint'] = settings.recognition.aliyunS2sEndpoint
     pipeline = { kind: 's2s', s2s_model: options.s2sModel }
   } else {
     const recognition = config.recognitionProvider ?? 'local'
@@ -108,10 +107,8 @@ export function mapSessionConfig(
       if (!mt || !enabledModelIds.has(mt)) return
       const credentials = config.translationOptions
       if (provider === 'cloud' && (!credentials?.endpoint || !credentials.model)) return
+      if (provider === 'index-translate' && credentials?.endpoint && credentials.endpoint !== INDEX_TRANSLATE_ENDPOINT) return
       if (provider === 'cloud' || provider === 'mymemory') Object.assign(headers, backendMtHeaders(credentials))
-      if ((provider === 'google' || provider === 'microsoft' || provider === 'index-translate') && settings.translation.providerOverrides?.[provider]) {
-        Object.assign(headers, backendMtHeaders(translationOptionsFor(settings.translation, provider)))
-      }
       pipeline.translation_model = mt
       const fallback = config.fallbackTranslationProvider
       if (fallback) {
@@ -130,9 +127,6 @@ export function mapSessionConfig(
       if (modelId === MIMO_TTS_MODEL) {
         if (!options.ttsApiKey) return
         headers['x-nola-tts-key'] = options.ttsApiKey
-        const source = settings.modelWorkspace?.connections.find(item => item.service === 'mimo' && item.capability === 'TTS')
-        if (source?.endpoint) headers['x-nola-tts-endpoint'] = source.endpoint
-        if (source?.models[0]?.id) headers['x-nola-tts-model'] = source.models[0].id
       }
       pipeline.tts_model = modelId
       if (voice) pipeline.tts_voice = voice

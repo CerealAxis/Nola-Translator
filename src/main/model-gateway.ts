@@ -1,16 +1,12 @@
-import { inferAstrBotSpeech } from './astrbot-speech'
-import { workspaceChatConnection, workspaceSpeechConnection, workspaceSpeechModel } from '../shared/model-workspace'
-import { astrBotSpeechPreset, astrBotSpeechPresetForBinding } from '../shared/astrbot-speech-presets'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'
 import { WebSocket, WebSocketServer } from 'ws'
 import type { ResourceRecord } from '../shared/contracts'
-import { defaultModelBinding, isCloudModelDisabled, isModelEnabled, mergeModelPolicy, sceneModelBinding } from '../shared/model-policy'
-import { buildConfiguredCloudModels, configuredBatchSpeechModels } from '../shared/model-availability'
+import { defaultModelBinding, isModelEnabled, mergeModelPolicy, sceneModelBinding } from '../shared/model-policy'
+import { buildConfiguredCloudModels } from '../shared/model-availability'
 import { legacyFallbackReady } from '../shared/cloud-models'
 import { configurationOf, recognitionLanguages } from '../shared/model-capabilities'
-import { localChatSettingsOf } from '../shared/language-model'
 import { fallbackTranslationFieldsOf, recognitionFieldsOf, supportsRecognitionNativeTranslation, translationOptionsFor, translationOptionsOf } from '../shared/cloud-config'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { customCredentialSlot, customModelsOf } from '../shared/custom-models'
@@ -63,7 +59,6 @@ export interface ModelGatewayOptions {
   backendInstances?(): Promise<{ model_id: string; state: string }[]>
   ocr?: { load(resourceId: string): Promise<void>; release(): Promise<void>; infer(request: ScreenOcrRequest, signal: AbortSignal): Promise<ScreenOcrResult> }
   getSettings(): AppSettings
-  chatGptPlanPresence?(provider: CredentialProvider): Promise<boolean | undefined>
   directLaunch(model: string): Promise<EngineLaunchSpec>
   listResources(): Promise<ResourceRecord[]>
   getCredential?(provider: CredentialProvider): Promise<string>
@@ -183,9 +178,7 @@ export class ModelGateway {
       const changed = patch.modelGateway?.[`${kind}Model`] ?? (!settings.modelGateway[`${kind}Model`] ? patch.modelPolicy?.defaults[kind] : undefined)
       const disabled = patch.modelPolicy && !isModelEnabled({ ...settings, modelPolicy: mergeModelPolicy(settings, patch.modelPolicy) }, kind, binding)
       const concurrencyChanged = kind === 'llm' && patch.modelGateway?.concurrency?.llm !== undefined && patch.modelGateway.concurrency.llm !== settings.modelGateway.concurrency?.llm
-      const chatChanged = kind === 'llm' && patch.modelWorkspace
-        && JSON.stringify(localChatSettingsOf(patch.modelWorkspace, binding.slice(9))) !== JSON.stringify(localChatSettingsOf(settings.modelWorkspace, binding.slice(9)))
-      if (disabled || concurrencyChanged || chatChanged || patch.compute || patch.modelGateway?.[kind] === false || changed !== undefined && normalizeModelBinding(kind, changed) !== binding) throw new GatewayError(409, 'RESOURCE_IN_USE', 'resource_in_use')
+      if (disabled || concurrencyChanged || patch.compute || patch.modelGateway?.[kind] === false || changed !== undefined && normalizeModelBinding(kind, changed) !== binding) throw new GatewayError(409, 'RESOURCE_IN_USE', 'resource_in_use')
     }
   }
 
@@ -286,7 +279,7 @@ export class ModelGateway {
     } }
   }
 
-  async infer(request: DirectModelRequest, signal: AbortSignal, inspect = false, probe = false): Promise<DirectModelResult> {
+  async infer(request: DirectModelRequest, signal: AbortSignal, inspect = false): Promise<DirectModelResult> {
     const kind = request.kind as WorkerKind
     const settings = this.options.getSettings()
     const binding = normalizeModelBinding(kind, request.model) || this.bindingFor(kind, settings.modelGateway, settings)
@@ -294,22 +287,12 @@ export class ModelGateway {
     let held: WorkerSlot | undefined
     try {
       signal.throwIfAborted()
-      const preset = astrBotSpeechPresetForBinding(binding)
-      const speech = workspaceSpeechConnection(settings.modelWorkspace, kind, binding)
-      if (preset?.capability.toLowerCase() === kind && (preset.id !== 'mimo' || speech)) {
-        const model = speech && workspaceSpeechModel(speech, binding)
-        if (!speech || !model || (!probe && (!model.enabled || (binding === MIMO_TTS_BINDING && !isModelEnabled(settings, kind, binding))))) throw new GatewayError(503, 'The requested model is not enabled.', 'model_disabled')
-        if (inspect) return { text: '', voices: model.voice ? [model.voice] : [] }
-        entry = this.begin(kind, binding)
-        const key = preset.keyless ? '' : await this.options.getCredential?.(preset.id === 'mimo' ? 'mimo-tts' : customCredentialSlot(speech.id)) ?? ''
-        return await inferAstrBotSpeech(speech, request, key, signal, probe ? { ...model, enabled: true } : model)
-      }
       if (this.options.inferBackend) {
         const enabled = isModelEnabled(settings, kind, binding)
-        if (!binding || (bindingIsLocal(binding) || binding === MIMO_TTS_BINDING && !probe) && !enabled) throw new GatewayError(503, 'The requested model is not enabled.', 'model_disabled')
-        if (!enabled && !probe) await this.plan(kind, binding, [], settings, settings.modelGateway)
+        if (!binding || (bindingIsLocal(binding) || binding === MIMO_TTS_BINDING) && !enabled) throw new GatewayError(503, 'The requested model is not enabled.', 'model_disabled')
+        if (!enabled) await this.plan(kind, binding, [], settings, settings.modelGateway)
         if (!inspect) entry = this.begin(kind, binding, false)
-        const result = await this.options.inferBackend({ ...request, model: binding }, signal, { ...(inspect ? { inspect: true } : {}), ...(probe ? { strictProvider: true } : {}), concurrency: this.concurrencyFor(kind, binding) })
+        const result = await this.options.inferBackend({ ...request, model: binding }, signal, { ...(inspect ? { inspect: true } : {}), concurrency: this.concurrencyFor(kind, binding) })
         if (result) return result
         throw new GatewayError(503, 'The requested model is unavailable in the backend.', 'model_unavailable')
       }
@@ -406,21 +389,11 @@ export class ModelGateway {
     } catch (error) { console.error('[gateway.instances]', error) }
     finally { this.polling = false }
   }
-  async batchSpeechModels(): Promise<AvailableGatewayModel[]> {
-    const settings = this.options.getSettings()
-    return configuredBatchSpeechModels(settings, await this.credentialPresence(settings))
-  }
-
   private async credentialPresence(settings: AppSettings): Promise<Record<CredentialProvider, boolean>> {
     const slots: CredentialProvider[] = ['aliyun-asr', 'minimax-asr', 'cloud',
       'fallback-cloud', 'mimo-tts',
-      ...customModelsOf(settings.translation).map(profile => customCredentialSlot(profile.id, settings.modelWorkspace)),
-      ...(settings.modelWorkspace?.connections.flatMap(connection => {
-        const speech = astrBotSpeechPreset(connection.service)
-        return speech && !speech.keyless && speech.id !== 'mimo' ? [customCredentialSlot(connection.id)] : []
-      }) ?? [])]
-    return Object.fromEntries(await Promise.all([...new Set(slots)].map(async slot =>
-      [slot, await this.options.chatGptPlanPresence?.(slot) ?? !!await this.options.getCredential?.(slot)]))) as Record<CredentialProvider, boolean>
+      ...customModelsOf(settings.translation).map(profile => customCredentialSlot(profile.id))]
+    return Object.fromEntries(await Promise.all(slots.map(async slot => [slot, !!await this.options.getCredential?.(slot)]))) as Record<CredentialProvider, boolean>
   }
   private changed(): void { this.options.onChanged?.(this.snapshot()) }
   revealKey(): Promise<string> {
@@ -478,13 +451,11 @@ export class ModelGateway {
   private readonly onDemandLocalLanguageControllers = new Set<AbortController>()
   private readonly onDemandLocalLanguageLeases = new Set<(error?: unknown) => void>()
 
-  async acquireLanguageModel(binding?: string, probe = false) {
+  async acquireLanguageModel(binding?: string) {
     const settings = this.options.getSettings()
     const wanted = normalizeModelBinding('llm', binding) || defaultModelBinding(settings, 'llm')
+    if (!wanted || (bindingIsLocal(wanted) && !isModelEnabled(settings, 'llm', wanted))) throw new GatewayError(503, 'The language model is not enabled in Model Management', 'model_disabled')
     const local = bindingIsLocal(wanted)
-    if (!wanted || (local ? !isModelEnabled(settings, 'llm', wanted) : !probe && isCloudModelDisabled(settings, 'llm', wanted))) {
-      throw new GatewayError(503, 'The language model is not enabled in Model Management', 'model_disabled')
-    }
     if (local && this.state === 'running' && this.services.llm.model === wanted && ['pending', 'loading'].includes(this.services.llm.state)) {
       this.languageOpening ??= this.configureLanguageModel(true).finally(() => { this.languageOpening = undefined })
       await this.languageOpening
@@ -656,9 +627,9 @@ export class ModelGateway {
         workerConfig.recognitionOptions = { ...workerConfig.recognitionOptions as object, apiKey: key }
       } else if (kind === 'mt') {
         const options = backup ? translationOptionsOf(backupSettings)
-          : translationOptionsFor(settings.translation, translationProvider, binding.startsWith('mt-custom:') ? binding.slice(10) : undefined, settings.modelWorkspace)
+          : translationOptionsFor(settings.translation, translationProvider, binding.startsWith('mt-custom:') ? binding.slice(10) : undefined)
         const credential: CredentialProvider | undefined = translationProvider === 'cloud'
-          ? backup ? 'fallback-cloud' : customCredentialSlot(binding.slice(10), settings.modelWorkspace)
+          ? backup ? 'fallback-cloud' : customCredentialSlot(binding.slice(10))
           : undefined
         // A missing key stays a request-time failure rather than a load failure, the way a cloud
         // translation binding behaved before the gateway owned several instances per capability.
@@ -1020,24 +991,20 @@ export class ModelGateway {
       getCredential: provider => this.options.getCredential?.(provider) ?? Promise.resolve('') }
     let cloudName = ''
     let signature: string
-    const local = bindingIsLocal(binding)
-    const disabled = local ? !isModelEnabled(settings, 'llm', binding) : isCloudModelDisabled(settings, 'llm', binding)
     try {
       const profile = customModelsOf(settings.translation).find(item => item.id === binding.replace(/^custom:/, ''))
-      if (!local && !disabled) {
+      if (!bindingIsLocal(binding)) {
         const configured = (await buildConfiguredCloudModels(settings, await this.credentialPresence(settings))).llm.find(model => model.binding === binding)
         if (!configured) throw new Error('The selected cloud LLM is not configured or ready')
         cloudName = configured.name
       }
-      signature = createHash('sha256').update(JSON.stringify([binding, settings.compute, profile,
-        local && localChatSettingsOf(settings.modelWorkspace, binding.slice(9)),
-        profile && workspaceChatConnection(settings.modelWorkspace, profile.id), this.concurrencyFor('llm', binding)])).digest('hex')
+      signature = createHash('sha256').update(JSON.stringify([binding, settings.compute, profile, this.concurrencyFor('llm', binding)])).digest('hex')
     } catch {
       if (this.stopping) return
       this.services.llm = { state: 'failed', model: binding, name: '', error: 'LLM credentials are unavailable' }
       this.changed(); return
     }
-    if (!disabled && previous?.signature === signature && this.services.llm.state === 'ready') { this.scheduleModelIdle('llm'); return }
+    if (previous?.signature === signature && this.services.llm.state === 'ready') { this.scheduleModelIdle('llm'); return }
     this.llm = undefined
     if (previous) {
       previous.retired = true
@@ -1045,11 +1012,11 @@ export class ModelGateway {
       else await previous.runtime.close()
     }
     if (this.stopping) return
-    if (disabled) {
+    if (bindingIsLocal(binding) && !isModelEnabled(settings, 'llm', binding)) {
       this.services.llm = { state: 'failed', model: binding, name: '', error: 'Enable this model in Model Management before loading it.', errorCode: 'model_disabled' }
       this.changed(); return
     }
-    if (!local) {
+    if (!bindingIsLocal(binding)) {
       this.services.llm = { state: 'ready', model: binding, name: cloudName }
       this.changed(); return
     }

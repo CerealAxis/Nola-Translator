@@ -1,9 +1,6 @@
 export const modelsSettingsZh = {
   removing: '正在移除…',
   removeFailed: '模型移除失败',
-  pauseDownloadFailed: '暂停下载失败',
-  resumeDownloadFailed: '继续下载失败',
-  cancelDownloadFailed: '取消下载失败',
   removeFailedDescription: '模型可能仍被使用，请停止相关服务后重试。',
   retryRemove: '重试移除',
   selectionUnavailable: '所选模型已不可用',
@@ -86,9 +83,6 @@ export const modelsSettingsZh = {
 export const modelsSettingsEn: Record<keyof typeof modelsSettingsZh, string> = {
   removing: 'Removing…',
   removeFailed: 'Model removal failed',
-  pauseDownloadFailed: 'Could not pause the download',
-  resumeDownloadFailed: 'Could not resume the download',
-  cancelDownloadFailed: 'Could not cancel the download',
   removeFailedDescription: 'The model may still be in use. Stop related services and retry.',
   retryRemove: 'Retry removal',
   selectionUnavailable: 'Selected model is unavailable',

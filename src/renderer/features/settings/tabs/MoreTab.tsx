@@ -21,7 +21,7 @@ import authorAvatarUrl from '../../../../../assets/brand/cerealaxis.png'
 import shadcnLogoUrl from '../../../../../assets/brand/shadcn-ui.png'
 
 const AUTHOR_URL = 'https://github.com/CerealAxis'
-const SPONSOR_URL = 'https://nolax.org/zh-CN/contributing/sponsor'
+const SPONSOR_URL = 'https://nola.xaviermc.top/zh-CN/contributing/sponsor'
 const REPOSITORY_URL = 'https://github.com/CerealAxis/Nola-Translator'
 const SHADCN_UI_URL = 'https://ui.shadcn.com/'
 const COPIED_HOLD_MS = 1500

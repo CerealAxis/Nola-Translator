@@ -1,5 +1,3 @@
-import onnxWheels from './onnx-runtime-wheels.json'
-import crispWheels from './crisp-runtime-wheels.json'
 import { z } from 'zod'
 
 export const computeSettingsSchema = z.object({
@@ -88,11 +86,6 @@ export type HardwareInventory = {
   notes: string[]
 }
 export type RuntimeRecommendation = { engineId: string | null; llamaId: string | null; reasons: string[] }
-export const RUNTIME_KINDS = ['engine', 'llama', 'crisp', 'onnx'] as const
-export type RuntimeKind = typeof RUNTIME_KINDS[number]
-export function isRuntimeKind(value: unknown): value is RuntimeKind {
-  return RUNTIME_KINDS.some(kind => kind === value)
-}
 export type LocalRuntime = {
   path: string
   status: 'ready' | 'missing' | 'failed' | 'incompatible'
@@ -105,63 +98,24 @@ export type LocalRuntime = {
   bundled?: boolean
   xformersVersion?: string
   cudaVersion?: string
-  executionProviders?: string[]
 }
 export type RuntimeSnapshot = {
   packages: RuntimePackageState[]
   recipes: RuntimeRecipeState[]
   hardware: HardwareInventory
   recommendation: RuntimeRecommendation
-  local: { engine: LocalRuntime; llama: LocalRuntime; crisp?: LocalRuntime; onnx?: LocalRuntime }
+  local: { engine: LocalRuntime; llama: LocalRuntime; crisp?: LocalRuntime }
   python?: { path: string; version: string; ready: boolean; reason: string }
   operation: { id: string; phase: 'download' | 'verify' | 'extract' | 'prepare' | 'check'; bytes: number; totalBytes: number; startedAt?: number; detail?: string } | null
   lastError: string | null
   directory: string
 }
 
-export const CRISP_RUNTIME_ID = 'crispasr-0-8-55-vulkan'
+export const CRISP_RUNTIME_ID = 'crispasr-0-8-43-vulkan'
 
-const onnxBackendSchema = z.enum(['directml', 'cpu', 'cuda', 'cuda11', 'cuda12', 'openvino', 'qnn', 'webgpu'])
-export type OnnxBackend = z.infer<typeof onnxBackendSchema>
-
-export const ONNX_RUNTIME_BACKENDS: Record<OnnxBackend, string> = {
-  directml: 'DirectML', cpu: 'CPU', cuda: 'CUDA / TensorRT', cuda11: 'CUDA 11 / TensorRT',
-  cuda12: 'CUDA 12 / TensorRT', openvino: 'OpenVINO', qnn: 'QNN', webgpu: 'WebGPU',
-}
-
-export const ONNX_RUNTIME_PROVIDERS: Record<string, string> = {
-  CPUExecutionProvider: 'CPU',
-  DmlExecutionProvider: 'DirectML',
-  CUDAExecutionProvider: 'CUDA',
-  TensorrtExecutionProvider: 'TensorRT',
-  OpenVINOExecutionProvider: 'OpenVINO',
-  QNNExecutionProvider: 'QNN',
-  WebGpuExecutionProvider: 'WebGPU',
-}
-
-export const DEFAULT_ONNX_RUNTIME_ID = 'onnx-directml-1-24-4'
-export const ONNX_RUNTIME_VERSIONS = z.array(runtimeWheelSchema.extend({
-  backend: onnxBackendSchema, version: z.string().regex(/^\d+\.\d+\.\d+$/), legacy: z.boolean().optional(),
-})).parse(onnxWheels).map(item => ({
-  ...item, id: 'onnx-' + item.backend + '-' + item.version.replaceAll('.', '-'),
-  name: 'ONNX Runtime ' + item.version + ' (' + ONNX_RUNTIME_BACKENDS[item.backend] + ')',
-}))
-
-const LEGACY_CRISP_RUNTIME_FILES = [
+export const CRISP_RUNTIME_FILES = [
   { url: 'https://files.pythonhosted.org/packages/5c/06/2ed13aeedd45410c0d1ec1fd4e16aa645b4d197ff20243dd0cc893fcb6e5/crispasr-0.8.43-py3-none-win_amd64.whl',
     name: 'crispasr-0.8.43-py3-none-win_amd64.whl', bytes: 14_522_754, sha256: '546184aa746ec9f46ca568ae98ec5e436edb518a9bb56b445d9cfdbec431db7f' },
   { url: 'https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.43/crispasr-0.8.43%2Bvulkan-py3-none-win_amd64.whl',
     name: 'crispasr-0.8.43+vulkan-py3-none-win_amd64.whl', bytes: 28_714_544, sha256: '08854cc005537d925ea3191e63b3dc840191a58a961844dc61403f64e5904678' },
 ] as const
-
-export const CRISP_RUNTIME_VERSIONS = [
-  ...crispWheels.flatMap(({ version, cpu, vulkan, cuda }) => [
-    { id: 'crispasr-' + version.replaceAll('.', '-') + '-cuda', version, backend: 'cuda', name: 'CrispASR ' + version + ' (CUDA 12 + CPU)', files: [cpu, cuda] },
-    { id: 'crispasr-' + version.replaceAll('.', '-') + '-vulkan', version, backend: 'vulkan', name: 'CrispASR ' + version + ' (Vulkan + CPU)', files: [cpu, vulkan] },
-    { id: 'crispasr-' + version.replaceAll('.', '-') + '-cpu', version, backend: 'cpu', name: 'CrispASR ' + version + ' (CPU)', files: [cpu] },
-  ]),
-  { id: 'crispasr-0-8-43-vulkan', version: '0.8.43', backend: 'vulkan', name: 'CrispASR 0.8.43 (Vulkan + CPU)', files: LEGACY_CRISP_RUNTIME_FILES },
-]
-
-export const BUNDLED_CRISP_RUNTIME = CRISP_RUNTIME_VERSIONS.find(item => item.id === CRISP_RUNTIME_ID)!
-export const CRISP_RUNTIME_FILES = BUNDLED_CRISP_RUNTIME.files

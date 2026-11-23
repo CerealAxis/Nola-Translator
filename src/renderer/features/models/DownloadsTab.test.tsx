@@ -19,7 +19,7 @@ it('shows the failed download and offers both retry and cancel', () => {
   render(<DownloadsTab />)
   const card = screen.getByRole('listitem')
   expect(within(card).getByText(record.name)).toBeInTheDocument()
-  expect(within(card).getByText('模型下载失败')).toBeInTheDocument()
+  expect(within(card).getByText('未安装')).toBeInTheDocument()
   expect(within(card).getByRole('button', { name: '重试' })).toBeEnabled()
   fireEvent.click(within(card).getByRole('button', { name: '取消任务' }))
   expect(cancel).toHaveBeenCalledWith(record.resourceId, 'cancel')

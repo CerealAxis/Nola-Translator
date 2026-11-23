@@ -4,7 +4,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { detachSettingsStore, settingsStore } from '@/store/settingsStore'
 import * as settingsActions from '@/store/settingsStore'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
-import { CRISP_RUNTIME_VERSIONS, DEFAULT_ONNX_RUNTIME_ID, ONNX_RUNTIME_VERSIONS } from '../../../shared/compute'
 import { ComputeTab } from './tabs/ComputeTab'
 import { RuntimeComponents } from './tabs/RuntimeComponents'
 import { GeneralTab } from './tabs/GeneralTab'
@@ -89,66 +88,6 @@ it('scrolls the main settings viewport to the inference engine section', () => {
   expect(main.scrollTo).toHaveBeenCalledWith({ top: 660, behavior: 'smooth' })
 })
 
-it('defaults ONNX Runtime to DirectML and installs the chosen CPU version', async () => {
-  const install = vi.spyOn(store.actions.settings, 'installRuntimeComponent').mockResolvedValue()
-  const user = userEvent.setup()
-  render(<RuntimeComponents />)
-
-  await user.click(screen.getByRole('tab', { name: /ONNX Runtime/ }))
-  const backend = screen.getByRole('combobox', { name: '执行后端' })
-  expect(backend).toHaveTextContent('DirectML')
-  const versions = screen.getByRole('combobox', { name: 'ONNX Runtime' })
-  expect(versions).toHaveTextContent(ONNX_RUNTIME_VERSIONS.find(item => item.id === DEFAULT_ONNX_RUNTIME_ID)!.version)
-  await user.click(backend)
-  await user.click(await screen.findByRole('option', { name: 'CPU' }))
-  await user.click(versions)
-  const cpu = ONNX_RUNTIME_VERSIONS.filter(version => version.backend === 'cpu' && !version.legacy)
-  expect(screen.getAllByRole('option').map(option => option.textContent?.trim())).toEqual(cpu.map(version => version.version))
-  await user.click(await screen.findByRole('option', { name: cpu[1].version }))
-  await user.click(screen.getByRole('button', { name: '安装' }))
-  expect(install).toHaveBeenCalledWith(cpu[1].id, false)
-})
-
-it('shows the installed ONNX Runtime separately from the providers that passed detection', () => {
-  const missing = { path: '', status: 'missing' as const, backend: '', version: '', gpuAvailable: false, reason: '' }
-  settingsStore.setState({ runtimes: {
-    packages: [], recipes: [], hardware: { adapters: [], nvidiaDriver: null, notes: [] },
-    recommendation: { engineId: null, llamaId: null, reasons: [] }, operation: null, lastError: null, directory: '',
-    local: { engine: missing, llama: missing, onnx: {
-      ...missing, status: 'ready', backend: 'directml', version: '1.24.4', bundled: true,
-      executionProviders: ['CPUExecutionProvider'],
-    } },
-  } })
-
-  render(<ComputeTab settings={DEFAULT_SETTINGS} />)
-
-  const labels = screen.getAllByText('ONNX Runtime', { exact: true })
-  const rows = labels.map(label => label.closest('.settings-row')?.textContent).filter(Boolean)
-  expect(rows).toContain('ONNX RuntimeCPU')
-  expect(rows).toContain('ONNX RuntimeONNX Runtime 1.24.4 (DirectML)')
-})
-
-it('filters CrispASR versions by backend and installs the matching CPU package', async () => {
-  const install = vi.spyOn(store.actions.settings, 'installRuntimeComponent').mockResolvedValue()
-  const user = userEvent.setup()
-  render(<RuntimeComponents />)
-
-  await user.click(screen.getByRole('tab', { name: /CrispASR/ }))
-  const backend = screen.getByRole('combobox', { name: '执行后端' })
-  await user.click(backend)
-  await user.click(await screen.findByRole('option', { name: 'CPU' }))
-  const versions = screen.getByRole('combobox', { name: '安装 CrispASR' })
-  const cpu = CRISP_RUNTIME_VERSIONS.filter(version => version.backend === 'cpu')
-  await waitFor(() => expect(backend).toHaveTextContent('CPU'))
-  await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
-  versions.focus()
-  await user.keyboard('{Enter}')
-  expect((await screen.findAllByRole('option')).map(option => option.textContent?.trim())).toEqual(cpu.map(version => version.version))
-  await user.click(await screen.findByRole('option', { name: cpu[1].version }))
-  await user.click(screen.getByRole('button', { name: '安装' }))
-  expect(install).toHaveBeenCalledWith(cpu[1].id, false)
-})
-
 it('shows a retry action instead of a spinner when saved settings cannot be read', () => {
   settingsStore.setState({ settings: null, loading: false, loadError: 'settings read failed' })
   render(<SettingsPage />)
@@ -221,7 +160,7 @@ it('shows the engine summary and keeps diagnostic copying in Help and About', ()
   expect(screen.queryByRole('button', { name: '恢复出厂设置' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '查看' })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'GitHub 主页' })).toHaveAttribute('href', 'https://github.com/CerealAxis')
-  expect(screen.getByRole('link', { name: '赞助' })).toHaveAttribute('href', 'https://nolax.org/zh-CN/contributing/sponsor')
+  expect(screen.getByRole('link', { name: '赞助' })).toHaveAttribute('href', 'https://nola.xaviermc.top/zh-CN/contributing/sponsor')
   expect(document.querySelector('a[href="https://github.com/sponsors/CerealAxis"]')).toBeNull()
   expect(screen.getByRole('link', { name: 'shadcn/ui 官网' })).toHaveAttribute('href', 'https://ui.shadcn.com/')
   expect(screen.getByRole('group', { name: '虚位以待' })).toBeInTheDocument()

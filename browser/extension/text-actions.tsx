@@ -156,10 +156,10 @@ export function TextActions({ selection, preferences, dismiss }: { selection: Te
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length
       event.preventDefault(); buttons[next]?.focus()
     }}>
-      {(selection.target || preferences.selectionTranslate) && <Button variant="bare" size="icon-sm" disabled={busy} aria-label={t(selection.target ? 'translateInput' : 'translateSelection')} tooltip={t(selection.target ? 'translateInput' : 'translateSelection')} onClick={() => void translate()}>{busy ? <Spinner className="animate-spin" /> : <Languages />}</Button>}
-      {preferences.ttsProvider !== DISABLED_PROVIDER && (selection.target || preferences.selectionSpeak) && <Button variant="bare" size="icon-sm" disabled={busy} aria-label={t('readAloud')} tooltip={t('readAloud')} onClick={() => void speak()}><Volume2 /></Button>}
+      {(selection.target || preferences.selectionTranslate) && <Button variant="bare" size="icon-sm" disabled={busy} aria-label={t(selection.target ? 'translateInput' : 'translateSelection')} title={t(selection.target ? 'translateInput' : 'translateSelection')} onClick={() => void translate()}>{busy ? <Spinner className="animate-spin" /> : <Languages />}</Button>}
+      {preferences.ttsProvider !== DISABLED_PROVIDER && (selection.target || preferences.selectionSpeak) && <Button variant="bare" size="icon-sm" disabled={busy} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak()}><Volume2 /></Button>}
       <Popover open={more} onOpenChange={setMore}>
-        <PopoverTrigger render={<Button variant="bare" size="icon-sm" aria-label={t('more')} tooltip={t('more')} />}><MoreVertical /></PopoverTrigger>
+        <PopoverTrigger render={<Button variant="bare" size="icon-sm" aria-label={t('more')} title={t('more')} />}><MoreVertical /></PopoverTrigger>
         {menuContainer && <PopoverContent container={menuContainer} align="start" className="nola-selection-menu"><PopoverTitle className="sr-only">{t('more')}</PopoverTitle>
           {(selection.target || preferences.selectionCopy) && <Button variant="bare" disabled={busy} onClick={() => { void copy(); setMore(false) }}><Copy data-icon="inline-start" />{t('copyTranslation')}</Button>}
           {selection.target && restorable !== undefined && <Button variant="bare" onClick={restore}><Undo2 data-icon="inline-start" />{t('restoreInput')}</Button>}
@@ -170,8 +170,8 @@ export function TextActions({ selection, preferences, dismiss }: { selection: Te
     <div ref={setMenuContainer} style={{ display: 'contents' }} />
     {result && <div className="nola-selection-result nola-popup-surface" aria-live="polite">
       <div className="nola-selection-result-actions">
-        {(selection.target || preferences.selectionCopy) && result && <Button variant="bare" size="icon-sm" aria-label={t('copyTranslation')} tooltip={t('copyTranslation')} onClick={() => void copy()}><Copy /></Button>}
-        <Button variant="bare" size="icon-sm" aria-label={t('close')} tooltip={t('close')} onClick={dismiss}><X /></Button>
+        {(selection.target || preferences.selectionCopy) && result && <Button variant="bare" size="icon-sm" aria-label={t('copyTranslation')} title={t('copyTranslation')} onClick={() => void copy()}><Copy /></Button>}
+        <Button variant="bare" size="icon-sm" aria-label={t('close')} title={t('close')} onClick={dismiss}><X /></Button>
       </div>
       <p dir="auto">{result}</p>
     </div>}

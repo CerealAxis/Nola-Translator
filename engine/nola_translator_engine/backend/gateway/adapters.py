@@ -167,16 +167,15 @@ class MiMoTtsAdapter(Adapter):
         key = ctx.provider_options.get("api_key", "").strip()
         if not key:
             raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="tts", message="MiMo API key is missing")
+        if voice and voice not in MIMO_TTS_VOICES:
+            raise GatewayError(GatewayErrorCode.INVALID_INPUT, stage="tts", message="Unsupported MiMo voice")
         timeout = 30.0 if ctx.deadline is None else ctx.deadline - time.monotonic()
         if timeout <= 0:
             raise GatewayError(GatewayErrorCode.TIMEOUT, stage="tts", message="MiMo synthesis deadline expired")
         try:
             async with asyncio.timeout(timeout), httpx.AsyncClient(timeout=timeout) as client:
-                endpoint = (ctx.provider_options.get("endpoint") or MIMO_TTS_ENDPOINT).rstrip("/")
-                if not endpoint.endswith("/chat/completions"):
-                    endpoint += "/chat/completions"
-                response = await client.post(endpoint, headers={"Authorization": f"Bearer {key}"}, json={
-                    "model": ctx.provider_options.get("model") or MIMO_TTS_MODEL,
+                response = await client.post(MIMO_TTS_ENDPOINT, headers={"Authorization": f"Bearer {key}"}, json={
+                    "model": MIMO_TTS_MODEL,
                     "messages": [{"role": "assistant", "content": text}],
                     "audio": {"format": "wav", "voice": voice or "mimo_default"},
                     "stream": False,
@@ -354,17 +353,14 @@ class LocalWorkerAdapter(Adapter):
         chunk = SynthesisChunk(pcm=pcm, sample_rate=rate, channels=channels, seq=0, terminal=True)
         return SynthesisResult(chunks=[chunk], voices=voices, sample_rate=rate)
 
-    async def llm_endpoint(self, instance: ModelInstance, ctx: CallContext, *, context_window: int | None = None) -> dict[str, Any]:
+    async def llm_endpoint(self, instance: ModelInstance, ctx: CallContext) -> dict[str, Any]:
         """Local LLM inference streams from a llama.cpp server the desktop AI SDK
         owns; the gateway returns the endpoint + context window and leaves chat
         history, streaming, tool execution and approval in Electron (doc 08 §6)."""
 
-        config = instance.configuration.compute_options.get("prewarm") or _prewarm(instance)
-        if context_window is not None:
-            config = {**config, "compute": {**config.get("compute", {}), "contextSize": context_window}}
         request = WorkerRequest(
             kind="llm",
-            config=config,
+            config=instance.configuration.compute_options.get("prewarm") or _prewarm(instance),
             resource_id=instance.configuration.resource_id,
         )
         return await self._call(instance, request, ctx, stage="llm")
@@ -475,13 +471,11 @@ class CustomMtAdapter(_NetworkMtAdapter):
         config = TranslationOptions(
             endpoint=options.get("endpoint", ""), model=options.get("model", ""), apiKey=options.get("api_key", ""),
             apiFormat=options.get("api_format", "chat-completions"),
-            apiVersion=options.get("api_version", ""), apiService=options.get("api_service", ""),
             contextWindow=options.get("context_window", 128000), maxOutputTokens=options.get("max_output_tokens", 4096),
         )
         return custom_translation_provider(
             config.apiFormat, endpoint=config.endpoint, model=config.model, api_key=config.apiKey,
             context_window=config.contextWindow, max_output_tokens=config.maxOutputTokens,
-            api_version=config.apiVersion, api_service=config.apiService,
         )
 
 
@@ -489,21 +483,21 @@ class GoogleMtAdapter(_NetworkMtAdapter):
     adapter_id = "google"
 
     def _provider(self, instance: ModelInstance, options: dict[str, str]) -> GoogleTranslateProvider:
-        return GoogleTranslateProvider(**({'endpoint': options['endpoint']} if options.get('endpoint') else {}))
+        return GoogleTranslateProvider()
 
 
 class IndexPublicMtAdapter(_NetworkMtAdapter):
     adapter_id = "index-translate"
 
     def _provider(self, instance: ModelInstance, options: dict[str, str]) -> IndexTranslatePublicProvider:
-        return IndexTranslatePublicProvider(**{key: options[key] for key in ('endpoint', 'model') if options.get(key)})
+        return IndexTranslatePublicProvider()
 
 
 class MicrosoftMtAdapter(_NetworkMtAdapter):
     adapter_id = "microsoft"
 
     def _provider(self, instance: ModelInstance, options: dict[str, str]) -> MicrosoftTranslatorProvider:
-        return MicrosoftTranslatorProvider(**({'endpoint': options['endpoint']} if options.get('endpoint') else {}))
+        return MicrosoftTranslatorProvider()
 
 
 class MyMemoryMtAdapter(_NetworkMtAdapter):

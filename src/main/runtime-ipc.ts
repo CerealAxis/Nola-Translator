@@ -1,12 +1,11 @@
 import { loggedHandle } from './logged-ipc'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { RuntimeManager } from './runtime-manager'
-import { isRuntimeKind, type RuntimeKind } from '../shared/compute'
 import type { EngineProcess } from './engine-process'
 
 /** Python import and DLL paths are fixed at launch; a changed selection needs a new child. */
 export async function recheckRuntimeEnvironment(manager: Pick<RuntimeManager, 'recheck' | 'selectedDirectories'>,
-  engine: Pick<EngineProcess, 'currentState' | 'stop' | 'start'>, components?: readonly RuntimeKind[]) {
+  engine: Pick<EngineProcess, 'currentState' | 'stop' | 'start'>, components?: readonly ('engine' | 'llama' | 'crisp')[]) {
   const previous = JSON.stringify(manager.selectedDirectories())
   await manager.recheck(components)
   const directories = manager.selectedDirectories()
@@ -18,10 +17,10 @@ export async function recheckRuntimeEnvironment(manager: Pick<RuntimeManager, 'r
 }
 
 export function registerRuntimeIpc(manager: RuntimeManager, window: () => BrowserWindow | null,
-  prepare: (components?: readonly RuntimeKind[]) => Promise<void>, isSessionBusy: () => boolean,
+  prepare: (components?: readonly ('engine' | 'llama' | 'crisp')[]) => Promise<void>, isSessionBusy: () => boolean,
   whenRuntimeReady: () => Promise<void> = async () => {},
   install: (id: string, repair: boolean) => Promise<void> = (id, repair) => manager.install(id, repair),
-  uninstall: (kind: RuntimeKind) => Promise<void> = kind => manager.uninstall(kind)): () => void {
+  uninstall: (kind: 'engine' | 'llama' | 'crisp') => Promise<void> = kind => manager.uninstall(kind)): () => void {
   const channels = ['runtime:list', 'runtime:install', 'runtime:import', 'runtime:cancel', 'runtime:prepare', 'runtime:settings', 'runtime:uninstall']
   loggedHandle(channels[5], (_event, component: unknown) => {
     if (component !== 'engine' && component !== 'llama' && component !== 'crisp') throw new Error('INVALID_ARGUMENT')
@@ -42,7 +41,7 @@ export function registerRuntimeIpc(manager: RuntimeManager, window: () => Browse
   loggedHandle(channels[6], async (_event, kind: unknown) => {
     await whenRuntimeReady()
     if (isSessionBusy()) throw new Error('sessionAlreadyRunning')
-    if (!isRuntimeKind(kind)) throw new Error('INVALID_ARGUMENT')
+    if (kind !== 'engine' && kind !== 'llama' && kind !== 'crisp') throw new Error('INVALID_ARGUMENT')
     return uninstall(kind)
   })
   loggedHandle(channels[2], async () => {
@@ -60,10 +59,10 @@ export function registerRuntimeIpc(manager: RuntimeManager, window: () => Browse
   loggedHandle(channels[3], () => manager.cancel())
   loggedHandle(channels[4], async (_event, requested: unknown) => {
     await whenRuntimeReady()
-    if (requested !== undefined && (!Array.isArray(requested) || requested.some(kind => !isRuntimeKind(kind)))) {
+    if (requested !== undefined && (!Array.isArray(requested) || requested.some(kind => kind !== 'engine' && kind !== 'llama' && kind !== 'crisp'))) {
       throw new Error('INVALID_ARGUMENT')
     }
-    await prepare(requested as RuntimeKind[] | undefined)
+    await prepare(requested as ('engine' | 'llama' | 'crisp')[] | undefined)
     return manager.snapshot()
   })
   return () => { manager.cancel(); for (const channel of channels) ipcMain.removeHandler(channel) }

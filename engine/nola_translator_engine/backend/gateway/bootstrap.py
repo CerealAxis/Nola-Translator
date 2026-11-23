@@ -20,7 +20,6 @@ from typing import Callable
 from ...compute import ComputeDevice, ComputeOptions, choose_devices, model_memory_mb, probe_devices
 from ...resources import RESOURCE_BY_ID
 from ...recognition.aliyun import QWEN_REALTIME_LANGUAGES, STREAMING_ASR_LANGUAGES
-from ...recognition.crisp_asr import crisp_acceleration_library, cuda_device_count
 from ...recognition.minimax import MINIMAX_LANGUAGES
 from ...translation.google_translate import DEFAULT_GOOGLE_TRANSLATE_ENDPOINT
 from ...translation.index_translate import PUBLIC_ENDPOINT
@@ -88,16 +87,9 @@ def _local_placement(entry: RegistryEntry, devices: list[ComputeDevice], overrid
     estimate = entry.definition.estimated_memory_mb
     kind = configuration.kind
     device_field = "recognitionDevice" if kind in (ModelKind.ASR, ModelKind.TTS) else "translationDevice"
-    if not devices:
+    if not devices or adapter in ("crisp-asr", "crisp-tts"):
+        # shortcut: Crisp stays on CPU until Vulkan placement can target a budgeted adapter.
         selected = "cpu"
-    elif adapter in ("crisp-asr", "crisp-tts"):
-        selected = "cpu"
-        accelerator = crisp_acceleration_library()
-        cuda = [device for device in devices if device.backend == "cuda" and device.totalMemoryMb > 0]
-        if accelerator and accelerator[0] == "cuda" and len(cuda) == 1 and cuda_device_count() == 1:
-            candidates = [device for device in devices if device.id == "cpu"] + cuda
-            recognition, _, _ = choose_devices(candidates, options, estimate, 0, None, "crisp-cuda")
-            selected = recognition.id
     elif kind in (ModelKind.ASR, ModelKind.TTS):
         recognition, _, _ = choose_devices(devices, options, estimate, 0, None, adapter)
         selected = recognition.id
@@ -169,7 +161,7 @@ def build_default_gateway(*, model_dir: Path | None = None, worker_factory: Call
     mimo_capabilities = ModelCapabilities(
         model_id=MIMO_TTS_MODEL, adapter_id=MIMO_TTS_MODEL, kinds=[ModelKind.TTS], operations=[Operation.SYNTHESIZE],
         operation_profiles={Operation.SYNTHESIZE: OperationProfile(streaming_output="false", audio_output="utterance")},
-        languages=LanguageCapabilities(input=["zh", "zh-Hant", "en"], speech_output=["zh", "zh-Hant", "en"], speech_output_available=True),
+        languages=LanguageCapabilities(input=["zh", "en"], speech_output=["zh", "en"], speech_output_available=True),
     )
     registry.register(
         ModelDefinition(MIMO_TTS_MODEL, [ModelKind.TTS], mimo_capabilities),

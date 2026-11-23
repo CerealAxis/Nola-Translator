@@ -84,10 +84,7 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
             writer.write({ type: 'text-delta', id: 'result', delta: text })
             writer.write({ type: 'text-end', id: 'result' })
           }
-          if (result.audio) {
-            const mediaType = /^data:(audio\/[\w.+-]+);/.exec(result.audio)?.[1] ?? 'audio/wav'
-            writer.write({ type: 'file', mediaType, url: result.audio })
-          }
+          if (result.audio) writer.write({ type: 'file', mediaType: 'audio/wav', url: result.audio })
           writer.write({ type: 'finish', finishReason: 'stop' })
         } catch (error) {
           if (activeStep && !signal?.aborted) writer.write({ type: 'tool-output-error', toolCallId: activeStep,
@@ -144,8 +141,7 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
         if (config.comicProjectId) comicRequests.set(id, abort)
         void app.streamLanguageModel!({ id, source: local ? 'local' : 'custom', modelId: config.model.slice(local ? 9 : 7), body, projectId: config.projectId ?? null,
           comicProjectId: config.comicProjectId ?? null,
-          effort: local && (config.effort === 'enabled' || config.effort === 'disabled') ? config.effort
-            : config.effort === 'low' || config.effort === 'medium' || config.effort === 'high' ? config.effort : 'auto',
+          effort: ['low', 'medium', 'high'].includes(config.effort) ? config.effort as 'low' | 'medium' | 'high' : 'auto',
         }).catch(error => finish(inferenceError(error)))
       },
       cancel() { closed = true; comicRequests.delete(id); unsubscribe?.(); cancel() },

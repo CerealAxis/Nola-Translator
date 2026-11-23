@@ -181,12 +181,12 @@ def synthesize(resources, request, compute):
     adapter = resources.adapter_for(model_id)
     cache_key = (model_id, compute.recognitionDevice, compute.cpuThreads, compute.precision, compute.quantization)
     if adapter == 'crisp-tts' or '-crisp-' in model_id:
-        def run_crisp(use_acceleration):
-            key = (*cache_key, use_acceleration)
+        def run_crisp(use_vulkan):
+            key = (*cache_key, use_vulkan)
             runtime = _TTS_CACHE.get(key)
             if runtime is None:
                 runtime = CrispAsrRuntime(resources.recognition_weight_path(model_id), threads=compute.cpuThreads or 4,
-                    use_acceleration=use_acceleration, allow_cpu_fallback=compute.allowCpuFallback)
+                    use_vulkan=use_vulkan, allow_cpu_fallback=compute.allowCpuFallback)
                 runtime.load()
                 _TTS_CACHE[key] = runtime
             try:
@@ -210,12 +210,12 @@ def synthesize(resources, request, compute):
                 runtime.unload()
                 raise
 
-        use_acceleration = compute.recognitionDevice != 'cpu'
+        use_vulkan = compute.recognitionDevice != 'cpu'
         retry_on_cpu = False
         try:
-            return run_crisp(use_acceleration)
+            return run_crisp(use_vulkan)
         except RuntimeError:
-            if not use_acceleration or not compute.allowCpuFallback:
+            if not use_vulkan or not compute.allowCpuFallback:
                 raise
             retry_on_cpu = True
         if retry_on_cpu:

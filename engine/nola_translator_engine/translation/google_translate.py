@@ -41,9 +41,8 @@ class GoogleTranslateProvider(_NetworkTransport):
         self,
         *,
         client: httpx.AsyncClient | None = None,
-        endpoint: str = DEFAULT_GOOGLE_TRANSLATE_ENDPOINT,
     ) -> None:
-        self.endpoint = endpoint
+        self.endpoint = DEFAULT_GOOGLE_TRANSLATE_ENDPOINT
         self._http = client
 
     def timeout_for(self, text: str, source: str, target: str) -> float:

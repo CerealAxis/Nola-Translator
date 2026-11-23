@@ -28,7 +28,7 @@ Nola Translator 是一款跨平台实时翻译应用，支持 Windows 桌面端�
 ## 演示
 
 <p align="center">
-  <a href="https://nolax.org/">
+  <a href="https://nola.xaviermc.top/">
     <img src="/screenshots/zh-CN/home.png" alt="点击前往官网体验 Nola Translator" width="1000">
   </a>
 </p>
@@ -163,7 +163,7 @@ npm run build     # 构建桌面应用
 
 - [Issues](https://github.com/CerealAxis/Nola-Translator/issues) — 报告问题
 - [Discussions](https://github.com/CerealAxis/Nola-Translator/discussions) — 提问与交流
-- [帮助文档](https://nolax.org/zh-CN/docs) — 帮助文档
+- [帮助文档](https://nola.xaviermc.top/zh-CN/docs) — 帮助文档
 
 ## 参考项目
 

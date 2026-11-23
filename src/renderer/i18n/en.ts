@@ -64,7 +64,7 @@ export const en: Dictionary = {
   modelConfig: {
     title: 'Configure model', pending: 'Needs configuration', edit: 'Edit configuration', configure: 'Configure and enable',
     view: 'View configuration', viewTitle: 'View model configuration', viewDescription: 'Shows the current model configuration. It cannot be changed here.',
-    description: 'Confirm the supported languages and save to use this model in a session.',
+    description: 'Confirm the model task, inference engine and language capabilities before using it in a session.',
     slot: 'Model task', recognition: 'Speech recognition', translation: 'Translation', synthesis: 'Speech synthesis', removeLanguage: 'Remove language', engine: 'Inference engine',
     languages: 'Recognition languages', autoDetection: 'Supports automatic language detection', sourceLanguages: 'Supported source languages', targetLanguages: 'Supported target languages',
     restrictPairs: 'Restrict translation directions', pairsHint: 'When off, all combinations of selected source and target languages are allowed. When on, only the listed directions are allowed.',

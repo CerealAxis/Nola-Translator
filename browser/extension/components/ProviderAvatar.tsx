@@ -33,7 +33,6 @@ import edgeLogo from '../../../src/renderer/assets/browsers/edge.png'
 import { Avatar, AvatarFallback } from '../../../src/renderer/components/ui/avatar'
 import { NolaLogo } from '../logo'
 import type { ProviderConnection } from '../providers'
-import { TooltipHint } from '../../../src/renderer/components/ui/tooltip'
 
 const providerIcons: Partial<Record<string, ComponentType>> = {
   nola: NolaLogo,
@@ -73,13 +72,12 @@ const providerIcons: Partial<Record<string, ComponentType>> = {
   azure: Azure,
 }
 
-export function ProviderAvatar({ provider, showTooltip = true }: { provider?: Pick<ProviderConnection, 'preset' | 'name'>; showTooltip?: boolean }) {
+export function ProviderAvatar({ provider }: { provider?: Pick<ProviderConnection, 'preset' | 'name'> }) {
   const preset = provider?.preset ?? ''
   const Icon = providerIcons[preset] ?? Plug
-  const avatar = <Avatar className="nola-provider-avatar" aria-hidden="true">
+  return <Avatar className="nola-provider-avatar" title={provider?.name} aria-hidden="true">
     <AvatarFallback>
       {preset === 'edge-tts' ? <img src={edgeLogo} alt="" /> : <Icon />}
     </AvatarFallback>
   </Avatar>
-  return showTooltip && provider?.name ? <TooltipHint content={provider.name}>{avatar}</TooltipHint> : avatar
 }

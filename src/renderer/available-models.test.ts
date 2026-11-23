@@ -4,24 +4,13 @@ import * as availableModelsModule from './available-models'
 import { useModelOptions } from './model-options'
 import { stores } from './store'
 import { buildAvailableModels, modelBindingPatch, resolveModelBinding, savedBindingOf, type AvailableModel } from './available-models'
-import { DEFAULT_SETTINGS, MIMO_TTS_BINDING, type AppSettings, type CredentialProvider } from '../shared/settings'
-import { buildConfiguredCloudModels } from '../shared/model-availability'
+import { DEFAULT_SETTINGS, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { ModelGatewaySnapshot } from '../shared/model-gateway'
 import type { ResourceRecord } from '../shared/contracts'
 
 /** The catalog only reads which slots hold a key, so a sparse record is enough for a fixture. */
 const credentials = (stored: CredentialProvider[]): Readonly<Record<CredentialProvider, boolean>> =>
   Object.fromEntries(stored.map(slot => [slot, true])) as Record<CredentialProvider, boolean>
-
-it('includes both Chinese scripts for the built-in MiMo speech model', () => {
-  const configured = settings({ modelPolicy: { enabled: { [`tts:${MIMO_TTS_BINDING}`]: true }, defaults: {}, selections: {} } })
-  const stored = credentials(['mimo-tts'])
-  const renderer = buildAvailableModels({ settings: configured, credentials: stored, resources: [], snapshot: null })
-  const cloud = buildConfiguredCloudModels(configured, stored)
-  for (const catalog of [renderer, cloud]) {
-    expect(catalog.tts.find(model => model.binding === MIMO_TTS_BINDING)?.targetLanguages).toEqual(['zh', 'zh-Hant', 'en'])
-  }
-})
 
 it('uses current model selections for languages even when legacy settings name different providers', () => {
   const beforeSettings = stores.settings.getState()
@@ -55,16 +44,14 @@ it('uses current model selections for languages even when legacy settings name d
   }
 })
 
-it('expands chat translation to all app languages and keeps speech capabilities specific', () => {
+it('advertises explicit speech and custom translation inventories without expanding them', () => {
   const configured = structuredClone(settings({ modelPolicy: { enabled: { 'tts:resource:tts-kokoro-crisp-q8-0': true }, defaults: {}, selections: {} } }))
   configured.translation.customModels = [{ id: 'limited', name: 'Limited', endpoint: 'https://example.com/v1', model: 'limited', apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024, sourceLanguages: ['ja'], languages: ['en'] }]
   const catalog = buildAvailableModels({ settings: configured, credentials: credentials([]),
     resources: [{ resourceId: 'tts-kokoro-crisp-q8-0', installed: true, kind: 'ttsModel', languages: ['zh', 'en', 'ja'] } as ResourceRecord],
     snapshot: snapshotWith('tts', 'resource:tts-kokoro-crisp-q8-0', 'Kokoro') })
   expect(catalog.tts[0].targetLanguages).toEqual(['en'])
-  expect(catalog.mt.find(model => model.binding === 'mt-custom:limited')).toMatchObject({
-    sourceLanguages: expect.arrayContaining(['auto', 'ja', 'zh']), targetLanguages: expect.arrayContaining(['en', 'ja', 'zh']),
-  })
+  expect(catalog.mt.find(model => model.binding === 'mt-custom:limited')).toMatchObject({ sourceLanguages: ['ja'], targetLanguages: ['en'] })
 })
 
 const snapshotWith = (kind: keyof ModelGatewaySnapshot['services'], model: string, name: string): ModelGatewaySnapshot => ({
@@ -97,23 +84,6 @@ it('leaves an installed but unloaded local model out of the catalog', () => {
   expect(catalog.asr).toEqual([])
 })
 
-it('honors explicitly disabled cloud models without hiding legacy configured models', () => {
-  const disabled = { 'asr:cloud:aliyun': false, 'mt:cloud:index-translate': false, 'llm:custom:limited': false }
-  const configured = settings({
-    modelPolicy: { enabled: disabled, defaults: {}, selections: {} },
-    modelWorkspace: { connections: [], localSources: {}, managedBindings: Object.keys(disabled) },
-  })
-  configured.translation = { ...configured.translation, customModels: [
-    { id: 'limited', name: 'Limited', endpoint: 'https://example.test/v1', model: 'limited', apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024, languages: ['en'] },
-  ] }
-  const catalog = buildAvailableModels({ settings: configured, credentials: credentials(['aliyun-asr']), resources: [],
-    snapshot: snapshotWith('llm', 'custom:limited', 'Limited') })
-  expect(catalog.asr).toEqual([])
-  expect(catalog.llm).toEqual([])
-  expect(catalog.mt.map(model => model.binding)).toEqual(expect.arrayContaining(['cloud:mymemory', 'mt-custom:limited']))
-  expect(catalog.mt.some(model => model.binding === 'cloud:index-translate')).toBe(false)
-})
-
 it('hides realtime local models while the Model Gateway is stopped', () => {
   const configured = settings({ modelPolicy: { enabled: { 'asr:resource:sense-voice-small': true, 'llm:resource:qwen35-0.8b': true }, defaults: {}, selections: {} } })
   const catalog = buildAvailableModels({ settings: configured, credentials: credentials([]),
@@ -124,25 +94,6 @@ it('hides realtime local models while the Model Gateway is stopped', () => {
     ], instances: [] } } })
   expect(catalog.asr).toEqual([])
   expect(catalog.llm).toEqual([])
-})
-
-it('offers local chat and native cloud chat in the text translation picker', () => {
-  const id = 'qwen35-0.8b-q4-k-m'
-  const configured = settings({ modelPolicy: { enabled: { [`llm:resource:${id}`]: true }, defaults: {}, selections: {} } })
-  configured.translation.customModels = [{ id: 'gemini', name: 'Gemini', endpoint: 'https://example.com',
-    model: 'gemini-2.5-flash', apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024, languages: ['en'] }]
-  configured.modelWorkspace = { localSources: {}, connections: [{
-    id: 'gemini-source', service: 'gemini-native', capability: 'LLM', name: 'Gemini', endpoint: 'https://example.com',
-    protocol: 'google-native', workspace: '', region: '', models: [{ id: 'gemini-2.5-flash', name: 'Gemini', enabled: true, profileId: 'gemini' }],
-  }] }
-  const stored = credentials(['cloud-model:gemini-source'])
-  const catalog = buildAvailableModels({ settings: configured, credentials: stored,
-    resources: [{ ...asrRecord, resourceId: id, kind: 'translationModel', provider: 'llama.cpp' }],
-    snapshot: { ...snapshotWith('mt', '', ''), realtime: {
-      models: [{ model_id: id, enabled: true, kinds: ['mt'], operations: ['translate'] }], instances: [],
-    } } })
-  expect(catalog.mt.map(model => model.binding)).toEqual(expect.arrayContaining([`resource:${id}`, 'mt-custom:gemini']))
-  expect(buildConfiguredCloudModels(configured, stored).mt).toContainEqual(expect.objectContaining({ binding: 'mt-custom:gemini' }))
 })
 
 describe('resolveModelBinding', () => {
@@ -189,7 +140,7 @@ it('requires enablement for local models while configured cloud services remain 
   const catalog = buildAvailableModels({ settings: configured, resources: [asrRecord], credentials: credentials(['aliyun-asr']),
     snapshot: snapshotWith('asr', 'resource:sense-voice-small', 'SenseVoice') })
   expect(catalog.asr.map(model => model.binding)).toEqual(['cloud:aliyun'])
-  expect(catalog.mt.map(model => model.binding)).toEqual(['cloud:microsoft', 'cloud:mymemory', 'cloud:google', 'cloud:index-translate', 'mt-custom:gemini'])
+  expect(catalog.mt.map(model => model.binding)).toEqual(['cloud:microsoft', 'cloud:mymemory', 'cloud:google', 'cloud:index-translate'])
 })
 
 it('excludes a removed resource even if an old snapshot still reports it ready', () => {

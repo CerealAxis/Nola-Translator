@@ -22,7 +22,7 @@ Nola Translator는 Windows 데스크톱과 브라우저를 지원하는 오픈�
 ## 데모
 
 <p align="center">
-  <a href="https://nolax.org/">
+  <a href="https://nola.xaviermc.top/">
     <img src="docs/public/screenshots/ko/home.png" alt="Nola Translator 온라인 데모 체험" width="1000">
   </a>
 </p>
@@ -157,7 +157,7 @@ Nola Translator의 후속 개발을 지원하려면 다음 방법으로 후원�
 
 - [Issues](https://github.com/CerealAxis/Nola-Translator/issues) — 문제 신고
 - [Discussions](https://github.com/CerealAxis/Nola-Translator/discussions) — 질문하고 소통하세요.
-- [도움말 문서](https://nolax.org/ko/docs) — 도움말 문서
+- [도움말 문서](https://nola.xaviermc.top/ko/docs) — 도움말 문서
 
 ## 참고 프로젝트
 

@@ -46,7 +46,7 @@ export async function probeLocalLlama(directory: string): Promise<LocalRuntime> 
     logDiagnostic('runtime.llama-probe.ready', { directory, files, stdout: version.stdout, stderr: version.stderr })
     const backend = ['cuda', 'vulkan', 'sycl', 'openvino', 'hip', 'rocm'].find(b => files.includes(`ggml-${b}`)) ?? 'cpu'
     const output = version.stdout + version.stderr
-    const cudaVersion = /cudart64_(\d+)\.dll/.exec(files)?.[1]
+    const cudaVersion = /cudart64_13\.dll/.test(files) ? '13.4' : /cudart64_12\.dll/.test(files) ? '12.4' : undefined
     const build = /\bbuild\s+(\d+)/i.exec(output)?.[1] ?? /version:\s*(\d+)(?:\s|$)/i.exec(output)?.[1]
     return { ...result, status: 'ready', cudaVersion, backend: backend === 'hip' ? 'rocm' : backend, gpuAvailable: backend !== 'cpu',
       version: build ? `b${build}` : /version:\s*([^\r\n]+)/i.exec(output)?.[1]?.slice(0, 128) ?? output.trim().slice(0, 128) }
@@ -62,10 +62,11 @@ export async function probeLocalCrisp(python: string, directory: string): Promis
   if (!await access(join(directory, 'crispasr', '__init__.py')).then(() => true, () => false)) return result
   try {
     const setup = pythonRuntimePaths([directory], dirname(python), directory)
-    const script = `${setup}; import json,crispasr; from importlib.metadata import version; from pathlib import Path; p=Path(crispasr.__file__).parent; print(json.dumps(dict(version=version('crispasr'),backend=next((b for b in ('cuda','vulkan') if (p/b/'crispasr.dll').is_file()), 'cpu'),path=str(p.parent))))`
+    const script = `${setup}; import json,crispasr; from importlib.metadata import version; from pathlib import Path; p=Path(crispasr.__file__).parent; print(json.dumps(dict(version=version('crispasr'),vulkan=(p/'vulkan'/'crispasr.dll').is_file(),path=str(p.parent))))`
     const probe = await run(python, ['-I', '-c', script], { windowsHide: true, timeout: 30_000, maxBuffer: 1024 * 1024 })
-    const actual = JSON.parse(probe.stdout.trim()) as { version: string; backend: 'cuda' | 'vulkan' | 'cpu'; path: string }
-    return { ...result, path: actual.path, status: 'ready', version: actual.version, backend: actual.backend, gpuAvailable: actual.backend !== 'cpu' }
+    const actual = JSON.parse(probe.stdout.trim()) as { version: string; vulkan: boolean; path: string }
+    if (actual.version !== '0.8.43') return { ...result, status: 'incompatible', version: actual.version, reason: `CrispASR ${actual.version} 与当前固定版本 0.8.43 不匹配` }
+    return { ...result, path: actual.path, status: 'ready', version: actual.version, backend: actual.vulkan ? 'vulkan' : 'cpu', gpuAvailable: actual.vulkan }
   } catch (error) {
     logDiagnostic('runtime.crisp-probe.failed', { directory, ...processFailure(error) })
     return { ...result, status: 'failed', reason: String(error).slice(-2048) }

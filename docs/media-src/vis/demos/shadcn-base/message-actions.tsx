@@ -12,7 +12,6 @@ import {
   MessageContent,
   MessageFooter,
 } from "@/styles/base-rhea/ui/message"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/styles/base-rhea/ui/tooltip"
 
 export function MessageActionsDemo() {
   return (
@@ -25,24 +24,20 @@ export function MessageActionsDemo() {
             </BubbleContent>
           </Bubble>
           <MessageFooter>
-            <Tooltip>
-              <TooltipTrigger render={<Button variant="ghost" size="icon" aria-label="复制" />}>
-                <CopyIcon />
-              </TooltipTrigger>
-              <TooltipContent>复制</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger render={<Button variant="ghost" size="icon" aria-label="喜欢" />}>
-                <ThumbsUpIcon />
-              </TooltipTrigger>
-              <TooltipContent>喜欢</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger render={<Button variant="ghost" size="icon" aria-label="不喜欢" />}>
-                <ThumbsDownIcon />
-              </TooltipTrigger>
-              <TooltipContent>不喜欢</TooltipContent>
-            </Tooltip>
+            <Button variant="ghost" size="icon" aria-label="复制" title="复制">
+              <CopyIcon />
+            </Button>
+            <Button variant="ghost" size="icon" aria-label="喜欢" title="喜欢">
+              <ThumbsUpIcon />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="不喜欢"
+              title="不喜欢"
+            >
+              <ThumbsDownIcon />
+            </Button>
           </MessageFooter>
         </MessageContent>
       </Message>
@@ -53,12 +48,14 @@ export function MessageActionsDemo() {
           </Bubble>
           <MessageFooter className="gap-2">
             <span className="font-normal text-destructive">发送失败</span>
-            <Tooltip>
-              <TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label="重试" />}>
-                <RefreshCcwIcon />
-              </TooltipTrigger>
-              <TooltipContent>重试</TooltipContent>
-            </Tooltip>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              title="重试"
+              aria-label="重试"
+            >
+              <RefreshCcwIcon />
+            </Button>
           </MessageFooter>
         </MessageContent>
       </Message>

@@ -59,7 +59,7 @@ export function LandingBrandMarquee({ locale }: { locale: Locale }) {
         size="icon-sm"
         className="site-brand-strip-toggle"
         aria-label={action}
-        tooltip={action}
+        title={action}
         onClick={() => setPaused(current => !current)}
       >
         {paused ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}

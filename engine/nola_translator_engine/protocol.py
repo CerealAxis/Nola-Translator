@@ -49,7 +49,7 @@ class BrowserTimeline(ProtocolModel):
 
 class TranslationOptions(ProtocolModel):
     #: A field of its own, separate from the provider name, so one `cloud` provider covers all
-    #: several wire shapes. `endpoint` means something different per format: the two OpenAI
+    #: four wire shapes. `endpoint` means something different per format: the two OpenAI
     #: formats take a versioned base (`https://api.openai.com/v1`), while `anthropic` and
     #: `ollama` take a bare origin, and the provider appends the path its format needs.
     #: No `min_length`: an empty endpoint is the legitimate "not configured yet" state, and a
@@ -57,9 +57,7 @@ class TranslationOptions(ProtocolModel):
     endpoint: str = Field(default="", max_length=2048)
     region: str = Field(default="", max_length=128)
     model: str = Field(default="", max_length=256)
-    apiFormat: Literal["chat-completions", "chat-responses", "anthropic", "ollama", "google-native", "azure-openai"] = "chat-completions"
-    apiVersion: str = Field(default="", max_length=32)
-    apiService: str = Field(default="", max_length=64)
+    apiFormat: Literal["chat-completions", "chat-responses", "anthropic", "ollama"] = "chat-completions"
     #: Ceiling the engine fits a request into, reserving room for the reply and splitting the
     #: source text when it does not fit. Nothing downstream clips this to what a vendor
     #: documents, so 10M is a fat-finger guard rather than a real model's window, and it
@@ -292,10 +290,10 @@ class TranslationPair(ProtocolModel):
 class ModelConfiguration(ProtocolModel):
     slot: Literal["recognition", "translation"]
     engine: Literal["pytorch", "llama", "crisp"]
-    languages: list[str]
+    languages: list[str] = Field(max_length=200)
     supportsAutoDetection: bool
-    sourceLanguages: list[str]
-    targetLanguages: list[str]
+    sourceLanguages: list[str] = Field(max_length=200)
+    targetLanguages: list[str] = Field(max_length=200)
     translationPairs: list[TranslationPair] | None = Field(default=None, max_length=512)
 
 
@@ -475,7 +473,7 @@ class ResourceRecord(ProtocolModel):
     provider: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=256)
     description: str = Field(min_length=1, max_length=1024)
-    languages: list[str]
+    languages: list[str] = Field(max_length=200)
     configuration: ModelConfiguration | None = None
     sourceLanguage: str | None = Field(default=None, max_length=32)
     targetLanguage: str | None = Field(default=None, max_length=32)

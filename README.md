@@ -22,7 +22,7 @@ Nola Translator is a cross-platform real-time translation application for Window
 ## Demo
 
 <p align="center">
-  <a href="https://nolax.org/">
+  <a href="https://nola.xaviermc.top/">
     <img src="docs/public/screenshots/en/home.png" alt="Click to try the Nola Translator online demo" width="1000">
   </a>
 </p>
@@ -157,7 +157,7 @@ Support the development of Nola Translator through:
 
 - [Issues](https://github.com/CerealAxis/Nola-Translator/issues) — Report a problem
 - [Discussions](https://github.com/CerealAxis/Nola-Translator/discussions) — Questions and discussion
-- [Documentation](https://nolax.org/en/docs) — Documentation
+- [Documentation](https://nola.xaviermc.top/en/docs) — Documentation
 
 ## Reference Projects
 

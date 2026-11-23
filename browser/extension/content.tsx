@@ -463,8 +463,10 @@ function install(): void {
     trigger.host.style.display = trigger.host.hidden ? 'none' : adapter.controls ? 'inline-flex' : 'block'
     if (!adapter.controls) { trigger.host.style.left = `${Math.max(0, rect.right - trigger.host.getBoundingClientRect().width - token('--space-2'))}px`; trigger.host.style.top = `${rect.top + spacing}px` }
     const triggerLabel = t('button')
+    // The native hover tooltip rides on the trigger host.
+    trigger.host.title = triggerLabel
     const subtitleVisible = subtitles.state().active || state.status === 'active'
-    triggerRoot.render(<Button size="icon-sm" variant="bare" aria-label={triggerLabel} tooltip={triggerLabel} aria-expanded={state.panelOpen} onClick={store.togglePanel}><NolaLogo /><Badge className="nola-trigger-state" variant={subtitleVisible ? 'default' : 'secondary'}>{t(subtitleVisible ? 'subtitleOn' : 'subtitleOff')}</Badge></Button>)
+    triggerRoot.render(<Button size="icon-sm" variant="bare" aria-label={triggerLabel} aria-expanded={state.panelOpen} onClick={store.togglePanel}><NolaLogo /><Badge className="nola-trigger-state" variant={subtitleVisible ? 'default' : 'secondary'}>{t(subtitleVisible ? 'subtitleOn' : 'subtitleOff')}</Badge></Button>)
     const controls = adapter.controls
     if (controls) requestAnimationFrame(() => {
       if (!trigger.host.hidden && trigger.host.parentElement === controls) alignPlayerTrigger(controls, trigger.host)

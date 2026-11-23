@@ -171,7 +171,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
    */
   const reportFailure = useCallback((message: string, description: string, cause: unknown, action: NotifyAction) => {
     if (searchNotice) dismissNotice(searchNotice)
-    searchNotice = notifyRetryableFailure(message, { cause, description: cause ? undefined : description, action })
+    searchNotice = notifyRetryableFailure(message, { cause, description, action })
   }, [])
 
   /*
@@ -308,7 +308,13 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
    */
   const installHub = (target: HubHit, source: ModelDownloadSource) => {
     void actions.models.installHubModel(target.summary.repo, installSlotOf(target), source).catch((cause: unknown) => {
-      notifyModelDownloadFailure(t, () => installHub(target, source), { cause })
+      console.error('[models] hub install failed', cause)
+      notifyModelDownloadFailure(
+        t('models.downloadFailed'),
+        t('errors.downloadFailed'),
+        t('errors.downloadFailedAction'),
+        () => installHub(target, source),
+      )
     })
   }
   const descriptionOf = (summary: HubModelSummary) => summary.description
@@ -341,10 +347,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
         {filters.map(item => <TabsTrigger key={item.id} value={item.id}>{item.label}</TabsTrigger>)}
       </TabsList>
     </TabsRoot>
-    {failed && !awaiting ? <Button variant="secondary" className="self-start" onClick={() => {
-      requested.current = true
-      setRefresh(value => value + 1)
-    }}>{t('errors.searchFailedAction')}</Button> : null}
+    {failed && !awaiting ? <p className="type-muted text-muted">{t('errors.searchFailed')}</p> : null}
     {awaiting ? <SearchSkeletons /> : null}
     {!awaiting && !failed && !nextCursor && visible.length === 0 ? <Empty>
       <EmptyTitle>{t('models.noResults')}</EmptyTitle>
@@ -365,7 +368,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
           busy={busyIds.includes(liveId) || busyIds.includes(summary.repo)}
           onInstall={() => install(hit)}
           onCancel={() => { void actions.models.manageResource(liveId, 'cancel').catch((cause: unknown) => {
-            notifyError(t('modelsSettingsUi.cancelDownloadFailed'), { cause })
+            notifyError(t('errors.engineOperationFailed'), { cause })
           }) }}
           footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onClick={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="outline" size="sm" onClick={() => setDetail(hit)}>
             {t('models.openDetails')}

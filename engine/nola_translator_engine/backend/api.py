@@ -82,7 +82,6 @@ class LanguageModelOpenRequest(BaseModel):
     lease_id: UUID
     model: str = Field(min_length=1, max_length=256)
     max_concurrency: int = Field(default=1, ge=1)
-    context_window: int | None = Field(default=None, ge=512, le=32768)
 
 
 class GatewayLoadingPolicy(BaseModel):
@@ -93,10 +92,6 @@ class GatewayLoadingPolicy(BaseModel):
 class GatewayModelLoad(BaseModel):
     model: str = Field(min_length=1, max_length=256)
     kind: Literal['asr', 'mt', 'tts']
-
-
-class GatewayS2sProbe(BaseModel):
-    model: str = Field(min_length=1, max_length=256)
 
 
 def cloud_asr_options(headers):
@@ -111,8 +106,7 @@ def cloud_asr_options(headers):
 def cloud_mt_options(headers, prefix="x-nola-provider-"):
     options = {}
     for name, limit in (("api-key", 4096), ("region", 32), ("endpoint", 2048), ("email", 256),
-                        ("model", 256), ("api-format", 32), ("api-version", 32), ("api-service", 64),
-                        ("context-window", 8), ("max-output-tokens", 8)):
+                        ("model", 256), ("api-format", 32), ("context-window", 8), ("max-output-tokens", 8)):
         header = prefix + ("key" if name == "api-key" else name)
         value = headers.get(header, "")
         if 0 < len(value) <= limit:
@@ -129,24 +123,19 @@ def _configure_realtime_provider(registry, session, headers):
         if 0 < len(api_key) <= 4096 and 0 < len(workspace) <= 128 and len(region) <= 32:
             registry.provider_connections.setdefault(session.session_id, {
                 "provider": "aliyun", "api_key": api_key, "workspace_id": workspace, "region": region,
-                "endpoint": headers.get("x-nola-provider-endpoint", "")[:2048],
             })
         return
     connection = registry.provider_connections.setdefault(session.session_id, {})
-    if pipeline.translation_model in ("google", "microsoft", "mymemory", "index-translate", "custom-mt"):
+    if pipeline.translation_model in ("google", "microsoft", "mymemory", "custom-mt"):
         connection.setdefault("mt_options", cloud_mt_options(headers))
-    if pipeline.fallback_translation_model in ("google", "microsoft", "mymemory", "index-translate", "custom-mt"):
+    if pipeline.fallback_translation_model in ("google", "microsoft", "mymemory", "custom-mt"):
         connection.setdefault("fallback_mt_options", cloud_mt_options(headers, "x-nola-fallback-"))
     if pipeline.asr_model in ("aliyun", "minimax"):
         connection.setdefault("asr_options", cloud_asr_options(headers))
     if pipeline.tts_model == MIMO_TTS_MODEL:
         tts_key = headers.get("x-nola-tts-key", "")
         if 0 < len(tts_key) <= 4096:
-            connection["tts_options"] = {
-                "api_key": tts_key,
-                "endpoint": headers.get("x-nola-tts-endpoint", "")[:2048],
-                "model": headers.get("x-nola-tts-model", "")[:256],
-            }
+            connection["tts_api_key"] = tts_key
 
 
 async def _run_while_connected(request: Request, operation):
@@ -492,39 +481,6 @@ def build_router() -> APIRouter:
         except GatewayError as error:
             return _gateway_error_response(error, ctx.server_instance_id)
 
-    @router.post("/gateway/s2s-probe", status_code=204)
-    async def gateway_s2s_probe(request: Request, body: GatewayS2sProbe):
-        from .s2s_provider import MODELS, S2SProtocolError
-
-        ctx = backend(request)
-        if ctx.gateway is None or body.model not in MODELS:
-            return _error_response(422, ErrorPayload(
-                code="INVALID_CONFIG", stage="gateway", message_key="pipeline.s2sConfigurationUnavailable",
-            ), ctx.server_instance_id)
-        operation = Operation.S2S_SESSION
-        match = MatchRequest(operation=operation, model_id=body.model, source_language="auto", target_language="en")
-        config = {
-            "api_key": request.headers.get("x-nola-provider-key", "")[:4096],
-            "workspace_id": request.headers.get("x-nola-provider-workspace", "")[:128],
-            "region": request.headers.get("x-nola-provider-region", "")[:32],
-            "endpoint": request.headers.get("x-nola-provider-endpoint", "")[:2048],
-            "source_language": "auto", "target_language": "en", "outputs": ["target"],
-        }
-
-        async def probe():
-            async with ctx.gateway.s2s_session(CallContext(operation, str(uuid4())), request=match, config=config):
-                return True
-
-        try:
-            if not await _run_while_connected(request, probe()):
-                return JSONResponse(status_code=499, content={})
-        except GatewayError as error:
-            return _gateway_error_response(error, ctx.server_instance_id)
-        except S2SProtocolError:
-            return _error_response(502, ErrorPayload(
-                code="PROVIDER_DISCONNECTED", stage="gateway", message_key="pipeline.s2sConfigurationUnavailable",
-            ), ctx.server_instance_id)
-
     @router.post("/gateway/language-models")
     async def open_language_model(request: Request, body: LanguageModelOpenRequest):
         from .direct_language_model import open_direct_language_model
@@ -541,9 +497,7 @@ def build_router() -> APIRouter:
             ), ctx.server_instance_id)
 
         async def acquire():
-            lease = await open_direct_language_model(
-                ctx.gateway, body.model, max_concurrency=body.max_concurrency, context_window=body.context_window,
-            )
+            lease = await open_direct_language_model(ctx.gateway, body.model, max_concurrency=body.max_concurrency)
             ctx.language_model_leases[token] = lease
             return lease
 

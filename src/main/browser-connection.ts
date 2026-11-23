@@ -154,7 +154,7 @@ export function browserSessionConfig(settings: AppSettings, request: Extract<Bro
     translationProvider: s2sModel ? 'recognition' : translation.provider, translationModelId: translation.localModelId,
     allowIntermediateTranslation: supportsIntermediateTranslation(translation.provider) && translation.translateIntermediate,
     intermediateTranslationIntervalMs: translation.intermediateTranslationIntervalMs,
-    translationOptions: translationOptionsOf(translation, settings.modelWorkspace),
+    translationOptions: translationOptionsOf(translation),
     ...fallbackTranslationFieldsOf(translation),
     browserTimeline: { epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate },
   }

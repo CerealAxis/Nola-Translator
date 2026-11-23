@@ -1,7 +1,7 @@
 """Resolve the approved Windows cp312 combinations against official release metadata.
 
 Sources: pytorch.org/get-started/previous-versions, download.pytorch.org/whl,
-PyPI wheel metadata, and pinned ggml-org/llama.cpp releases.
+PyPI wheel metadata, and ggml-org/llama.cpp release b11532. No binaries are downloaded.
 """
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
@@ -14,7 +14,7 @@ from urllib.parse import unquote, urljoin, urldefrag
 from urllib.request import Request, urlopen
 
 
-ROWS = [('2.15.0', ['cu132', 'xpu', 'cpu'], None, [])] + [
+ROWS = [
     (v, ['cu132', 'cu130', 'cu126', 'xpu', 'cpu'], '0.0.35', ['cu130', 'cu126'])
     for v in ['2.14.1', '2.14.0', '2.13.0', '2.12.1', '2.12.0']
 ] + [
@@ -95,31 +95,6 @@ def recipe(args):
     return result
 
 
-def llama_packages(version, cuda, *, only_vulkan=False):
-    with get(f'https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/{version}') as response:
-        assets = {item['name']: item for item in json.load(response)['assets']}
-
-    def release_file(name):
-        asset = assets[name]
-        return dict(url=asset['browser_download_url'], sha256=asset['digest'].removeprefix('sha256:'), bytes=asset['size'])
-
-    variants = [('cpu', 'cpu', 'CPU'), ('cuda', 'cuda-12.4', 'CUDA 12.4'),
-                ('cuda', f'cuda-{cuda}', f'CUDA {cuda}'), ('vulkan', 'vulkan', 'Vulkan'),
-                ('openvino', 'openvino-2026.4.1', 'OpenVINO 2026.4.1'),
-                ('sycl', 'sycl', 'SYCL'), ('rocm', 'rocm-10.0', 'ROCm 10.0')]
-    packages = []
-    for backend, suffix, label in variants:
-        if only_vulkan and backend != "vulkan":
-            continue
-        item = dict(id=f'llama-{version}-{suffix.replace(".", "-")}', name=f'llama.cpp {version} \u00b7 Windows x64 ({label})',
-                    kind='llama', backend=backend, version=version, architecture='x64',
-                    **release_file(f'llama-{version}-bin-win-{suffix}-x64.zip'))
-        if backend == 'cuda':
-            item['companions'] = [release_file(f'cudart-llama-bin-win-{suffix}-x64.zip')]
-        packages.append(item)
-    return packages
-
-
 def main():
     tasks = []
     for version, backends, xf, xf_backends in ROWS:
@@ -129,23 +104,30 @@ def main():
                 tasks.append((version, backend, xf))
     with ThreadPoolExecutor(max_workers=8) as pool:
         recipes = list(pool.map(recipe, tasks))
-    for torch_version, directml_version, vision_version in [
-        ('2.4.1', '0.2.5.dev240914', '0.19.1'),
-        ('2.3.1', '0.2.4.dev240815', None),
-    ]:
-        with get(f'https://pypi.org/pypi/torch-directml/{directml_version}/json') as response:
-            directml = json.load(response)
-        asset = next(f for f in directml['urls'] if '-cp312-cp312-win_amd64.whl' in f['filename'])
-        direct = recipe((torch_version, 'cpu', None))
-        companions = [dict(url=asset['url'], filename=asset['filename'], sha256=asset['digests']['sha256'], bytes=asset['size'])]
-        if vision_version:
-            companions.append(wheel('cpu', 'torchvision', vision_version))
-        direct.update(id=f'torch-{torch_version.replace(".", "-")}-directml', name=f'Torch {torch_version} (DirectML)',
-                      backend='directml', directmlVersion=directml_version, companions=companions)
-        recipes.append(direct)
-    packages = llama_packages("b12651", None, only_vulkan=True)
-    for version, cuda in [('b12650', '13.5'), ('b12649', '13.5'), ('b11532', '13.4')]:
-        packages.extend(llama_packages(version, cuda))
+    with get('https://pypi.org/pypi/torch-directml/0.2.4.dev240815/json') as response:
+        directml = json.load(response)
+    asset = next(f for f in directml['urls'] if '-cp312-cp312-win_amd64.whl' in f['filename'])
+    direct = recipe(('2.3.1', 'cpu', None))
+    direct.update(id='torch-2-3-1-directml', name='Torch 2.3.1 (DirectML)', backend='directml',
+                  directmlVersion='0.2.4.dev240815', companions=[
+                      dict(url=asset['url'], filename=asset['filename'], sha256=asset['digests']['sha256'], bytes=asset['size'])])
+    recipes.append(direct)
+    with get('https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b11532') as response:
+        assets = {a['name']: a for a in json.load(response)['assets']}
+    def release_file(name):
+        a = assets[name]
+        return dict(url=a['browser_download_url'], sha256=a['digest'].removeprefix('sha256:'), bytes=a['size'])
+    packages = []
+    for backend, suffix, label in [('cpu', 'cpu', 'CPU'), ('cuda', 'cuda-12.4', 'CUDA 12.4'),
+                                 ('cuda', 'cuda-13.4', 'CUDA 13.4'), ('vulkan', 'vulkan', 'Vulkan'),
+                                 ('openvino', 'openvino-2026.4.1', 'OpenVINO 2026.4.1'),
+                                 ('sycl', 'sycl', 'SYCL'), ('rocm', 'rocm-10.0', 'ROCm 10.0')]:
+        p = dict(id=f'llama-b11532-{suffix.replace(".", "-")}', name=f'llama.cpp b11532 · Windows x64 ({label})',
+                 kind='llama', backend=backend, version='b11532', architecture='x64',
+                 **release_file(f'llama-b11532-bin-win-{suffix}-x64.zip'))
+        if backend == 'cuda':
+            p['companions'] = [release_file(f'cudart-llama-bin-win-{suffix}-x64.zip')]
+        packages.append(p)
     root = Path(__file__).resolve().parents[1] / 'build'
     for filename, key, entries in [('runtime-recipes.json', 'recipes', recipes), ('runtime-catalog.json', 'packages', packages)]:
         (root / filename).write_text(json.dumps({'version': 1, key: entries}, indent=2) + '\n', encoding='utf-8')

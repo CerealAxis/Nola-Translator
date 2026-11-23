@@ -112,7 +112,7 @@ class PersistentSynthesizer:
         adapter = self.resources.adapter_for(self.model_id)
         if adapter == 'crisp-tts' or '-crisp-' in self.model_id:
             self.runtime = CrispAsrRuntime(self.resources.recognition_weight_path(self.model_id),
-                threads=self.compute.cpuThreads or 4, use_acceleration=self.compute.recognitionDevice != 'cpu',
+                threads=self.compute.cpuThreads or 4, use_vulkan=self.compute.recognitionDevice != 'cpu',
                 allow_cpu_fallback=self.compute.allowCpuFallback)
             self.runtime.load()
             prepare_crisp_synthesis(self.runtime._session, root)

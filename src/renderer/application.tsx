@@ -4,7 +4,7 @@ import { ErrorBoundary } from './components/primitives/ErrorBoundary'
 import { Spinner } from './components/ui/spinner'
 import { ArrowLeft, AudioLines, LayoutDashboard, SlidersHorizontal, Settings, MessagesSquare, Network, Headphones, ScanText, BookOpen, Gamepad2 } from 'lucide-react'
 import { useI18n } from './i18n'
-import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, ROUTE_TITLES, Routes, pathOf, settingsPath, useRoute } from './routes'
+import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, ROUTE_TITLES, Routes, settingsPath, useRoute } from './routes'
 import { HomePage } from './features/home'
 import { ComicBooksLoading, ComicProjectLoading } from './features/comic/ComicLoading'
 import { SETTINGS_NAVIGATION } from './features/settings/settingsNavigation'
@@ -22,7 +22,6 @@ const GameTranslationPage = lazy(() => import('./features/game/GameTranslationPa
 const RecordsPage = lazy(() => import('./features/records').then(module => ({ default: module.RecordsPage })))
 const RecordDetailPage = lazy(() => import('./features/records').then(module => ({ default: module.RecordDetailPage })))
 const ModelsPage = lazy(() => import('./features/models').then(module => ({ default: module.ModelsPage })))
-const ModelPreviewPage = lazy(() => import('./features/models/preview/ModelPreviewPage'))
 const SettingsPage = lazy(() => import('./features/settings').then(module => ({ default: module.SettingsPage })))
 
 /** Keep the Assistant-ui runtime outside the route element that is keyed by path. */
@@ -66,7 +65,6 @@ export const APPLICATION_PAGES = {
   records: () => <RecordsPage />,
   record: () => <RecordDetailPage />,
   models: () => <ModelsPage />,
-  'model-management': () => <ModelPreviewPage />,
   settings: () => <SettingsPage />,
   workbench: () => null, // ApplicationShell owns the persistent instance.
 } satisfies RoutesProps['pages']
@@ -118,7 +116,6 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
   const entries = [
     ['overview', 'home', 'nav.home', LayoutDashboard, '#/'],
     ['overview', 'models', 'nav.models', SlidersHorizontal, '#/models'],
-    ['overview', 'model-management', 'nav.models', Settings, pathOf('model-management')],
     ['overview', 'model-gateway', 'nav.modelGateway', Network, '#/model-gateway'],
     ['features', 'workspace', 'nav.workspace', AudioLines, '#/workspace'],
     ['features', 'meeting', 'meeting.navTitle', Headphones, '#/meeting'],

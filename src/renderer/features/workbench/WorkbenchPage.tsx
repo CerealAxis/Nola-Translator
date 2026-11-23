@@ -111,7 +111,7 @@ class WorkbenchSpeechSynthesisAdapter {
       await audioContext.resume()
       const app = getBridge()?.app
       if (!app?.directModel) throw new Error(this.t('workbench.runtimeUnavailable'))
-      const result = await app.directModel({ id: requestId, model: modelId, kind: 'tts', text, voice })
+      const result = await app.directModel({ id: requestId, model: `resource:${modelId}`, kind: 'tts', text, voice })
       if (isEnded()) return
       if (!result.audio) throw new Error(this.t('workbench.noAudioResult'))
       const samples = await audioContext.decodeAudioData(await (await fetch(result.audio)).arrayBuffer())
@@ -190,12 +190,11 @@ function WorkbenchChat({ snapshot, onAction, busy, ...page }: WorkbenchChatProps
     if (!settings || requestRunning) return
     const saved = config.model || savedBindingOf(config.kind, settings)
     const resolution = resolveModelBinding(config.kind, saved, available[config.kind])
-    const batch = models.find(model => model.batchSpeech && model.kind === config.kind && model.id === saved)
-    const selected = batch ?? models.find(model => model.kind === config.kind && model.id === resolution.binding)
+    const selected = models.find(model => model.kind === config.kind && model.id === resolution.binding)
     if (config.model !== (selected?.id ?? '') || config.images !== selected?.images) {
       setConfig(previous => ({ ...previous, model: selected?.id ?? '', images: selected?.images }))
-      if (!batch && resolution.unavailable && config.model) void notifyGatewayStartIssue(t, config.kind, config.model)
-      if (!batch && resolution.replaced && config.model) notifyInfo(t('gateway.modelSwitched', { name: resolution.replaced.name }),
+      if (resolution.unavailable && config.model) void notifyGatewayStartIssue(t, config.kind, config.model)
+      if (resolution.replaced && config.model) notifyInfo(t('gateway.modelSwitched', { name: resolution.replaced.name }),
         { description: t('gateway.modelSwitchedLoaded') })
     }
   }, [settings, models, available, requestRunning, config.kind, config.model, config.images, t])
@@ -224,9 +223,8 @@ function WorkbenchChat({ snapshot, onAction, busy, ...page }: WorkbenchChatProps
   const attachments = useMemo(() => new CompositeAttachmentAdapter([new SimpleImageAttachmentAdapter(), new SimpleTextAttachmentAdapter(), new AudioAttachmentAdapter(), videoAttachments]), [videoAttachments])
   const audioAttachments = useMemo(() => new CompositeAttachmentAdapter([new AudioAttachmentAdapter(), videoAttachments]), [videoAttachments])
   const speech = useMemo(() => new WorkbenchSpeechSynthesisAdapter(() => {
-    const selected = configRef.current
-    const ready = modelsRef.current.find(model => model.kind === 'tts' && (selected.kind === 'tts' ? model.id === selected.model : model.id.startsWith('resource:')))
-    return { modelId: ready?.id ?? '', voice: selected.kind === 'tts' ? selected.voice : settingsRef.current?.synthesis.voice ?? '' }
+    const ready = modelsRef.current.find(model => model.kind === 'tts')
+    return { modelId: ready?.id.startsWith('resource:') ? ready.id.slice(9) : '', voice: configRef.current.kind === 'tts' ? configRef.current.voice : settingsRef.current?.synthesis.voice ?? '' }
   }, t,
   error => notifyError(t('workbench.readAloudErrorTitle'), {
     cause: error,
@@ -282,8 +280,7 @@ function WorkbenchChat({ snapshot, onAction, busy, ...page }: WorkbenchChatProps
         setConfig(next)
         if (next.model !== config.model) {
           setTtsVoices({ model: '', names: [] })
-          const batch = models.some(model => model.id === next.model && model.kind === next.kind && model.batchSpeech)
-          if (settings && next.model && !batch) void selectModelBinding(next.kind, next.model, settings).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
+          if (settings && next.model) void selectModelBinding(next.kind, next.model, settings).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
         }
       }}
       voices={ttsVoices.model === config.model ? ttsVoices.names : []} onVoices={names => setTtsVoices({ model: config.model, names })}

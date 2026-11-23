@@ -233,7 +233,6 @@ export function backendLaunchSpec(options: {
   resourcesPath: string
   managedEngineDirectory?: string
   managedCrispDirectory?: string
-  managedOnnxDirectory?: string
 }): EngineLaunchSpec {
   // runpy.run_module('nola_translator_engine.backend') executes backend/__main__.py,
   // which starts uvicorn and prints the ready frame. Reusing the engine spec keeps

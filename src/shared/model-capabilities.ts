@@ -4,8 +4,8 @@ import { LANGUAGE_CODES, normalizeLanguage } from './languages'
 import type { ResourceRecord } from './contracts'
 
 const language = z.string().refine(code => LANGUAGE_CODES.includes(normalizeLanguage(code)) || INDEX_TRANSLATE_LANGUAGES.includes(normalizeLanguage(code)))
-const languages = z.array(language)
-const sourceLanguages = z.array(z.string().refine(code => code === 'auto' || language.safeParse(code).success))
+const languages = z.array(language).max(200)
+const sourceLanguages = z.array(z.string().refine(code => code === 'auto' || language.safeParse(code).success)).max(200)
 export const modelConfigurationSchema = z.object({
   slot: z.enum(['recognition', 'translation']),
   engine: z.enum(['pytorch', 'llama', 'crisp']),

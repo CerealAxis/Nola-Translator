@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardAction, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { configurationOf } from '../../../shared/model-capabilities'
 import { modelEngines, type InferenceEngine } from '../../../shared/model-engines'
-import { modelImportEntry } from '../../../shared/model-import-catalog'
 
 import type { ReactNode } from 'react'
 import { Download, X } from 'lucide-react'
@@ -72,21 +71,17 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(digits)} ${BYTE_UNITS[exponent]}`
 }
 
-const PARAMETER_COUNTS = [
-  ['sensevoice-small', '234M'],
-  ['fun-asr-nano-', '800M'],
-  ['vibevoice-asr-', '7B'],
-  ['mimo-v2.5-asr-', '7.5B'],
-] as const
-
+/**
+ * Parameter count read off the model identifier, `null` when the name states none. SenseVoice
+ * states no count, so it is answered with `Small` rather than left blank.
+ *
+ * The digits need a non-alphanumeric boundary before them: without it `M2M100` matches at `2M`
+ * and reports 2M instead of 418M.
+ */
 export function paramsOf(record: ResourceRecord): string | null {
-  if (record.resourceId === 'paddleocr-vl-1.6-onnx') return '0.9B'
-  const entry = modelImportEntry(record.resourceId)
-  if (!entry) return null
-  const publishedCount = PARAMETER_COUNTS.find(([prefix]) => entry.id.startsWith(prefix))
-  if (publishedCount) return publishedCount[1]
-  const match = /(?:^|[^0-9A-Za-z])(\d+(?:\.\d+)?[BM](?:-A\d+(?:\.\d+)?[BM])?)(?![0-9A-Za-z])/i.exec(entry.name)
-  return match?.[1].toUpperCase() ?? null
+  const match = /(?:^|[^0-9A-Za-z])(\d+(?:\.\d+)?)\s?([BM])(?![A-Za-z])/i.exec(record.name) ?? /(\d+(?:\.\d+)?)([bm])/.exec(record.resourceId)
+  if (!match) return record.name.toLowerCase().includes('sensevoice') ? 'Small' : null
+  return `${match[1]}${match[2].toUpperCase()}`
 }
 
 /** Quantisation tier read off the model identifier: the three Hy-MT2 tiers, Qwen's NF4. */

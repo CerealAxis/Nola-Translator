@@ -102,7 +102,7 @@ const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(lo
       outline: { level: [2, 3], label: text.documentation.outline },
       docFooter: { prev: text.documentation.previous, next: text.documentation.next },
       editLink: { pattern: `${repositoryUrl}/edit/main/docs/:path`, text: text.documentation.editPage },
-      lastUpdated: { text: text.documentation.lastUpdated, formatOptions: { dateStyle: 'medium', timeStyle: 'short', forceLocale: true } },
+      lastUpdated: { text: text.documentation.lastUpdated, formatOptions: { dateStyle: 'medium', timeStyle: 'short' } },
       returnToTopLabel: text.documentation.backToTop,
       sidebarMenuLabel: text.nav.menu,
       skipToContentLabel: text.nav.skip,

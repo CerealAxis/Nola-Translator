@@ -164,7 +164,7 @@ function FixedCloudModelDialog({ id, onClose }: FixedCloudModelDialogProps) {
       if (Object.keys(patch).length) await updateSettings(patch)
       notifySuccess(t('common.saved'))
       onClose()
-    } catch (cause) { notifyError(t('modelConfig.saveFailed'), { cause }) }
+    } catch (cause) { notifyError(t('modelsSettingsUi.saveError'), { cause }) }
     finally { setSaving(false) }
   }
   const remove = async () => {
@@ -233,7 +233,7 @@ export async function removeCloudModel(model: CloudModel): Promise<void> {
   let patch: AppSettingsPatch
   let credential: CredentialProvider
   if (model.profile) {
-    credential = customCredentialSlot(model.profile.id, settings.modelWorkspace)
+    credential = customCredentialSlot(model.profile.id)
     const active = settings.translation.customModelId === model.profile.id || (model.profile.id === 'legacy' && !settings.translation.customModelId)
     patch = { translation: { customModels: customModelsOf(settings.translation).filter(item => item.id !== model.profile!.id),
       ...(active ? { customModelId: '', cloudName: '', cloudModel: DEFAULT_SETTINGS.translation.cloudModel, cloudEndpoint: DEFAULT_SETTINGS.translation.cloudEndpoint, cloudLanguages: [...LANGUAGE_CODES], cloudSourceLanguages: [...SOURCE_LANGUAGE_OPTIONS],
@@ -263,9 +263,7 @@ export async function removeCloudModel(model: CloudModel): Promise<void> {
     patch = { ...patch, modelPolicy: { ...policy, enabled: { ...policy.enabled, [`llm:${model.id}`]: false } } }
   }
   await updateSettings(patch)
-  if (!patch.translation?.customModels?.some(profile => customCredentialSlot(profile.id, settings.modelWorkspace) === credential)) {
-    await actions.models.setTranslationCredential(credential, '')
-  }
+  await actions.models.setTranslationCredential(credential, '')
 }
 
 /** Shared by model management and quick captions so switching keeps connection fields together. */

@@ -19,7 +19,7 @@ vi.mock('./FeatureActivityNotice', () => ({ FeatureActivityNotice: () => null })
 it('opens account actions and connects settings, help and the login notice', async () => {
   render(<AppShell>content</AppShell>)
   fireEvent.click(screen.getByRole('button', { name: '账户菜单' }))
-  expect(await screen.findByRole('menuitem', { name: '官网' })).toHaveAttribute('href', 'https://nolax.org')
+  expect(await screen.findByRole('menuitem', { name: '帮助' })).toHaveAttribute('href', 'https://nola.xaviermc.top')
   fireEvent.click(screen.getByRole('menuitem', { name: '登录' }))
   expect(actions.notify).toHaveBeenCalledWith('登录功能未启用')
   fireEvent.click(screen.getByRole('button', { name: '账户菜单' }))
