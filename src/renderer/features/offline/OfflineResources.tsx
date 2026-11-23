@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectFieldLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SettingGroup, SettingSelect } from '../settings/SettingsPage'
 import { SettingsRow } from '../settings/SettingsRow'
-import { CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES } from '../../../shared/compute'
+import { BUNDLED_CRISP_RUNTIME, CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES } from '../../../shared/compute'
 import type { ResourceRecord } from '../../../shared/contracts'
 import { modelEngines } from '../../../shared/model-engines'
 import { ImportHelp, ModelImportPanel } from './ModelImportPanel'
@@ -72,7 +72,7 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
   const runtimeNames = new Map([
     ...engineOptions.map(item => [item.id, item.name] as const),
     ...llamaOptions.map(item => [item.id, item.name] as const),
-    [CRISP_RUNTIME_ID, 'CrispASR 0.8.43 · Vulkan'] as const,
+    [CRISP_RUNTIME_ID, BUNDLED_CRISP_RUNTIME.name] as const,
   ])
   const runtimeBytes = runtimeIds.reduce((sum, id) => {
     const recipe = engineOptions.find(item => item.id === id)
@@ -144,7 +144,7 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
         {step === 0 ? <div className="offline-loader-fields">
           <SettingsRow label="PyTorch"><SettingSelect value={engine} onChange={value => updateLoader(setEngine, value)} ariaLabel="PyTorch" options={[{ value: '', label: t('offline.none') }, ...engineOptions.map(item => ({ value: item.id, label: item.name }))]} /></SettingsRow>
           <SettingsRow label="llama.cpp"><SettingSelect value={llama} onChange={value => updateLoader(setLlama, value)} ariaLabel="llama.cpp" options={[{ value: '', label: t('offline.none') }, ...llamaOptions.map(item => ({ value: item.id, label: item.name }))]} /></SettingsRow>
-          <SettingsRow label="CrispASR"><SettingSelect value={crisp} onChange={value => updateLoader(setCrisp, value)} ariaLabel="CrispASR" options={[{ value: '', label: t('offline.none') }, { value: CRISP_RUNTIME_ID, label: '0.8.43 · Vulkan' }]} /></SettingsRow>
+          <SettingsRow label="CrispASR"><SettingSelect value={crisp} onChange={value => updateLoader(setCrisp, value)} ariaLabel="CrispASR" options={[{ value: '', label: t('offline.none') }, { value: CRISP_RUNTIME_ID, label: BUNDLED_CRISP_RUNTIME.version + ' (Vulkan)' }]} /></SettingsRow>
         </div> : null}
         {step === 1 ? <div className="offline-model-fields"><div className="model-import-section-heading"><Label className="type-body">{t('offline.modelChoice')}</Label><ImportHelp label={t('offline.modelChoice')}>{t('offline.loaderRequired')}</ImportHelp></div>
           {modelPicker('recognitionModel', recognition, setRecognition, t('offline.recognition'))}

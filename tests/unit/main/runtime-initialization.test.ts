@@ -1,10 +1,10 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { RuntimeManager } from '../../../src/main/runtime-manager'
 import { missingLocalRuntime } from '../../../src/main/local-runtimes'
-import { CRISP_RUNTIME_ID } from '../../../src/shared/compute'
+import { BUNDLED_CRISP_RUNTIME, CRISP_RUNTIME_ID, CRISP_RUNTIME_VERSIONS, DEFAULT_ONNX_RUNTIME_ID, ONNX_RUNTIME_VERSIONS } from '../../../src/shared/compute'
 
 const mocks = vi.hoisted(() => ({ run: vi.fn(), hardware: vi.fn(), engine: vi.fn(), llama: vi.fn(), crisp: vi.fn(), candidates: vi.fn() }))
 vi.mock('electron', () => ({ net: {}, session: {} }))
@@ -27,7 +27,7 @@ beforeEach(() => {
   mocks.llama.mockImplementation(async (path: string) => ({ ...missingLocalRuntime(path), status: 'ready', backend: 'vulkan', version: 'b11532', gpuAvailable: true }))
   mocks.crisp.mockImplementation(async (_python: string, path: string) => path.includes(CRISP_RUNTIME_ID)
     ? missingLocalRuntime(path)
-    : ({ ...missingLocalRuntime(path), status: 'ready', backend: 'vulkan', version: '0.8.43', gpuAvailable: true }))
+    : ({ ...missingLocalRuntime(path), status: 'ready', backend: 'vulkan', version: BUNDLED_CRISP_RUNTIME.version, gpuAvailable: true }))
 })
 afterEach(async () => { vi.clearAllMocks(); for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }) })
 
@@ -62,6 +62,37 @@ it('discovers all existing components without a saved selection regardless of cl
   await manager.initialize()
   expect((await manager.snapshot()).local.engine.status).toBe('ready')
   expect((await manager.snapshot()).local.llama.status).toBe('ready')
+})
+
+it('uses the saved ONNX Runtime and restores the bundled version when it is removed', async () => {
+  const { manager, directory } = await createManager(false)
+  const directml = ONNX_RUNTIME_VERSIONS.find(item => item.id === DEFAULT_ONNX_RUNTIME_ID)!
+  const cpu = ONNX_RUNTIME_VERSIONS.find(item => item.id === 'onnx-cpu-1-23-2')!
+  const managed = join(directory, directml.id)
+  const bundled = join(directory, 'Lib', 'site-packages')
+  for (const path of [managed, bundled]) {
+    await mkdir(join(path, 'onnxruntime'), { recursive: true })
+    await writeFile(join(path, 'onnxruntime', '__init__.py'), '')
+  }
+  await writeFile(join(managed, 'runtime-installed.json'), JSON.stringify({ kind: 'onnx', id: directml.id }))
+  await writeFile(join(directory, 'current-components.json'), JSON.stringify({ onnx: { path: managed, id: directml.id } }))
+  mocks.run.mockImplementation(async (_python, args) => {
+    if (args.at(-1) === managed) return { stdout: JSON.stringify([directml.version, ['DmlExecutionProvider', 'CPUExecutionProvider']]) }
+    if (args.at(-1) === bundled) return { stdout: JSON.stringify([cpu.version, ['CPUExecutionProvider']]) }
+    if (args.includes('CPUExecutionProvider')) return { stdout: 'CPUExecutionProvider' }
+    if (args.includes('DmlExecutionProvider')) throw new Error('DirectML adapter unavailable')
+    return { stdout: '3.12.10' }
+  })
+
+  await manager.initialize()
+  expect(manager.selectedDirectories().onnx).toBe(managed)
+  expect((await manager.snapshot()).local.onnx).toMatchObject({
+    id: directml.id, managed: true, gpuAvailable: false, executionProviders: ['CPUExecutionProvider'],
+  })
+
+  await manager.uninstall('onnx')
+  expect(manager.selectedDirectories().onnx).toBeUndefined()
+  expect((await manager.snapshot()).local.onnx).toMatchObject({ id: cpu.id, bundled: true })
 })
 
 it('does not treat a matching external llama runtime as app-managed', async () => {
@@ -105,6 +136,42 @@ it('allows disabling and restoring the bundled CrispASR runtime without download
 
   await manager.install(CRISP_RUNTIME_ID)
   expect((await manager.snapshot()).local.crisp).toMatchObject({ id: CRISP_RUNTIME_ID, bundled: true, managed: false, status: 'ready' })
+})
+
+it('restores a selected CrispASR CPU release and falls back to the bundle after uninstall', async () => {
+  const { manager, directory } = await createManager(false)
+  const release = CRISP_RUNTIME_VERSIONS.find(item => item.backend === 'cpu')!
+  const managed = join(directory, release.id)
+  await mkdir(managed)
+  await writeFile(join(managed, 'runtime-installed.json'), JSON.stringify({ kind: 'crisp', id: release.id }))
+  await writeFile(join(directory, 'current-components.json'), JSON.stringify({ crisp: { path: managed, id: release.id } }))
+  mocks.crisp.mockImplementation(async (_python: string, path: string) => path === managed
+    ? { ...missingLocalRuntime(path), status: 'ready', backend: 'cpu', version: release.version }
+    : { ...missingLocalRuntime(path), status: 'ready', backend: 'vulkan', version: BUNDLED_CRISP_RUNTIME.version })
+
+  await manager.initialize()
+  expect(manager.selectedDirectories().crisp).toBe(managed)
+  await manager.uninstall('crisp')
+  expect((await manager.snapshot()).local.crisp).toMatchObject({ id: CRISP_RUNTIME_ID, bundled: true, status: 'ready' })
+})
+
+it.each([false, true])('upgrades bundled CrispASR and preserves a managed legacy selection (%s)', async managed => {
+  const { manager, directory } = await createManager(false)
+  const legacyId = 'crispasr-0-8-43-vulkan'
+  const legacyDirectory = join(directory, legacyId)
+  const bundledDirectory = join(directory, 'Lib', 'site-packages')
+  const path = managed ? legacyDirectory : bundledDirectory
+  await mkdir(legacyDirectory)
+  await writeFile(join(legacyDirectory, 'runtime-installed.json'), JSON.stringify({ kind: 'crisp', id: legacyId }))
+  await writeFile(join(directory, 'current-components.json'), JSON.stringify({ crisp: { path, id: legacyId } }))
+  mocks.crisp.mockImplementation(async (_python: string, checked: string) => ({
+    ...missingLocalRuntime(checked), status: 'ready', backend: 'vulkan',
+    version: checked === legacyDirectory ? '0.8.43' : BUNDLED_CRISP_RUNTIME.version,
+  }))
+
+  await manager.initialize()
+
+  expect((await manager.snapshot()).local.crisp).toMatchObject({ id: managed ? legacyId : CRISP_RUNTIME_ID, path })
 })
 
 it('completes startup normally when neither optional inference component is installed', async () => {

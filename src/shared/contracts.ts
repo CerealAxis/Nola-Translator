@@ -63,7 +63,9 @@ export type SessionConfig = {
     endpoint?: string
     region?: string
     model?: string
-    apiFormat?: CloudApiFormat
+    apiFormat?: CloudApiFormat | 'google-native' | 'azure-openai'
+    apiVersion?: string
+    apiService?: string
     contextWindow?: number
     maxOutputTokens?: number
     apiKey?: string

@@ -2,8 +2,8 @@ import { useEffect } from 'react'
 import type { ResourceRecord } from '@/bridge'
 import { actions, stores } from '@/store'
 import { useI18n } from '@/i18n'
-import { notifyInfo, notifyRetryableFailure, notifySuccess, notifyWarning } from '@/components/primitives/notify'
-import { settingsPath } from '@/routes'
+import { notifyInfo, notifyRetryableFailure, notifySuccess, notifyWarning, type NotifyOptions } from '@/components/primitives/notify'
+import { modelManagementPath, settingsPath } from '@/routes'
 import { supportErrorCodeForCause } from '../../../shared/error-catalog'
 
 const suppressedStartNotices = new Set<string>()
@@ -17,11 +17,10 @@ export function suppressNextDownloadStartNotice(resourceId: string) {
  * A download that stopped. The user can start it again from the page, so the notice only has
  * to say what went wrong and leaves on its own.
  */
-export function notifyModelDownloadFailure(title: string, description: string, actionLabel: string, retry: () => void, supportCode?: string) {
-  notifyRetryableFailure(title, {
-    description,
-    supportCode,
-    action: { label: actionLabel, onPress: retry },
+export function notifyModelDownloadFailure(t: ReturnType<typeof useI18n>['t'], retry: () => void, options: Pick<NotifyOptions, 'description' | 'cause' | 'supportCode'> = {}) {
+  notifyRetryableFailure(t('models.downloadFailed'), {
+    ...options,
+    action: { label: t('errors.downloadFailedAction'), onPress: retry },
   })
 }
 
@@ -29,9 +28,7 @@ export function notifyModelRemoveFailure(record: Pick<ResourceRecord, 'resourceI
   if (reportedRemoveFailures.has(record.resourceId)) return
   reportedRemoveFailures.add(record.resourceId)
   notifyRetryableFailure(t('modelsSettingsUi.removeFailed'), {
-    supportCode: 'MDL-021',
     cause,
-    description: t('modelsSettingsUi.removeFailedDescription'),
     action: {
       label: t('modelsSettingsUi.retryRemove'),
       onPress: () => {
@@ -69,7 +66,7 @@ export function ModelDownloadNotice() {
           if (suppressedStartNotices.delete(record.resourceId)) continue
           notifyInfo(t('models.downloadStarted'), {
             description: t('models.downloadStartedDescription', { name: record.name }),
-            action: { label: t('models.viewProgress'), onPress: () => { window.location.hash = '#/models/downloads' } },
+            action: { label: t('models.viewProgress'), onPress: () => { window.location.hash = modelManagementPath('downloads') } },
             duration: 12000,
           })
           continue
@@ -80,9 +77,10 @@ export function ModelDownloadNotice() {
          * mark of its own, so this notice is the only report of that failure.
          */
         const wasRemoving = prior?.state === 'running' && prior.phase === 'remove'
+        if (!wasRemoving && record.state === 'running' && record.phase === 'remove') reportedRemoveFailures.delete(record.resourceId)
         if (wasRemoving) {
           if (record.state === 'failed') {
-            notifyModelRemoveFailure(record, t)
+            notifyModelRemoveFailure(record, t, record.errorCode)
           } else if (record.state === 'idle' && !record.installed) {
             reportedRemoveFailures.delete(record.resourceId)
             notifySuccess(t('modelsSettingsUi.removeComplete', { name: record.name }))
@@ -115,20 +113,14 @@ function notifyFailure(record: Pick<ResourceRecord, 'resourceId' | 'name' | 'err
       : record.errorCode === 'resourceUnavailable' ? 'models.downloadReasonUnavailable'
         : record.errorCode === 'integrityCheckFailed' ? 'models.downloadReasonIntegrity'
           : record.errorCode === 'installFailed' ? 'models.downloadReasonInstall' : null
-  notifyModelDownloadFailure(
-    t('models.downloadFailed'),
-    reasonKey ? t(reasonKey) : t('errors.downloadFailed'),
-    t('errors.downloadFailedAction'),
-    () => {
-      // The retry reports its own failure: a record that stays in the failed state is
-      // not announced again, so a silent retry would leave the user with nothing.
-      void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => {
-        notifyRetryableFailure(t('models.installFailed'), {
-          cause,
-          description: t('models.downloadReasonInstall'),
-        })
-      })
-    },
-    record.errorCode ? supportErrorCodeForCause(record.errorCode) : 'NET-006',
-  )
+  const retry = () => {
+    void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => {
+      notifyModelDownloadFailure(t, retry, { cause })
+    })
+  }
+  notifyModelDownloadFailure(t, retry, {
+    description: reasonKey ? t(reasonKey) : undefined,
+    cause: record.errorCode,
+    supportCode: record.errorCode ? supportErrorCodeForCause(record.errorCode) : undefined,
+  })
 }

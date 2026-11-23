@@ -11,7 +11,9 @@ from nola_translator_engine.models.manager import ModelManager
 from nola_translator_engine.resources import HYMT2_1_8B_Q4_K_M, M2M100_418M, QWEN35_SPECS
 from nola_translator_engine.translation.google_translate import GoogleTranslateProvider
 from nola_translator_engine.translation.mymemory import MyMemoryTranslationProvider
-from nola_translator_engine.translation.network import LocalQwenTranslationProvider, MicrosoftTranslatorProvider
+from nola_translator_engine.translation.network import (
+    AzureOpenAITranslationProvider, GeminiTranslationProvider, LocalQwenTranslationProvider, MicrosoftTranslatorProvider,
+)
 
 
 @pytest.fixture
@@ -25,6 +27,40 @@ def request(model, *, source="en", provisional=False):
         Operation.TRANSLATE, source_language=source, target_language="zh", model_id=model,
         source_is_provisional=provisional,
     )
+
+
+@pytest.mark.parametrize("protocol, provider", [
+    ("google-native", GeminiTranslationProvider), ("azure-openai", AzureOpenAITranslationProvider),
+])
+async def test_native_chat_profiles_translate_through_the_gateway(gateway, monkeypatch, protocol, provider):
+    def handle(message):
+        body = json.loads(message.content)
+        if protocol == "google-native":
+            assert message.url.path == "/v1beta/models/test-model:generateContent"
+            assert message.headers["x-goog-api-key"] == "test-key"
+            assert body["contents"][0]["parts"] == [{"text": "Hello."}]
+            assert body["systemInstruction"]["parts"][0]["text"]
+            return httpx.Response(200, json={"candidates": [{"finishReason": "STOP", "content": {
+                "parts": [{"text": "reasoning", "thought": True}, {"text": "你好。"}],
+            }}]})
+        assert message.url.path == "/openai/deployments/test-model/chat/completions"
+        assert message.url.params["api-version"] == "2024-10-21"
+        assert message.headers["api-key"] == "test-key"
+        assert body["messages"][-1]["content"] == "Hello."
+        return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": "你好。"}}]})
+
+    def client(instance):
+        instance._http = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+        return instance._http
+
+    monkeypatch.setattr(provider, "_client", client)
+    ctx = CallContext(Operation.TRANSLATE, "native-chat", provider_options={
+        "endpoint": "https://translation.example.test", "model": "test-model", "api_key": "test-key",
+        "api_format": protocol, "api_version": "2024-10-21",
+    })
+    result = await gateway.translate(ctx, text="Hello.", source="en", target="zh", request=request("custom-mt"))
+    assert result.text == "你好。"
+    await gateway.shutdown()
 
 
 @pytest.mark.parametrize("reason, expected", [("translationRateLimited", "rate_limited"), ("URLError", "network_unavailable"), ("translationTimeout", "request_timeout")])
@@ -47,6 +83,14 @@ def test_index_public_accepts_provisional_source(gateway):
     capabilities = matched.entry.definition.capabilities
     assert capabilities.translation_policy.allow_preview
     assert capabilities.operation_profiles[Operation.TRANSLATE].incremental_translation == "snapshot_retranslate"
+
+
+@pytest.mark.parametrize("language", ["zh", "zh-Hant", "en"])
+def test_mimo_tts_accepts_supported_language(gateway, language):
+    request = MatchRequest(
+        Operation.SYNTHESIZE, target_language=language, model_id="mimo-v2.5-tts",
+    )
+    assert gateway.match(request).entry.definition.model_id == "mimo-v2.5-tts"
 
 
 async def test_local_qwen_prompt_bounds_history_and_escapes_chat_delimiters():
@@ -86,7 +130,7 @@ async def test_provider_rejects_provisional_before_network_and_translates_commit
             assert json.loads(message.content) == [[["Hello."], "auto", "zh-CN"], "wt_lib"]
             return httpx.Response(200, json=[["你好。"]])
         if model == "microsoft":
-            assert message.url.host == "edge.microsoft.com"
+            assert message.url.host == "translator.example.test"
             assert json.loads(message.content) == ["Hello."]
             assert "from" not in message.url.params
             assert message.url.params["to"] == "zh-Hans"
@@ -200,3 +244,18 @@ async def test_auto_pytorch_and_llama_share_admission_budget(tmp_path, monkeypat
         await gateway.release(instance, lease)
         await gateway.manager.shutdown()
     assert gateway.admission.snapshot(gpu.id).reserved_mb == 0
+
+@pytest.mark.parametrize("adapter_name", ["GoogleMtAdapter", "MicrosoftMtAdapter", "IndexPublicMtAdapter"])
+async def test_cloud_adapter_uses_saved_address_without_forwarding_a_cloud_key(adapter_name):
+    from nola_translator_engine.backend.gateway import adapters
+
+    endpoint = "https://proxy.example/translation/v1"
+    adapter = getattr(adapters, adapter_name)()
+    provider = adapter._provider(None, {"endpoint": endpoint, "model": "custom-index", "api_key": "unused"})
+    try:
+        assert provider.endpoint == endpoint
+        if adapter_name == "IndexPublicMtAdapter":
+            assert provider.model == "custom-index"
+            assert "Authorization" not in provider._headers()
+    finally:
+        await provider.aclose()

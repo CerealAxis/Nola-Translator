@@ -20,7 +20,10 @@
 .vp-doc .linkcard { margin: 16px 0; border: 1px solid var(--vp-c-divider); border-radius: var(--doc-radius); }
 .vp-doc .linkcard:hover { background: var(--vp-c-brand-soft); }
 .vp-doc .linkcard .logo img { width: 48px; height: 48px; }
-.VPDoc .nola-doc-meta { color: var(--vp-c-text-3); font-size: 13px; margin-bottom: 16px; font-variant-numeric: tabular-nums; }
+.VPDoc .VPDocFooter { display: flex; flex-direction: column; }
+.VPDoc .VPDocFooter .edit-info { order: 0; }
+.VPDoc .nola-doc-views { order: 1; margin: -8px 0 14px; color: var(--vp-c-text-3); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.VPDoc .VPDocFooter .prev-next { order: 2; }
 .VPDoc .nola-doc-discussion { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--vp-c-divider); }
 .VPDoc .nola-doc-top { display:block; color:var(--vp-c-text-2); font-size:12px; margin-top:24px; }
 .VPDoc a:not(:where(.nola-vis-doc .vitepress-demo-plugin-preview *)):focus-visible {

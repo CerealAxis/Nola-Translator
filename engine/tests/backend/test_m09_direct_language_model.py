@@ -65,6 +65,17 @@ async def test_direct_language_model_releases_on_invalid_endpoint(gateway):
     assert caught.value.code is GatewayErrorCode.INTERNAL
     loader.unload.assert_awaited_once()
 
+async def test_direct_language_model_uses_requested_context_for_worker(gateway):
+    gateway, _, adapter = gateway
+    adapter._call.return_value["contextWindow"] = 8192
+    lease = await open_direct_language_model(gateway, MODEL, context_window=8192)
+    try:
+        assert lease.context_window == 8192
+        assert adapter._call.await_args.args[1].config["compute"]["contextSize"] == 8192
+        assert gateway.registry.get("llm:" + MODEL).configuration.compute_options["compute"]["contextSize"] == 32768
+    finally:
+        await lease.release()
+
 
 async def test_direct_language_model_releases_cancelled_start(gateway):
     gateway, loader, adapter = gateway

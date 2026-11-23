@@ -101,7 +101,7 @@ export function SessionBar({ status, pausePending, elapsedMs, onPause, onResume,
 
       <div className="flex shrink-0 items-center gap-2">
         {paused ? (
-          <Button variant="outline" size="sm" className="rounded-xl" onClick={onResume} disabled={busy} title={t('workspace.resume')}>
+          <Button variant="outline" size="sm" className="rounded-xl" onClick={onResume} disabled={busy} tooltip={t('workspace.resume')}>
             {pausePending ? <Spinner /> : <Play aria-hidden="true" />}
             {t('workspace.resume')}
           </Button>
@@ -112,7 +112,7 @@ export function SessionBar({ status, pausePending, elapsedMs, onPause, onResume,
             className="rounded-xl"
             onClick={onPause}
             disabled={!running || busy}
-            title={t('workspace.pause')}
+            tooltip={t('workspace.pause')}
           >
             {pausePending ? <Spinner /> : <Pause aria-hidden="true" />}
             {t('workspace.pause')}
@@ -125,7 +125,7 @@ export function SessionBar({ status, pausePending, elapsedMs, onPause, onResume,
           className="rounded-xl"
           onClick={onStop}
           disabled={busy}
-          title={t('workspace.endConfirm')}
+          tooltip={t('workspace.endConfirm')}
         >
           <CircleStop aria-hidden="true" />
           {status === 'stopping' ? t('workspace.stopping') : t('workspace.stop')}

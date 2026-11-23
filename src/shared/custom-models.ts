@@ -1,3 +1,4 @@
+import type { ModelWorkspace } from './model-workspace'
 import { z } from 'zod'
 import { LANGUAGE_CODES } from './languages'
 import { DEFAULT_SETTINGS, SOURCE_LANGUAGE_OPTIONS, type AppSettingsPatch, type CustomTranslationModel, type CredentialProvider, type TranslationSettings } from './settings'
@@ -18,8 +19,14 @@ export const customModelSchema = z.object({
   sourceLanguages: z.array(z.string().refine(code => SOURCE_LANGUAGE_OPTIONS.includes(code))).min(1).max(SOURCE_LANGUAGE_OPTIONS.length).optional(),
 }).strict()
 
-export function customCredentialSlot(id: string): CredentialProvider {
-  return id === 'legacy' ? 'cloud' : `cloud-model:${id}`
+export function customCredentialSlot(id: string, workspace?: ModelWorkspace): CredentialProvider {
+  const group = workspace?.connections.find(connection => connection.capability === 'LLM' && connection.models.some(model => model.profileId === id))?.id
+    ?? providerGroupOf(id) ?? id
+  return group === 'legacy' ? 'cloud' : `cloud-model:${group}`
+}
+
+export function providerGroupOf(id: string): string | undefined {
+  return /^(provider_[a-f0-9]{24})_[a-f0-9]{24}$/.exec(id)?.[1]
 }
 
 /** Legacy configurations keep their original encrypted credential slot until removed. */
@@ -36,9 +43,9 @@ export function customModelsOf(translation: TranslationSettings): CustomTranslat
 export function customModelPatch(translation: TranslationSettings, model: CustomTranslationModel): Partial<TranslationSettings> {
   return { provider: 'cloud', customModelId: model.id, cloudName: model.name, cloudEndpoint: model.endpoint,
     cloudModel: model.model, cloudApiFormat: model.apiFormat, cloudContextWindow: model.contextWindow,
-    cloudMaxOutputTokens: model.maxOutputTokens, cloudLanguages: model.languages,
-    cloudSourceLanguages: model.sourceLanguages ?? [...SOURCE_LANGUAGE_OPTIONS],
-    targetLanguage: model.languages.includes(translation.targetLanguage) ? translation.targetLanguage : model.languages.includes('zh') ? 'zh' : model.languages[0],
+    cloudMaxOutputTokens: model.maxOutputTokens, cloudLanguages: [...LANGUAGE_CODES],
+    cloudSourceLanguages: [...SOURCE_LANGUAGE_OPTIONS],
+    targetLanguage: LANGUAGE_CODES.includes(translation.targetLanguage) ? translation.targetLanguage : 'zh',
   }
 }
 

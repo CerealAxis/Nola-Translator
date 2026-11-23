@@ -1,3 +1,4 @@
+import type { RuntimeKind } from '../../shared/compute'
 import type { ModelConfiguration } from '../../shared/model-capabilities'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from '../../shared/browser'
 import type { AppUpdateCheckResult, ReleaseAnnouncement } from '../../shared/app-updates'
@@ -47,7 +48,7 @@ export type { HubCompatibility, HubInspectResult, HubModelSummary, HubSearchResu
 export type { PrewarmErrorCode, PrewarmResult } from '../../shared/contracts'
 
 /** Route id for this app's multi-window UI; `routes.tsx` holds the hash mapping. */
-export type RouteId = 'workbench' | 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'game-translation' | 'comic-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
+export type RouteId = 'workbench' | 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'game-translation' | 'comic-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'model-management' | 'settings'
 
 export interface NolaBridge {
   desktopData?: import('../../shared/desktop-data').DesktopDataApi
@@ -133,9 +134,9 @@ export interface NolaBridge {
   runtimes: {
     openSettings(component: 'engine' | 'llama' | 'crisp'): Promise<void>
     list(): Promise<RuntimeSnapshot>
-    prepare(components?: readonly ('engine' | 'llama' | 'crisp')[]): Promise<RuntimeSnapshot>
+    prepare(components?: readonly RuntimeKind[]): Promise<RuntimeSnapshot>
     install(id: string, repair?: boolean): Promise<void>
-    uninstall(kind: 'engine' | 'llama' | 'crisp'): Promise<void>
+    uninstall(kind: RuntimeKind): Promise<void>
     import(): Promise<boolean>
     cancel(): Promise<void>
   }
@@ -163,6 +164,9 @@ export interface NolaBridge {
     releaseDirectModel?(): Promise<void>
     agentWorkspace?(action: import('../../shared/agent-workspace').WorkspaceAction): Promise<import('../../shared/agent-workspace').AgentWorkspaceSnapshot>
     directModel?(request: import('../../shared/agent-workspace').DirectModelRequest, inspect?: boolean): Promise<import('../../shared/agent-workspace').DirectModelResult>
+    listCloudModels?(request: import('../../shared/cloud-model-tools').CloudModelListRequest): Promise<import('../../shared/cloud-model-tools').RemoteChatModel[]>
+    probeCloudModel?(request: import('../../shared/cloud-model-tools').CloudModelProbeRequest): Promise<{ audio?: string }>
+    chatGptPlan?(request: import('../../shared/chatgpt-plan').ChatGptPlanRequest): Promise<import('../../shared/chatgpt-plan').ChatGptPlanResult>
     streamLanguageModel?(request: import('../../shared/language-model').LanguageModelStreamRequest): Promise<void>
     resolveLanguageModelAudio?(result: import('../../shared/language-model').LanguageModelAudioResult): Promise<void>
     onLanguageModelStream?(callback: (event: import('../../shared/language-model').LanguageModelStreamEvent) => void): () => void

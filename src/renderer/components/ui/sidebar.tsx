@@ -109,7 +109,7 @@ function SidebarTrigger({ expandLabel, collapseLabel, ...props }: Omit<Component
       aria-controls={sidebarId}
       aria-expanded={open}
       aria-label={label}
-      title={label}
+      tooltip={label}
       onClick={toggleSidebar}
     >
       <PanelLeft aria-hidden="true" />

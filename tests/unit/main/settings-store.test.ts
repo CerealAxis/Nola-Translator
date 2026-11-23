@@ -3,11 +3,30 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { SettingsStore } from '../../../src/main/settings-store'
-import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
+import { settingsPatchSchema } from '../../../src/main/settings-schema'
+import { DEFAULT_SETTINGS, SOURCE_LANGUAGE_OPTIONS } from '../../../src/shared/settings'
+import { LANGUAGE_CODES } from '../../../src/shared/languages'
 import { GITHUB_PROXY_AUTO } from '../../../src/shared/github-proxies'
 import { PYPI_MIRROR_AUTO, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO } from '../../../src/shared/pypi-mirrors'
 
 describe('设置存储', () => {
+  it('restores the model workspace while rejecting credentials in its settings payload', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-model-management-'))
+    const path = join(directory, 'settings.json')
+    const connection = { id: 'provider_aabb00112233445566778899', service: 'openai', capability: 'LLM',
+      name: 'Work', endpoint: 'https://example.test/v1', protocol: 'chat-completions', icon: 'OpenAI',
+      workspace: '', region: 'cn-beijing', models: [] } as const
+    const modelWorkspace = { connections: [{ ...connection, models: [] }], localSources: { qwen35: true } }
+    try {
+      const store = new SettingsStore(path)
+      const patch = settingsPatchSchema.parse({ modelWorkspace })
+      await store.update(patch)
+      expect((await new SettingsStore(path).load()).modelWorkspace).toEqual(modelWorkspace)
+      expect(settingsPatchSchema.safeParse({ modelWorkspace: {
+        ...modelWorkspace, connections: [{ ...connection, key: 'secret' }],
+      } }).success).toBe(false)
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
   it('persists desktop font and density, restores defaults, and rejects invalid saved preferences', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-typography-'))
     const path = join(directory, 'settings.json')
@@ -50,10 +69,12 @@ describe('设置存储', () => {
       const store = new SettingsStore(path)
       await store.update({ translation: { customModels: [first, second], customModelId: 'second', provider: 'cloud' } })
       const restored = await new SettingsStore(path).load()
-      expect(restored.translation).toMatchObject({ customModels: [first, second], customModelId: 'second', cloudName: 'Second', cloudEndpoint: second.endpoint, cloudLanguages: ['ja', 'en'], targetLanguage: 'ja' })
+      const languages = { languages: LANGUAGE_CODES, sourceLanguages: SOURCE_LANGUAGE_OPTIONS }
+      expect(restored.translation).toMatchObject({ customModels: [{ ...first, ...languages }, { ...second, ...languages }],
+        customModelId: 'second', cloudName: 'Second', cloudEndpoint: second.endpoint, cloudLanguages: LANGUAGE_CODES, targetLanguage: 'zh' })
       await store.update({ translation: { cloudName: 'Renamed' } })
       expect(store.current().translation.customModels?.find(model => model.id === 'second')?.name).toBe('Renamed')
-      expect(store.current().translation.customModels?.[0]).toEqual(first)
+      expect(store.current().translation.customModels?.[0]).toEqual({ ...first, ...languages })
       expect(await readFile(path, 'utf8')).not.toContain('apiKey')
     } finally { await rm(directory, { recursive: true, force: true }) }
   })

@@ -30,26 +30,10 @@ import type { ComputeSettings, ComputeSnapshot, RuntimeSnapshot } from '../../..
 import { descriptionKeyOf, factsOf, formatBytes, paramsOf, quantizationOf } from './ModelCard'
 import { isEngineAvailable } from './engine-availability'
 import { estimatedVramMb, modelFit, type ModelFit } from './model-fit'
-import { type RecommendedFamily } from './modelFamily'
+import { FAMILY_NAMES, type RecommendedFamily } from './modelFamily'
 import { ModelMark } from './modelBrand'
 import { DownloadSourceTabs } from './DownloadSourceTabs'
 import { ModelLanguageSelect } from './ModelConfigurationDialog'
-
-const FAMILY_NAMES: Record<RecommendedFamily, string> = {
-  qwen: 'Qwen3-ASR',
-  qwen35: 'Qwen3.5',
-  sensevoice: 'SenseVoiceSmall',
-  funasr: 'Fun-ASR',
-  vibevoice: 'VibeVoice-ASR',
-  mimo: 'MiMo-V2.5-ASR',
-  tts: 'Qwen3-TTS',
-  kokoro: 'Kokoro-82M',
-  piper: 'Piper',
-  cosyvoice3: 'CosyVoice3',
-  hymt2: 'Hy-MT2',
-  index: 'Index-Translate',
-  other: 'M2M100',
-}
 
 function engineLabel(engine: InferenceEngine): string {
   return engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'
@@ -101,7 +85,7 @@ const FIT_COLORS: Record<ModelFit, 'success' | 'warning' | 'danger'> = {
   recommended: 'success', tryable: 'warning', notRecommended: 'danger',
 }
 
-function FitChip({ record, engine, compute, computeSnapshot }: { record: ResourceRecord; engine: Parameters<typeof modelFit>[1]; compute: ComputeSettings; computeSnapshot?: ComputeSnapshot | null }) {
+function FitChip({ record, engine, compute, computeSnapshot }: { record: ResourceRecord; engine: InferenceEngine; compute: ComputeSettings; computeSnapshot?: ComputeSnapshot | null }) {
   const { t } = useI18n()
   const fit = modelFit(record, engine, compute, computeSnapshot)
   return <Badge variant={FIT_COLORS[fit]}  aria-label={t(`models.${fit}`)}>{t(`models.${fit}`)}</Badge>
@@ -131,6 +115,52 @@ function PublisherAvatar({ record }: { record: ResourceRecord }) {
   return <span className="models-family-dialog__publisher" aria-hidden="true">{AvatarIcon ? <AvatarIcon size={26} /> : <ModelMark record={record} kind={record.kind} size={22} />}</span>
 }
 
+export function FamilyModelSelect({ selected, records, installedIds, engine, compute, computeSnapshot, onChange, onboarding }: {
+  selected: ResourceRecord
+  records: readonly ResourceRecord[]
+  installedIds?: ReadonlySet<string>
+  engine?: InferenceEngine
+  compute: ComputeSettings
+  computeSnapshot?: ComputeSnapshot | null
+  onChange: (resourceId: string) => void
+  onboarding?: boolean
+}) {
+  const { t } = useI18n()
+  const label = t('offline.modelChoice')
+  const isInstalled = (record: ResourceRecord) => installedIds?.has(record.resourceId) ?? record.installed
+  const badges = (record: ResourceRecord) => <>
+    {isInstalled(record) && <Badge variant="success">{t('models.installed')}</Badge>}
+    {engine && <FitChip record={record} engine={engine} compute={compute} computeSnapshot={computeSnapshot} />}
+  </>
+  return <div className="select models-family-dialog__model-select" data-onboarding={onboarding ? 'model-version' : undefined}>
+    <Select value={selected.resourceId} aria-label={label} onValueChange={key => { if (typeof key === 'string') onChange(key) }}>
+      <Label>{label}</Label>
+      <SelectTrigger className="w-full" aria-label={label}>
+        <SelectValue>
+          <span className="models-family-dialog__selected-model">
+            <PublisherAvatar record={selected} />
+            <span>{modelDisplayName(selected)}</span>
+            <small>{formatBytes(selected.downloadBytes ?? selected.installedBytes)}</small>
+            <span className="models-family-dialog__selected-model-badges">{badges(selected)}</span>
+          </span>
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent data-onboarding={onboarding ? 'model-file-options' : undefined} alignItemWithTrigger={false} align="start">
+        <SelectGroup className="models-family-dialog__model-list">
+          {records.map(record => <SelectItem key={record.resourceId} value={record.resourceId} disabled={isInstalled(record)} label={modelDisplayName(record)}>
+            <PublisherAvatar record={record} />
+            <span className="models-family-dialog__model-text">
+              <span>{modelDisplayName(record)}</span>
+              <small>{formatBytes(record.downloadBytes ?? record.installedBytes)}</small>
+            </span>
+            <span className="models-family-dialog__model-badges">{badges(record)}</span>
+          </SelectItem>)}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  </div>
+}
+
 export function RecommendedFamilyDialog({ family, records, compute, computeSnapshot, runtimes, busyIds, onClose, onInstall, onCancel, onManualDownload }: RecommendedFamilyDialogProps) {
   const { t } = useI18n()
   const engines = ENGINE_ORDER.filter(engine => records.some(record => modelEngines(record).includes(engine)))
@@ -142,7 +172,8 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
   const [source, setSource] = useState<ModelDownloadSource>('huggingface')
   const engineRecords = records.filter(record => modelEngines(record).includes(engine))
   const parameterOptions = [...new Set(engineRecords.map(record => paramsOf(record) ?? ''))]
-  const filtered = engineRecords.filter(record => (paramsOf(record) ?? '') === parameters)
+  const showParameters = parameterOptions.length > 0 && !parameterOptions.includes('')
+  const filtered = showParameters ? engineRecords.filter(record => paramsOf(record) === parameters) : engineRecords
   const selected = filtered.find(record => record.resourceId === selectedId) ?? filtered[0]
   const state = resourceStateOf(selected)
   const entry = modelImportEntry(selected.resourceId)
@@ -188,26 +219,19 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
                 })}
               </TabsList></TabsRoot>
             </section>
-            <section data-onboarding="model-scale" aria-label={t('models.parameterScale')}>
+            {showParameters && <section data-onboarding="model-scale" aria-label={t('models.parameterScale')}>
               <Label className="models-family-dialog__label">{t('models.parameterScale')}</Label>
               <TabsRoot value={parameters} onValueChange={value => {
                 const first = engineRecords.find(record => (paramsOf(record) ?? '') === value)
                 if (first) { setParameters(value); setSelectedId(first.resourceId); setSource('huggingface') }
               }}><TabsList className="models-family-dialog__choices">
-                {parameterOptions.map(option => <TabsTrigger key={option} value={option}>{option || selected.name}</TabsTrigger>)}
+                {parameterOptions.map(option => <TabsTrigger key={option} value={option}>{option}</TabsTrigger>)}
               </TabsList></TabsRoot>
-            </section>
+            </section>}
           </div>
-          <div className="select models-family-dialog__model-select" data-onboarding="model-version"><Select value={selected.resourceId} onValueChange={key => { if (typeof key === 'string') { setSelectedId(key); setSource('huggingface') } }} aria-label={t('offline.modelChoice')}>
-            <Label>{t('offline.modelChoice')}</Label>
-            <SelectTrigger className="w-full" aria-label={t('offline.modelChoice')}><SelectValue><span className="models-family-dialog__selected-model"><PublisherAvatar record={selected} /><span>{modelDisplayName(selected)}</span><small>{formatBytes(selected.downloadBytes ?? selected.installedBytes)}</small><span className="models-family-dialog__selected-model-badges">{selected.installed ? <Badge variant="success" >{t('models.installed')}</Badge> : null}{family === 'tts' ? null : <FitChip record={selected} engine={engine} compute={compute} computeSnapshot={computeSnapshot} />}</span></span></SelectValue></SelectTrigger>
-            <SelectContent data-onboarding="model-file-options" alignItemWithTrigger={false} align="start"><SelectGroup className="models-family-dialog__model-list">{filtered.map(record => <SelectItem key={record.resourceId} value={record.resourceId} disabled={record.installed} label={modelDisplayName(record)}>
-              <PublisherAvatar record={record} />
-              <span className="models-family-dialog__model-text"><span>{modelDisplayName(record)}</span><small>{formatBytes(record.downloadBytes ?? record.installedBytes)}</small></span>
-              <span className="models-family-dialog__model-badges">{record.installed ? <Badge variant="success" >{t('models.installed')}</Badge> : null}{family === 'tts' ? null : <FitChip record={record} engine={engine} compute={compute} computeSnapshot={computeSnapshot} />}</span>
-
-            </SelectItem>)}</SelectGroup></SelectContent>
-          </Select></div>
+          <FamilyModelSelect selected={selected} records={filtered} engine={family === 'tts' ? undefined : engine}
+            compute={compute} computeSnapshot={computeSnapshot} onboarding
+            onChange={key => { setSelectedId(key); setSource('huggingface') }} />
           <section className="models-family-dialog__selection" aria-label={t('models.details')}>
             <Label className="models-family-dialog__label">{t('models.details')}</Label>
             <p>{selected.name} · {factsOf(selected).join(' · ')}</p>

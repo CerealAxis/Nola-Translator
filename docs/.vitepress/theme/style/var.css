@@ -31,7 +31,6 @@
   text-decoration: none;
 }
 
-.nola-vis-doc .nola-doc-meta:empty,
 .nola-vis-doc .VPNavBarTranslations,
 .nola-vis-doc .VPNavScreenTranslations {
   display: none;

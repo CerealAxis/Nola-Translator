@@ -108,7 +108,7 @@ const categoryId = 'DIC_kwDOUvoCYs4DIc6Z'
 <template>
   <DefaultTheme.Layout>
     <template #doc-before>
-      <nav v-if="breadcrumbs.length > 1" class="nola-doc-breadcrumb" :aria-label="breadcrumbLabels[locale]">
+      <nav v-if="breadcrumbs.length" class="nola-doc-breadcrumb" :aria-label="breadcrumbLabels[locale]">
         <ol>
           <li v-for="(item, index) in breadcrumbs" :key="item.path">
             <span v-if="index > 0" aria-hidden="true">›</span>
@@ -117,10 +117,9 @@ const categoryId = 'DIC_kwDOUvoCYs4DIc6Z'
           </li>
         </ol>
       </nav>
-      <div class="nola-doc-meta">
-        <time v-if="page.lastUpdated" :datetime="new Date(page.lastUpdated).toISOString()">{{ new Date(page.lastUpdated).toLocaleDateString(lang) }}</time>
-        <span v-if="pageViews !== undefined" class="nola-doc-views"><span>{{ pageViewsLabel }}</span> <span>{{ pageViews }}</span></span>
-      </div>
+    </template>
+    <template #doc-footer-before>
+      <div v-if="pageViews !== undefined" class="nola-doc-views">{{ pageViewsLabel }}: {{ pageViews }}</div>
     </template>
     <template #doc-after>
       <div class="nola-doc-discussion" v-if="frontmatter.comments !== false" data-nosnippet>
@@ -139,7 +138,7 @@ const categoryId = 'DIC_kwDOUvoCYs4DIc6Z'
 
 <style scoped>
 .nola-doc-breadcrumb {
-  margin-block-end: var(--label-gap, .5rem);
+  margin-block-end: var(--section-gap, 1.5rem);
   color: var(--vp-c-text-2);
 }
 .nola-doc-breadcrumb ol,

@@ -195,7 +195,9 @@ export class SessionController {
     parsed.max_segment_ms = startSettings.recognition.max_segment_ms ?? 10000
     parsed.silence_end_ms = startSettings.recognition.silence_end_ms ?? 800
     // A profile switch while the ASR key is loading must not send the new key to the old endpoint.
-    if (parsed.translationProvider === 'cloud' && startSettings.translation.customModelId) parsed.translationOptions = translationOptionsOf({ ...startSettings.translation, provider: 'cloud' })
+    if (parsed.translationProvider === 'cloud' && !parsed.translationBinding?.startsWith('mt-custom:') && startSettings.translation.customModelId) {
+      parsed.translationOptions = translationOptionsOf({ ...startSettings.translation, provider: 'cloud' }, startSettings.modelWorkspace)
+    }
     delete parsed.recordingPath
     this.starting = true
     const operation = ++this.operation
@@ -233,7 +235,7 @@ export class SessionController {
       if (provider === 'local' || provider === 'recognition') delete parsed.translationOptions
       if (!this.options.useGateway && provider === 'cloud') {
         const customId = startSettings.translation.customModelId
-        const apiKey = await this.options.getCredential(provider === 'cloud' && customId ? customCredentialSlot(customId) : provider)
+        const apiKey = await this.options.getCredential(provider === 'cloud' && customId ? customCredentialSlot(customId, startSettings.modelWorkspace) : provider)
         checkCancelled()
         if (apiKey) parsed.translationOptions = { ...parsed.translationOptions, apiKey }
       }

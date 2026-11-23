@@ -14,6 +14,7 @@ import { usePortalContainer } from './components/usePortalContainer'
 import { browserErrorDescription, browserText } from './i18n'
 import { DEFAULT_PREFERENCES, observePreferences, savePreferences, type Preferences } from './preferences'
 import { requestProviderAccess, type ProviderConnection } from './providers'
+import { TooltipHint } from '../../src/renderer/components/ui/tooltip'
 
 export const languageOptions = (locale: UiLanguage) => LANGUAGE_CODES.map(code => ({ value: code, label: languageName(code, locale) }))
 
@@ -79,15 +80,17 @@ export function ConnectionStatus({ t, compact = false, onReconnect }: { t: Retur
   const variant = status === 'connected' && !checking ? 'success' : 'secondary'
   if (compact) return <div className="nola-provider-status" aria-busy={checking}>
     <Badge role="status" variant={variant}>{label}</Badge>
-    {status === 'disconnected' && <Button variant="outline" size="icon-xs" disabled={checking} aria-label={t('reconnect')} title={t('reconnect')} onClick={() => void check(true)}><RefreshCw aria-hidden="true" /></Button>}
+    {status === 'disconnected' && <Button variant="outline" size="icon-xs" disabled={checking} aria-label={t('reconnect')} tooltip={t('reconnect')} onClick={() => void check(true)}><RefreshCw aria-hidden="true" /></Button>}
   </div>
   return <span className="flex" role="status" aria-busy={checking}>
-    <Badge
-      variant={variant}
-      render={<button type="button" disabled={checking} title={t('testConnection')} aria-label={`${label} · ${t('testConnection')}`} onClick={() => void check(true)} />}
-    >
-      {label}<RefreshCw data-icon="inline-end" aria-hidden="true" />
-    </Badge>
+    <TooltipHint content={t('testConnection')} disabledTrigger={checking}>
+      <Badge
+        variant={variant}
+        render={<button type="button" disabled={checking} aria-label={`${label} · ${t('testConnection')}`} onClick={() => void check(true)} />}
+      >
+        {label}<RefreshCw data-icon="inline-end" aria-hidden="true" />
+      </Badge>
+    </TooltipHint>
   </span>
 }
 

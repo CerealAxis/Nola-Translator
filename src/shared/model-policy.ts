@@ -79,7 +79,15 @@ export function modelPolicyOf(settings: AppSettings): ModelPolicy {
 
 export function isModelEnabled(settings: AppSettings, kind: GatewayCapability, binding: string): boolean {
   const key = modelPolicyKey(kind, binding)
-  return !!key && modelPolicyOf(settings).enabled[key] === true
+  if (!key) return false
+  const { enabled } = modelPolicyOf(settings)
+  if (kind === 'mt' && key.startsWith('mt:resource:qwen35-')) return (enabled[key] ?? enabled[modelPolicyKey('llm', binding)]) === true
+  return enabled[key] === true
+}
+
+export function isCloudModelDisabled(settings: AppSettings, kind: GatewayCapability, binding: string): boolean {
+  const key = modelPolicyKey(kind, binding)
+  return settings.modelWorkspace?.managedBindings?.includes(key) === true && modelPolicyOf(settings).enabled[key] === false
 }
 
 export function defaultModelBinding(settings: AppSettings, kind: GatewayCapability): string {

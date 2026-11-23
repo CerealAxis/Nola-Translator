@@ -2,6 +2,199 @@
   "version": 1,
   "packages": [
     {
+      "id": "llama-b12651-vulkan",
+      "name": "llama.cpp b12651 \u00b7 Windows x64 (Vulkan)",
+      "kind": "llama",
+      "backend": "vulkan",
+      "version": "b12651",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12651/llama-b12651-bin-win-vulkan-x64.zip",
+      "sha256": "e58fa9a137d8046c69334005ad6fb3e904ddc7e56f2a61ad1b844335826ef3f4",
+      "bytes": 38939211
+    },
+    {
+      "id": "llama-b12650-cpu",
+      "name": "llama.cpp b12650 \u00b7 Windows x64 (CPU)",
+      "kind": "llama",
+      "backend": "cpu",
+      "version": "b12650",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12650/llama-b12650-bin-win-cpu-x64.zip",
+      "sha256": "98ddbb60ab72c2b5c32fb66c17f4cb1fbc4b7f077aa8f1dee9fe9b941537f74d",
+      "bytes": 25096521
+    },
+    {
+      "id": "llama-b12650-cuda-12-4",
+      "name": "llama.cpp b12650 \u00b7 Windows x64 (CUDA 12.4)",
+      "kind": "llama",
+      "backend": "cuda",
+      "version": "b12650",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12650/llama-b12650-bin-win-cuda-12.4-x64.zip",
+      "sha256": "c4f561834118be194a60f88d08c58395ff0ff67386d079c845738b5f84f19258",
+      "bytes": 358031727,
+      "companions": [
+        {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12650/cudart-llama-bin-win-cuda-12.4-x64.zip",
+          "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
+          "bytes": 391443627
+        }
+      ]
+    },
+    {
+      "id": "llama-b12650-cuda-13-5",
+      "name": "llama.cpp b12650 \u00b7 Windows x64 (CUDA 13.5)",
+      "kind": "llama",
+      "backend": "cuda",
+      "version": "b12650",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12650/llama-b12650-bin-win-cuda-13.5-x64.zip",
+      "sha256": "61ee2181fea60294369ea9752dff54a7f4e7221c3b384c4c264d257f81a7eb1e",
+      "bytes": 225702165,
+      "companions": [
+        {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12650/cudart-llama-bin-win-cuda-13.5-x64.zip",
+          "sha256": "c2bf4cc202bfbaaa7a0b75f5082457c3811326947bb216059b72839d844e9cba",
+          "bytes": 426314199
+        }
+      ]
+    },
+    {
+      "id": "llama-b12650-vulkan",
+      "name": "llama.cpp b12650 \u00b7 Windows x64 (Vulkan)",
+      "kind": "llama",
+      "backend": "vulkan",
+      "version": "b12650",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12650/llama-b12650-bin-win-vulkan-x64.zip",
+      "sha256": "6dea3c0aa58319337bfbe32046d3b36573e8ac742ebefbccc6dedd9b283b6876",
+      "bytes": 38939284
+    },
+    {
+      "id": "llama-b12650-openvino-2026-4-1",
+      "name": "llama.cpp b12650 \u00b7 Windows x64 (OpenVINO 2026.4.1)",
+      "kind": "llama",
+      "backend": "openvino",
+      "version": "b12650",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12650/llama-b12650-bin-win-openvino-2026.4.1-x64.zip",
+      "sha256": "a2aa97c7a9464afa8bf00e91a321f8fdaf158c2d91dfdc865f85dd2b7d656090",
+      "bytes": 105293605
+    },
+    {
+      "id": "llama-b12650-sycl",
+      "name": "llama.cpp b12650 \u00b7 Windows x64 (SYCL)",
+      "kind": "llama",
+      "backend": "sycl",
+      "version": "b12650",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12650/llama-b12650-bin-win-sycl-x64.zip",
+      "sha256": "22e5ef884e3225d46ae2e93aadb0eb4e19bc726f8905708f8ba82c6585367c43",
+      "bytes": 173398869
+    },
+    {
+      "id": "llama-b12650-rocm-10-0",
+      "name": "llama.cpp b12650 \u00b7 Windows x64 (ROCm 10.0)",
+      "kind": "llama",
+      "backend": "rocm",
+      "version": "b12650",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12650/llama-b12650-bin-win-rocm-10.0-x64.zip",
+      "sha256": "50ebece77dc0ef76cc0018a4addac5ba73d9183831fbc31d2851d152eff0a77d",
+      "bytes": 284457096
+    },
+    {
+      "id": "llama-b12649-cpu",
+      "name": "llama.cpp b12649 \u00b7 Windows x64 (CPU)",
+      "kind": "llama",
+      "backend": "cpu",
+      "version": "b12649",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12649/llama-b12649-bin-win-cpu-x64.zip",
+      "sha256": "0e2ff97a5ef40de3e4ca910231676c044e0813c54727b2012022a2d2401e1fa9",
+      "bytes": 25096466
+    },
+    {
+      "id": "llama-b12649-cuda-12-4",
+      "name": "llama.cpp b12649 \u00b7 Windows x64 (CUDA 12.4)",
+      "kind": "llama",
+      "backend": "cuda",
+      "version": "b12649",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12649/llama-b12649-bin-win-cuda-12.4-x64.zip",
+      "sha256": "f512ff1fcabf545a073b29ecb848611bee02fe564d22709f0e50b4972e18ee46",
+      "bytes": 358031782,
+      "companions": [
+        {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12649/cudart-llama-bin-win-cuda-12.4-x64.zip",
+          "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
+          "bytes": 391443627
+        }
+      ]
+    },
+    {
+      "id": "llama-b12649-cuda-13-5",
+      "name": "llama.cpp b12649 \u00b7 Windows x64 (CUDA 13.5)",
+      "kind": "llama",
+      "backend": "cuda",
+      "version": "b12649",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12649/llama-b12649-bin-win-cuda-13.5-x64.zip",
+      "sha256": "f473f8ad9b66bab211c9a4fa266e201542660f618f85711b706a9edcfa856619",
+      "bytes": 225702220,
+      "companions": [
+        {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12649/cudart-llama-bin-win-cuda-13.5-x64.zip",
+          "sha256": "c2bf4cc202bfbaaa7a0b75f5082457c3811326947bb216059b72839d844e9cba",
+          "bytes": 426314199
+        }
+      ]
+    },
+    {
+      "id": "llama-b12649-vulkan",
+      "name": "llama.cpp b12649 \u00b7 Windows x64 (Vulkan)",
+      "kind": "llama",
+      "backend": "vulkan",
+      "version": "b12649",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12649/llama-b12649-bin-win-vulkan-x64.zip",
+      "sha256": "b31a6a166e3b8fc651912d8ed1872a83ba088daa855f5ff8682a1684d6072e21",
+      "bytes": 38939337
+    },
+    {
+      "id": "llama-b12649-openvino-2026-4-1",
+      "name": "llama.cpp b12649 \u00b7 Windows x64 (OpenVINO 2026.4.1)",
+      "kind": "llama",
+      "backend": "openvino",
+      "version": "b12649",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12649/llama-b12649-bin-win-openvino-2026.4.1-x64.zip",
+      "sha256": "3172239522f51a34cf7b6984d7a0cd82ae9998a9f05a6e0ce1a12a5a15392db7",
+      "bytes": 105293661
+    },
+    {
+      "id": "llama-b12649-sycl",
+      "name": "llama.cpp b12649 \u00b7 Windows x64 (SYCL)",
+      "kind": "llama",
+      "backend": "sycl",
+      "version": "b12649",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12649/llama-b12649-bin-win-sycl-x64.zip",
+      "sha256": "5edd2fca6d63f8c7f5666524216cbeae82ee381d71dbc0f688b5a8eb356fa29c",
+      "bytes": 173398926
+    },
+    {
+      "id": "llama-b12649-rocm-10-0",
+      "name": "llama.cpp b12649 \u00b7 Windows x64 (ROCm 10.0)",
+      "kind": "llama",
+      "backend": "rocm",
+      "version": "b12649",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12649/llama-b12649-bin-win-rocm-10.0-x64.zip",
+      "sha256": "e7583acc2db96e58d752163487c1691359825fe70f45a9619c2afd1792ac9a12",
+      "bytes": 284457151
+    },
+    {
       "id": "llama-b11532-cpu",
       "name": "llama.cpp b11532 \u00b7 Windows x64 (CPU)",
       "kind": "llama",

@@ -89,7 +89,7 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
       {variant === 'session' ? <div className="nola-no-drag flex min-w-0 items-center gap-3">{leading}{sessionTitle}{status}{timer}</div> : leading}
       <div className={`nola-titlebar-tools nola-no-drag${windowsShell ? ' nola-titlebar-tools--windows' : ''}`}>
         {actions}
-        {preferences && <><Button variant="secondary" size="icon" className="nola-titlebar-icon" aria-label={t('shortcuts.title')} title={t('shortcuts.title')} onClick={() => setShortcutsOpen(true)}><Keyboard aria-hidden="true" /></Button><Menu.Root>
+        {preferences && <><Button variant="secondary" size="icon" className="nola-titlebar-icon" aria-label={t('shortcuts.title')} tooltip={t('shortcuts.title')} onClick={() => setShortcutsOpen(true)}><Keyboard aria-hidden="true" /></Button><Menu.Root>
           <Menu.Trigger render={<Button variant="secondary" size="icon" className="nola-titlebar-icon" aria-label={t('titleBar.language')}>
             <Languages aria-hidden="true" />
           </Button>} />

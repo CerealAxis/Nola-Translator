@@ -67,23 +67,23 @@ export function FloatingControls({ preferences, active, error, onTranslate, onRe
   }
   return <div ref={container} className="nola-floating-controls" data-side={preferences.floatingSide} data-expanded={expanded} data-pinned={preferences.floatingLocked} data-dragging={dragging} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocusCapture={() => setHovered(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setHovered(false) }}>
     <div className="nola-floating-rail">
-      <Button className="nola-floating-tool" variant={active ? "default" : "outline"} size="sm" disabled={translationDisabled} aria-label={t(active ? 'restorePage' : 'translatePage')} title={t(translationDisabled ? 'providerDisabled' : active ? 'restorePage' : 'translatePage')} onClick={toggleTranslation} aria-pressed={active}><Languages /></Button>
+      <Button className="nola-floating-tool" variant={active ? "default" : "outline"} size="sm" disabled={translationDisabled} aria-label={t(active ? 'restorePage' : 'translatePage')} tooltip={t(translationDisabled ? 'providerDisabled' : active ? 'restorePage' : 'translatePage')} onClick={toggleTranslation} aria-pressed={active}><Languages /></Button>
       <div className="nola-floating-main">
-        <Button className="nola-floating-trigger" variant="outline" size="lg" aria-label={t(preferences.floatingClickAction === 'panel' ? 'floatingOpenPanel' : active ? 'restorePage' : 'translatePage')} title={t(preferences.floatingClickAction === 'panel' ? 'floatingOpenPanel' : active ? 'restorePage' : 'translatePage')} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { if (drag.current?.moved) onPosition(drag.current.original, false); drag.current = undefined; setDragging(false); suppressClick.current = false }} onClick={() => {
+        <Button className="nola-floating-trigger" variant="outline" size="lg" aria-label={t(preferences.floatingClickAction === 'panel' ? 'floatingOpenPanel' : active ? 'restorePage' : 'translatePage')} tooltip={t(preferences.floatingClickAction === 'panel' ? 'floatingOpenPanel' : active ? 'restorePage' : 'translatePage')} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { if (drag.current?.moved) onPosition(drag.current.original, false); drag.current = undefined; setDragging(false); suppressClick.current = false }} onClick={() => {
           if (suppressClick.current) { suppressClick.current = false; return }
           if (preferences.floatingClickAction === 'translate') { if (!translationDisabled) toggleTranslation() }
           else openPanel()
         }}><NolaLogo /></Button>
         <Popover open={menu} onOpenChange={setMenu}>
-          <PopoverTrigger render={<Button className="nola-floating-dismiss-trigger" variant="bare" size="icon-xs" aria-label={t('close')} title={t('close')} />}><X /></PopoverTrigger>
+          <PopoverTrigger render={<Button className="nola-floating-dismiss-trigger" variant="bare" size="icon-xs" aria-label={t('close')} tooltip={t('close')} />}><X /></PopoverTrigger>
           {menuContainer && <PopoverContent container={menuContainer} side={preferences.floatingSide === 'right' ? 'left' : 'right'} align="start" className="nola-floating-popover"><PopoverTitle className="sr-only">{t('close')}</PopoverTitle>
             <Button variant="bare" onClick={() => { setMenu(false); onHide('site') }}>{t('floatingHideSite')}</Button>
             <Button variant="bare" onClick={() => { setMenu(false); onHide('all') }}>{t('floatingHideAll')}</Button>
           </PopoverContent>}
         </Popover>
-        <Button className="nola-floating-pin" variant="bare" size="icon-xs" aria-label={t(preferences.floatingLocked ? 'unpinFloating' : 'pinFloating')} title={t(preferences.floatingLocked ? 'unpinFloating' : 'pinFloating')} onClick={onLock}>{preferences.floatingLocked ? <PinOff /> : <Pin />}</Button>
+        <Button className="nola-floating-pin" variant="bare" size="icon-xs" aria-label={t(preferences.floatingLocked ? 'unpinFloating' : 'pinFloating')} tooltip={t(preferences.floatingLocked ? 'unpinFloating' : 'pinFloating')} onClick={onLock}>{preferences.floatingLocked ? <PinOff /> : <Pin />}</Button>
       </div>
-      <Button className="nola-floating-tool" variant="outline" size="sm" aria-label={t('settings')} title={t('settings')} onClick={() => window.open(chrome.runtime.getURL('options.html#floatingButton'), '_blank')}><Settings2 /></Button>
+      <Button className="nola-floating-tool" variant="outline" size="sm" aria-label={t('settings')} tooltip={t('settings')} onClick={() => window.open(chrome.runtime.getURL('options.html#floatingButton'), '_blank')}><Settings2 /></Button>
     </div>
     <div ref={setMenuContainer} style={{ display: 'contents' }} />
   </div>

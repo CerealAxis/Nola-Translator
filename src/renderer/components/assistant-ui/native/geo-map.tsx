@@ -6,6 +6,7 @@ import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, useTooltipAnchor } from "@/components/ui/tooltip";
 import { field, mono, paper } from "./surfaces";
 
 export interface GeoMapPlace {
@@ -89,6 +90,7 @@ export function GeoMap({
   const leafletRef = useRef<LeafletModule | null>(null);
   const markersRef = useRef(new Map<string, LeafletMarker>());
   const [mapReady, setMapReady] = useState(false);
+  const { anchor, close: closeTooltip, handlers: tooltipHandlers } = useTooltipAnchor();
   const mapContent = useMemo(() => {
     const validPlaces = places.filter((place) =>
       isCoordinate(place.lat, place.lng),
@@ -162,6 +164,10 @@ export function GeoMap({
       leafletRef.current = leaflet;
       map = leaflet.map(container, { keyboard: true });
       mapRef.current = map;
+      for (const control of container.querySelectorAll<HTMLElement>(".leaflet-control-zoom [title]")) {
+        control.dataset.tooltipText = control.title;
+        control.removeAttribute("title");
+      }
 
       leaflet
         .tileLayer(resolvedTileUrl, {
@@ -211,18 +217,23 @@ export function GeoMap({
       const marker = leaflet
         .marker([place.lat, place.lng], {
           icon: markerIcon(leaflet, place.id === activeIdRef.current),
-          title: place.label,
         })
         .addTo(layer)
         .on("click", () => selectPlaceRef.current(place));
+      const element = marker.getElement();
+      if (element) {
+        element.dataset.tooltipText = place.label;
+        element.setAttribute("aria-label", place.label);
+      }
       markersRef.current.set(place.id, marker);
     }
 
     return () => {
+      closeTooltip();
       markersRef.current.clear();
       layer.remove();
     };
-  }, [contentSignature, mapReady]);
+  }, [closeTooltip, contentSignature, mapReady]);
 
   useEffect(() => {
     const leaflet = leafletRef.current;
@@ -246,6 +257,7 @@ export function GeoMap({
       {...props}
     >
       <div
+        {...tooltipHandlers}
         ref={containerRef}
         role="region"
         aria-label={`Map of ${validPlaces.length} places`}
@@ -266,6 +278,9 @@ export function GeoMap({
           </span>
         ) : null}
       </div>
+      <Tooltip open={!!anchor} onOpenChange={(open) => { if (!open) closeTooltip(); }}>
+        <TooltipContent anchor={anchor} className="wrap-anywhere">{anchor?.dataset.tooltipText}</TooltipContent>
+      </Tooltip>
 
       <ol className="mt-2 flex flex-col gap-0.5">
         {validPlaces.map((place) => {

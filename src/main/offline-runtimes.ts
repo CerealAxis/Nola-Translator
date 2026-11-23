@@ -6,7 +6,7 @@ import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative } from 'node:path'
 import { z } from 'zod'
-import { CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES, type RuntimePackage, type RuntimeRecipe } from '../shared/compute'
+import { CRISP_RUNTIME_VERSIONS, type RuntimePackage, type RuntimeRecipe } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
 import type { OfflineItem, OfflineTask } from '../shared/offline'
 import { pypiIndexUrls, PYPI_MIRROR_OFF } from '../shared/pypi-mirrors'
@@ -25,8 +25,8 @@ function archiveName(artifact: Artifact, index: number): string {
   return safeResourceName(`${String(index).padStart(2, '0')}-${leaf}`, 'archive')
 }
 
-function pinnedFiles(recipe: RuntimeRecipe | undefined, pkg: RuntimePackage | undefined, crisp = false): NamedArtifact[] {
-  if (crisp) return [...CRISP_RUNTIME_FILES]
+function pinnedFiles(recipe: RuntimeRecipe | undefined, pkg: RuntimePackage | undefined, crisp?: typeof CRISP_RUNTIME_VERSIONS[number]): NamedArtifact[] {
+  if (crisp) return [...crisp.files]
   if (recipe) return [recipe.wheel, ...recipe.companions].map(item => ({ ...item, name: item.filename }))
   if (!pkg) throw new Error('Unsupported runtime combination')
   return [pkg, ...(pkg.companions ?? [])].map((item, index) => ({ ...item, name: archiveName(item, index) }))
@@ -39,7 +39,7 @@ interface Options {
   network?: () => NetworkSettings
   download: (artifact: Artifact, path: string, signal: AbortSignal, progress: (bytes: number) => void) => Promise<void>
   installPython: (id: string, wheelhouse: string, requirements: string, signal: AbortSignal) => Promise<void>
-  installCrisp?: (files: string[], signal: AbortSignal) => Promise<void>
+  installCrisp?: (id: string, files: string[], signal: AbortSignal) => Promise<void>
   installLlama: (id: string, files: string[], signal: AbortSignal) => Promise<void>
 }
 
@@ -113,8 +113,8 @@ export class OfflineRuntimes {
   private async validate(root: string, resource: Resource, signal: AbortSignal): Promise<string | undefined> {
     const recipe = this.options.recipes.find(item => item.id === resource.id)
     const pkg = this.options.packages.find(item => item.id === resource.id)
-    const crisp = resource.id === CRISP_RUNTIME_ID && resource.kind === 'crisp'
-    if (!crisp && (resource.kind === 'python' ? !recipe : !pkg)) throw new Error('Unsupported runtime combination')
+    const crisp = resource.kind === 'crisp' ? CRISP_RUNTIME_VERSIONS.find(item => item.id === resource.id) : undefined
+    if (resource.kind === 'crisp' ? !crisp : resource.kind === 'python' ? !recipe : !pkg) throw new Error('Unsupported runtime combination')
     const folder = join(root, resource.id)
     if (new Set(resource.files.map(file => file.name)).size !== resource.files.length) throw new Error('Duplicate runtime files')
     for (const file of resource.files) {
@@ -138,7 +138,7 @@ export class OfflineRuntimes {
     try { manifest = await this.manifest(root) }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error }
     return Promise.all(manifest.resources.map(async resource => {
-      const name = this.options.recipes.find(item => item.id === resource.id)?.name ?? this.options.packages.find(item => item.id === resource.id)?.name ?? (resource.id === CRISP_RUNTIME_ID ? 'CrispASR 0.8.43 · Vulkan' : resource.id)
+      const name = this.options.recipes.find(item => item.id === resource.id)?.name ?? this.options.packages.find(item => item.id === resource.id)?.name ?? CRISP_RUNTIME_VERSIONS.find(item => item.id === resource.id)?.name ?? resource.id
       try {
         const lock = await this.validate(root, resource, signal)
         if (lock) await this.verifyClosure(join(root, resource.id), lock, signal, this.options.recipes.find(item => item.id === resource.id))
@@ -161,7 +161,7 @@ export class OfflineRuntimes {
       signal.throwIfAborted()
       const recipe = this.options.recipes.find(item => item.id === id)
       const pkg = this.options.packages.find(item => item.id === id)
-      const crisp = id === CRISP_RUNTIME_ID
+      const crisp = CRISP_RUNTIME_VERSIONS.find(item => item.id === id)
       if (!recipe && !pkg && !crisp) throw new Error('Unknown runtime combination')
       const folder = join(root, id)
       await mkdir(folder, { recursive: true })
@@ -245,7 +245,8 @@ export class OfflineRuntimes {
         } finally { await rm(temporary, { recursive: true, force: true }) }
       } else if (resource.kind === 'crisp') {
         if (!this.options.installCrisp) throw new Error('CrispASR installer unavailable')
-        await this.options.installCrisp(CRISP_RUNTIME_FILES.map(file => join(folder, file.name)), signal)
+        const release = CRISP_RUNTIME_VERSIONS.find(item => item.id === id)!
+        await this.options.installCrisp(id, release.files.map(file => join(folder, file.name)), signal)
       } else await this.options.installLlama(id, resource.files.map(file => join(folder, file.name)), signal)
       progress('install', position + 1, ids.length, id)
     }

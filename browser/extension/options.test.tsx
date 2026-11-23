@@ -19,7 +19,7 @@ let glossaryDocument: GlossaryDocument | undefined
 
 vi.mock('./preferences', async original => ({ ...await original<typeof import('./preferences')>(), savePreferences: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('./settings-fields', async original => ({ ...await original<typeof import('./settings-fields')>(), usePreferences: () => [settings, 'en', browserText('en')], ConnectionStatus: () => <div data-testid="connection-status" /> }))
-vi.mock('./provider-client', () => ({ translate: vi.fn().mockResolvedValue('Translated text'), translateImage: vi.fn().mockResolvedValue('Image translation result'), synthesize: vi.fn(), testProvider: vi.fn().mockResolvedValue('OK'), clearTranslationCache: vi.fn().mockResolvedValue(undefined), providerRequest: vi.fn().mockResolvedValue({ desktopConcurrency: 10 }) }))
+vi.mock('./provider-client', () => ({ translate: vi.fn().mockResolvedValue('Translated text'), translateImage: vi.fn().mockResolvedValue('Image translation result'), synthesize: vi.fn(), testProvider: vi.fn().mockResolvedValue({ message: 'OK', elapsedMs: 42 }), clearTranslationCache: vi.fn().mockResolvedValue(undefined), providerRequest: vi.fn().mockResolvedValue({ desktopConcurrency: 10 }) }))
 vi.mock('./providers', async original => { const actual = await original<typeof import('./providers')>(); return { ...actual, loadProviders: vi.fn().mockResolvedValue(actual.DEFAULT_PROVIDERS), saveProviders: vi.fn().mockResolvedValue(undefined), requestProviderAccess: vi.fn().mockResolvedValue(true) } })
 vi.mock('./glossary-store', async original => {
   const actual = await original<typeof import('./glossary-store')>()
@@ -267,7 +267,7 @@ describe('extension settings', () => {
     expect(saveProviders).not.toHaveBeenCalled()
   })
   it('does not display a previous provider test result after switching connections', async () => {
-    let finish!: (result: string) => void
+    let finish!: (result: { message: string; elapsedMs: number }) => void
     vi.mocked(testProvider).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
     const user = userEvent.setup(); render(<Options />)
     await user.click(screen.getByRole('button', { name: 'API connections' }))
@@ -275,8 +275,21 @@ describe('extension settings', () => {
     await user.click(screen.getByRole('button', { name: 'Test connection' }))
     await waitFor(() => expect(testProvider).toHaveBeenCalled())
     await user.click(screen.getByRole('button', { name: 'Microsoft Translator' }))
-    await act(async () => finish('OLD OK'))
+    await act(async () => finish({ message: 'OLD OK', elapsedMs: 42 }))
     expect(showToast).not.toHaveBeenCalled()
+  })
+  it('shows connection test progress and the measured latency in a toast', async () => {
+    let finish!: (result: { message: string; elapsedMs: number }) => void
+    vi.mocked(testProvider).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'API connections' }))
+    await user.click(await screen.findByRole('button', { name: 'Google Translate' }))
+    const button = screen.getByRole('button', { name: 'Test connection' })
+    await user.click(button)
+    expect(screen.getByRole('button', { name: 'Test connection' })).toBeDisabled()
+    await act(async () => finish({ message: 'OK', elapsedMs: 42 }))
+    expect(showToast).toHaveBeenCalledWith({ type: 'success', title: 'Google Translate', description: 'Connected · Latency 42 ms' })
+    expect(screen.getByRole('button', { name: 'Test connection' })).toBeEnabled()
   })
   it('preserves a dirty provider draft when another preference or provider revision changes', async () => {
     const user = userEvent.setup(); render(<Options />)

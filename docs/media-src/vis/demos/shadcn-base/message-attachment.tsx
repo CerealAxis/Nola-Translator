@@ -13,6 +13,7 @@ import {
 } from "@/styles/base-rhea/ui/attachment"
 import { Bubble, BubbleContent } from "@/styles/base-rhea/ui/bubble"
 import { Message, MessageContent } from "@/styles/base-rhea/ui/message"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/styles/base-rhea/ui/tooltip"
 
 export function MessageAttachmentDemo() {
   return (
@@ -50,15 +51,12 @@ export function MessageAttachmentDemo() {
               <AttachmentDescription>PDF · 2.4 MB</AttachmentDescription>
             </AttachmentContent>
             <AttachmentActions>
-              <AttachmentAction
-                type="button"
-                title="下载"
-                aria-label="下载"
-                size="icon-sm"
-                variant="secondary"
-              >
-                <DownloadIcon />
-              </AttachmentAction>
+              <Tooltip>
+                <TooltipTrigger render={<AttachmentAction type="button" aria-label="下载" size="icon-sm" variant="secondary" />}>
+                  <DownloadIcon />
+                </TooltipTrigger>
+                <TooltipContent>下载</TooltipContent>
+              </Tooltip>
             </AttachmentActions>
           </Attachment>
         </MessageContent>

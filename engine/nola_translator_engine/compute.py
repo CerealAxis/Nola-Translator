@@ -172,6 +172,8 @@ def choose_devices(devices: list[ComputeDevice], options: ComputeOptions,
     def candidates(choice: str, task: str) -> list[ComputeDevice]:
         def supports(d: ComputeDevice) -> bool:
             if task == "recognition":
+                if recognition_adapter == "crisp-cuda":
+                    return d.id == "cpu" or d.backend == "cuda"
                 return d.id == "cpu" if recognition_adapter == "crisp-asr" else d.id == "cpu" or (d.llamaDevice is not None if recognition_adapter == "llama-asr" else d.recognition and d.torchDevice is not None)
             return d.id == "cpu" or (d.translation and
                 (d.llamaDevice is not None if translation_adapter == "llama.cpp" else d.torchDevice is not None))

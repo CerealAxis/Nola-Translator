@@ -9,6 +9,7 @@ import * as sessionLog from '../../../src/main/session-log'
 import type { SessionConfig } from '../../../src/shared/contracts'
 import { DEFAULT_SETTINGS, MIMO_TTS_BINDING, MIMO_TTS_MODEL, REALTIME_S2S_MODELS } from '../../../src/shared/settings'
 import { INDEX_TRANSLATE_ENDPOINT } from '../../../src/shared/index-translate'
+import { translationOptionsFor } from '../../../src/shared/cloud-config'
 
 const asr = 'sensevoice-small-crisp-q8-0'
 const models = new Set([asr, 'google', 'tts'])
@@ -46,6 +47,42 @@ it('retries a failed v2 Index Translate request with the configured Google backu
       text: 'Hello', source: 'en', target: 'zh' }, new AbortController().signal, undefined, settings, getCredential))
       .resolves.toEqual({ text: '你好' })
     expect(calls).toEqual(['index-translate', 'google'])
+  } finally { vi.unstubAllGlobals() }
+})
+
+it('keeps an Azure chat deployment and its API version in direct and realtime translation', async () => {
+  const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [{
+    id: 'azure', name: 'Azure', endpoint: 'https://azure.example', model: 'my-deployment', apiFormat: 'chat-completions' as const,
+    contextWindow: 8192, maxOutputTokens: 1024, languages: ['en'],
+  }] }, modelWorkspace: { localSources: {}, connections: [{
+    id: 'azure-source', capability: 'LLM' as const, service: 'azure-openai' as const,
+    name: 'Azure', endpoint: 'https://azure.example', protocol: 'azure-openai', workspace: '2024-10-21', region: '',
+    models: [{ id: 'my-deployment', name: 'Azure', enabled: true, profileId: 'azure' }],
+  }] } }
+  const getKey = vi.fn(async () => 'test-key')
+  const checkHeaders = (headers: HeadersInit | undefined) => {
+    const actual = new Headers(headers)
+    expect(actual.get('x-nola-provider-api-format')).toBe('azure-openai')
+    expect(actual.get('x-nola-provider-api-version')).toBe('2024-10-21')
+    expect(actual.get('x-nola-provider-model')).toBe('my-deployment')
+    expect(actual.get('x-nola-provider-key')).toBe('test-key')
+  }
+  const options = translationOptionsFor(settings.translation, 'cloud', 'azure', settings.modelWorkspace)
+  const mapped = mapSessionConfig({ ...config, translationProvider: 'cloud',
+    translationOptions: { ...options, apiKey: 'test-key' } }, settings, new Set([asr, 'custom-mt']))
+  expect(mapped?.config.pipeline).toMatchObject({ translation_model: 'custom-mt' })
+  checkHeaders(mapped?.headers)
+  vi.stubGlobal('fetch', vi.fn(async (url: URL, request: RequestInit) => {
+    if (url.pathname.endsWith('/capabilities')) return Response.json({ models: [{ model_id: 'custom-mt', enabled: true, operations: ['translate'] }] })
+    checkHeaders(request.headers)
+    expect(JSON.parse(String(request.body)).model).toBe('custom-mt')
+    return Response.json({ text: '你好' })
+  }))
+  try {
+    const backend = { baseUrl: 'http://127.0.0.1:1234', authorizationHeader: () => ({}) }
+    await expect(inferBackendMt(backend, { id: '7be83820-3293-42c0-a66a-ac4496b82616', kind: 'mt', model: 'mt-custom:azure',
+      text: 'Hello', source: 'en', target: 'zh' }, new AbortController().signal, undefined, settings, getKey)).resolves.toEqual({ text: '你好' })
+    expect(getKey).toHaveBeenCalledExactlyOnceWith('cloud-model:azure-source')
   } finally { vi.unstubAllGlobals() }
 })
 
@@ -456,4 +493,13 @@ describe('desktop backend session', () => {
       await new Promise<void>(resolve => server.close(() => resolve()))
     }
   })
+})
+
+it('passes the saved Index Translate endpoint and model to the private backend', () => {
+  const endpoint = 'https://proxy.example/index/v1'
+  const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation,
+    providerOverrides: { 'index-translate': { endpoint, model: 'test-index-model' } },
+  } }
+  const mapped = mapSessionConfig({ ...config, translationProvider: 'index-translate' }, settings, new Set([...models, 'index-translate']))
+  expect(mapped?.headers).toMatchObject({ 'x-nola-provider-endpoint': endpoint, 'x-nola-provider-model': 'test-index-model' })
 })

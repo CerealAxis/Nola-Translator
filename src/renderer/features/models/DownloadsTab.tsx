@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import { resourceStateOf } from '@/bridge'
 import type { ResourceRecord, ResourceRecordWithRate } from '@/bridge'
-import { notifyError, notifyRetryableFailure } from '@/components/primitives/notify'
+import { notifyError } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
@@ -25,6 +25,11 @@ export function DownloadsTab() {
   const rows = resources.filter(
     (item) => item.phase !== 'remove' && (item.state === 'cancelling' || (resourceStateOf(item) !== 'absent' && resourceStateOf(item) !== 'installed')),
   )
+  const install = (record: ResourceRecord, source?: Parameters<typeof actions.models.manageResource>[2]) => {
+    void actions.models.manageResource(record.resourceId, 'install', source).catch((cause: unknown) => {
+      notifyModelDownloadFailure(t, () => install(record, source), { cause })
+    })
+  }
 
   if (rows.length === 0) {
     return (
@@ -42,21 +47,7 @@ export function DownloadsTab() {
       <DownloadSourceDialog record={downloadTarget} onClose={() => setDownloadTarget(null)} onSelect={source => {
         const target = downloadTarget
         setDownloadTarget(null)
-        if (target) void actions.models.manageResource(target.resourceId, 'install', source).catch(() => {
-          notifyModelDownloadFailure(
-            t('models.downloadFailed'),
-            t('errors.downloadFailed'),
-            t('errors.downloadFailedAction'),
-            // The retry reports its own failure: a task that stays failed is not announced
-            // again, so a silent retry would leave the user with nothing.
-            () => { void actions.models.manageResource(target.resourceId, 'install', source).catch((cause: unknown) => {
-              notifyRetryableFailure(t('models.installFailed'), {
-                cause,
-                description: t('models.downloadReasonInstall'),
-              })
-            }) },
-          )
-        })
+        if (target) install(target, source)
       }} />
 
       <div className="models-downloads" role="list" aria-label={t('models.tabDownloads')}>
@@ -66,7 +57,7 @@ export function DownloadsTab() {
           busy={busyIds.includes(record.resourceId)}
           onRetry={() => {
             if (record.kind !== 'ocrModel' && record.kind !== 'inpaintModel' && record.kind !== 'detectModel') { setDownloadTarget(record); return }
-            void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => notifyError(t('models.downloadFailed'), { cause }))
+            install(record)
           }}
         />)}
       </div>
@@ -83,7 +74,7 @@ function DownloadCard({ record, busy, onRetry }: { record: ResourceRecordWithRat
   const total = record.downloadBytes ?? record.installedBytes
   const raw = record.progress ?? 0
   const value = Math.min(1, Math.max(0, raw > 1 ? raw / 100 : raw))
-  const label = failed ? t('models.notInstalled')
+  const label = failed ? t('models.downloadFailed')
     : paused ? t('models.paused')
     : cancelling ? t('models.cancelling')
     : state === 'verifying' ? t('models.verifying')
@@ -101,10 +92,10 @@ function DownloadCard({ record, busy, onRetry }: { record: ResourceRecordWithRat
       <CardAction className="model-download-card__actions">
         {failed && <Tooltip><TooltipTrigger render={<Button variant="bare" size="icon-sm" disabled={busy} aria-label={t('models.retry')} onClick={onRetry} />}><RotateCcw /></TooltipTrigger><TooltipContent>{t('models.retry')}</TooltipContent></Tooltip>}
         {canPause && <Tooltip><TooltipTrigger render={<Button variant="bare" size="icon-sm" disabled={busy} aria-label={t(paused ? 'models.resume' : 'models.pause')} onClick={() => {
-          void actions.models.manageResource(record.resourceId, paused ? 'resume' : 'pause').catch((cause: unknown) => notifyError(t('errors.engineOperationFailed'), { cause }))
+          void actions.models.manageResource(record.resourceId, paused ? 'resume' : 'pause').catch((cause: unknown) => notifyError(t(paused ? 'modelsSettingsUi.resumeDownloadFailed' : 'modelsSettingsUi.pauseDownloadFailed'), { cause }))
         }} />}>{paused ? <Play /> : <Pause />}</TooltipTrigger><TooltipContent>{t(paused ? 'models.resume' : 'models.pause')}</TooltipContent></Tooltip>}
         <Tooltip><TooltipTrigger render={<Button variant="bare" size="icon-sm" disabled={busy || cancelling || (!failed && !record.cancellable)} aria-label={t('models.cancelTask')} onClick={() => {
-          void actions.models.manageResource(record.resourceId, 'cancel').catch((cause: unknown) => notifyError(t('errors.engineOperationFailed'), { cause }))
+          void actions.models.manageResource(record.resourceId, 'cancel').catch((cause: unknown) => notifyError(t('modelsSettingsUi.cancelDownloadFailed'), { cause }))
         }} />}><X /></TooltipTrigger><TooltipContent>{t('models.cancelTask')}</TooltipContent></Tooltip>
       </CardAction>
     </CardHeader>

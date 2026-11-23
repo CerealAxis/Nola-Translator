@@ -53,9 +53,10 @@ export async function synthesize(text: string, language: string, signal?: AbortS
   if (!result.audioBase64 || !result.contentType) throw new Error('providerEmpty')
   return { audioBase64: result.audioBase64, contentType: result.contentType }
 }
-export async function testProvider(connection: ProviderConnection, capability?: Capability): Promise<string> {
+export async function testProvider(connection: ProviderConnection, capability?: Capability): Promise<{ message: string; elapsedMs: number }> {
   if (!await requestProviderAccess(connection)) throw new Error('providerPermission')
+  const started = performance.now()
   const result = await providerRequest({ type: 'test', connection, capability })
-  return result.message ?? 'OK'
+  return { message: result.message ?? 'OK', elapsedMs: Math.round(performance.now() - started) }
 }
 export async function clearTranslationCache(): Promise<void> { await providerRequest({ type: 'clearCache' }) }

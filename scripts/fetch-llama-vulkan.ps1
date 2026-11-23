@@ -6,9 +6,9 @@ $target = [IO.Path]::GetFullPath((Join-Path $vendorRoot 'llama-vulkan'))
 $cacheRoot = Join-Path $vendorRoot 'llama-zips'
 $catalog = Get-Content -LiteralPath (Join-Path $projectRoot 'build\runtime-catalog.json') -Raw | ConvertFrom-Json
 $packages = @($catalog.packages | Where-Object {
-    $_.kind -eq 'llama' -and $_.architecture -eq 'x64' -and $_.backend -eq 'vulkan'
+    $_.id -eq 'llama-b12651-vulkan' -and $_.kind -eq 'llama' -and $_.architecture -eq 'x64' -and $_.backend -eq 'vulkan'
 })
-if ($packages.Count -ne 1) { throw 'Runtime catalog must contain exactly one Windows x64 Vulkan llama package.' }
+if ($packages.Count -ne 1) { throw 'The bundled Windows x64 llama.cpp Vulkan build b12651 must be in the runtime catalog.' }
 $package = $packages[0]
 if (-not $package.url -or $package.sha256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'Vulkan llama runtime URL or SHA-256 is invalid.' }
 $archiveName = [IO.Path]::GetFileName(([Uri]$package.url).AbsolutePath)
@@ -29,8 +29,16 @@ if ($present -and (Test-Path -LiteralPath $marker) -and (Get-Content -LiteralPat
     Write-Host "vendor/llama-vulkan already contains the catalog Vulkan runtime; skipping download."
     exit 0
 }
+$previous = $null
 if (Test-Path -LiteralPath $target) {
-    throw 'vendor/llama-vulkan exists but is incomplete or has a different source; inspect and move it before rebuilding.'
+    if ((Get-Item -LiteralPath $target -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw 'vendor/llama-vulkan must not be a link.'
+    }
+    $installedSource = if (Test-Path -LiteralPath $marker) { (Get-Content -LiteralPath $marker -Raw).Trim() }
+    $previous = $catalog.packages | Where-Object {
+        $_.kind -eq 'llama' -and $_.backend -eq 'vulkan' -and $_.architecture -eq 'x64' -and $_.sha256 -eq $installedSource
+    } | Select-Object -First 1
+    if (-not $previous) { throw 'vendor/llama-vulkan has an unrecognized source; inspect and move it before rebuilding.' }
 }
 
 New-Item -ItemType Directory -Force -Path $vendorRoot, $cacheRoot | Out-Null
@@ -71,7 +79,17 @@ try {
     & node (Join-Path $PSScriptRoot 'verify-llama-runtime.mjs') $staging
     if ($LASTEXITCODE -ne 0) { throw 'Vulkan llama runtime does not resolve its dependencies.' }
     Set-Content -LiteralPath (Join-Path $staging 'nola-runtime-source.txt') -Value $expectedSource -Encoding ASCII
-    Move-Item -LiteralPath $staging -Destination $target
+    $backup = $null
+    if ($previous) {
+        $backup = "$target.previous-$([Guid]::NewGuid().ToString('N'))"
+        Move-Item -LiteralPath $target -Destination $backup
+    }
+    try {
+        Move-Item -LiteralPath $staging -Destination $target
+    } catch {
+        if ($backup) { Move-Item -LiteralPath $backup -Destination $target }
+        throw
+    }
 } finally {
     if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
 }

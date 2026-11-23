@@ -162,7 +162,7 @@ export const copy: Record<Locale, LandingCopy> = {
 
 export const docsNav: Record<Locale, DocsNavCopy> = {
   'zh-CN': {
-    root: 'Nola Translator 帮助文档',
+    root: '帮助文档',
     gettingStarted: '开始入门', introduction: '产品介绍', downloadAndInstall: '下载与安装', environment: '环境配置', localModels: '本地模型配置', cloudModels: '云端模型配置',
     features: '功能介绍', liveTranslation: '快速同传', floatingCaptions: '悬浮字幕', browserCaptions: '浏览器字幕', settings: '系统设定',
     troubleshooting: '疑难解答', feedback: '如何反馈', faq: '常见问题',
@@ -171,7 +171,7 @@ export const docsNav: Record<Locale, DocsNavCopy> = {
     legal: '软件协议', userAgreement: '用户协议', privacyPolicy: '隐私协议',
   },
   'zh-TW': {
-    root: 'Nola Translator 說明文件',
+    root: '說明文件',
     gettingStarted: '開始使用', introduction: '產品介紹', downloadAndInstall: '下載與安裝', environment: '環境設定', localModels: '本機模型設定', cloudModels: '雲端模型設定',
     features: '功能介紹', liveTranslation: '即時口譯', floatingCaptions: '浮動字幕', browserCaptions: '瀏覽器字幕', settings: '系統設定',
     troubleshooting: '疑難排解', feedback: '意見回饋', faq: '常見問題',
@@ -180,7 +180,7 @@ export const docsNav: Record<Locale, DocsNavCopy> = {
     legal: '軟體協定', userAgreement: '使用者條款', privacyPolicy: '隱私權政策',
   },
   'zh-HK': {
-    root: 'Nola Translator 說明文件',
+    root: '說明文件',
     gettingStarted: '快速入門', introduction: '產品介紹', downloadAndInstall: '下載與安裝', environment: '環境設定', localModels: '本機模型設定', cloudModels: '雲端模型設定',
     features: '功能介紹', liveTranslation: '即時傳譯', floatingCaptions: '懸浮字幕', browserCaptions: '瀏覽器字幕', settings: '系統設定',
     troubleshooting: '疑難排解', feedback: '提交意見', faq: '常見問題',
@@ -189,7 +189,7 @@ export const docsNav: Record<Locale, DocsNavCopy> = {
     legal: '軟體協議', userAgreement: '使用者條款', privacyPolicy: '私隱政策',
   },
   en: {
-    root: 'Nola Translator Help Documentation',
+    root: 'Help Documentation',
     gettingStarted: 'Getting Started', introduction: 'Product Overview', downloadAndInstall: 'Download and Install', environment: 'Environment Setup', localModels: 'Local Models', cloudModels: 'Cloud Models',
     features: 'Features', liveTranslation: 'Live Translation', floatingCaptions: 'Caption Overlay', browserCaptions: 'Browser Captions', settings: 'Settings',
     troubleshooting: 'Troubleshooting', feedback: 'Reporting Issues', faq: 'FAQ',
@@ -198,7 +198,7 @@ export const docsNav: Record<Locale, DocsNavCopy> = {
     legal: 'Legal', userAgreement: 'Terms of Service', privacyPolicy: 'Privacy Policy',
   },
   ja: {
-    root: 'Nola Translator ヘルプドキュメント',
+    root: 'ヘルプドキュメント',
     gettingStarted: 'はじめに', introduction: '製品概要', downloadAndInstall: 'ダウンロードとインストール', environment: '環境設定', localModels: 'ローカルモデル設定', cloudModels: 'クラウドモデル設定',
     features: '機能紹介', liveTranslation: 'リアルタイム翻訳', floatingCaptions: '字幕オーバーレイ', browserCaptions: 'ブラウザー字幕', settings: 'システム設定',
     troubleshooting: 'トラブルシューティング', feedback: '問題の報告', faq: 'よくある質問',
@@ -207,7 +207,7 @@ export const docsNav: Record<Locale, DocsNavCopy> = {
     legal: 'ライセンス', userAgreement: '利用規約', privacyPolicy: 'プライバシーポリシー',
   },
   ko: {
-    root: 'Nola Translator 도움말 문서',
+    root: '도움말 문서',
     gettingStarted: '시작하기', introduction: '제품 소개', downloadAndInstall: '다운로드 및 설치', environment: '환경 설정', localModels: '로컬 모델 설정', cloudModels: '클라우드 모델 설정',
     features: '기능 소개', liveTranslation: '실시간 통역', floatingCaptions: '자막 오버레이', browserCaptions: '브라우저 자막', settings: '시스템 설정',
     troubleshooting: '문제 해결', feedback: '문제 신고', faq: '자주 묻는 질문',

@@ -422,7 +422,10 @@ class QwenS2SAdapter:
                             turn_detection={"type": "server_vad"})
         if config.get("voice") and "audio" in outputs:
             settings["voice"] = config["voice"]
-        url = f"wss://{workspace}.{region}.maas.aliyuncs.com/api-ws/v1/realtime?model={model}"
+        endpoint = config.get("endpoint")
+        if endpoint and (not isinstance(endpoint, str) or not endpoint.startswith(("ws://", "wss://"))):
+            raise S2SProtocolError("invalid_provider_endpoint")
+        url = endpoint or f"wss://{workspace}.{region}.maas.aliyuncs.com/api-ws/v1/realtime?model={model}"
         try:
             ws = await self._connector(url, {"Authorization": f"Bearer {api_key}"})
         except Exception:

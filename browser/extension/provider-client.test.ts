@@ -1,6 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { providerRequest } from './provider-client'
-afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
+import { providerRequest, testProvider } from './provider-client'
+import { createProvider, requestProviderAccess } from './providers'
+vi.mock('./providers', async original => ({ ...await original<typeof import('./providers')>(), requestProviderAccess: vi.fn() }))
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); vi.restoreAllMocks() })
 it('rejects empty envelopes without reading an undefined message id', async () => {
   let receive!: (message: unknown) => void
   const disconnect = vi.fn()
@@ -25,4 +27,19 @@ it('releases the initial request timer and port when posting races with disconne
   await expect(providerRequest({ type: 'generate', text: 'test' })).rejects.toThrow('providerDisconnected')
   expect(disconnect).toHaveBeenCalledOnce()
   expect(vi.getTimerCount()).toBe(0)
+})
+
+it('starts measuring only after API access is granted', async () => {
+  let grant!: (allowed: boolean) => void
+  vi.mocked(requestProviderAccess).mockImplementationOnce(() => new Promise(resolve => { grant = resolve }))
+  let receive!: (message: unknown) => void
+  let requestId = ''
+  vi.stubGlobal('chrome', { runtime: { connect: () => ({ postMessage: (message: { id: string }) => { requestId = message.id }, disconnect: vi.fn(), onMessage: { addListener: (listener: typeof receive) => { receive = listener } }, onDisconnect: { addListener: vi.fn() } }) } })
+  const clock = vi.spyOn(performance, 'now').mockReturnValueOnce(100).mockReturnValueOnce(142)
+  const pending = testProvider(createProvider('google-translate'))
+  expect(clock).not.toHaveBeenCalled()
+  grant(true)
+  await vi.waitFor(() => expect(requestId).not.toBe(''))
+  receive({ id: requestId, result: { message: 'OK' } })
+  await expect(pending).resolves.toEqual({ message: 'OK', elapsedMs: 42 })
 })

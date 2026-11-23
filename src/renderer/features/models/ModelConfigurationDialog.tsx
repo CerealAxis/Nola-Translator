@@ -4,19 +4,17 @@ import { SettingSwitch } from '../settings/SettingsPage'
 import { ChevronDown, Check, Trash2, X } from 'lucide-react'
 import { Dialog, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ResourceRecord } from '@/bridge'
-import { languageName } from '@/bridge'
 import { actions } from '@/store'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { SettingsRow } from '../settings/SettingsRow'
 import { CircleHelp } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { normalizeLanguage } from '../../../shared/languages'
+import { modelLanguageName, normalizeLanguage } from '../../../shared/languages'
 import { SOURCE_LANGUAGE_OPTIONS } from '../../../shared/settings'
 import { INDEX_TRANSLATE_LANGUAGES } from '../../../shared/index-translate'
 import { modelEngines } from '../../../shared/model-engines'
@@ -28,6 +26,8 @@ export interface ModelConfigurationDialogProps {
   onClose: () => void
   /** Read-only mode disables edits and omits the save action. */
   readOnly?: boolean
+  hideRemove?: boolean
+  className?: string
 }
 
 export interface ModelLanguageSelectProps {
@@ -36,14 +36,15 @@ export interface ModelLanguageSelectProps {
   codes: readonly string[]
   onChange: (value: string[]) => void
   multiple?: boolean
+  genericChinese?: boolean
   /** Read-only mode disables the picker and omits tag removal. */
   readOnly?: boolean
 }
 
-export function ModelLanguageSelect({ label, value, codes, onChange, multiple = true, readOnly = false }: ModelLanguageSelectProps) {
+export function ModelLanguageSelect({ label, value, codes, onChange, multiple = true, readOnly = false, genericChinese = false }: ModelLanguageSelectProps) {
   const fieldRef = useRef<HTMLDivElement>(null)
   const { language, t } = useI18n()
-  const name = (code: string) => languageName(code, language)
+  const name = (code: string) => modelLanguageName(code, language, genericChinese)
   const ariaLabel = typeof label === 'string' ? label : undefined
   const options = <>
     <div ref={fieldRef} className="model-language-field">
@@ -74,15 +75,16 @@ export function ModelLanguageSelect({ label, value, codes, onChange, multiple = 
   </SettingsRow>
 }
 
-export function ModelConfigurationDialog({ record, onClose, readOnly = false }: ModelConfigurationDialogProps) {
+export function ModelConfigurationDialog({ record, onClose, readOnly = false, hideRemove = false, className = 'modal__dialog modal__dialog--lg' }: ModelConfigurationDialogProps) {
   const { t, language } = useI18n()
-  const engines = modelEngines(record)
+  const [engine] = modelEngines(record)
+  const slot = record.kind === 'recognitionModel' ? 'recognition' : 'translation'
   const [draft, setDraft] = useState<ModelConfiguration>(() => {
     const configured = configurationOf(record)
-    if (configured) return configured
+    if (configured) return { ...configured, slot, engine: engine ?? configured.engine }
     return {
-      slot: record.kind === 'recognitionModel' ? 'recognition' : 'translation',
-      engine: engines[0] ?? 'pytorch',
+      slot,
+      engine: engine ?? 'pytorch',
       languages: record.kind === 'recognitionModel' ? record.languages.map(normalizeLanguage) : [],
       supportsAutoDetection: true,
       sourceLanguages: record.kind === 'translationModel' ? ['auto', ...record.languages.map(normalizeLanguage)] : [],
@@ -99,14 +101,11 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
   const loaderCodes = record.provider === 'qwen3-asr' ? QWEN_LANGUAGES
     : record.provider === 'sensevoice' ? ['zh', 'en', 'yue', 'ja', 'ko']
       : record.provider === 'm2m100' ? M2M100_LANGUAGES : codes
-  const slot = record.kind === 'recognitionModel' ? 'recognition' : 'translation'
   const selectedCodes = draft.slot === 'recognition' ? draft.languages : [...draft.sourceLanguages, ...draft.targetLanguages]
   const recognitionCodes = [...new Set(['auto', ...codes])]
-  const valid = modelConfigurationSchema.safeParse(draft).success && engines.includes(draft.engine)
+  const valid = modelConfigurationSchema.safeParse(draft).success && engine === draft.engine
     && draft.slot === slot && selectedCodes.every(code => (draft.slot === 'translation' && code === 'auto') || loaderCodes.includes(normalizeLanguage(code)))
-  const engineLabel = (engine: typeof engines[number]) => engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'
-  const loaderHelp = `${t('modelConfig.modelHelp')} ${t('modelConfig.slot')}: ${t(slot === 'recognition' ? 'modelConfig.recognition' : 'modelConfig.translation')} · ${t('modelConfig.engine')}: ${engines.map(engineLabel).join(' / ')}`
-  const name = (code: string) => languageName(code, language)
+  const name = (code: string) => modelLanguageName(code, language)
   const save = async () => {
     if (!valid || saving) return
     setSaving(true)
@@ -131,7 +130,7 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
     } finally { setRemoving(false) }
   }
   return <Dialog open onOpenChange={open => { if (!open && !saving && !removing) onClose() }}>
-    <DialogContent className="model-configuration-dialog modal__dialog modal__dialog--lg">
+    <DialogContent className={`model-configuration-dialog ${className}`}>
       <DialogCloseButton disabled={saving || removing} />
       <DialogHeader><div className="settings-row__title"><DialogTitle>{t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}</DialogTitle><Tooltip><TooltipTrigger delay={300} render={<Button variant="secondary" size="sm" className="settings-row__help" aria-label={t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}><CircleHelp aria-hidden="true" /></Button>} /><TooltipContent  role="tooltip" className="settings-row__tooltip z-popup">{t(readOnly ? 'modelConfig.viewDescription' : 'modelConfig.description')}</TooltipContent></Tooltip></div></DialogHeader>
       {record.kind === 'ttsModel' || record.kind === 'inpaintModel' || record.kind === 'detectModel' ? null : <div className="model-configuration-dialog__body flex flex-col gap-[var(--space-2)]">
@@ -146,20 +145,6 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
           <ModelLanguageSelect label={t('modelConfig.sourceLanguages')} value={draft.sourceLanguages} codes={codes} onChange={sourceLanguages => patch({ sourceLanguages, translationPairs: draft.translationPairs?.filter(pair => sourceLanguages.includes(pair.source)) })} readOnly={readOnly} />
           <ModelLanguageSelect label={t('modelConfig.targetLanguages')} value={draft.targetLanguages} codes={codes} onChange={targetLanguages => patch({ targetLanguages, translationPairs: draft.translationPairs?.filter(pair => targetLanguages.includes(pair.target)) })} readOnly={readOnly} />
         </>}
-        <SettingsRow label={t('modelConfig.slot')} desc={loaderHelp} descriptionTooltip>
-        <div className="select"><Select disabled={readOnly} value={draft.slot} onValueChange={key => { if (readOnly) return; if (key === 'recognition' || key === 'translation') patch({ slot: key }) }}><SelectTrigger className="select__trigger settings-select-trigger w-full" aria-label={t('modelConfig.slot')}><SelectValue className="select__value">{value => t(value === 'recognition' ? 'modelConfig.recognition' : value === 'translation' ? 'modelConfig.translation' : 'modelConfig.synthesis')}</SelectValue></SelectTrigger>
-          <SelectContent className="settings-select-content"><SelectGroup>
-            <SelectItem className="settings-select-item" value="recognition" label={t('modelConfig.recognition')}>{t('modelConfig.recognition')}</SelectItem>
-            <SelectItem className="settings-select-item" value="translation" label={t('modelConfig.translation')}>{t('modelConfig.translation')}</SelectItem>
-            <SelectItem className="settings-select-item" value="synthesis" label={t('modelConfig.synthesis')} disabled>{t('modelConfig.synthesis')}</SelectItem>
-          </SelectGroup></SelectContent>
-        </Select></div>
-        </SettingsRow>
-        <SettingsRow label={t('modelConfig.engine')} desc={loaderHelp} descriptionTooltip>
-        <div className="select"><Select disabled={readOnly} value={draft.engine} onValueChange={key => { if (readOnly) return; if (key === 'pytorch' || key === 'llama' || key === 'crisp') patch({ engine: key }) }}><SelectTrigger className="select__trigger settings-select-trigger w-full" aria-label={t('modelConfig.engine')}><SelectValue className="select__value">{value => engines.includes(value) ? engineLabel(value) : ''}</SelectValue></SelectTrigger>
-          <SelectContent className="settings-select-content"><SelectGroup>{engines.map(engine => <SelectItem className="settings-select-item" key={engine} value={engine} label={engineLabel(engine)}>{engineLabel(engine)}</SelectItem>)}</SelectGroup></SelectContent>
-        </Select></div>
-        </SettingsRow>
         {draft.slot !== 'recognition' ? <>
           <SettingsRow label={t('modelConfig.restrictPairs')} desc={t('modelConfig.pairsHint')} descriptionTooltip>
           <SettingSwitch ariaLabel={t('modelConfig.restrictPairs')} isDisabled={readOnly} isSelected={draft.translationPairs !== undefined} onChange={enabled => { if (!readOnly) patch({ translationPairs: enabled ? [] : undefined }) }} />
@@ -179,7 +164,7 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
         </> : null}
       </div>}
       <DialogFooter>
-        {record.installed ? <Button variant="danger" disabled={saving || removing} aria-busy={removing} onClick={() => void remove()}>{removing ? <Spinner /> : <Trash2 aria-hidden="true" />}{t('modelsSettingsUi.deleteModel')}</Button> : null}
+        {record.installed && !hideRemove ? <Button variant="danger" disabled={saving || removing} aria-busy={removing} onClick={() => void remove()}>{removing ? <Spinner /> : <Trash2 aria-hidden="true" />}{t('modelsSettingsUi.deleteModel')}</Button> : null}
         <Button variant="tertiary" disabled={saving || removing} onClick={onClose}>{t('session.cancel')}</Button>
         {readOnly ? null : <Button disabled={!valid || saving || removing} aria-busy={saving} onClick={() => void save()}>{saving ? <Spinner /> : null}{t('modelConfig.save')}</Button>}
       </DialogFooter>

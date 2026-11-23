@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { Activity, CircleHelp, Copy, Eye, EyeOff, Mic, Languages, RotateCcw, Volume2, Bot, ScanText } from 'lucide-react'
 import { createHighlighterCore } from 'shiki/core'
@@ -8,7 +9,6 @@ import { requestFeatureStart } from '@/components/primitives/FeatureActivityNoti
 import { PageHeader } from '@/components/primitives'
 import { notifyError, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CodeBlock, CodeBlockActions, CodeBlockHeader, CodeBlockTitle } from '@/components/ui/code-block'
@@ -30,6 +30,8 @@ import { RealtimePipelineLabel, realtimeS2sNames } from '../workspace/RealtimePi
 import { ModelAvailabilityLabel } from '../workspace/ModelAvailabilityLabel'
 import { languageName } from '../../../shared/languages'
 import { useModelOptions } from '@/model-options'
+import { PerformanceMonitor } from './PerformanceMonitor'
+import { useMonitorCopy } from './performance-monitor-copy'
 import { customModelsOf } from '../../../shared/custom-models'
 import { cloudModelsOf } from '../../../shared/cloud-models'
 import { gatewayBindingPatch } from '@/available-models'
@@ -48,8 +50,8 @@ const exampleHighlighter = createHighlighterCore({
   engine: createJavaScriptRegexEngine({ forgiving: true }),
 })
 
-function GatewayExample({ code, language, copyLabel, onCopy, hint }: {
-  code: string; language: 'shellscript' | 'javascript'; copyLabel: string; onCopy: () => void; hint?: ReactNode
+function GatewayExample({ code, language, copyLabel, onCopy }: {
+  code: string; language: 'shellscript' | 'javascript'; copyLabel: string; onCopy: () => void
 }) {
   const [highlighted, setHighlighted] = useState<{ code: string; language: string; content: ReactNode } | null>(null)
   useEffect(() => {
@@ -65,7 +67,6 @@ function GatewayExample({ code, language, copyLabel, onCopy, hint }: {
   return <CodeBlock>
     <CodeBlockHeader>
       <CodeBlockTitle>{language === 'shellscript' ? 'curl' : 'JavaScript'}</CodeBlockTitle>
-      {hint}
       <CodeBlockActions><Tooltip><TooltipTrigger render={<Button variant="bare" size="icon-xs" aria-label={copyLabel} onClick={onCopy}><Copy aria-hidden="true" /></Button>} /><TooltipContent>{copyLabel}</TooltipContent></Tooltip></CodeBlockActions>
     </CodeBlockHeader>
     <pre data-slot="code-block-content" tabIndex={0} dir="ltr" className="type-code overflow-x-auto p-4"><code>{highlighted?.code === code && highlighted.language === language ? highlighted.content : code}</code></pre>
@@ -74,6 +75,8 @@ function GatewayExample({ code, language, copyLabel, onCopy, hint }: {
 
 export function ModelGatewayPage() {
   const { t, language } = useI18n()
+  const monitorCopy = useMonitorCopy()
+  const [showMonitor, setShowMonitor] = useState(false)
   const settings = useStore(stores.settings, state => state.settings)
   const modelOptions = useModelOptions(undefined, settings ? settings.modelGateway.mtModel || defaultModelBinding(settings, 'mt') : undefined)
   const runtimes = useStore(stores.settings, state => state.runtimes)
@@ -107,8 +110,19 @@ export function ModelGatewayPage() {
     }).catch(error => { console.error('[gateway.snapshot]', error); if (alive) setLoadFailed(true) })
     return () => { alive = false; unsubscribe() }
   }, [api])
-  if (!api) return <Alert><AlertDescription>{t('gateway.unavailable')}</AlertDescription></Alert>
-  if (!settings || !snapshot) return <div className="model-gateway-page"><PageHeader className="nola-page-heading" title={t('gateway.title')} /><p>{t(loadFailed ? 'gateway.actionFailed' : 'common.loading')}</p>{loadFailed ? <Button onClick={() => void refresh()}>{t('gateway.refresh')}</Button> : null}</div>
+  const monitorSwitch = <div className="performance-monitor-switch">
+    <label htmlFor="gateway-performance-monitor">{monitorCopy('title')}</label>
+    <Switch id="gateway-performance-monitor" aria-label={monitorCopy('title')} checked={showMonitor} onCheckedChange={setShowMonitor}><SwitchThumb /></Switch>
+  </div>
+  if (showMonitor) return <div className="model-gateway-page">
+    <PageHeader className="nola-page-heading" title={monitorCopy('title')} actions={monitorSwitch} />
+    <PerformanceMonitor />
+  </div>
+  if (!api) return <div className="model-gateway-page">
+    <PageHeader className="nola-page-heading" title={t('gateway.title')} actions={monitorSwitch} />
+    <Alert><AlertDescription>{t('gateway.unavailable')}</AlertDescription></Alert>
+  </div>
+  if (!settings || !snapshot) return <div className="model-gateway-page"><PageHeader className="nola-page-heading" title={t('gateway.title')} actions={monitorSwitch} /><p>{t(loadFailed ? 'gateway.actionFailed' : 'common.loading')}</p>{loadFailed ? <Button onClick={() => void refresh()}>{t('gateway.refresh')}</Button> : null}</div>
   const config = settings.modelGateway
   const defaultS2sModel = defaultRealtimeS2s(settings)
   const translationMode = defaultS2sModel ? 's2s' : 'cascade'
@@ -286,10 +300,10 @@ socket.on('open', async () => {
   socket.send(JSON.stringify({ type: 'session.finish' }));
 });`
   return <div className="model-gateway-page">
-    <PageHeader className="nola-page-heading" title={t('gateway.title')} actions={<Button data-onboarding="gateway-start" variant={running ? 'danger' : 'default'} disabled={pendingSettings > 0 || changing || (!running && (s2sBlocked || config.externalEnabled === false && !CAPABILITIES.some(kind => config[kind])))} onClick={() => void perform(async () => {
+    <PageHeader className="nola-page-heading" title={t('gateway.title')} actions={<div className="performance-monitor-controls">{monitorSwitch}<Button data-onboarding="gateway-start" variant={running ? 'danger' : 'default'} disabled={pendingSettings > 0 || changing || (!running && (s2sBlocked || config.externalEnabled === false && !CAPABILITIES.some(kind => config[kind])))} onClick={() => void perform(async () => {
       const result = running ? await api.stop() : await requestFeatureStart(() => api.start(), 'model-gateway')
       if (result) setSnapshot(result)
-    }, 'runtime')}>{t(running ? 'gateway.stop' : 'gateway.start')}</Button>} />
+    }, 'runtime')}>{t(running ? 'gateway.stop' : 'gateway.start')}</Button></div>} />
     <Card>
       <CardHeader><CardTitle><RealtimePipelineLabel /></CardTitle></CardHeader>
       <CardContent>
@@ -402,7 +416,7 @@ socket.on('open', async () => {
                     <span>{t(`gateway.${request.kind}`)}</span>
                     <time dateTime={new Date(request.startedAt).toISOString()}>{new Date(request.startedAt).toLocaleTimeString(language)}</time>
                   </div>
-                  <span className="model-gateway-request-model truncate" title={request.model}>{request.model}</span>
+                  <Tooltip><TooltipTrigger render={<span className="model-gateway-request-model truncate" />}>{request.model}</TooltipTrigger><TooltipContent>{request.model}</TooltipContent></Tooltip>
                 </div>
                 <div className="model-gateway-request-result">
                   <Badge variant={request.status === 'failed' ? 'danger' : request.status === 'completed' ? 'success' : request.status === 'running' ? 'accent' : 'secondary'}>{t(`gateway.${request.status}`)}</Badge>
@@ -414,7 +428,7 @@ socket.on('open', async () => {
         </div> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Activity aria-hidden="true" /></EmptyMedia><EmptyTitle>{t('gateway.noRequests')}</EmptyTitle></EmptyHeader></Empty>}
       </CardContent>
     </Card>
-    <Card><CardHeader><CardTitle><ModelAvailabilityLabel label={t('gateway.examples')} hint={t('gateway.examplesHint')} /></CardTitle></CardHeader><CardContent><Tabs defaultValue="mt"><TabsList aria-label={t('gateway.examples')}>{PUBLIC_CAPABILITIES.map(kind => <TabsTrigger key={kind} value={kind}>{t(`gateway.${kind}`)}</TabsTrigger>)}<TabsTrigger value="realtime">{t('gateway.realtime')}</TabsTrigger></TabsList>{PUBLIC_CAPABILITIES.map(kind => <TabsContent key={kind} value={kind} className="mt-[var(--panel-gap)]"><GatewayExample code={example(kind)} language="shellscript" copyLabel={t('gateway.copy')} onCopy={() => void copy(example(kind))} /></TabsContent>)}<TabsContent value="realtime" className="mt-[var(--panel-gap)]"><GatewayExample code={realtimeExample} language="javascript" copyLabel={t('gateway.copy')} onCopy={() => void copy(realtimeExample)} hint={<ModelAvailabilityLabel label={t('gateway.realtime')} hint={<div className="flex max-w-80 flex-col gap-2 whitespace-normal"><p>{t('gateway.realtimeHint')}</p><p>{t('gateway.realtimeBrowserHint')}</p></div>} />} /></TabsContent></Tabs></CardContent></Card>
+    <Card><CardHeader><CardTitle><ModelAvailabilityLabel label={t('gateway.examples')} hint={t('gateway.examplesHint')} /></CardTitle></CardHeader><CardContent><Tabs defaultValue="mt"><TabsList className="w-full" aria-label={t('gateway.examples')}>{PUBLIC_CAPABILITIES.map(kind => <TabsTrigger key={kind} value={kind}>{t(`gateway.${kind}`)}</TabsTrigger>)}<Tooltip><TooltipTrigger render={<TabsTrigger value="realtime" />}><span>{t('gateway.realtime')}</span><CircleHelp className="size-3.5" aria-hidden="true" /></TooltipTrigger><TooltipContent><div className="flex max-w-80 flex-col gap-2 whitespace-normal"><p>{t('gateway.realtimeHint')}</p><p>{t('gateway.realtimeBrowserHint')}</p></div></TooltipContent></Tooltip></TabsList>{PUBLIC_CAPABILITIES.map(kind => <TabsContent key={kind} value={kind} className="mt-[var(--panel-gap)]"><GatewayExample code={example(kind)} language="shellscript" copyLabel={t('gateway.copy')} onCopy={() => void copy(example(kind))} /></TabsContent>)}<TabsContent value="realtime" className="mt-[var(--panel-gap)]"><GatewayExample code={realtimeExample} language="javascript" copyLabel={t('gateway.copy')} onCopy={() => void copy(realtimeExample)} /></TabsContent></Tabs></CardContent></Card>
     <Dialog open={confirmS2sOff} onOpenChange={setConfirmS2sOff}><DialogContent>
       <DialogHeader><DialogTitle>{t('session.s2sDisableTitle')}</DialogTitle><DialogDescription>{t('session.s2sDisableHint')}</DialogDescription></DialogHeader>
       <DialogFooter><Button variant="secondary" onClick={() => setConfirmS2sOff(false)}>{t('common.cancel')}</Button>

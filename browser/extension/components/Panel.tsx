@@ -87,11 +87,11 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
     {link('study', t('transcript'), BookOpen, !subtitleController || !subtitles?.active)}
     {link('settings', t('subtitleSettings'), Settings2, !preferences)}
     {(liveEnabled || locked) && <div className="nola-panel-controls">
-      <Button variant="secondary" disabled={primaryDisabled} title={blocked ? t(status) : undefined} onClick={() => { if (state.status === 'active') void store.stop(); else store.pressStart() }}>
+      <Button variant="secondary" disabled={primaryDisabled} tooltip={blocked ? t(status) : undefined} onClick={() => { if (state.status === 'active') void store.stop(); else store.pressStart() }}>
         {state.status === 'active' ? <Square aria-hidden="true" /> : <Play aria-hidden="true" />}
         {state.status === 'active' ? t('end') : state.status === 'starting' ? t('starting') : state.status === 'stopping' ? t('stopping') : t(enhanced ? 'live' : 'start')}
       </Button>
-      <Button variant="bare" size="icon-sm" aria-label={t('refresh')} title={t('refresh')} disabled={state.status === 'starting' || state.status === 'stopping' || state.capturePending} onClick={() => { subtitleController?.checkAvailability(true); void store.refresh() }}><RefreshCw aria-hidden="true" /></Button>
+      <Button variant="bare" size="icon-sm" aria-label={t('refresh')} tooltip={t('refresh')} disabled={state.status === 'starting' || state.status === 'stopping' || state.capturePending} onClick={() => { subtitleController?.checkAvailability(true); void store.refresh() }}><RefreshCw aria-hidden="true" /></Button>
     </div>}
     {liveEnabled && tabAudio && !enhanced && <Button variant="secondary" disabled={locked || !state.connected || !compatible} onClick={store.pressCapture}><AudioLines aria-hidden="true" />{t(state.audioCaptured ? 'audioCaptured' : 'captureAudio')}</Button>}
     </>}

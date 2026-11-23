@@ -1,5 +1,5 @@
 import './csp'
-import { Settings2, Plug, Keyboard, Languages, Captions, MousePointer2, TextCursorInput, Volume2, PanelsTopLeft, MousePointerClick, BookOpen, Archive, PanelTop, Search, Upload, Download, Plus, ArrowLeftRight, ChevronDown, ChevronUp, Copy, RefreshCw, X, CircleHelp, FileText, Trash2 } from 'lucide-react'
+import { Settings2, Plug, PlugZap, LoaderCircle, Keyboard, Languages, Captions, MousePointer2, TextCursorInput, Volume2, PanelsTopLeft, MousePointerClick, BookOpen, Archive, PanelTop, Search, Upload, Download, Plus, ArrowLeftRight, ChevronDown, ChevronUp, Copy, RefreshCw, X, CircleHelp, FileText, Trash2 } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type ClipboardEvent, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Button, buttonVariants } from '../../src/renderer/components/ui/button'
@@ -110,7 +110,7 @@ function ShortcutField({ label, value, defaultValue, onChange, modifierOnly = fa
     if (modifierOnly) { if (modifier) onChange(modifier); return }
     if (modifier || event.key === '+' || (!event.ctrlKey && !event.altKey && !event.metaKey)) return
     onChange([event.ctrlKey && 'Ctrl', event.altKey && 'Alt', event.shiftKey && 'Shift', event.metaKey && 'Meta', event.key.length === 1 ? event.key.toUpperCase() : event.key].filter(Boolean).join('+'))
-  }} /><KbdGroup aria-hidden="true">{value ? value.split('+').filter(Boolean).map((key, index) => <Kbd key={index}>{key}</Kbd>) : t('shortcutUnassigned')}</KbdGroup></div><Button variant="bare" size="icon-sm" aria-label={`${t('resetShortcut')} · ${label}`} title={t('resetShortcut')} disabled={value === defaultValue} onClick={() => onChange(defaultValue)}><RefreshCw /></Button><Button variant="bare" size="icon-sm" aria-label={`${t('removeShortcut')} · ${label}`} title={t('removeShortcut')} disabled={!value} onClick={() => onChange('')}><Trash2 /></Button></div></Field>
+  }} /><KbdGroup aria-hidden="true">{value ? value.split('+').filter(Boolean).map((key, index) => <Kbd key={index}>{key}</Kbd>) : t('shortcutUnassigned')}</KbdGroup></div><Button variant="bare" size="icon-sm" aria-label={`${t('resetShortcut')} · ${label}`} tooltip={t('resetShortcut')} disabled={value === defaultValue} onClick={() => onChange(defaultValue)}><RefreshCw /></Button><Button variant="bare" size="icon-sm" aria-label={`${t('removeShortcut')} · ${label}`} tooltip={t('removeShortcut')} disabled={!value} onClick={() => onChange('')}><Trash2 /></Button></div></Field>
 }
 function LanguageMultiField({ settings, locale, save, t }: { settings: Preferences; locale: Parameters<typeof languageOptions>[0]; save: Save; t: T }) {
   const [query, setQuery] = useState('')
@@ -147,6 +147,7 @@ function ProviderEditor({ providers, settings, onChange, t }: { providers: Provi
   const [addSearch, setAddSearch] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [provider, setProvider] = useState<ProviderConnection>()
+  const [testing, setTesting] = useState(false)
   const currentDraft = useRef(provider)
   currentDraft.current = provider
   useEffect(() => { setShowKey(false) }, [provider?.id])
@@ -164,10 +165,11 @@ function ProviderEditor({ providers, settings, onChange, t }: { providers: Provi
   async function test() {
     if (!provider) return
     setPending(true)
+    setTesting(true)
     try {
       const result = await testProvider(provider)
-      if (currentDraft.current === provider) showToast({ type: 'success', title: provider.name, description: result })
-    } catch (error) { if (currentDraft.current === provider) showToast({ type: 'error', description: browserErrorDescription(t, error instanceof Error ? error.message : '', 'providerRequestFailed') }) } finally { setPending(false) }
+      if (currentDraft.current === provider) showToast({ type: 'success', title: provider.name, description: `${t('connectionPassed')} · ${t('connectionLatency').replace('{ms}', String(result.elapsedMs))}` })
+    } catch (error) { if (currentDraft.current === provider) showToast({ type: 'error', description: browserErrorDescription(t, error instanceof Error ? error.message : '', 'providerRequestFailed') }) } finally { setPending(false); setTesting(false) }
   }
   async function save() {
     if (!provider) return
@@ -215,7 +217,7 @@ function ProviderEditor({ providers, settings, onChange, t }: { providers: Provi
           <JsonField key={`${provider.id}-options`} label={t('advancedOptions')} value={provider.options} onChange={options => update({ options })} error={t('invalidConfig')} />
         </FieldGroup></details>}
       </>}
-      {provider.preset !== 'nola' && <div className="nola-actions"><Button disabled={pending || !provider.name.trim()} onClick={() => void save()}>{t('save')}</Button><Button variant="outline" disabled={pending} onClick={() => void test()}>{pending ? t('translating') : t('testConnection')}</Button>{!bundledIndex && <ConfirmAction label={t('remove')} description={t('confirmRemoveProvider')} t={t} onConfirm={async () => {
+      {provider.preset !== 'nola' && <div className="nola-actions"><Button disabled={pending || !provider.name.trim()} onClick={() => void save()}>{t('save')}</Button><Button variant="outline" size="icon" disabled={pending} aria-label={t('testConnection')} tooltip={t(testing ? 'testingConnection' : 'testConnection')} onClick={() => void test()}>{testing ? <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" /> : <PlugZap aria-hidden="true" />}</Button>{!bundledIndex && <ConfirmAction label={t('remove')} description={t('confirmRemoveProvider')} t={t} onConfirm={async () => {
         const bindings = ['pageProvider', 'selectionProvider', 'inputProvider', 'subtitleProvider', 'asrProvider', 'ttsProvider', 's2sProvider', 'llmProvider'].filter(key => settings[key as keyof Preferences] === provider.id)
         if (bindings.length) await savePreferences(Object.fromEntries(bindings.map(key => [key, 'desktop'])))
         await onChange(providers.filter(p => p.id !== provider.id)); drafts.current.delete(provider.id); setSelected('desktop')
@@ -309,20 +311,20 @@ function TranslationCenter({ settings, providers, locale, t }: { settings: Prefe
   }
   return <div className="nola-translation-center">
     <div className="nola-hub-source">
-      <div className="nola-hub-languages"><PopupLanguage size="sm" label={t('source')} value={source} options={[{ value: 'auto', label: t('autoDetect') }, ...languageOptions(locale)]} onChange={setSource} t={t} /><Button variant="bare" size="icon-sm" aria-label={t('swapLanguages')} title={t('swapLanguages')} disabled={source === 'auto'} onClick={() => { setSource(target); setTarget(source) }}><ArrowLeftRight /></Button><PopupLanguage size="sm" label={t('target')} value={target} options={languageOptions(locale)} onChange={setTarget} t={t} /></div>
+      <div className="nola-hub-languages"><PopupLanguage size="sm" label={t('source')} value={source} options={[{ value: 'auto', label: t('autoDetect') }, ...languageOptions(locale)]} onChange={setSource} t={t} /><Button variant="bare" size="icon-sm" aria-label={t('swapLanguages')} tooltip={t('swapLanguages')} disabled={source === 'auto'} onClick={() => { setSource(target); setTarget(source) }}><ArrowLeftRight /></Button><PopupLanguage size="sm" label={t('target')} value={target} options={languageOptions(locale)} onChange={setTarget} t={t} /></div>
       <div className="nola-hub-input nola-card" onPaste={event => void paste(event)}>
         {image && <div className="nola-hub-attachment">
           <img src={image} alt={t('imageTranslate')} />
-          <Button variant="bare" size="icon-sm" aria-label={t('remove')} title={t('remove')} onClick={() => { pasteRevision.current++; setPreparingImage(false); changeImage('') }}><X /></Button>
+          <Button variant="bare" size="icon-sm" aria-label={t('remove')} tooltip={t('remove')} onClick={() => { pasteRevision.current++; setPreparingImage(false); changeImage('') }}><X /></Button>
         </div>}
         <Textarea className="focus-visible:ring-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nola-ui-ring" aria-label={t('inputText')} placeholder={t(active.includes(imageProvider) ? 'pasteTranslationInput' : 'inputText')} value={text} onChange={e => setText(e.target.value)} onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && hasInput && active.length && !pending) { event.preventDefault(); void run() } }} />
         <div className="nola-hub-input-actions">
-          {ttsEnabled && <Button variant="bare" size="icon-sm" disabled={!text.trim() || speaking} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak(text, source)}><Volume2 /></Button>}
+          {ttsEnabled && <Button variant="bare" size="icon-sm" disabled={!text.trim() || speaking} aria-label={t('readAloud')} tooltip={t('readAloud')} onClick={() => void speak(text, source)}><Volume2 /></Button>}
           <Button disabled={pending || !hasInput || !active.length} onClick={() => void run()}>{t(pending ? 'translating' : 'startTranslation')}</Button>
         </div>
       </div>
     </div>
-    <div className="nola-hub-results"><div className="nola-hub-toolbar"><Popover><PopoverTrigger render={<Button variant="outline" />}><Languages data-icon="inline-start" />{t('provider')}<Badge>{active.length}</Badge><ChevronDown data-icon="inline-end" /></PopoverTrigger><PopoverContent className="nola-hub-provider-picker" align="end"><PopoverTitle>{t('selectProviders')}</PopoverTitle>{available.map(p => <Toggle key={p.id} label={p.name} checked={selected.includes(p.id)} onChange={checked => selectProvider(p.id, checked)} />)}</PopoverContent></Popover><Button variant="bare" size="icon-sm" aria-label={t('apiProviders')} title={t('apiProviders')} onClick={() => { window.location.hash = 'apiProviders' }}><Settings2 /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('expand')} title={t('expand')} onClick={() => setCollapsed([])}><ChevronDown /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('collapse')} title={t('collapse')} onClick={() => setCollapsed(active)}><ChevronUp /></Button></div>
+    <div className="nola-hub-results"><div className="nola-hub-toolbar"><Popover><PopoverTrigger render={<Button variant="outline" />}><Languages data-icon="inline-start" />{t('provider')}<Badge>{active.length}</Badge><ChevronDown data-icon="inline-end" /></PopoverTrigger><PopoverContent className="nola-hub-provider-picker" align="end"><PopoverTitle>{t('selectProviders')}</PopoverTitle>{available.map(p => <Toggle key={p.id} label={p.name} checked={selected.includes(p.id)} onChange={checked => selectProvider(p.id, checked)} />)}</PopoverContent></Popover><Button variant="bare" size="icon-sm" aria-label={t('apiProviders')} tooltip={t('apiProviders')} onClick={() => { window.location.hash = 'apiProviders' }}><Settings2 /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('expand')} tooltip={t('expand')} onClick={() => setCollapsed([])}><ChevronDown /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('collapse')} tooltip={t('collapse')} onClick={() => setCollapsed(active)}><ChevronUp /></Button></div>
       {active.map(id => {
         const provider = available.find(p => p.id === id) ?? DEFAULT_PROVIDERS.find(p => p.id === imageProvider)!
         const result = results[id], expanded = !collapsed.includes(id)
@@ -333,12 +335,12 @@ function TranslationCenter({ settings, providers, locale, t }: { settings: Prefe
             <CardTitle className="flex-wrap"><ProviderAvatar provider={provider} /><span className="min-w-0 wrap-anywhere">{provider.name}</span>{elapsed !== undefined && <Badge variant="secondary" className="tabular-nums" dir="ltr">{elapsed < 1000 ? `${Math.floor(elapsed)} ms` : `${(elapsed / 1000).toFixed(2)} s`}</Badge>}</CardTitle>
             <div className="nola-hub-card-actions">
               {!unsupported && <>
-                <Button variant="bare" size="icon-sm" disabled={!hasInput || result?.pending} aria-label={t('refresh')} title={t('refresh')} onClick={() => void run([id])}><RefreshCw /></Button>
-                {ttsEnabled && <Button variant="bare" size="icon-sm" disabled={!result?.text || speaking} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak(result!.text!, target)}><Volume2 /></Button>}
-                <Button variant="bare" size="icon-sm" disabled={!result?.text} aria-label={t('copyTranslation')} title={t('copyTranslation')} onClick={() => { void Promise.resolve().then(() => navigator.clipboard.writeText(result!.text!)).then(() => showToast({ type: 'success', description: t('copied') })).catch(() => showToast({ type: 'error', description: t('internalError') })) }}><Copy /></Button>
+                <Button variant="bare" size="icon-sm" disabled={!hasInput || result?.pending} aria-label={t('refresh')} tooltip={t('refresh')} onClick={() => void run([id])}><RefreshCw /></Button>
+                {ttsEnabled && <Button variant="bare" size="icon-sm" disabled={!result?.text || speaking} aria-label={t('readAloud')} tooltip={t('readAloud')} onClick={() => void speak(result!.text!, target)}><Volume2 /></Button>}
+                <Button variant="bare" size="icon-sm" disabled={!result?.text} aria-label={t('copyTranslation')} tooltip={t('copyTranslation')} onClick={() => { void Promise.resolve().then(() => navigator.clipboard.writeText(result!.text!)).then(() => showToast({ type: 'success', description: t('copied') })).catch(() => showToast({ type: 'error', description: t('internalError') })) }}><Copy /></Button>
               </>}
-              <Button variant="bare" size="icon-sm" aria-label={t(expanded ? 'collapse' : 'expand')} aria-expanded={expanded} title={t(expanded ? 'collapse' : 'expand')} onClick={() => setCollapsed(current => expanded ? [...current, id] : current.filter(value => value !== id))}>{expanded ? <ChevronUp /> : <ChevronDown />}</Button>
-              {!(image && id === imageProvider) && <Button variant="bare" size="icon-sm" aria-label={t('close')} title={t('close')} onClick={() => selectProvider(id, false)}><X /></Button>}
+              <Button variant="bare" size="icon-sm" aria-label={t(expanded ? 'collapse' : 'expand')} aria-expanded={expanded} tooltip={t(expanded ? 'collapse' : 'expand')} onClick={() => setCollapsed(current => expanded ? [...current, id] : current.filter(value => value !== id))}>{expanded ? <ChevronUp /> : <ChevronDown />}</Button>
+              {!(image && id === imageProvider) && <Button variant="bare" size="icon-sm" aria-label={t('close')} tooltip={t('close')} onClick={() => selectProvider(id, false)}><X /></Button>}
             </div>
           </CardHeader>
           {expanded && <CardContent aria-live="polite"><p className={result?.text ? undefined : 'nola-muted'} dir="auto">{unsupported ? t('providerImageUnsupported') : result?.pending ? t('translating') : result?.text || t('awaitingTranslation')}</p></CardContent>}

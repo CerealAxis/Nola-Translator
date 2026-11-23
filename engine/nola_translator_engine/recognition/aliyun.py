@@ -89,8 +89,6 @@ def resolve_aliyun(config: ModelSelection) -> tuple[str, str, str, str]:
         raise ValueError("Unsupported Aliyun recognition model or region")
     if not re.fullmatch(r"[A-Za-z0-9-]{1,128}", workspace):
         raise ValueError("Aliyun workspace ID is required")
-    if options and options.endpoint:
-        raise ValueError("Aliyun recognition uses the workspace's official WebSocket endpoint")
     if model == MODELS[0] and config.sourceLanguage != "auto":
         raise ValueError("Qwen3.8 LiveTranslate supports automatic source-language detection only")
     aliases = ({"tl": "fil", "no": "nb"} if model in MODELS else
@@ -106,7 +104,10 @@ def resolve_aliyun(config: ModelSelection) -> tuple[str, str, str, str]:
     if config.translationProvider == "recognition" and len(config.targetLanguages) > 1:
         raise ValueError("Aliyun native translation supports at most one target language")
     api_path = "/api-ws/v1/inference" if model in INFERENCE_ASR_MODELS else f"/api-ws/v1/realtime?{urlencode({'model': model})}"
-    url = f"wss://{workspace}.{region}.maas.aliyuncs.com{api_path}"
+    endpoint = options.endpoint if options else ""
+    if endpoint and not endpoint.startswith(("ws://", "wss://")):
+        raise ValueError("Aliyun recognition endpoint must use ws or wss")
+    url = endpoint or f"wss://{workspace}.{region}.maas.aliyuncs.com{api_path}"
     target = config.targetLanguages[0] if config.translationProvider == "recognition" and config.targetLanguages else "en"
     return url, model, (options.apiKey if options else ""), aliases.get(target, target)
 

@@ -5,11 +5,17 @@
  * match on the repo path, local ids on their resourceId, anything else stays `'unknown'`.
  */
 import Alibaba from '@lobehub/icons/es/Alibaba/components/Mono'
+import AlibabaColor from '@lobehub/icons/es/Alibaba/components/Color'
 import Bilibili from '@lobehub/icons/es/Bilibili/components/Mono'
+import BilibiliColor from '@lobehub/icons/es/Bilibili/components/Color'
 import Hunyuan from '@lobehub/icons/es/Hunyuan/components/Mono'
+import HunyuanColor from '@lobehub/icons/es/Hunyuan/components/Color'
 import Meta from '@lobehub/icons/es/Meta/components/Mono'
+import MetaColor from '@lobehub/icons/es/Meta/components/Color'
 import Microsoft from '@lobehub/icons/es/Microsoft/components/Mono'
+import MicrosoftColor from '@lobehub/icons/es/Microsoft/components/Color'
 import Qwen from '@lobehub/icons/es/Qwen/components/Mono'
+import QwenColor from '@lobehub/icons/es/Qwen/components/Color'
 import XiaomiMiMo from '@lobehub/icons/es/XiaomiMiMo/components/Mono'
 import { AudioLines, Globe, ScanText } from 'lucide-react'
 import type { ComponentType, SVGProps } from 'react'
@@ -27,6 +33,16 @@ const MARK_BY_BRAND: Record<KnownBrand, Mark> = {
   bilibili: Bilibili,
   meta: Meta,
   microsoft: Microsoft,
+  'xiaomi-mimo': XiaomiMiMo,
+}
+
+const COLOR_MARK_BY_BRAND: Record<KnownBrand, Mark> = {
+  qwen: QwenColor,
+  alibaba: AlibabaColor,
+  hunyuan: HunyuanColor,
+  bilibili: BilibiliColor,
+  meta: MetaColor,
+  microsoft: MicrosoftColor,
   'xiaomi-mimo': XiaomiMiMo,
 }
 
@@ -91,11 +107,12 @@ export interface ModelMarkProps {
   /** Only used when no brand matches: falls back to the generic icon for `kind`. */
   kind: 'recognitionModel' | 'translationModel' | 'ttsModel' | 'ocrModel' | 'detectModel' | 'inpaintModel'
   size?: number
+  brandColors?: boolean
 }
 
-export function ModelMark({ record, kind, size = 30 }: ModelMarkProps) {
+export function ModelMark({ record, kind, size = 30, brandColors = false }: ModelMarkProps) {
   const brand = record ? brandOf(record) : 'unknown'
-  const Mark = brand === 'unknown' ? null : MARK_BY_BRAND[brand]
+  const Mark = brand === 'unknown' ? null : (brandColors ? COLOR_MARK_BY_BRAND : MARK_BY_BRAND)[brand]
 
   if (!Mark) {
     return (kind === 'ocrModel' || kind === 'detectModel' || kind === 'inpaintModel') ? <ScanText aria-hidden="true" /> : kind === 'translationModel' ? <Globe aria-hidden="true" /> : <AudioLines aria-hidden="true" />

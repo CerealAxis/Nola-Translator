@@ -3,6 +3,8 @@ import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_PUBLIC_MODEL } from './index-
 import { GOOGLE_TRANSLATE_ENDPOINT } from './google-translate'
 import { ALIYUN_ASR_MODELS, DEFAULT_SETTINGS, MINIMAX_RECOGNITION_MODELS, type RecognitionProvider, type RecognitionSettings, type TranslationProvider, type TranslationSettings } from './settings'
 import { customModelsOf } from './custom-models'
+import { CHATGPT_PLAN_SERVICE } from './chatgpt-plan'
+import { workspaceChatConnection, type ModelWorkspace } from './model-workspace'
 
 /** Connection options are public configuration; credentials are injected only by the main process. */
 export function recognitionFieldsOf(settings: RecognitionSettings): Pick<SessionConfig, 'recognitionProvider' | 'recognitionOptions' | 'max_segment_ms' | 'silence_end_ms'> {
@@ -12,6 +14,7 @@ export function recognitionFieldsOf(settings: RecognitionSettings): Pick<Session
     max_segment_ms: settings.max_segment_ms ?? 10000,
     silence_end_ms: settings.silence_end_ms ?? 800,
     ...(provider === 'aliyun' ? { recognitionOptions: {
+      endpoint: settings.aliyunAsrEndpoint || undefined,
       workspaceId: settings.aliyunWorkspaceId ?? '',
       region: settings.aliyunRegion ?? 'cn-beijing',
       model: settings.aliyunModel ?? ALIYUN_ASR_MODELS[0],
@@ -22,13 +25,14 @@ export function recognitionFieldsOf(settings: RecognitionSettings): Pick<Session
   }
 }
 
-export function translationOptionsOf(settings: TranslationSettings): SessionConfig['translationOptions'] {
+export function translationOptionsOf(settings: TranslationSettings, workspace?: ModelWorkspace): SessionConfig['translationOptions'] {
   switch (settings.provider) {
-    case 'cloud': return { endpoint: settings.cloudEndpoint, model: settings.cloudModel, apiFormat: settings.cloudApiFormat, contextWindow: settings.cloudContextWindow, maxOutputTokens: settings.cloudMaxOutputTokens }
-    case 'microsoft': return { endpoint: DEFAULT_SETTINGS.translation.microsoftEndpoint }
+    case 'cloud': return (settings.customModelId && translationOptionsFor(settings, 'cloud', settings.customModelId, workspace))
+      || { endpoint: settings.cloudEndpoint, model: settings.cloudModel, apiFormat: settings.cloudApiFormat, contextWindow: settings.cloudContextWindow, maxOutputTokens: settings.cloudMaxOutputTokens }
+    case 'microsoft': return { endpoint: settings.providerOverrides?.microsoft?.endpoint ?? DEFAULT_SETTINGS.translation.microsoftEndpoint }
     case 'mymemory': return { endpoint: settings.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint, email: settings.mymemoryEmail ?? '' }
-    case 'google': return { endpoint: GOOGLE_TRANSLATE_ENDPOINT }
-    case 'index-translate': return { endpoint: INDEX_TRANSLATE_ENDPOINT, model: INDEX_TRANSLATE_PUBLIC_MODEL, apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024 }
+    case 'google': return { endpoint: settings.providerOverrides?.google?.endpoint ?? GOOGLE_TRANSLATE_ENDPOINT }
+    case 'index-translate': return { endpoint: settings.providerOverrides?.['index-translate']?.endpoint ?? INDEX_TRANSLATE_ENDPOINT, model: settings.providerOverrides?.['index-translate']?.model ?? INDEX_TRANSLATE_PUBLIC_MODEL, apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024 }
     default: return undefined
   }
 }
@@ -40,19 +44,26 @@ export function translationOptionsOf(settings: TranslationSettings): SessionConf
  * hold several providers at once, so a binding has to resolve its own endpoint without reading the
  * selection of another consumer.
  */
-export function translationOptionsFor(settings: TranslationSettings, provider: TranslationProvider, customModelId = ''): SessionConfig['translationOptions'] {
+export function translationOptionsFor(settings: TranslationSettings, provider: TranslationProvider, customModelId = '', workspace?: ModelWorkspace): SessionConfig['translationOptions'] {
   switch (provider) {
     case 'cloud': {
       const profiles = customModelsOf(settings)
-      const profile = profiles.find(item => item.id === (customModelId || settings.customModelId || 'legacy')) ?? profiles[0]
+      const profile = profiles.find(item => item.id === (customModelId || settings.customModelId || 'legacy'))
+        ?? (customModelId ? undefined : profiles[0])
       if (!profile) return undefined
-      return { endpoint: profile.endpoint, model: profile.model, apiFormat: profile.apiFormat,
+      const source = workspaceChatConnection(workspace, profile.id)
+      if (source?.service === CHATGPT_PLAN_SERVICE) return undefined
+      const protocol = source?.protocol
+      return { endpoint: profile.endpoint, model: profile.model,
+        apiFormat: protocol === 'google-native' || protocol === 'azure-openai' ? protocol : profile.apiFormat,
+        ...(protocol === 'azure-openai' && source?.workspace ? { apiVersion: source.workspace } : {}),
+        ...(source ? { apiService: source.service } : {}),
         contextWindow: profile.contextWindow, maxOutputTokens: profile.maxOutputTokens }
     }
-    case 'microsoft': return { endpoint: DEFAULT_SETTINGS.translation.microsoftEndpoint }
+    case 'microsoft': return { endpoint: settings.providerOverrides?.microsoft?.endpoint ?? DEFAULT_SETTINGS.translation.microsoftEndpoint }
     case 'mymemory': return { endpoint: settings.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint, email: settings.mymemoryEmail ?? '' }
-    case 'google': return { endpoint: GOOGLE_TRANSLATE_ENDPOINT }
-    case 'index-translate': return { endpoint: INDEX_TRANSLATE_ENDPOINT, model: INDEX_TRANSLATE_PUBLIC_MODEL, apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024 }
+    case 'google': return { endpoint: settings.providerOverrides?.google?.endpoint ?? GOOGLE_TRANSLATE_ENDPOINT }
+    case 'index-translate': return { endpoint: settings.providerOverrides?.['index-translate']?.endpoint ?? INDEX_TRANSLATE_ENDPOINT, model: settings.providerOverrides?.['index-translate']?.model ?? INDEX_TRANSLATE_PUBLIC_MODEL, apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024 }
     default: return undefined
   }
 }

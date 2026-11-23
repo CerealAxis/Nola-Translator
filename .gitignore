@@ -61,3 +61,5 @@ __pycache__/
 /comics/
 /.agents/
 /.idea/
+/chatgpt-plan.json
+/screen-translation.json

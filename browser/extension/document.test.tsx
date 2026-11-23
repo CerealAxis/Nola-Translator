@@ -5,7 +5,7 @@ import { DocumentWorkbench } from './document'
 import { browserText } from './i18n'
 import { DEFAULT_PREFERENCES } from './preferences'
 import { translate } from './provider-client'
-import type { OpenDocument } from './document-formats'
+import { openDocument, type OpenDocument } from './document-formats'
 
 vi.mock('./settings-fields', () => ({
   usePreferences: () => [{ ...DEFAULT_PREFERENCES, sourceLanguage: 'en', pageLanguage: 'zh' }, 'en', browserText('en')],
@@ -48,6 +48,18 @@ async function finishTranslation(user: ReturnType<typeof userEvent.setup>) {
 }
 const sourceSelect = () => screen.getByRole('combobox', { name: 'Source language' })
 const targetSelect = () => screen.getByRole('combobox', { name: 'Target language' })
+
+it('shows spreadsheet cell addresses in the document tooltip', async () => {
+  vi.mocked(openDocument).mockResolvedValueOnce({
+    format: 'xlsx', dispose: vi.fn(), export: exportFile,
+    sections: [{ name: '', units: [], markup: () => '<table><tbody><tr><td data-tooltip-text="A1">Value</td></tr></tbody></table>' }],
+  })
+  await openFile()
+  const cell = await screen.findByRole('cell', { name: 'Value' })
+  await userEvent.setup().hover(cell)
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('A1')
+  expect(cell).not.toHaveAttribute('title')
+})
 
 it('keeps both language selectors usable after translation and preserves results when switching is cancelled', async () => {
   const user = userEvent.setup()

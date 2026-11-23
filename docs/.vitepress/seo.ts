@@ -33,15 +33,17 @@ function designAncestors(items: DefaultTheme.SidebarItem[], path: string): Crumb
 
 function breadcrumbs(page: PageData): Crumb[] {
   const path = pagePath(page.relativePath)
-  if (path === '/vis/' || page.frontmatter.noindex) return []
+  if (page.frontmatter.noindex) return []
+  if (path === '/vis/') return [{ text: copy['zh-CN'].nav.designDocs, path }]
   if (path.startsWith('/vis/')) {
     const ancestors = designAncestors(visSidebar, path) ?? [{ text: copy['zh-CN'].nav.designDocs, path: '/vis/' }]
     return [...ancestors, { text: page.title, path }]
   }
   const [, segment, section, article] = path.split('/')
-  if (!Object.hasOwn(localeNames, segment) || !section || section === 'docs') return []
+  if (!Object.hasOwn(localeNames, segment) || !section) return []
   const locale = segment as Locale
   const trail = [{ text: docsNav[locale].root, path: `/${locale}/docs` }]
+  if (section === 'docs') return trail
   if (article && Object.hasOwn(helpSections, section)) {
     const sectionTitle = helpSections[section as keyof typeof helpSections]
     trail.push({ text: docsNav[locale][sectionTitle], path: `/${locale}/${section}/` })

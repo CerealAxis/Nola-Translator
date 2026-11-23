@@ -8,6 +8,7 @@ import { Button, buttonVariants } from '../../src/renderer/components/ui/button'
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '../../src/renderer/components/ui/empty'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '../../src/renderer/components/ui/dialog'
 import { showToast, ToastProvider } from '../../src/renderer/components/ui/toast'
+import { TooltipHint, Tooltip, TooltipContent, TooltipTrigger, useTooltipAnchor } from '../../src/renderer/components/ui/tooltip'
 import { ChoiceField } from './components/ChoiceField'
 import { languageOptions, usePreferences } from './settings-fields'
 import { DEFAULT_PROVIDERS, loadProviders, requestProviderAccess, visibleProviderConnections } from './providers'
@@ -81,6 +82,16 @@ async function translateUnit(unit: DocumentUnit, source: string, target: string,
     if (text.trim()) output.push(await translate(text, source, target, 'document', signal, provider))
   }
   return output.join(' ')
+}
+
+function DocumentMarkup({ markup }: { markup: string }) {
+  const { anchor, close, handlers } = useTooltipAnchor()
+  useEffect(close, [close, markup])
+
+  return <Tooltip open={!!anchor} onOpenChange={open => { if (!open) close() }}>
+    <div {...handlers} dangerouslySetInnerHTML={{ __html: markup }} />
+    <TooltipContent anchor={anchor} className="wrap-anywhere">{anchor?.dataset.tooltipText}</TooltipContent>
+  </Tooltip>
 }
 
 export function DocumentWorkbench() {
@@ -284,7 +295,7 @@ export function DocumentWorkbench() {
           : <div className="nola-doc-sheet" data-format={opened.doc.format} dir="auto">
             {opened.doc.format === 'txt' ? <div className="whitespace-pre-wrap">{markup}</div>
               : opened.doc.format === 'md' ? <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={['img']} components={{ a: props => <a href={props.href} target="_blank" rel="noopener noreferrer">{props.children}</a> }}>{markup}</ReactMarkdown>
-              : <div dangerouslySetInnerHTML={{ __html: markup }} />}
+              : <DocumentMarkup markup={markup} />}
           </div>}
           </div>
         })}
@@ -294,9 +305,9 @@ export function DocumentWorkbench() {
 
   return <main className="nola-doc-workbench">
     <header className="nola-doc-header">
-      <a href="options.html" data-slot="button" data-variant="outline" aria-label={t('settings')} title={t('settings')} className={buttonVariants({ variant: 'outline', size: 'icon-sm', className: 'button' })}><ArrowLeft aria-hidden="true" /></a>
+      <TooltipHint content={t('settings')}><a href="options.html" data-slot="button" data-variant="outline" aria-label={t('settings')} className={buttonVariants({ variant: 'outline', size: 'icon-sm', className: 'button' })}><ArrowLeft aria-hidden="true" /></a></TooltipHint>
       <h1>{t('documentTranslation')}</h1>
-      {opened && <span className="nola-doc-filename truncate" title={opened.file.name}>{opened.file.name}</span>}
+      {opened && <Tooltip><TooltipTrigger render={<span className="nola-doc-filename truncate" />}>{opened.file.name}</TooltipTrigger><TooltipContent>{opened.file.name}</TooltipContent></Tooltip>}
       {opened && <div className="nola-doc-header-actions">
         <Button variant="outline" size="sm" disabled={Boolean(busy) || running} onClick={() => picker.current?.click()}><Upload data-icon="inline-start" />{t('documentChoose')}</Button>
         <Button size="sm" disabled={Boolean(busy) || running || !units.length || values.size !== units.length} onClick={() => void download()}><Download data-icon="inline-start" />{t(busy === 'exporting' ? 'documentExporting' : 'documentExport')}</Button>
@@ -337,12 +348,12 @@ export function DocumentWorkbench() {
       </div>}
       <div ref={compare} className="nola-doc-compare" data-both={both} data-resizing={resizing} style={{ '--doc-split': split / 100, '--doc-zoom': zoom / 100 } as CSSProperties}>
       <div className="nola-doc-viewer-toolbar">
-        <Button variant="outline" size="icon-sm" aria-label={previousLabel} title={previousLabel} disabled={currentPage === 0} onClick={() => goToPage(currentPage - 1)}><ChevronLeft /></Button>
+        <Button variant="outline" size="icon-sm" aria-label={previousLabel} tooltip={previousLabel} disabled={currentPage === 0} onClick={() => goToPage(currentPage - 1)}><ChevronLeft /></Button>
         <span aria-label={pageLabel} aria-live="polite">{currentPage + 1} / {opened.doc.sections.length}</span>
-        <Button variant="outline" size="icon-sm" aria-label={nextLabel} title={nextLabel} disabled={currentPage >= opened.doc.sections.length - 1} onClick={() => goToPage(currentPage + 1)}><ChevronRight /></Button>
-        <Button variant="outline" size="icon-sm" aria-label={zoomOutLabel} title={zoomOutLabel} disabled={zoom <= 50} onClick={() => setZoom(value => Math.max(50, value - 10))}><ZoomOut /></Button>
+        <Button variant="outline" size="icon-sm" aria-label={nextLabel} tooltip={nextLabel} disabled={currentPage >= opened.doc.sections.length - 1} onClick={() => goToPage(currentPage + 1)}><ChevronRight /></Button>
+        <Button variant="outline" size="icon-sm" aria-label={zoomOutLabel} tooltip={zoomOutLabel} disabled={zoom <= 50} onClick={() => setZoom(value => Math.max(50, value - 10))}><ZoomOut /></Button>
         <span>{zoom}%</span>
-        <Button variant="outline" size="icon-sm" aria-label={zoomInLabel} title={zoomInLabel} disabled={zoom >= 200} onClick={() => setZoom(value => Math.min(200, value + 10))}><ZoomIn /></Button>
+        <Button variant="outline" size="icon-sm" aria-label={zoomInLabel} tooltip={zoomInLabel} disabled={zoom >= 200} onClick={() => setZoom(value => Math.min(200, value + 10))}><ZoomIn /></Button>
       </div>
         {original && preview('source')}
         {both && <div className="nola-doc-divider" role="separator" aria-label={t('documentDivider')} aria-orientation="vertical" aria-valuemin={20} aria-valuemax={80} aria-valuenow={split} tabIndex={0}

@@ -223,7 +223,6 @@ export function MeetingModePage() {
             </div>
           </div>
           <RealtimeProcessingField id="meeting-pipeline" className="nola-settings-field" disabled={locked} value={mode.pipeline === 'auto' ? 'default' : mode.pipeline} onChange={value => change('pipeline', value === 'default' ? 'auto' : value)} />
-          <TextProcessingSceneField scene="meeting" disabled={locked} />
           <Field className="nola-settings-field nola-language-pair-field">
             <ModelAvailabilityLabel label={t('shellUi.languageDirection')} hint={t('meeting.languageDirectionHint')} />
             <LanguageDirectionSelect source={mode.localLanguage} target={mode.remoteLanguage} sourceCodes={localCodes} targetCodes={remoteCodes}
@@ -232,6 +231,7 @@ export function MeetingModePage() {
               onSourceChange={value => change('localLanguage', value)} onTargetChange={value => change('remoteLanguage', value)}
               onSwap={localCodes.includes(mode.remoteLanguage) && remoteCodes.includes(mode.localLanguage) ? () => setDraft(previous => ({ ...(previous ?? mode), localLanguage: mode.remoteLanguage, remoteLanguage: mode.localLanguage })) : undefined} />
           </Field>
+          <TextProcessingSceneField scene="meeting" disabled={locked} />
         </FieldGroup>
         <FieldGroup className="nola-settings-fields">
           <h2 className="nola-settings-heading">{t('meeting.routing')}</h2>
