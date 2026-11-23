@@ -36,7 +36,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 
 import { app, BrowserWindow, ipcMain, safeStorage, screen, session, shell, type IpcMainInvokeEvent } from 'electron'
 
-import type { AppSettings, OverlaySettings } from '../shared/settings'
+import type { AppSettings, CredentialProvider, OverlaySettings } from '../shared/settings'
 import { defaultRealtimeS2s, MIMO_TTS_BINDING, NO_TRANSLATION_LANGUAGE, REALTIME_S2S_MODELS } from '../shared/settings'
 import { z } from 'zod'
 import { isModelEnabled, sceneModelBinding } from '../shared/model-policy'
@@ -53,8 +53,13 @@ import { BackendSupervisor, backendLaunchSpec } from './backend-supervisor'
 import { BackendSession, mapBrowserSessionConfig, mapSessionConfig, type BackendSessionConfig } from './backend-session'
 import { captionPaint, latencyMeta, LatencySession, latencyWavePoint } from './latency-session'
 import { LatencyWindow } from './latency-window'
-import { BackendScreenOcr, backendAsrHeaders, backendMtHeaders, backendCloudAsr, gatewayMtBackup, inferBackendModel, inferBackendMt, openBackendAsrStream, openBackendLanguageModel, backendGatewayControl, backendGatewayInstances } from './backend-direct-model'
+import { BackendScreenOcr, backendAsrHeaders, backendMtHeaders, backendCloudAsr, backendCloudMt, gatewayMtBackup, inferBackendModel, inferBackendMt, openBackendAsrStream, openBackendLanguageModel, backendGatewayControl, backendGatewayInstances, probeBackendS2s } from './backend-direct-model'
 import { createGatewayLanguageModel } from './gateway-language-model'
+import { ChatGptPlan } from './chatgpt-plan'
+import { CHATGPT_PLAN_SERVICE, chatGptPlanRequest } from '../shared/chatgpt-plan'
+import { cloudModelError, cloudModelHttpError, fetchCloudChatModels } from './cloud-model-tools'
+import { cloudModelListRequestSchema, cloudModelProbeRequestSchema } from '../shared/cloud-model-tools'
+import { astrBotSpeechPresetForBinding } from '../shared/astrbot-speech-presets'
 import { ALIYUN_S2S_SPEECH_LANGUAGES, fallbackTranslationFieldsOf, recognitionFieldsOf, remoteSourceLanguages, translationOptionsFor } from '../shared/cloud-config'
 import { aliyunConnectionReady } from '../shared/cloud-models'
 import { clearDataRootPointer, clearPendingDataMigration, defaultDataRoot, fallbackDataRoot, legacyDefaultDataRoot, readDataRootPointer, readPendingDataMigration, resolveDataRoot, setSessionDataRoot, writeDataRootPointer, writePendingDataMigration } from './data-root'
@@ -580,6 +585,13 @@ if (!hasSingleInstanceLock) {
     if (initialSettings.modelStoragePath) await cleanupStorageCaches(initialSettings.modelStoragePath)
     const meetings = new MeetingStore(join(dataRoot, 'meetings'))
     const credentials = new SecureCredentialStore(join(dataRoot, 'credentials.json'), safeStorage)
+    const chatGptPlan = new ChatGptPlan(new SecureCredentialStore(join(dataRoot, 'chatgpt-plan.json'), safeStorage), url => shell.openExternal(url))
+    const chatGptPlanPresence = async (provider: CredentialProvider) => {
+      const source = settings.current().modelWorkspace?.connections.find(source =>
+        source.service === CHATGPT_PLAN_SERVICE && customCredentialSlot(source.id) === provider)
+      if (source) return chatGptPlan.handle({ action: 'status', sourceId: source.id })
+        .then(result => result.account?.authorized === true, () => false)
+    }
     for (const provider of ['google', 'fallback-google', 'microsoft']) {
       await credentials.remove(provider).catch(error => console.error('[credentials] obsolete translator key removal failed', error))
     }
@@ -628,7 +640,7 @@ if (!hasSingleInstanceLock) {
           const directories = runtimes.selectedDirectories(settings.current().compute)
           const spec = backendLaunchSpec({
             isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
-            managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp,
+            managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp, managedOnnxDirectory: directories.onnx,
           })
           return { ...spec, env: { ...spec.env, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? bundledLlamaDirectory } }
         },
@@ -682,10 +694,10 @@ if (!hasSingleInstanceLock) {
     engine = new EngineProcess({
       resolveLaunchSpec: () => {
         const compute = launchCompute
-        const { engine: engineDirectory, llama: llamaDirectory, crisp: crispDirectory } = runtimes.selectedDirectories(compute)
+        const { engine: engineDirectory, llama: llamaDirectory, crisp: crispDirectory, onnx: onnxDirectory } = runtimes.selectedDirectories(compute)
         return {
           ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
-            managedEngineDirectory: engineDirectory, managedCrispDirectory: crispDirectory }),
+            managedEngineDirectory: engineDirectory, managedCrispDirectory: crispDirectory, managedOnnxDirectory: onnxDirectory }),
           env: { ...resourceEnvironment,
             NOLA_TRANSLATOR_LLAMA_DIR: llamaDirectory ?? '',
             // The main logger receives structured pipeline diagnostics on stderr, keeping one
@@ -889,8 +901,8 @@ if (!hasSingleInstanceLock) {
       const provider = config.translationProvider ?? 'local'
       if (provider === 'cloud' && config.translationBinding?.startsWith('mt-custom:')) {
         const id = config.translationBinding.slice('mt-custom:'.length)
-        const translation = translationOptionsFor(current.translation, 'cloud', id)
-        if (translation) resolved.translationOptions = { ...translation, apiKey: await credentials.get(customCredentialSlot(id)) }
+        const translation = translationOptionsFor(current.translation, 'cloud', id, current.modelWorkspace)
+        if (translation) resolved.translationOptions = { ...translation, apiKey: await credentials.get(customCredentialSlot(id, current.modelWorkspace)) }
       }
       if (provider === 'google' || provider === 'microsoft' || provider === 'mymemory') {
         resolved.translationOptions = translationOptionsFor(current.translation, provider)
@@ -1199,7 +1211,7 @@ if (!hasSingleInstanceLock) {
         const directories = runtimes.selectedDirectories(settings.current().compute)
         const spec = createEngineLaunchSpec({
           isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
-          managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp,
+          managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp, managedOnnxDirectory: directories.onnx,
           module: 'nola_translator_engine.offline_models',
         })
         return runOfflineModelWorker({ ...spec, env: { ...resourceEnvironment,
@@ -1365,7 +1377,7 @@ if (!hasSingleInstanceLock) {
         }
         const directories = runtimes.selectedDirectories(compute)
         return { ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
-          managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp, module: 'nola_translator_engine.local_call' }),
+          managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp, managedOnnxDirectory: directories.onnx, module: 'nola_translator_engine.local_call' }),
           env: { ...resourceEnvironment, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? '', NOLA_TRANSLATOR_RUN_LOG_STDERR: '1' } }
     }
     let gatewayLease: FeatureLease | null = null
@@ -1421,11 +1433,17 @@ if (!hasSingleInstanceLock) {
       },
       createLanguageModel: (services, binding, signal) => createGatewayLanguageModel({
         ...services,
-        openLocalLanguageModel: async (resourceId, localSignal) => {
+        getChatGptPlanToken: sourceId => {
+          if (!settings.current().modelWorkspace?.connections.some(source => source.id === sourceId && source.service === CHATGPT_PLAN_SERVICE)) {
+            throw new Error('CHATGPT_SIGN_IN_REQUIRED')
+          }
+          return chatGptPlan.accessToken(sourceId)
+        },
+        openLocalLanguageModel: async (resourceId, localSignal, contextWindow) => {
           await ensureRealtimeBackend()
           const concurrency = gatewayConcurrency(`resource:${resourceId}`, settings.current().modelGateway.concurrency?.llm)
           if (!backend?.ready) throw new Error('realtimeBackendUnavailable')
-          const connection = await openBackendLanguageModel(backend, resourceId, localSignal, concurrency)
+          const connection = await openBackendLanguageModel(backend, resourceId, localSignal, concurrency, contextWindow)
           if (!connection) throw new Error('modelUnavailable')
           return connection
         },
@@ -1438,10 +1456,83 @@ if (!hasSingleInstanceLock) {
       },
       getCredential: provider => credentials.get(provider),
       getKey: () => credentials.get('model-gateway'), setKey: value => credentials.set('model-gateway', value),
+      chatGptPlanPresence,
       onChanged: snapshot => {
         for (const window of BrowserWindow.getAllWindows()) sendToRenderer(window, 'model-gateway:changed', snapshot)
         if (snapshot.state === 'failed' || snapshot.state === 'stopped') { gatewayLease?.release(); gatewayLease = null }
       },
+    })
+    loggedHandle('cloud-model:chatgpt-plan', (event, raw: unknown) => {
+      assertFeatureSender(event, true)
+      return chatGptPlan.handle(chatGptPlanRequest.parse(raw))
+    })
+    loggedHandle('cloud-model:list', async (event, raw: unknown) => {
+      assertFeatureSender(event, true)
+      const request = cloudModelListRequestSchema.parse(raw)
+      const current = settings.current()
+      const savedEndpoint = current.modelWorkspace?.connections.find(source => source.id === request.sourceId && source.capability === 'LLM')?.endpoint
+        || customModelsOf(current.translation).find(model => customCredentialSlot(model.id, current.modelWorkspace) === customCredentialSlot(request.sourceId))?.endpoint
+      const key = request.key.trim() || (savedEndpoint && URL.canParse(savedEndpoint) && URL.canParse(request.endpoint)
+        && new URL(savedEndpoint).origin === new URL(request.endpoint).origin
+        ? await credentials.get(customCredentialSlot(request.sourceId)) : '')
+      return fetchCloudChatModels(request, key, AbortSignal.timeout(15_000))
+    })
+    loggedHandle('cloud-model:probe', async (event, raw: unknown) => {
+      assertFeatureSender(event, true)
+      const request = cloudModelProbeRequestSchema.parse(raw)
+      const { capability, binding } = request
+      const signal = AbortSignal.timeout(25_000)
+      if (capability === 'LLM' && /^custom:[a-zA-Z0-9_-]{1,64}$/.test(binding)) {
+        const current = settings.current()
+        const profileId = binding.slice('custom:'.length)
+        const profile = customModelsOf(current.translation).find(model => model.id === profileId)
+        const hasKey = Boolean((await credentials.get(customCredentialSlot(profileId, current.modelWorkspace))).trim())
+        if (!hasKey && profile && URL.canParse(profile.endpoint) && new URL(profile.endpoint).origin === 'https://api.openai.com') {
+          throw cloudModelError('CLOUD_MODEL_KEY_REQUIRED')
+        }
+        const lease = await gateway!.acquireLanguageModel(binding, true)
+        let failure: unknown
+        try {
+          await generateText({ model: lease.model('disabled'), prompt: 'Reply with OK.', maxOutputTokens: Math.min(32, lease.profile.maxOutputTokens),
+            maxRetries: 0, abortSignal: AbortSignal.any([signal, lease.signal]) })
+        } catch (error) {
+          const status = error instanceof Error && 'statusCode' in error ? error.statusCode : undefined
+          failure = signal.aborted ? cloudModelError('REQUEST_TIMEOUT') : typeof status === 'number' ? cloudModelHttpError(status, hasKey)
+            : new Error(lease.redact(error instanceof Error ? error.message : 'Model request failed'))
+          throw failure
+        } finally { lease.release(failure) }
+        return {}
+      }
+      if (capability === 'S2S' && REALTIME_S2S_MODELS.some(model => model === binding)) {
+        const key = (await credentials.get('aliyun-asr')).trim()
+        if (!key) throw cloudModelError('CLOUD_MODEL_KEY_REQUIRED')
+        if (!settings.current().recognition.aliyunWorkspaceId) throw cloudModelError('CLOUD_MODEL_WORKSPACE_REQUIRED')
+        await ensureRealtimeBackend()
+        if (!backend?.ready) throw new Error('realtimeBackendUnavailable')
+        await probeBackendS2s(backend, binding, settings.current().recognition, key, signal)
+        return {}
+      }
+      const speech = astrBotSpeechPresetForBinding(binding)
+      if (capability === 'ASR' && request.audio && (backendCloudAsr(binding) || speech?.capability === 'ASR')) {
+        const provider = backendCloudAsr(binding)
+        if (provider && !(await credentials.get(`${provider}-asr`)).trim()) throw cloudModelError('CLOUD_MODEL_KEY_REQUIRED')
+        if (provider === 'aliyun' && !settings.current().recognition.aliyunWorkspaceId) throw cloudModelError('CLOUD_MODEL_WORKSPACE_REQUIRED')
+        await gateway!.infer({ id: randomUUID(), kind: 'asr', model: binding, audio: request.audio, source: 'auto' }, signal, false, true)
+        return {}
+      }
+      if (capability === 'MT' && binding.startsWith('cloud:') && backendCloudMt(binding)) {
+        const result = await gateway!.infer({ id: randomUUID(), kind: 'mt', model: binding, text: 'Hello.', source: 'en', target: 'zh' }, signal, false, true)
+        if (!result.text.trim()) throw cloudModelError('CLOUD_MODEL_NO_TRANSLATION')
+        return {}
+      }
+      if (capability === 'TTS' && request.text && speech?.capability === 'TTS') {
+        if (binding === MIMO_TTS_BINDING && !(await credentials.get('mimo-tts')).trim()) throw cloudModelError('CLOUD_MODEL_KEY_REQUIRED')
+        const voice = binding === MIMO_TTS_BINDING ? settings.current().synthesis.voice : undefined
+        const result = await gateway!.infer({ id: randomUUID(), kind: 'tts', model: binding, text: request.text, voice }, signal, false, true)
+        if (!result.audio?.startsWith('data:audio/')) throw cloudModelError('CLOUD_MODEL_NO_AUDIO')
+        return { audio: result.audio }
+      }
+      throw new Error('Cloud model is not configured')
     })
     loggedHandle('feature-activity:snapshot', event => { assertFeatureSender(event); return activity.snapshot() })
     loggedHandle('feature-activity:stop', event => { assertFeatureSender(event); return activity.stop() })
@@ -1643,6 +1734,7 @@ if (!hasSingleInstanceLock) {
       meetings,
       audioProtocol: `${MEETING_AUDIO_SCHEME}://`,
       credentials,
+      chatGptPlanPresence,
       engine,
       getOverlayWindow,
       getMainWindow: () => mainWindow,
@@ -1703,8 +1795,10 @@ if (!hasSingleInstanceLock) {
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
       workspace: new AgentWorkspace(join(dataRoot, 'local-call')),
       listDirectModels: async () => {
-        const snapshot = await gateway!.snapshotWithCatalog()
-        return Object.values(snapshot.availableModels ?? {}).flat().map(model => ({ model: model.binding, name: model.name, kind: model.kind }))
+        const [snapshot, speech] = await Promise.all([gateway!.snapshotWithCatalog(), gateway!.batchSpeechModels()])
+        const available = new Map([...Object.values(snapshot.availableModels ?? {}).flat(), ...speech]
+          .map(model => [model.binding, { model: model.binding, name: model.name, kind: model.kind }]))
+        return [...available.values()]
       },
       inferModel: async (request, signal, inspect) => {
         const prepared = request.kind === 'mt' && !request.image && request.text && !inspect

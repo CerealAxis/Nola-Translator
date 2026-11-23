@@ -4,7 +4,7 @@ const article = (text: string, path: string) => ({ text, link: `/vis/${path}` })
 
 export const visSidebar: DefaultTheme.SidebarItem[] = [
   {
-    text: 'Nola Translator 设计文档',
+    text: '设计文档',
     link: '/vis/',
     items: [
       article('DESIGN.md', 'DESIGN'),

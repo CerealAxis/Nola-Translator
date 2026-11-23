@@ -2,6 +2,22 @@ import type { ResourceRecord } from '@/bridge'
 
 export type RecommendedFamily = 'qwen' | 'sensevoice' | 'funasr' | 'vibevoice' | 'mimo' | 'qwen35' | 'tts' | 'kokoro' | 'piper' | 'cosyvoice3' | 'hymt2' | 'index' | 'other'
 
+export const FAMILY_NAMES: Record<RecommendedFamily, string> = {
+  qwen: 'Qwen3-ASR',
+  qwen35: 'Qwen3.5',
+  sensevoice: 'SenseVoiceSmall',
+  funasr: 'Fun-ASR',
+  vibevoice: 'VibeVoice-ASR',
+  mimo: 'MiMo-V2.5-ASR',
+  tts: 'Qwen3-TTS',
+  kokoro: 'Kokoro-82M',
+  piper: 'Piper',
+  cosyvoice3: 'CosyVoice3',
+  hymt2: 'Hy-MT2',
+  index: 'Index-Translate',
+  other: 'M2M100',
+}
+
 export function isQwen3TtsRecord(record: Pick<ResourceRecord, 'kind' | 'resourceId'>): boolean {
   return record.kind === 'ttsModel' && record.resourceId.startsWith('tts-qwen3-tts-')
 }

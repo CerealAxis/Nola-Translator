@@ -268,6 +268,18 @@ export function createIpcBridge(): NolaBridge {
           if (!injected.directModel) throw new Error('Direct model runtime unavailable')
           return injected.directModel(request, inspect)
         }),
+      listCloudModels: request => call('listCloudModels', injected => {
+        if (!injected.listCloudModels) throw new MissingIpcApiError('listCloudModels')
+        return injected.listCloudModels(request)
+      }),
+      probeCloudModel: request => call('probeCloudModel', injected => {
+        if (!injected.probeCloudModel) throw new MissingIpcApiError('probeCloudModel')
+        return injected.probeCloudModel(request)
+      }),
+      chatGptPlan: request => call('chatGptPlan', injected => {
+        if (!injected.chatGptPlan) throw new MissingIpcApiError('chatGptPlan')
+        return injected.chatGptPlan(request)
+      }),
       cancelLanguageModel: id => call('cancelLanguageModel', injected => injected.cancelLanguageModel?.(id) ?? Promise.resolve()),
       releaseDirectModel: () => call('releaseDirectModel', injected => injected.releaseDirectModel?.() ?? Promise.resolve()),
       resolveLanguageModelAudio: result => call('resolveLanguageModelAudio', injected => {

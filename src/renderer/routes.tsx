@@ -27,6 +27,7 @@ import { useI18n } from '@/i18n'
 export type SettingsTab = 'general' | 'audio' | 'appearance' | 'browser' | 'shortcuts' | 'engine' | 'storage' | 'text-processing' | 'help' | 'developer'
 
 export type TextProcessingLibrary = 'glossary' | 'preserve-words' | 'subtitle-words'
+export type ModelManagementView = 'sources' | 'search' | 'downloads'
 
 const ALL_SETTINGS_TABS: readonly SettingsTab[] = [
   'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'text-processing', 'help', 'developer',
@@ -51,6 +52,7 @@ export interface Route {
   tab?: SettingsTab
   /** Only `models` has this optional subtab. */
   modelsTab?: 'downloads'
+  modelManagementView?: ModelManagementView
   /** 仅 `record` 有，是 meetingId。 */
   id?: string
   projectId?: string
@@ -74,6 +76,10 @@ export function settingsPath(tab: SettingsTab | TextProcessingLibrary): string {
 
 export function recordPath(id: string): string {
   return `#/records/${encodeURIComponent(id)}`
+}
+
+export function modelManagementPath(view: ModelManagementView = 'sources'): string {
+  return view === 'sources' ? '#/model-management' : `#/model-management/${view}`
 }
 
 export function pathOf(route: RouteId, options?: { tab?: SettingsTab | TextProcessingLibrary; id?: string }): string {
@@ -102,6 +108,8 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab | TextProce
       return options?.id ? recordPath(options.id) : '#/records'
     case 'models':
       return '#/models'
+    case 'model-management':
+      return modelManagementPath()
     case 'settings':
       return options?.tab ? settingsPath(options.tab) : `#/settings/${DEFAULT_SETTINGS_TAB}`
   }
@@ -131,6 +139,7 @@ const PARENT_ROUTES: Record<RouteId, RouteId | null> = {
   records: 'home',
   record: 'records',
   models: 'home',
+  'model-management': 'home',
   settings: 'home',
 }
 
@@ -183,8 +192,15 @@ export function parseRoute(hash: string): Route {
       const decoded = safeDecode(id)
       return { route: 'record', id: decoded, path: `#/records/${id}` }
     }
+    case 'model-management':
+      if (segments[1] === 'search' || segments[1] === 'downloads') {
+        return { route: 'model-management', modelManagementView: segments[1], path: modelManagementPath(segments[1]) }
+      }
+      return { route: 'model-management', path: pathOf('model-management') }
     case 'models':
-      return segments[1] === 'downloads' ? { route: 'models', modelsTab: 'downloads', path: '#/models/downloads' } : { route: 'models', path: '#/models' }
+      if (segments[1] === 'demo' || segments[1] === 'providers') return { route: 'model-management', path: pathOf('model-management') }
+      if (segments[1] === 'downloads') return { route: 'models', modelsTab: 'downloads', path: '#/models/downloads' }
+      return { route: 'models', path: '#/models' }
     case 'settings': {
       const section = segments[1] === 'text-processing' ? segments[2] : segments[1]
       if (section === 'glossary' || section === 'preserve-words' || section === 'subtitle-words') {
@@ -304,6 +320,7 @@ export const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.m
   records: 'nav.records',
   record: 'nav.records',
   models: 'nav.models',
+  'model-management': 'nav.models',
   settings: 'nav.settings',
 }
 
@@ -323,8 +340,7 @@ export function Routes({ pages }: RoutesProps): ReactNode {
 
   return (
     <div
-      // key 用 path：同一路由换 tab 也算一次进入，淡入才会重新播。
-      key={path}
+      key={route === 'model-management' ? modelManagementPath() : path}
       data-page={route}
       className="nola-page-enter nola-route-content"
     >

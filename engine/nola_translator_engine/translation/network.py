@@ -12,7 +12,7 @@ from time import monotonic
 import httpx
 from collections.abc import Callable
 from typing import Any
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, getproxies, proxy_bypass, urlopen
 
 from .base import ProviderTranslation, revision_context
@@ -38,21 +38,27 @@ DEFAULT_CONTEXT_WINDOW = 128_000
 DEFAULT_MAX_OUTPUT_TOKENS = 4_096
 
 
-def custom_translation_provider(api_format, *, endpoint, model, api_key, context_window, max_output_tokens):
+def custom_translation_provider(api_format, *, endpoint, model, api_key, context_window, max_output_tokens,
+                                api_version="", api_service=""):
     providers = {
         "chat-completions": (OpenAICompatibleProvider, DEFAULT_OPENAI_ENDPOINT, "gpt-4.1-mini"),
         "chat-responses": (OpenAIResponsesProvider, DEFAULT_OPENAI_ENDPOINT, "gpt-4.1-mini"),
         "anthropic": (AnthropicMessagesProvider, DEFAULT_ANTHROPIC_ENDPOINT, "claude-haiku-4-5"),
         "ollama": (OllamaTranslationProvider, DEFAULT_OLLAMA_ENDPOINT, "qwen3:4b"),
+        "google-native": (GeminiTranslationProvider, "https://generativelanguage.googleapis.com", "gemini-2.5-flash"),
+        "azure-openai": (AzureOpenAITranslationProvider, "", ""),
     }
     if api_format not in providers:
-        raise ValueError(f"未知的翻译接口格式 apiFormat：{api_format}。可选：chat-completions、chat-responses、anthropic、ollama")
+        raise ValueError(f"未知的翻译接口格式 apiFormat：{api_format}")
     provider, default_endpoint, default_model = providers[api_format]
-    return provider(
+    instance = provider(
         endpoint=default_endpoint if endpoint is None else endpoint,
         model=default_model if model is None else model,
         api_key=api_key, context_window=context_window, max_output_tokens=max_output_tokens,
+        **({"api_version": api_version} if api_format == "azure-openai" else {}),
     )
+    instance.api_service = api_service
+    return instance
 
 #: Characters per token, used ONLY to keep a request inside the user's contextWindow. This
 #: is an approximation, not tokenisation: no tokenizer is loaded, and the real ratio is
@@ -229,8 +235,9 @@ class MicrosoftTranslatorProvider(_NetworkTransport):
         self,
         *,
         requester: JsonRequester = _post_json,
+        endpoint: str = DEFAULT_MICROSOFT_ENDPOINT,
     ) -> None:
-        self.endpoint = DEFAULT_MICROSOFT_ENDPOINT
+        self.endpoint = endpoint.rstrip('/')
         self.requester = requester
 
     async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
@@ -292,6 +299,7 @@ class _BudgetedChatProvider(_NetworkTransport):
     #: user has to change.
     label = ""
     supports_streaming = False
+    api_service = ""
 
     def __init__(
         self,
@@ -317,6 +325,16 @@ class _BudgetedChatProvider(_NetworkTransport):
 
     def _headers(self) -> dict[str, str]:
         raise NotImplementedError
+
+    def _request_headers(self) -> dict[str, str]:
+        headers = self._headers()
+        if self.api_service in ("minimax-token-plan", "minimax-token-plan-global", "xiaomi-token-plan") and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        elif self.api_service in ("kimi-code", "kimi-code-global"):
+            headers["User-Agent"] = "astrbot/4.29.4"
+        elif self.api_service == "ssycloud":
+            headers["X-Title"] = "AstrBot"
+        return headers
 
     def _payload(self, text: str, system: str) -> dict[str, Any]:
         raise NotImplementedError
@@ -403,7 +421,7 @@ class _BudgetedChatProvider(_NetworkTransport):
         for chunk in chunks:
             # the chunks are one utterance and the scheduler already
             # runs the per-target requests concurrently, which is the concurrency that pays.
-            result = await self._request_json(self._url(), self._payload(chunk, system), self._headers())
+            result = await self._request_json(self._url(), self._payload(chunk, system), self._request_headers())
             parts.append(self._extract(result))
         return ProviderTranslation(_join_chunks(parts), (source, target))
 
@@ -425,7 +443,7 @@ class _BudgetedChatProvider(_NetworkTransport):
             payload = {**self._payload(chunk, system), "stream": True}
             buffer = ""
             finished = False
-            async with self._client().stream('POST', self._url(), json=payload, headers=self._headers()) as response:
+            async with self._client().stream('POST', self._url(), json=payload, headers=self._request_headers()) as response:
                 response.raise_for_status()
                 if 'text/event-stream' not in response.headers.get('content-type', ''):
                     # Some compatible gateways ignore stream and return their ordinary JSON reply.
@@ -532,6 +550,9 @@ class OpenAICompatibleProvider(_BudgetedChatProvider):
         # https://platform.minimax.io/docs/api-reference/text-openai-api
         if urlsplit(self.endpoint).hostname in ('api.minimax.io', 'api.minimax.cn', 'api.minimax.chat'):
             payload.update(temperature=1, reasoning_split=True)
+        if re.match(r"^(?:o[134](?:-|$)|gpt-5(?:[.-]|$))", self.model, re.IGNORECASE):
+            payload["max_completion_tokens"] = payload.pop("max_tokens")
+            payload.pop("temperature")
         return payload
 
     def _stream_delta(self, event: dict[str, Any]) -> tuple[str, bool]:
@@ -569,6 +590,57 @@ def bounded_translation_history(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [text[-256:] for text in value[-3:] if isinstance(text, str) and text.strip()]
+
+
+class AzureOpenAITranslationProvider(OpenAICompatibleProvider):
+    name = "azure-openai"
+    label = "Azure OpenAI"
+
+    def __init__(self, *, api_version: str, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.api_version = api_version or "2024-05-01-preview"
+
+    def _url(self) -> str:
+        if self.endpoint.endswith("/openai/v1"):
+            return f"{self.endpoint}/chat/completions"
+        deployment = quote(self.model, safe="")
+        query = urlencode({"api-version": self.api_version})
+        return f"{self.endpoint.removesuffix('/openai')}/openai/deployments/{deployment}/chat/completions?{query}"
+
+    def _headers(self) -> dict[str, str]:
+        return {"api-key": self.api_key}
+
+
+class GeminiTranslationProvider(_BudgetedChatProvider):
+    name = "google-native"
+    label = "Gemini"
+
+    def _url(self) -> str:
+        base = self.endpoint if re.search(r"/v1(?:beta|alpha)?$", self.endpoint) else f"{self.endpoint}/v1beta"
+        return f"{base}/models/{quote(self.model.removeprefix('models/'), safe='')}:generateContent"
+
+    def _headers(self) -> dict[str, str]:
+        return {"x-goog-api-key": self.api_key}
+
+    def _payload(self, text: str, system: str) -> dict[str, Any]:
+        return {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": text}]}],
+            "generationConfig": {"temperature": 0, "maxOutputTokens": self._output_token_limit(text, system)},
+        }
+
+    def _extract(self, result: object) -> str:
+        try:
+            candidate = result["candidates"][0]  # type: ignore[index]
+            if candidate.get("finishReason") not in (None, "STOP"):
+                raise RuntimeError("Gemini 译文被截断或阻止")
+            parts = candidate["content"]["parts"]
+            translated = "".join(part.get("text", "") for part in parts if not part.get("thought")).strip()
+        except (AttributeError, IndexError, KeyError, TypeError) as error:
+            raise RuntimeError("Gemini 响应格式无效") from error
+        if not translated:
+            raise RuntimeError("Gemini 没有返回译文")
+        return translated
 
 
 class LocalQwenTranslationProvider(OpenAICompatibleProvider):

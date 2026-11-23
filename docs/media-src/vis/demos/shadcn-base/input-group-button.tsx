@@ -20,6 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/styles/base-nova/ui/popover"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/styles/base-nova/ui/tooltip"
 
 export default function InputGroupButtonExample() {
   const { copyToClipboard, isCopied } = useCopyToClipboard()
@@ -30,16 +31,13 @@ export default function InputGroupButtonExample() {
       <InputGroup>
         <InputGroupInput placeholder="https://x.com/shadcn" readOnly />
         <InputGroupAddon align="inline-end">
-          <InputGroupButton
-            aria-label="复制"
-            title="复制"
-            size="icon-xs"
-            onClick={() => {
-              copyToClipboard("https://x.com/shadcn")
-            }}
-          >
-            {isCopied ? <IconCheck /> : <IconCopy />}
-          </InputGroupButton>
+          <Tooltip>
+            <TooltipTrigger render={<InputGroupButton aria-label="复制" size="icon-xs"
+              onClick={() => copyToClipboard("https://x.com/shadcn")} />}>
+              {isCopied ? <IconCheck /> : <IconCopy />}
+            </TooltipTrigger>
+            <TooltipContent>复制</TooltipContent>
+          </Tooltip>
         </InputGroupAddon>
       </InputGroup>
       <InputGroup className="[--radius:9999px]">

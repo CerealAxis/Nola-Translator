@@ -67,6 +67,19 @@ const networkSettingsSchema = z.object({
   proxyForRuntimeDownload: z.boolean().optional(),
 }).strip()
 
+const translationOptionsSchema = z.object({
+  endpoint: z.string().max(2048).optional(),
+  apiKey: z.string().max(4096).optional(),
+  email: z.string().max(320).optional(),
+  region: z.string().max(128).optional(),
+  model: z.string().max(256).optional(),
+  apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama', 'google-native', 'azure-openai']).optional(),
+  apiVersion: z.string().max(32).optional(),
+  apiService: z.string().max(64).optional(),
+  contextWindow: z.number().int().min(256).max(10_000_000).optional(),
+  maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
+}).strip().optional()
+
 export const sessionConfigSchema = z
   .object({
     outputMode: z.enum(['source', 'translation', 'speech']).optional(),
@@ -88,27 +101,9 @@ export const sessionConfigSchema = z
     intermediateTranslationIntervalMs: z.number().int().min(0).max(2000).optional(),
     translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate', 'recognition']).optional(),
     translationModelId: translationModelIdSchema.optional(),
-    translationOptions: z.object({
-      endpoint: z.string().max(2048).optional(),
-      apiKey: z.string().max(4096).optional(),
-      email: z.string().max(320).optional(),
-      region: z.string().max(128).optional(),
-      model: z.string().max(256).optional(),
-      apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
-      // The ceiling the engine fits a request into: it reserves room for the reply and splits the
-      // source text when it does not fit. Nothing clips it to a vendor window, so 10M is a
-      // fat-finger guard.
-      contextWindow: z.number().int().min(256).max(10_000_000).optional(),
-      maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
-    }).strip().optional(),
+    translationOptions: translationOptionsSchema,
     fallbackTranslationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate']).optional(),
-    fallbackTranslationOptions: z.object({
-      endpoint: z.string().max(2048).optional(), apiKey: z.string().max(4096).optional(),
-      email: z.string().max(320).optional(), region: z.string().max(128).optional(), model: z.string().max(256).optional(),
-      apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
-      contextWindow: z.number().int().min(256).max(10_000_000).optional(),
-      maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
-    }).strip().optional(),
+    fallbackTranslationOptions: translationOptionsSchema,
     recordingPath: z.string().min(1).max(4096).optional(),
     recognitionBinding: z.string().max(512).optional(),
     translationBinding: z.string().max(512).optional(),
@@ -134,24 +129,9 @@ const prewarmConfigSchema = z.object({
   intermediateTranslationIntervalMs: z.number().int().min(0).max(2000).optional(),
   translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate', 'recognition']).optional(),
   translationModelId: translationModelIdSchema.optional(),
-  translationOptions: z.object({
-    endpoint: z.string().max(2048).optional(),
-    apiKey: z.string().max(4096).optional(),
-    email: z.string().max(320).optional(),
-    region: z.string().max(128).optional(),
-    model: z.string().max(256).optional(),
-    apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
-    contextWindow: z.number().int().min(256).max(10_000_000).optional(),
-    maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
-  }).strip().optional(),
+  translationOptions: translationOptionsSchema,
   fallbackTranslationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate']).optional(),
-  fallbackTranslationOptions: z.object({
-    endpoint: z.string().max(2048).optional(), apiKey: z.string().max(4096).optional(),
-    email: z.string().max(320).optional(), region: z.string().max(128).optional(), model: z.string().max(256).optional(),
-    apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
-    contextWindow: z.number().int().min(256).max(10_000_000).optional(),
-    maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
-  }).strip().optional(),
+  fallbackTranslationOptions: translationOptionsSchema,
   recognitionBinding: z.string().max(512).optional(),
   translationBinding: z.string().max(512).optional(),
 }).strip()
@@ -344,7 +324,7 @@ export const resourceSchema = z
     provider: z.string().min(1).max(64),
     name: z.string().min(1).max(256),
     description: z.string().min(1).max(1024),
-    languages: z.array(z.string().min(1).max(32)).max(200),
+    languages: z.array(z.string().min(1).max(32)),
     configuration: modelConfigurationSchema.optional(),
     sourceLanguage: z.string().max(32).optional(),
     targetLanguage: z.string().max(32).optional(),

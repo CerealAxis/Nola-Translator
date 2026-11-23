@@ -1,5 +1,6 @@
 import { LANGUAGE_CODES } from './languages'
 import type { ModelPolicy } from './model-policy'
+import type { ModelWorkspace } from './model-workspace'
 import { DEFAULT_MODEL_GATEWAY, type ModelGatewaySettings } from './model-gateway'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from './compute'
 import { GITHUB_PROXY_AUTO } from './github-proxies'
@@ -129,6 +130,7 @@ export type AppSettings = {
   meetingMode?: import('./meeting-mode').MeetingModeSettings
   modelGateway: ModelGatewaySettings
   modelPolicy?: ModelPolicy
+  modelWorkspace?: ModelWorkspace
   closeBehavior: 'tray' | 'quit'
 }
 
@@ -179,6 +181,8 @@ export type RecognitionSettings = {
   max_segment_ms?: number
   silence_end_ms?: number
   provider?: RecognitionProvider
+  aliyunAsrEndpoint?: string
+  aliyunS2sEndpoint?: string
   aliyunWorkspaceId?: string
   aliyunRegion?: 'cn-beijing' | 'ap-southeast-1'
   aliyunModel?: AliyunRecognitionModel
@@ -223,7 +227,8 @@ export type CloudApiFormat = 'chat-completions' | 'chat-responses' | 'anthropic'
  */
 export const MIMO_TTS_MODEL = 'mimo-v2.5-tts'
 export const MIMO_TTS_BINDING = `cloud:${MIMO_TTS_MODEL}`
-export const MIMO_TTS_NAME = 'MiMo V2.5 TTS'
+export const MIMO_TTS_NAME = 'MiMo TTS(API)'
+export const MIMO_TTS_LANGUAGES = ['zh', 'zh-Hant', 'en'] as const
 export type CredentialProvider = 'cloud' | 'fallback-cloud' | 'microsoft' | 'google' | 'fallback-google' | 'aliyun-asr' | 'minimax-asr' | 'mimo-tts' | `cloud-model:${string}`
 export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'fallback-cloud', 'aliyun-asr', 'minimax-asr', 'mimo-tts']
 
@@ -251,6 +256,7 @@ export interface CustomTranslationModel {
 export type Hymt2ModelId = 'hy-mt2-1.8b-q4-k-m' | 'hy-mt2-1.8b-q3-k-m' | 'hy-mt2-1.8b-iq2-m' | 'hy-mt2-7b-q4-k-m' | (string & {})
 
 export type TranslationSettings = {
+  providerOverrides?: Partial<Record<'google' | 'microsoft' | 'index-translate', { endpoint: string; model?: string }>>
   provider: TranslationProvider
   localModelId: string
   /** Only read when provider is `cloud`. Passed through as a base; the engine appends the path its format needs. */

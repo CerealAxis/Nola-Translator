@@ -1,4 +1,5 @@
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
+import { cloneElement, useCallback, useId, useState, type HTMLAttributes, type ReactElement, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 function TooltipProvider({
@@ -25,6 +26,7 @@ function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
 function TooltipContent({
   className,
   container,
+  anchor,
   side = "top",
   sideOffset = 4,
   align = "center",
@@ -34,11 +36,12 @@ function TooltipContent({
 }: TooltipPrimitive.Popup.Props & Pick<TooltipPrimitive.Portal.Props, "container"> &
   Pick<
     TooltipPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset"
+    "align" | "alignOffset" | "anchor" | "side" | "sideOffset"
   >) {
   return (
     <TooltipPrimitive.Portal container={container}>
       <TooltipPrimitive.Positioner
+        anchor={anchor}
         align={align}
         alignOffset={alignOffset}
         side={side}
@@ -47,6 +50,7 @@ function TooltipContent({
       >
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
+          role="tooltip"
           className={cn(
             "z-popup inline-flex w-fit max-w-xs origin-(--transform-origin) items-center gap-1.5 rounded-nola-ui-xl bg-overlay px-3 py-1.5 type-body text-overlay-foreground shadow-overlay has-data-[slot=kbd]:pr-1.5 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-popup **:data-[slot=kbd]:rounded-sm data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
             className
@@ -61,5 +65,54 @@ function TooltipContent({
   )
 }
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
+function TooltipHint({ children, content, disabledTrigger }: {
+  children: ReactElement<{ "aria-describedby"?: string }>
+  content: ReactNode
+  disabledTrigger?: boolean
+}) {
+  const [container, setContainer] = useState<ShadowRoot | null>(null)
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  const setTrigger = useCallback((node: HTMLElement | null) => {
+    const root = node?.getRootNode()
+    setContainer(root instanceof ShadowRoot ? root : null)
+  }, [])
+  const description = [children.props["aria-describedby"], open ? id : undefined].filter(Boolean).join(" ") || undefined
+
+  return (
+    <Tooltip disabled={!content} onOpenChange={setOpen}>
+      <TooltipTrigger
+        ref={setTrigger}
+        render={disabledTrigger
+          ? <span className="inline-flex max-w-full" aria-describedby={open ? id : undefined}>{children}</span>
+          : cloneElement(children, { "aria-describedby": description })}
+      />
+      {content && <TooltipContent id={id} container={container ?? undefined} className="wrap-anywhere">{content}</TooltipContent>}
+    </Tooltip>
+  )
+}
+
+function useTooltipAnchor() {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null)
+  const close = useCallback(() => setAnchor(null), [])
+
+  function findAnchor(target: EventTarget | null, container: HTMLElement) {
+    const node = target instanceof Element ? target.closest<HTMLElement>("[data-tooltip-text]") : null
+    return node && container.contains(node) && node.dataset.tooltipText ? node : null
+  }
+
+  const handlers: HTMLAttributes<HTMLElement> = {
+    onPointerOver: event => {
+      if (event.pointerType !== "touch") setAnchor(findAnchor(event.target, event.currentTarget))
+    },
+    onPointerOut: event => setAnchor(findAnchor(event.relatedTarget, event.currentTarget)),
+    onFocus: event => setAnchor(findAnchor(event.target, event.currentTarget)),
+    onBlur: event => setAnchor(findAnchor(event.relatedTarget, event.currentTarget)),
+    onKeyDown: event => { if (event.key === "Escape") close() },
+  }
+
+  return { anchor, close, handlers }
+}
+
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, TooltipHint, useTooltipAnchor }
 

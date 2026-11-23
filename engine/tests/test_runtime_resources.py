@@ -10,6 +10,7 @@ import pytest
 from nola_translator_engine import resources as resources_module
 from nola_translator_engine.audio.devices import AudioDeviceRecord
 from nola_translator_engine import runtime as runtime_module
+from nola_translator_engine.model_capabilities import LANGUAGE_CODES
 from nola_translator_engine.models.manager import FileEntry, ModelSpec
 from nola_translator_engine.protocol import NetworkSettings, parse_command_line
 from nola_translator_engine.resources import (
@@ -22,6 +23,22 @@ from nola_translator_engine.resources import (
     SENSEVOICE_RESOURCE_ID,
 )
 from nola_translator_engine.runtime import EngineRuntime
+
+
+async def test_list_resources_preserves_all_qwen35_languages(tmp_path):
+    runtime = EngineRuntime(tmp_path, lambda _: None)
+    command = parse_command_line('{"protocolVersion":1,"type":"listResources","requestId":"full-catalog"}')
+
+    events = await runtime.handle(command)
+
+    catalog = next(event for event in events if event.type == "resources")
+    models = {record.resourceId: record for record in catalog.resources}
+    for size in ("0.8b", "2b", "4b"):
+        record = models[f"qwen35-{size}-q4-k-m"]
+        assert record.configuration is not None
+        assert set(record.languages) == LANGUAGE_CODES
+        assert set(record.configuration.sourceLanguages) == LANGUAGE_CODES | {"auto"}
+        assert set(record.configuration.targetLanguages) == LANGUAGE_CODES
 
 
 def test_status_does_not_construct_an_unloaded_recognition_model(tmp_path, monkeypatch):

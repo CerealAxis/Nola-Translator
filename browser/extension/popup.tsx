@@ -25,6 +25,7 @@ import { ProviderAvatar } from './components/ProviderAvatar'
 import { Badge } from '../../src/renderer/components/ui/badge'
 import { SubtitleAvailabilityTooltip } from './components/SubtitleAvailabilityTooltip'
 import { useErrorToasts } from './components/useErrorToasts'
+import { TooltipHint } from '../../src/renderer/components/ui/tooltip'
 
 const providerSlots = [
   ['pageProvider', 'web', 'mt'], ['subtitleProvider', 'video', 'mt'], ['selectionProvider', 'selection', 'mt'],
@@ -100,22 +101,27 @@ export function Popup({ store }: PopupProps) {
   return <main className="nola-popup">
     <div className="nola-popup-body">
       <header className="nola-popup-header"><div className="nola-panel-brand"><NolaLogo /><h1>Nola Translator</h1></div><div className="nola-popup-header-tools">
-        <Button variant="bare" size="icon-sm" aria-label={t('translationHub')} title={t('translationHub')} onClick={() => openSettings('translationHub')}><Languages /></Button>
-        {!location.pathname.endsWith('/sidepanel.html') && <Button variant="bare" size="icon-sm" aria-label={t('openTranslationPanel')} title={t('openTranslationPanel')} onClick={openSidebar}><PanelRight /></Button>}
+        <Button variant="bare" size="icon-sm" aria-label={t('translationHub')} tooltip={t('translationHub')} onClick={() => openSettings('translationHub')}><Languages /></Button>
+        {!location.pathname.endsWith('/sidepanel.html') && <Button variant="bare" size="icon-sm" aria-label={t('openTranslationPanel')} tooltip={t('openTranslationPanel')} onClick={openSidebar}><PanelRight /></Button>}
       </div></header>
       {usesDesktop && <ConnectionStatus t={t} compact onReconnect={() => store.send('refreshDesktopConnection')} />}
       <div className="nola-popup-languages">
         <PopupLanguage label={t('source')} value={settings.sourceLanguage} options={[{ value: 'auto', label: t('autoDetect') }, ...languages]} onChange={value => save({ sourceLanguage: value })} t={t} />
-        <Button variant="bare" size="icon-sm" aria-label={t('swapLanguages')} title={t('swapLanguages')} disabled={settings.sourceLanguage === 'auto'} onClick={() => save({ sourceLanguage: settings.pageLanguage, pageLanguage: settings.sourceLanguage })}><ArrowLeftRight /></Button>
+        <Button variant="bare" size="icon-sm" aria-label={t('swapLanguages')} tooltip={t('swapLanguages')} disabled={settings.sourceLanguage === 'auto'} onClick={() => save({ sourceLanguage: settings.pageLanguage, pageLanguage: settings.sourceLanguage })}><ArrowLeftRight /></Button>
         <PopupLanguage label={t('target')} value={settings.pageLanguage} options={languages} onChange={value => save({ pageLanguage: value })} t={t} />
       </div>
       <Dialog><div className="nola-popup-provider-row"><span>{t('provider')}</span><DialogTrigger render={<Button variant="bare" className="nola-provider-summary" aria-label={t('apiProviders')} />}>
-        <span className="nola-provider-avatars">{providerSlots.slice(0, 5).filter(([key]) => settings[key] !== DISABLED_PROVIDER).map(([key, label]) => <span key={key} title={`${t(label)}: ${providers.find(item => item.id === settings[key])?.name ?? ''}`}><ProviderAvatar provider={providers.find(item => item.id === settings[key])} /></span>)}<Badge variant="secondary" className="nola-provider-count">+{providerSlots.length - 5}</Badge></span>
+        <span className="nola-provider-avatars">{providerSlots.slice(0, 5).filter(([key]) => settings[key] !== DISABLED_PROVIDER).map(([key, label]) => {
+          const provider = providers.find(item => item.id === settings[key])
+          return <TooltipHint key={key} content={`${t(label)}: ${provider?.name ?? ''}`}>
+            <span><ProviderAvatar provider={provider} showTooltip={false} /></span>
+          </TooltipHint>
+        })}<Badge variant="secondary" className="nola-provider-count">+{providerSlots.length - 5}</Badge></span>
       </DialogTrigger></div><DialogContent className="nola-popup-drawer"><header><DialogTitle>{t('provider')}</DialogTitle><DialogClose render={<Button variant="bare" size="icon-sm" aria-label={t('close')} />}><X /></DialogClose></header>
         <div className="nola-popup-provider-fields">{providerSlots.slice(0, 5).map(([key, label, capability]) => <ChoiceField key={key} label={t(label)} value={settings[key]} options={providerOptions(settings[key], capability)} onChange={value => saveProvider(key, value)} />)}<LiveServiceField settings={settings} providers={providers} t={t} /><details><summary>{t('advancedSettings')}</summary><ChoiceField label={t('llm')} value={settings.llmProvider} options={providerOptions(settings.llmProvider, 'llm')} onChange={value => saveProvider('llmProvider', value)} /></details></div>
         <Button variant="outline" onClick={() => openSettings('apiProviders')}><Settings2 data-icon="inline-start" />{t('apiProviders')}</Button>
       </DialogContent></Dialog>
-      <Button disabled={!canTranslate || !pageEnabled && state.enabled && !restoring} title={!pageEnabled && state.enabled && !restoring ? t('providerDisabled') : undefined} aria-label={t(restoring ? 'restorePage' : state.enabled ? 'translatePage' : 'enableSite')} onClick={() => { if (!state.enabled) store.enable(); else act(restoring ? 'stopPageTranslation' : 'startPageTranslation') }}>
+      <Button disabled={!canTranslate || !pageEnabled && state.enabled && !restoring} tooltip={!pageEnabled && state.enabled && !restoring ? t('providerDisabled') : undefined} aria-label={t(restoring ? 'restorePage' : state.enabled ? 'translatePage' : 'enableSite')} onClick={() => { if (!state.enabled) store.enable(); else act(restoring ? 'stopPageTranslation' : 'startPageTranslation') }}>
         <span>{t(state.pending || acting ? 'starting' : restoring ? 'restorePage' : state.enabled ? 'translatePage' : 'enableSite')}</span>{state.enabled && !restoring && !acting && <KbdGroup data-icon="inline-end">{settings.shortcutPage.split('+').filter(Boolean).map((key, index) => <Kbd key={index}>{key}</Kbd>)}</KbdGroup>}
       </Button>
       <div className="nola-popup-switches">

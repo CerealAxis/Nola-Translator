@@ -13,7 +13,6 @@ import { LANGUAGE_CODES } from '../../../shared/languages'
 import { SettingSelect } from '../settings/SettingsPage'
 import { SettingsRow } from '../settings/SettingsRow'
 import { NumberRow } from '../settings/tabs/TranslationTab'
-import { ModelLanguageSelect } from './ModelConfigurationDialog'
 
 export interface CustomModelDialogProps { modelId?: string; onClose: () => void }
 
@@ -23,7 +22,7 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
   const credentials = useStore(stores.models, state => state.credentials)
   const [draft, setDraft] = useState<CustomTranslationModel>(() => {
     const saved = settings && customModelsOf(settings.translation).find(model => model.id === modelId)
-    return saved ? { ...saved, sourceLanguages: saved.sourceLanguages ?? [...SOURCE_LANGUAGE_OPTIONS] } : { id: crypto.randomUUID(), name: '', endpoint: DEFAULT_SETTINGS.translation.cloudEndpoint,
+    return saved ? { ...saved, languages: [...LANGUAGE_CODES], sourceLanguages: [...SOURCE_LANGUAGE_OPTIONS] } : { id: crypto.randomUUID(), name: '', endpoint: DEFAULT_SETTINGS.translation.cloudEndpoint,
       model: '', apiFormat: 'chat-completions', contextWindow: DEFAULT_SETTINGS.translation.cloudContextWindow,
       maxOutputTokens: DEFAULT_SETTINGS.translation.cloudMaxOutputTokens, images: false, languages: [...LANGUAGE_CODES], sourceLanguages: [...SOURCE_LANGUAGE_OPTIONS] }
   })
@@ -31,7 +30,7 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
   const [keyVisible, setKeyVisible] = useState(false)
   const [saving, setSaving] = useState(false)
   const patch = (value: Partial<CustomTranslationModel>) => setDraft(previous => ({ ...previous, ...value }))
-  const slot = customCredentialSlot(draft.id)
+  const slot = customCredentialSlot(draft.id, settings?.modelWorkspace)
   const stored = !!credentials[slot]
   const valid = customModelSchema.safeParse(draft).success && (draft.apiFormat !== 'anthropic' || stored || !!key.trim())
   const save = async () => {
@@ -59,11 +58,12 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
     try {
       const translation = stores.settings.getState().settings!.translation
       const selected = translation.customModelId === draft.id || (draft.id === 'legacy' && !translation.customModelId && translation.provider === 'cloud')
-      await updateSettings({ translation: { customModels: customModelsOf(translation).filter(item => item.id !== draft.id),
+      const customModels = customModelsOf(translation).filter(item => item.id !== draft.id)
+      await updateSettings({ translation: { customModels,
         ...(selected ? { customModelId: '', cloudName: '', cloudModel: DEFAULT_SETTINGS.translation.cloudModel, cloudEndpoint: DEFAULT_SETTINGS.translation.cloudEndpoint,
           cloudLanguages: [...LANGUAGE_CODES], cloudSourceLanguages: [...SOURCE_LANGUAGE_OPTIONS], ...(translation.provider === 'cloud' ? { provider: 'mymemory' as const } : {}) } : {}),
       } })
-      await actions.models.setTranslationCredential(slot, '')
+      if (!customModels.some(model => customCredentialSlot(model.id, settings.modelWorkspace) === slot)) await actions.models.setTranslationCredential(slot, '')
       notifySuccess(t('common.done'))
       onClose()
     } catch (cause) { notifyError(t('modelsSettingsUi.removeFailed'), { cause }) }
@@ -94,14 +94,6 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
         <SettingsRow label={t('suite.supportsImages')}><Switch aria-label={t('suite.supportsImages')} checked={draft.images === true} disabled={saving} onCheckedChange={images => patch({ images })}><SwitchThumb /></Switch></SettingsRow>
         <NumberRow label={t('settings.contextWindow')} value={draft.contextWindow} onCommit={contextWindow => patch({ contextWindow })} />
         <NumberRow label={t('settings.maxOutputTokens')} value={draft.maxOutputTokens} onCommit={maxOutputTokens => patch({ maxOutputTokens })} />
-        <details><summary className="cursor-pointer py-2 type-body">{t('workbench.translationCapabilities')}</summary>
-        <ModelLanguageSelect label={t('modelConfig.sourceLanguages')} codes={[...SOURCE_LANGUAGE_OPTIONS]} value={draft.sourceLanguages ?? [...SOURCE_LANGUAGE_OPTIONS]} onChange={sourceLanguages => patch({ sourceLanguages })} />
-        <ModelLanguageSelect label={t('modelConfig.targetLanguages')} codes={[...LANGUAGE_CODES]} value={draft.languages} onChange={languages => patch({ languages })} />
-        <div className="models-language-actions"><span className="type-muted text-muted">{t('modelConfig.selectedLanguageCount', { count: draft.languages.length })}</span>
-          <Button variant="secondary" size="sm" onClick={() => patch({ sourceLanguages: [...SOURCE_LANGUAGE_OPTIONS], languages: [...LANGUAGE_CODES] })}>{t('modelsSettingsUi.selectAllLanguages')}</Button>
-          <Button variant="secondary" size="sm" onClick={() => patch({ sourceLanguages: [], languages: [] })}>{t('modelsSettingsUi.clearLanguages')}</Button>
-        </div>
-        </details>
       </div>
       <DialogFooter>
         {modelId ? <Button variant="danger" disabled={saving} aria-busy={saving} onClick={() => void remove()}><Trash2 aria-hidden="true" />{t('modelsSettingsUi.deleteModel')}</Button> : null}

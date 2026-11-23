@@ -1249,12 +1249,16 @@ function collectPlatformRuntime() {
 
 function collectLlamaRuntime() {
   const catalog = JSON.parse(readFileSync(join(ROOT, 'build', 'runtime-catalog.json'), 'utf8'))
-  const packages = catalog.packages.filter(item => item.kind === 'llama' && item.architecture === 'x64' && item.backend === 'vulkan')
-  if (packages.length !== 1 || packages[0].version !== 'b11532') {
+  const version = 'b12651'
+  const bundled = catalog.packages.find(item =>
+    item.id === `llama-${version}-vulkan` && item.version === version
+    && item.kind === 'llama' && item.architecture === 'x64' && item.backend === 'vulkan',
+  )
+  if (!bundled) {
     report('unresolved', 'llama.cpp', 'verify the license for the configured Vulkan runtime version')
     return
   }
-  addEntry('llama.cpp', packages[0].version, LLAMA_CPP_LICENSE, 'platform')
+  addEntry('llama.cpp', bundled.version, LLAMA_CPP_LICENSE, 'platform')
 }
 
 function collectGameHook() {
@@ -1428,6 +1432,8 @@ function collectPythonTree() {
     const metadata = metadataText.split(/\r?\n\r?\n/)[0]
 
     const declaredName = (metadata.match(/^Name:\s*(.+)$/m)?.[1] ?? name).trim()
+    const packageName = declaredName === 'onnxruntime-directml' ? 'onnxruntime' : declaredName
+    const packageDirectory = distInfo.dir.startsWith(baseSitePackages) ? baseSitePackages : SITE_PACKAGES
     const version = (metadata.match(/^Version:\s*(.+)$/m)?.[1] ?? '').trim()
     if (!version) {
       report('unresolved', name, `${distInfo.name}/METADATA 里没有 Version 字段`)
@@ -1453,14 +1459,13 @@ function collectPythonTree() {
       }
       // 同一个 License-File 在四种布局下都可能出现：PEP 639 的 licenses/ 子目录、
       // dist-info 根（老 wheel）、包目录本身，以及 flatten 之后的散落路径。
-      const packageDirectory = distInfo.dir.startsWith(baseSitePackages) ? baseSitePackages : SITE_PACKAGES
       const flattened = Object.entries(licenseIndex).find(([, original]) => original === relative)?.[0]
       for (const candidate of [
         ...(flattened ? [join(distInfo.dir, 'licenses', flattened)] : []),
         join(distInfo.dir, 'licenses', relative),
         join(distInfo.dir, relative),
         join(packageDirectory, relative),
-        join(packageDirectory, declaredName, relative),
+        join(packageDirectory, packageName, relative),
       ]) {
         const content = readText(candidate)
         if (content !== null && !content.includes('.. literalinclude::')) {
@@ -1477,8 +1482,8 @@ function collectPythonTree() {
       for (const directory of [
         distInfo.dir,
         join(distInfo.dir, 'licenses'),
-        join(distInfo.dir.startsWith(baseSitePackages) ? baseSitePackages : SITE_PACKAGES, declaredName),
-        join(distInfo.dir.startsWith(baseSitePackages) ? baseSitePackages : SITE_PACKAGES, declaredName, 'licenses'),
+        join(packageDirectory, packageName),
+        join(packageDirectory, packageName, 'licenses'),
       ]) {
         const found = findLicenseFile(directory, [
           (file) => file === 'LICENSE',

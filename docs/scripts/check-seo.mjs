@@ -109,10 +109,12 @@ for (const file of sourcePages) {
   const nav = [...elementsByTag(body, 'nav')].find(node => attr(node, 'class')?.split(' ').includes('nola-doc-breadcrumb'))
   const visible = [...elementsByTag(nav, 'li')].map(item =>
     contents(children(item).find(node => node.tagName === 'a' || attr(node, 'aria-current') === 'page')).trim())
-  if (breadcrumb || visible.length) {
+  if (visible.length > 1) {
     check(JSON.stringify(visible) === JSON.stringify(breadcrumb?.itemListElement.map(item => item.name)),
       file, 'visible and structured breadcrumbs differ')
     check(breadcrumb?.itemListElement.every(item => urls.has(item.item)), file, 'breadcrumb target missing from sitemap')
+  } else {
+    check(!breadcrumb, file, 'structured breadcrumbs require at least two items')
   }
 }
 

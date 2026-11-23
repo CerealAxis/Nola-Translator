@@ -46,7 +46,7 @@ export function HomePage(): ReactNode {
                 {copy.action}
               </a>
               <a
-                href="https://nola.xaviermc.top"
+                href="https://nolax.org"
                 target="_blank"
                 rel="noreferrer"
                 data-slot="button"

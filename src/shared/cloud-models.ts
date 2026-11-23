@@ -1,3 +1,5 @@
+import { isNativeChatProfile, workspaceChatConnection } from './model-workspace'
+import { CHATGPT_PLAN_SERVICE } from './chatgpt-plan'
 import type { AppSettings, CredentialProvider, CustomTranslationModel } from './settings'
 import { DEFAULT_SETTINGS } from './settings'
 import { supportsRecognitionNativeTranslation } from './cloud-config'
@@ -10,6 +12,7 @@ export interface CloudModel {
   kind: 'recognitionModel' | 'translationModel'
   free: boolean
   ready: boolean
+  chatOnly?: boolean
 }
 
 export function validEndpoint(value: string | undefined): boolean {
@@ -42,7 +45,8 @@ export function cloudModelsOf(settings: AppSettings | null, credentials: Readonl
     })),
     ...(translation ? customModelsOf(translation).map(profile => ({
       id: `custom:${profile.id}` as const, profile, kind: 'translationModel' as const, free: false,
-      ready: customModelSchema.safeParse(profile).success && (profile.apiFormat !== 'anthropic' || !!credentials[customCredentialSlot(profile.id)]),
+      ...(workspaceChatConnection(settings?.modelWorkspace, profile.id)?.service === CHATGPT_PLAN_SERVICE ? { chatOnly: true } : {}),
+      ready: customModelSchema.safeParse(profile).success && ((profile.apiFormat !== 'anthropic' && !isNativeChatProfile(settings?.modelWorkspace, profile.id)) || !!credentials[customCredentialSlot(profile.id, settings?.modelWorkspace)]),
     })) : []),
   ]
   return models

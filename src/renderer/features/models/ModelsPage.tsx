@@ -16,7 +16,7 @@ import { CircleHelp } from 'lucide-react'
 import { getBridge } from '@/store'
 
 import { useI18n } from '@/i18n'
-import { settingsPath, useRoute } from '@/routes'
+import { modelManagementPath, settingsPath, useRoute } from '@/routes'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { notifyError, notifyInfo } from '@/components/primitives/notify'
 import { PageHeader } from '@/components/primitives'
@@ -84,7 +84,7 @@ export function ModelsPage() {
       }
       notifyInfo(t('models.visionSupplementStarted'), {
         description: t('models.visionSupplementDescription', { name: record.name }),
-        action: { label: t('models.viewProgress'), onPress: () => { window.location.hash = '#/models/downloads' } },
+        action: { label: t('models.viewProgress'), onPress: () => { window.location.hash = modelManagementPath('downloads') } },
         duration: 12000,
       })
       suppressNextDownloadStartNotice(resourceId)
@@ -140,18 +140,10 @@ export function ModelsPage() {
     : []
   const openFamilyKey = openFamily ? `${openFamily}:${openFamilyRecords.map(record => record.resourceId).join('|')}` : ''
 
-  // store.error is a diagnostic string, not interface copy: it goes to the log, and the
-  // failure itself reaches the user as a translated notice.
-  useEffect(() => {
-    if (error) console.error('[models]', error)
-  }, [error])
-
-  /*
-   * A catalog that never arrived and a catalog with nothing in it are different states, and
-   * the empty state claims the user has no models. The store keeps the reason; the notice
-   * tells the user, and the retry button lets them ask again.
-   */
   const loadFailed = !loaded && !loading && error !== null
+  useEffect(() => {
+    if (loadFailed) notifyError(t('errors.modelsLoadFailed'), { cause: error })
+  }, [loadFailed, error, t])
   const retryLoad = useCallback(() => {
     if (stores.models.getState().loading) return
     void actions.models.loadModels().catch(() => undefined)
@@ -166,7 +158,7 @@ export function ModelsPage() {
       setDownloadTarget(record)
       return
     }
-    void actions.models.manageResource(record.resourceId, action).catch((cause: unknown) => notifyError(t('errors.engineOperationFailed'), { cause }))
+    void actions.models.manageResource(record.resourceId, action).catch((cause: unknown) => notifyError(t('modelsSettingsUi.cancelDownloadFailed'), { cause }))
   }
 
   /*
@@ -174,13 +166,8 @@ export function ModelsPage() {
    * same download again, and a retry that fails reports itself the same way.
    */
   const install = (target: ResourceRecord, source: ModelDownloadSource) => {
-    void actions.models.manageResource(target.resourceId, 'install', source).catch(() => {
-      notifyModelDownloadFailure(
-        t('models.downloadFailed'),
-        t('errors.downloadFailed'),
-        t('errors.downloadFailedAction'),
-        () => install(target, source),
-      )
+    void actions.models.manageResource(target.resourceId, 'install', source).catch((cause: unknown) => {
+      notifyModelDownloadFailure(t, () => install(target, source), { cause })
     })
   }
 
@@ -246,7 +233,7 @@ export function ModelsPage() {
         onClose={() => setOpenFamily(null)}
         onInstall={(record, source) => install(record, source)}
         onCancel={record => { void actions.models.manageResource(record.resourceId, 'cancel').catch((cause: unknown) => {
-          notifyError(t('errors.engineOperationFailed'), { cause })
+          notifyError(t('modelsSettingsUi.cancelDownloadFailed'), { cause })
         }) }}
         onManualDownload={record => { setOpenFamily(null); offlineActions.openDownloads(record.resourceId) }}
       /> : null}

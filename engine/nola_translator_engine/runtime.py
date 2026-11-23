@@ -943,7 +943,7 @@ class EngineRuntime:
             protocolVersion=1, type="modelsPrewarmed", requestId=command.requestId,
             state="ready", recognitionModelId=model_id, translationModelId=translation_model_id,
             elapsedMs=(monotonic() - started_at) * 1000,
-            device="cloud" if config.recognitionProvider != "local" else ("vulkan" if self._active_recognition_runtime.using_vulkan else "cpu") if self.resources.adapter_for(model_id) == "crisp-asr" else (
+            device="cloud" if config.recognitionProvider != "local" else self._active_recognition_runtime.execution_backend if self.resources.adapter_for(model_id) == "crisp-asr" else (
                 self._recognition_device.llamaDevice or "cpu" if self.resources.adapter_for(model_id) == "llama-asr"
                 else self._recognition_device.torchDevice),
             runtime=self._active_recognition_runtime.describe(),
@@ -1162,20 +1162,22 @@ class EngineRuntime:
         if provider_name == "local":
             provider = self._local_translation_provider(config)
         elif provider_name == "microsoft":
-            provider = MicrosoftTranslatorProvider()
+            provider = MicrosoftTranslatorProvider(**({"endpoint": endpoint} if endpoint else {}))
         elif provider_name == "mymemory":
             provider = MyMemoryTranslationProvider(endpoint=resolved(endpoint, DEFAULT_MYMEMORY_ENDPOINT),
                 email=options.email if options else "")
         elif provider_name == "google":
-            provider = GoogleTranslateProvider()
+            provider = GoogleTranslateProvider(**({"endpoint": endpoint} if endpoint else {}))
         elif provider_name == "index-translate":
-            # Public API configuration is fixed and never consumes a cloud credential.
-            provider = IndexTranslatePublicProvider()
+            provider = IndexTranslatePublicProvider(**{
+                key: value for key, value in (("endpoint", endpoint), ("model", model)) if value
+            })
         elif provider_name == "cloud":
             provider = custom_translation_provider(
                 api_format, endpoint=endpoint if options is not None else None,
                 model=model if options is not None else None, api_key=api_key,
                 context_window=context_window, max_output_tokens=max_output_tokens,
+                api_version=options.apiVersion if options else "", api_service=options.apiService if options else "",
             )
         else:
             raise ValueError(
@@ -1309,7 +1311,7 @@ class EngineRuntime:
         if self.resources.adapter_for(model_id) == "crisp-asr":
             backend = None if self.resources.registry.get(model_id) else self._crisp_backend(model_id)
             runtime = CrispAsrRuntime(self.resources.recognition_weight_path(model_id), backend=backend, threads=self._torch_threads,
-                use_vulkan=compute.recognitionDevice != "cpu", allow_cpu_fallback=compute.allowCpuFallback)
+                use_acceleration=compute.recognitionDevice != "cpu", allow_cpu_fallback=compute.allowCpuFallback)
             await asyncio.to_thread(runtime.load)
             self._active_recognition_runtime = runtime
             return StreamingRecognizer(runtime, **vad_options, source_language=language, on_update=self._emit_update)

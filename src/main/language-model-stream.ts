@@ -102,7 +102,7 @@ async function streamGatewayLanguageModel(services: LanguageModelServices, sende
   }
   const providerOptions: Record<string, unknown> = {}
   if (profile.apiFormat === 'anthropic' && /^MiniMax-M3/i.test(profile.model)) providerOptions.anthropic = { thinking: { type: 'adaptive' } }
-  if (!local && request.effort !== 'auto') {
+  if (!local && (request.effort === 'low' || request.effort === 'medium' || request.effort === 'high')) {
     if (profile.apiFormat === 'anthropic') providerOptions.anthropic = { ...(providerOptions.anthropic as object), effort: request.effort }
     else providerOptions.openai = { reasoningEffort: request.effort }
   }

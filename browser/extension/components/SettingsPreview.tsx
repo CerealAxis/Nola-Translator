@@ -30,7 +30,7 @@ export function SettingsPreview({ kind, settings, t }: { kind: PreviewKind; sett
               <div className="nola-illustration-heading" aria-hidden="true" />
               {kind === 'inputTranslation' ? <div className="nola-illustration-input" data-translated={translated}>
                 <div className="nola-illustration-lines" aria-hidden="true"><i /><i /></div>
-                {settings.inputTranslation && <Button size="icon-sm" variant="outline" aria-label={translationLabel} title={translationLabel} onClick={() => setTranslated(!translated)}><Languages /></Button>}
+                {settings.inputTranslation && <Button size="icon-sm" variant="outline" aria-label={translationLabel} tooltip={translationLabel} onClick={() => setTranslated(!translated)}><Languages /></Button>}
               </div> : <>
                 {(kind !== 'web' || settings.pageDisplay === 'bilingual') && <div className="nola-illustration-lines" role="img" aria-label={t('sourceCaption')} data-selected={kind === 'selection' && settings.selectionTranslation}><i /><i /><i /></div>}
                 {(kind === 'web' || translated) && <div className="nola-illustration-lines nola-illustration-translation" role="img" aria-label={t('translatedCaption')} data-style={settings.pageStyle}><i /><i /></div>}
@@ -38,12 +38,12 @@ export function SettingsPreview({ kind, settings, t }: { kind: PreviewKind; sett
               </>}
             </div>
             {kind === 'selection' && settings.selectionTranslation && <div className="nola-illustration-toolbar nola-popup-surface" style={{ opacity: settings.selectionOpacity }} onKeyDown={event => { if (event.key === 'Escape') setOpen(false) }}>
-              {settings.selectionTranslate && <Button size="icon-sm" variant="bare" aria-label={translationLabel} title={translationLabel} onClick={() => setTranslated(!translated)}><Languages /></Button>}
+              {settings.selectionTranslate && <Button size="icon-sm" variant="bare" aria-label={translationLabel} tooltip={translationLabel} onClick={() => setTranslated(!translated)}><Languages /></Button>}
               {settings.selectionSpeak && <Volume2 role="img" aria-label={t('tts')} />}
-              <Button size="icon-sm" variant="bare" aria-label={t('more')} title={t('more')} aria-expanded={open} onClick={() => setOpen(!open)}><MoreVertical /></Button>
+              <Button size="icon-sm" variant="bare" aria-label={t('more')} tooltip={t('more')} aria-expanded={open} onClick={() => setOpen(!open)}><MoreVertical /></Button>
               {open && <div className="nola-illustration-more nola-popup-surface" role="group" aria-label={t('more')}>
                 {settings.selectionCopy && <Copy role="img" aria-label={t('copyTranslation')} />}
-                <Button size="icon-sm" variant="bare" aria-label={t('close')} title={t('close')} onClick={() => setOpen(false)}><X /></Button>
+                <Button size="icon-sm" variant="bare" aria-label={t('close')} tooltip={t('close')} onClick={() => setOpen(false)}><X /></Button>
               </div>}
             </div>}
             {kind === 'floatingButton' && settings.floatingButton && <div className="nola-demo-floating" data-pinned={settings.floatingLocked} data-side={settings.floatingSide} style={{ top: `${Math.max(20, Math.min(75, settings.floatingPosition * 100))}%` }}>

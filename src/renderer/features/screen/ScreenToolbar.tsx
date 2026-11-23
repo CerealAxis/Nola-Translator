@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { Spinner } from '@/components/ui/spinner'
 import type { ScreenCommand, ScreenConfig, ScreenSnapshot, ScreenSource, ScreenTranslationBridge } from '../../../shared/screen-translation'
+import { TooltipHint } from '@/components/ui/tooltip'
 
 export function ScreenToolbar({ api, snapshot }: { api: ScreenTranslationBridge; snapshot: ScreenSnapshot }) {
   const { t } = useI18n()
@@ -61,10 +62,10 @@ export function ScreenToolbar({ api, snapshot }: { api: ScreenTranslationBridge;
   }
   return <section ref={surface} className="screen-toolbar" aria-label={t('suite.toolbar')}>
     <div className="screen-toolbar__main">
-      <span className="screen-toolbar__drag" title={t(`screen.states.${status}`)} aria-label={t(`screen.states.${status}`)}><GripVertical /></span>
+      <TooltipHint content={t(`screen.states.${status}`)}><span className="screen-toolbar__drag" aria-label={t(`screen.states.${status}`)}><GripVertical /></span></TooltipHint>
       <Button variant="outline" size="sm" disabled={busy} onClick={() => void toggleSettings()}>{t(`suite.${config.captureMode}`)}</Button>
-      <Button variant="outline" size="sm" title={t('suite.readOnce')} disabled={busy || status === 'editing' || status === 'starting'} onClick={() => void run({ action: 'readOnce' })}><ScanText data-icon="inline-start" />{t('suite.readOnceAction')}</Button>
-      <Button variant="outline" size="sm" title={t(paused || !reading ? 'suite.resume' : 'suite.pause')} disabled={busy || status === 'editing'} onClick={() => void run({ action: paused ? 'resume' : reading ? 'pause' : 'start' })}>{paused || !reading ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}{t(paused || !reading ? 'suite.resumeAction' : 'suite.pauseAction')}</Button>
+      <Button variant="outline" size="sm" tooltip={t('suite.readOnce')} disabled={busy || status === 'editing' || status === 'starting'} onClick={() => void run({ action: 'readOnce' })}><ScanText data-icon="inline-start" />{t('suite.readOnceAction')}</Button>
+      <Button variant="outline" size="sm" tooltip={t(paused || !reading ? 'suite.resume' : 'suite.pause')} disabled={busy || status === 'editing'} onClick={() => void run({ action: paused ? 'resume' : reading ? 'pause' : 'start' })}>{paused || !reading ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}{t(paused || !reading ? 'suite.resumeAction' : 'suite.pauseAction')}</Button>
       <Button variant="destructive" size="sm" onClick={() => void api.command({ action: 'stop' }).catch(() => setFailed(true))}><Square data-icon="inline-start" />{t('screen.stop')}</Button>
       <Button variant="outline" size="icon-sm" aria-label={t('suite.display')} aria-expanded={expanded} onClick={() => void toggleSettings()}><Settings2 /></Button>
       <Button variant="outline" size="icon-sm" aria-label={t('suite.hideToolbar')} onClick={() => void run({ action: 'hideToolbar' })}><X /></Button>

@@ -53,6 +53,7 @@ from .models.registry import CustomFile, CustomModelEntry, CustomModelRegistry
 from .local_models import declared_languages_from_snapshot
 from .protocol import ResourceChangedEvent, ResourceRecord, ModelConfiguration, NetworkSettings
 from .model_capabilities import (
+    LANGUAGE_CODES,
     FUN_ASR_NANO_LANGUAGES,
     MIMO_ASR_LANGUAGES,
     QWEN_LANGUAGES,
@@ -263,7 +264,7 @@ RESOURCE_DEFINITIONS = _definitions() + tuple(
     ResourceDefinition(
         spec.model_id, "translationModel", "llama.cpp", QWEN35_NAMES[spec.model_id],
         "Qwen3.5 小型多语言语言模型，使用 Q4_K_M GGUF 并由 llama.cpp 本地运行。",
-        tuple(normalize(code) for code in FLORES_LANGUAGES), spec.total_bytes,
+        tuple(sorted(LANGUAGE_CODES)), spec.total_bytes,
     ) for spec in QWEN35_SPECS
 ) + tuple(ResourceDefinition(
     spec.model_id, "ocrModel",

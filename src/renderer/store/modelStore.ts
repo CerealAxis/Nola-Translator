@@ -1,3 +1,4 @@
+import { astrBotSpeechPreset } from '../../shared/astrbot-speech-presets'
 import type { ModelConfiguration } from '../../shared/model-capabilities'
 /**
  * Model domain: resource snapshot + audio devices + Hub search + credentials.
@@ -182,7 +183,9 @@ export async function loadModels(options: { includeDevices?: boolean } = {}): Pr
 
 async function loadCredentials(target: NolaBridge): Promise<Record<CredentialProvider, boolean>> {
   const settings = await target.settings.get()
-  const providers = [...new Set([...CREDENTIAL_PROVIDERS, ...customModelsOf(settings.translation).map(model => customCredentialSlot(model.id))])]
+  const workspaceSlots = settings.modelWorkspace?.connections.filter(connection => connection.capability === 'LLM' || astrBotSpeechPreset(connection.service))
+    .map(connection => customCredentialSlot(connection.id)) ?? []
+  const providers = [...new Set([...CREDENTIAL_PROVIDERS, ...workspaceSlots, ...customModelsOf(settings.translation).map(model => customCredentialSlot(model.id, settings.modelWorkspace))])]
   const entries = await Promise.all(
     providers.map(async (provider) => [provider, await target.translation.hasCredential(provider)] as const),
   )

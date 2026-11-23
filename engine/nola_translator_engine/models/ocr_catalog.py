@@ -287,7 +287,7 @@ OCR_NAMES = {OCR_RESOURCE_ID: "PP-OCRv5 mobile (CJK)", **{
 }}
 OCR_NAMES[MANGA_OCR_ID] = "Manga OCR (Japanese)"
 OCR_NAMES.update({
-    BABERU_OCR_ID: "Baberu OCR (Apache-2.0)",
-    PPOCRV6_ID: "PP-OCRv6 Medium (Apache-2.0)",
-    PADDLEOCR_VL_ID: "PaddleOCR-VL 1.6 (experimental; Apache-2.0)",
+    BABERU_OCR_ID: "Baberu OCR",
+    PPOCRV6_ID: "PP-OCRv6 Medium",
+    PADDLEOCR_VL_ID: "PaddleOCR-VL 1.6",
 })

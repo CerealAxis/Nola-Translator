@@ -1,0 +1,44 @@
+[
+  {
+    "version": "0.8.55",
+    "cpu": {
+      "url": "https://files.pythonhosted.org/packages/30/1b/17a612eb723495a8f9c53fe804c8392e35364c02f80ef40bd0e3ce185311/crispasr-0.8.55-py3-none-win_amd64.whl",
+      "name": "crispasr-0.8.55-py3-none-win_amd64.whl",
+      "sha256": "7d69e6310ae30b27cc3d84b9b01b7ab7520cefe3a116a2d0c9d9d76cdfb9dce0",
+      "bytes": 15809765
+    },
+    "vulkan": {
+      "name": "crispasr-0.8.55+vulkan-py3-none-win_amd64.whl",
+      "url": "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.55/crispasr-0.8.55%2Bvulkan-py3-none-win_amd64.whl",
+      "sha256": "ca315e72a71328d291838fe8c62898e3a766cf1e7e6af92989fd52bb6abeebd8",
+      "bytes": 29993561
+    },
+    "cuda": {
+      "name": "crispasr-0.8.55+cuda-py3-none-win_amd64.whl",
+      "url": "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.55/crispasr-0.8.55%2Bcuda-py3-none-win_amd64.whl",
+      "sha256": "a0c94a002de018114d4644879b04e6557d9ef56cacb0b27afe1a9a0819c6a9d7",
+      "bytes": 778473809
+    }
+  },
+  {
+    "version": "0.8.54",
+    "cpu": {
+      "url": "https://files.pythonhosted.org/packages/5c/0a/52c717debc6a6e3610b753a7a1ed525268edd46b5d67c423cd2849702fdc/crispasr-0.8.54-py3-none-win_amd64.whl",
+      "name": "crispasr-0.8.54-py3-none-win_amd64.whl",
+      "sha256": "45b333dd86050d1ce1aba5c6e9220751f3b086431320c203b31e6f39ad3b7e77",
+      "bytes": 15403024
+    },
+    "vulkan": {
+      "name": "crispasr-0.8.54+vulkan-py3-none-win_amd64.whl",
+      "url": "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.54/crispasr-0.8.54%2Bvulkan-py3-none-win_amd64.whl",
+      "sha256": "25ad972d36e7b8b0fd4984ce89f811d8c2c68aa3f1c320634f6eb85fa6a32fc9",
+      "bytes": 29594589
+    },
+    "cuda": {
+      "name": "crispasr-0.8.54+cuda-py3-none-win_amd64.whl",
+      "url": "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.54/crispasr-0.8.54%2Bcuda-py3-none-win_amd64.whl",
+      "sha256": "38ca4a33c17037ddfaf391ba628d6581cfbc98e999a1ee5cc0565d81b7b0ded4",
+      "bytes": 777907821
+    }
+  }
+]

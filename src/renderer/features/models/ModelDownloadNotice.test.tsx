@@ -15,6 +15,17 @@ const record: ResourceRecord = {
   installedBytes: 0, downloadBytes: 1312164352, state: 'running', phase: 'download', cancellable: true,
 }
 
+it('opens download management from the download-start notification', () => {
+  const showToast = vi.spyOn(toastQueue, 'showToast').mockImplementation(() => '')
+  stores.models.setState({ resources: [] })
+  render(<ModelDownloadNotice />)
+  act(() => { stores.models.setState({ resources: [record] }) })
+  const notice = showToast.mock.calls.find(([payload]) => payload.title === '模型下载已开始')?.[0]
+  expect(notice?.actionProps?.children).toBe('查看进度')
+  act(() => notice?.actionProps?.onClick())
+  expect(window.location.hash).toBe('#/model-management/downloads')
+})
+
 it('notifies on completion, failure with a reason, and cancellation', () => {
   const showToast = vi.spyOn(toastQueue, 'showToast').mockImplementation(() => '')
   stores.models.setState({ resources: [] })

@@ -27,7 +27,7 @@ import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { TooltipHint, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { FeatureOptionCard } from './FeatureOptionDialog'
 import { ProcessingIconButton, ProcessingPageHeading, textProcessingPath, type BreadcrumbEntry } from './ProcessingPage'
@@ -535,17 +535,16 @@ function RuleEntries({
                         </button>
                       </TableCell>
                       <TableCell className="min-w-40">
-                        <Textarea
+                        <TooltipHint content={regexError ? t('suite.textInvalidRegex') : undefined}><Textarea
                           rows={1}
                           className="min-h-9 py-1.5"
                           aria-label={t('suite.textPattern')}
                           placeholder={t('suite.textPattern')}
                           autoFocus={focusId === rule.id}
                           aria-invalid={regexError || undefined}
-                          title={regexError ? t('suite.textInvalidRegex') : undefined}
                           value={rule.pattern}
                           onChange={event => updateRule(rule.id, { pattern: event.target.value })}
-                        />
+                        /></TooltipHint>
                       </TableCell>
                       <TableCell className="min-w-40">
                         <Textarea

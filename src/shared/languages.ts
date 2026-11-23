@@ -26,7 +26,7 @@ export function normalizeLanguage(code: string): string {
   return key
 }
 function languageNames(locale: string): Intl.DisplayNames | null {
-  try { return new Intl.DisplayNames([locale], { type: 'language' }) } catch { return null }
+  try { return new Intl.DisplayNames([locale], { type: 'language', fallback: 'none' }) } catch { return null }
 }
 const chinese = languageNames('zh-CN')
 const traditionalChinese = languageNames('zh-TW')
@@ -34,6 +34,8 @@ const hongKongChinese = languageNames('zh-HK')
 const korean = languageNames('ko')
 const japanese = languageNames('ja')
 const english = languageNames('en')
+const displayNamesByLocale = { 'zh-CN': chinese, 'zh-TW': traditionalChinese, 'zh-HK': hongKongChinese, ko: korean, ja: japanese, en: english }
+const unknownLanguageNames = { 'zh-CN': '未知语言', 'zh-TW': '未知語言', 'zh-HK': '未知語言', ko: '알 수 없는 언어', ja: '不明な言語', en: 'Unknown language' }
 export const LANGUAGE_LABELS: Record<string, LanguageLabel> = Object.fromEntries(
   LANGUAGE_CODES.map(code => [code, {
     code,
@@ -61,8 +63,11 @@ Object.assign(LANGUAGE_LABELS, {
   none: specialLabel('none', '不翻译', 'No translation', { zhTW: '不翻譯', zhHK: '不翻譯', ko: '번역 안 함', ja: '翻訳しない' }),
   zh: specialLabel('zh', '中文（简体）', 'Chinese (Simplified)', { zhTW: '簡體中文', zhHK: '簡體中文', ko: '중국어(간체)', ja: '中国語（簡体字）' }),
   'zh-Hant': specialLabel('zh-Hant', '中文（繁体）', 'Chinese (Traditional)', { zhTW: '繁體中文', zhHK: '繁體中文', ko: '중국어(번체)', ja: '中国語（繁体字）' }),
+  'zh-sichuan': specialLabel('zh-sichuan', '四川话', 'Sichuanese', { zhTW: '四川話', zhHK: '四川話', ko: '쓰촨어', ja: '四川語' }),
   bo: specialLabel('bo', '藏语', 'Tibetan', { zhTW: '藏語', zhHK: '藏語', ja: 'チベット語', ko: '티베트어' }),
   yue: specialLabel('yue', '粤语', 'Cantonese', { zhTW: '粵語', zhHK: '粵語' }),
+  wuu: specialLabel('wuu', '吴语', 'Wu Chinese', { zhTW: '吳語', zhHK: '吳語', ja: '呉語', ko: '우어' }),
+  nan: specialLabel('nan', '闽南语', 'Min Nan Chinese', { zhTW: '閩南語', zhHK: '閩南語', ja: '閩南語', ko: '민난어' }),
   pi: specialLabel('pi', '巴利语', 'Pali', { zhTW: '巴利語', zhHK: '巴利語', ja: 'パーリ語', ko: '팔리어' }),
   ff: specialLabel('ff', '富拉语', 'Fulah', { zhTW: '富拉語', zhHK: '富拉語', ja: 'フラ語', ko: '풀라어' }),
   // M2M100 uses its own "ns" code for Northern Sotho; keep the inference code intact.
@@ -98,10 +103,21 @@ LANGUAGE_LABELS.fil = { ...LANGUAGE_LABELS.tl, code: 'fil' }
 export function languageName(code: string, locale: UiLanguage): string {
   const label = LANGUAGE_LABELS[normalizeLanguage(code)] ?? LANGUAGE_LABELS[code]
   if (!label) {
-    try { return languageNames(locale)?.of(code) ?? code } catch { return code }
+    try { return displayNamesByLocale[locale]?.of(code) ?? code } catch { return code }
   }
   if (locale === 'zh-CN') return label.zh
   if (locale === 'zh-TW') return label.zhTW
   if (locale === 'zh-HK') return label.zhHK
   return label[locale]
+}
+
+export function modelLanguageName(code: string, locale: UiLanguage, genericChinese = false): string {
+  const key = code.trim().toLowerCase()
+  const displayNames = displayNamesByLocale[locale]
+  if (genericChinese && key === 'zh') return displayNames?.of('zh') ?? 'Chinese'
+  const localized = languageName(code, locale)
+  if (localized && localized.toLowerCase() !== key) return localized
+  const fallback = languageName(code, 'en')
+  if (fallback && fallback.toLowerCase() !== key) return fallback
+  return unknownLanguageNames[locale]
 }

@@ -520,7 +520,7 @@ def _probe_runtime(root: Path, entry: CustomModelEntry, adapter: str) -> tuple[s
         from .recognition.crisp_asr import CrispAsrRuntime, prepare_crisp_synthesis, crisp_capabilities
 
         weight = next(item for item in entry.files if item.path.lower().endswith(('.gguf', '.bin', '.ggml', '.ggmf')))
-        runtime = CrispAsrRuntime(root / weight.path, threads=2, use_vulkan=True)
+        runtime = CrispAsrRuntime(root / weight.path, threads=2, use_acceleration=True)
         try:
             runtime.load()
             session = runtime._session

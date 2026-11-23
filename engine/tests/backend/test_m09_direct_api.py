@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import httpx
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -18,6 +19,36 @@ from nola_translator_engine.backend.gateway.operations import AsrObservation, Sy
 
 def translation():
     return {"id": str(uuid4()), "model": "local-mt", "kind": "mt", "text": "Hello", "source": "en", "target": "zh"}
+
+
+def test_s2s_probe_checks_the_selected_session_and_releases_it():
+    from nola_translator_engine.backend.s2s_provider import MODELS
+
+    models = []
+
+    class Gateway:
+        @asynccontextmanager
+        async def s2s_session(self, context, *, request, config):
+            assert request.model_id == MODELS[-1]
+            assert config["api_key"] == "provider-key" and config["workspace_id"] == "workspace"
+            models.append(request.model_id)
+            try:
+                yield object()
+            finally:
+                models.append("closed")
+
+        async def shutdown(self):
+            pass
+
+    url = "/api/v2/gateway/s2s-probe"
+    body = {"model": MODELS[-1]}
+    with TestClient(create_app(control_token="local-control", gateway=Gateway())) as client:
+        assert client.post(url, json=body).status_code == 401
+        assert client.post(url, json=body, headers={
+            "Authorization": "Bearer local-control", "x-nola-provider-key": "provider-key",
+            "x-nola-provider-workspace": "workspace",
+        }).status_code == 204
+    assert models == [MODELS[-1], "closed"]
 
 
 def test_gateway_v2_accepts_compute_preferences_and_image_translation():
@@ -216,9 +247,10 @@ def test_workbench_lease_is_held_until_explicit_release(monkeypatch):
     async def release():
         releases.append(True)
 
-    async def acquire(gateway, model, *, max_concurrency=1):
+    async def acquire(gateway, model, *, max_concurrency=1, context_window=None):
         assert model == "qwen-fixture"
         assert max_concurrency == 1
+        assert context_window == 4096
         return SimpleNamespace(endpoint="http://127.0.0.1:5000/v1", context_window=4096, release=release)
 
     async def shutdown():
@@ -235,7 +267,7 @@ def test_workbench_lease_is_held_until_explicit_release(monkeypatch):
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: client_class(transport=httpx.MockTransport(completions), **kwargs))
     auth = {"Authorization": "Bearer local-control"}
-    body = {"model": "qwen-fixture", "lease_id": str(uuid4())}
+    body = {"model": "qwen-fixture", "lease_id": str(uuid4()), "context_window": 4096}
     route = "/api/v2/gateway/language-models"
     with TestClient(create_app(control_token="local-control", gateway=SimpleNamespace(shutdown=shutdown))) as client:
         opened = client.post(route, headers=auth, json=body)

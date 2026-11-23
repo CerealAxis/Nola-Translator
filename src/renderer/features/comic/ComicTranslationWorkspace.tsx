@@ -100,7 +100,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  Tooltip,
+  TooltipHint, Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
@@ -1232,10 +1232,9 @@ export function ComicTranslationWorkspace({
           </div>
           <div className="comic-workflow__view-controls">
             {['repair', 'restore'].includes(tool) && (
-              <Input
+              <TooltipHint content={p('brushSize')}><Input
                 className="comic-workflow__brush-size"
                 aria-label={p('brushSize')}
-                title={p('brushSize')}
                 type="number"
                 min={2}
                 max={100}
@@ -1248,7 +1247,7 @@ export function ComicTranslationWorkspace({
                     ),
                   )
                 }
-              />
+              /></TooltipHint>
             )}
             <Popover>
               <PopoverTrigger

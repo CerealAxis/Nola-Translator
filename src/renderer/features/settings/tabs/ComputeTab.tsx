@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { encodeHardwarePreference, preferredHardwareId, sameAdapterName } from '../../../../shared/device-selection'
-import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
+import { DEFAULT_COMPUTE_SETTINGS, ONNX_RUNTIME_PROVIDERS } from '../../../../shared/compute'
 import type { AppSettingsPatch } from '../../../../shared/settings'
 import { claimRuntimeFailure, releaseRuntimeFailure } from '../settingsErrorChannel'
 import { SettingsRow } from '../SettingsRow'
@@ -18,10 +18,14 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   const runtimes = useStore(stores.settings, state => state.runtimes)
   const loading = useStore(stores.settings, state => state.computeChecking)
   const computeError = useStore(stores.settings, state => state.computeError)
+  const runtimeBusy = useStore(stores.settings, state => state.runtimeBusy || state.runtimeChecking || !!state.runtimes?.operation)
+  const sessionBusy = useStore(stores.session, state => ['starting', 'running', 'paused', 'stopping'].includes(state.status))
   const [refreshing, setRefreshing] = useState(false)
   const pendingSave = useRef<Promise<unknown>>(Promise.resolve())
   const compute = settings.compute ?? DEFAULT_COMPUTE_SETTINGS
   const hardware = runtimes?.hardware.adapters ?? []
+  const onnx = runtimes?.local.onnx
+  const onnxProviders = onnx?.executionProviders?.map(provider => ONNX_RUNTIME_PROVIDERS[provider] ?? provider) ?? []
   const hardwareLabel = (adapter: (typeof hardware)[number]) =>
     hardware.filter(item => item.name === adapter.name).length > 1
       ? adapter.name + ' · ' + adapter.hardwareId.slice(-8) : adapter.name
@@ -33,7 +37,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   const loadRuntimes = useCallback(async (): Promise<boolean> => {
     claimRuntimeFailure()
     try {
-      await actions.settings.loadRuntimeComponents()
+      await actions.settings.loadRuntimeComponents(true, ['onnx'])
       return true
     } catch (error) {
       notifyError(t('common.refreshFailed'), { cause: error })
@@ -95,7 +99,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
     })
   }, [computeError, refresh, t])
   return <div className="settings-panel">
-    <SettingGroup legend={t('compute.devices')} headingAction={<Button variant="secondary" size="sm" disabled={loading || refreshing}
+    <SettingGroup legend={t('compute.devices')} headingAction={<Button variant="secondary" size="sm" disabled={loading || refreshing || runtimeBusy || sessionBusy}
       aria-busy={loading || refreshing} onClick={() => void refresh()}>{t('runtime.recheck')}</Button>}>
       <SettingsRow label={t('compute.recognition')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={recognition.normalized} options={recognition.choices} ariaLabel={t('compute.recognition')} onChange={recognitionDevice => save({ compute: { recognitionDevice } })} /></SettingsRow>
       <SettingsRow label={t('compute.translation')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={translation.normalized} options={translation.choices} ariaLabel={t('compute.translation')} onChange={translationDevice => save({ compute: { translationDevice } })} /></SettingsRow>
@@ -112,6 +116,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
         </SettingsRow>
       })}
       {snapshot?.torchVersion && snapshot.torchVersion !== 'unavailable' ? <SettingsRow label={t('runtime.pytorch')}><span>{snapshot.torchVersion}</span></SettingsRow> : null}
+      {onnx ? <SettingsRow label="ONNX Runtime"><span>{onnxProviders.join(' / ') || t('compute.unavailable')}</span></SettingsRow> : null}
       {loading && (!runtimes || !snapshot) ? <p className="compute-hint" role="status"><LoaderCircle className="inline-block size-4 animate-spin" aria-hidden="true" /> {t('compute.checkingDevices')}</p> : null}
     </SettingGroup>
     {plan ? <SettingGroup legend={t('compute.actual')}>
