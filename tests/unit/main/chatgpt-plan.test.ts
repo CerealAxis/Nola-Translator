@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { streamText } from 'ai'
 import { ChatGptPlan } from '../../../src/main/chatgpt-plan'
 import { createGatewayLanguageModel } from '../../../src/main/gateway-language-model'
+import { probeCloudLanguageModel } from '../../../src/main/cloud-model-tools'
 import { CHATGPT_PLAN_ENDPOINT } from '../../../src/shared/chatgpt-plan'
 import { DEFAULT_SETTINGS, type AppSettings } from '../../../src/shared/settings'
 import { buildConfiguredCloudModels } from '../../../src/shared/model-availability'
@@ -104,4 +105,35 @@ it('uses the ChatGPT token on the fixed Responses route without storing the requ
   expect(init?.redirect).toBe('error')
   expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer plan-token')
   expect(JSON.parse(String(init?.body))).toMatchObject({ model: profile.model, store: false, stream: true })
+})
+
+it('probes a ChatGPT plan model with its account token and a streaming request', async () => {
+  const sourceId = 'provider_0123456789abcdef01234567'
+  const profile = { id: 'plan-profile', name: 'Plan model', model: 'plan-model', endpoint: CHATGPT_PLAN_ENDPOINT,
+    apiFormat: 'chat-responses' as const, contextWindow: 32768, maxOutputTokens: 512, languages: ['en'] }
+  const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [profile] },
+    modelWorkspace: { localSources: {}, connections: [{ id: sourceId, service: 'chatgpt-plan', capability: 'LLM',
+      name: 'ChatGPT', protocol: 'chat-responses', endpoint: CHATGPT_PLAN_ENDPOINT, workspace: '', region: '',
+      models: [{ id: profile.model, name: profile.name, enabled: true, profileId: profile.id }] }] } } as AppSettings
+  const getCredential = vi.fn(async () => '')
+  const getChatGptPlanToken = vi.fn(async () => 'plan-token')
+  const event = { type: 'response.completed', response: {} }
+  const fetchPlan = vi.fn<typeof fetch>().mockResolvedValue(new Response('data: ' + JSON.stringify(event) + '\n\n',
+    { headers: { 'Content-Type': 'text/event-stream' } }))
+  vi.stubGlobal('fetch', fetchPlan)
+  const controller = new AbortController()
+  const runtime = await createGatewayLanguageModel({ getSettings: () => settings, getCredential, getChatGptPlanToken },
+    'custom:' + profile.id, controller.signal)
+  const release = vi.fn()
+  const acquire = vi.fn(async () => ({ ...runtime, signal: controller.signal, release }))
+
+  await probeCloudLanguageModel('custom:' + profile.id, settings, getCredential, acquire, controller.signal)
+  expect(getCredential).not.toHaveBeenCalled()
+  expect(getChatGptPlanToken).toHaveBeenCalledWith(sourceId)
+  expect(JSON.parse(String(fetchPlan.mock.calls[0][1]?.body))).toMatchObject({ model: profile.model, store: false, stream: true })
+  expect(release).toHaveBeenCalledWith(undefined)
+  fetchPlan.mockResolvedValueOnce(Response.json({ error: { message: 'Unauthorized' } }, { status: 401 }))
+  await expect(probeCloudLanguageModel('custom:' + profile.id, settings, getCredential, acquire, controller.signal))
+    .rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+  expect(release).toHaveBeenLastCalledWith(expect.objectContaining({ code: 'AUTHENTICATION_FAILED' }))
 })

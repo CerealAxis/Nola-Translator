@@ -363,6 +363,10 @@ class LocalModelWorker:
                 future.set_exception(error)
         self._pending.clear()
 
+    @property
+    def pid(self) -> int | None:
+        return self._process.pid if self._process is not None and self.running else None
+
     def resident_memory_mb(self) -> float | None:
         """Measured child RSS when psutil is available; otherwise None so the
         caller keeps its conservative estimate (weights size != VRAM)."""

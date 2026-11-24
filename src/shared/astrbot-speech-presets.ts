@@ -3,7 +3,7 @@ export const astrBotSpeechPresets = [
   { id: 'mimo-stt-api', name: 'MiMo STT(API)', capability: 'ASR', endpoint: 'https://api.xiaomimimo.com/v1', model: 'mimo-v2.5-asr', icon: 'XiaomiMiMo' },
   { id: 'openai-tts-api', name: 'OpenAI TTS(API)', capability: 'TTS', endpoint: '', fallback: 'https://api.openai.com/v1', model: 'tts-1', voice: 'alloy', icon: 'OpenAI' },
   { id: 'mimo', name: 'MiMo TTS(API)', capability: 'TTS', endpoint: 'https://api.xiaomimimo.com/v1', model: 'mimo-v2.5-tts', voice: 'mimo_default', icon: 'XiaomiMiMo',
-    fields: { format: 'wav', style: '', dialect: '', seedText: 'Hello, MiMo, have you had lunch?' } },
+    fields: { format: 'wav', style: '', dialect: '', seedText: '' } },
   { id: 'edge-tts', name: 'Edge TTS', capability: 'TTS', endpoint: '', model: 'edge-tts', voice: 'zh-CN-XiaoxiaoNeural', icon: 'Microsoft', keyless: true, voiceOnly: true,
     fields: { rate: '+0%', volume: '+0%', pitch: '+0Hz' } },
   { id: 'fishaudio-tts', name: 'FishAudio TTS(API)', capability: 'TTS', endpoint: 'https://api.fish.audio/v1', model: 's2-pro', voice: '',

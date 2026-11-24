@@ -899,7 +899,7 @@ export const zhTW: Dictionary = {
     "searchPlaceholder": "搜尋 Hugging Face 上的模型",
     "experimentalNoticeTitle": "實驗性功能",
     "experimentalNoticeBody": "模型來自 Hugging Face 社群，能否安裝和辨識效果都不保證。",
-    "experimentalNoticeAction": "去看推薦模型",
+    "experimentalNoticeAction": "查看模型來源",
     "filterAll": "全部",
     "filterAsr": "語音辨識",
     "filterMt": "翻譯",

@@ -17,9 +17,10 @@ import { DownloadSourceTabs } from '../DownloadSourceTabs'
 import { ModelConfigurationDialog, ModelLanguageSelect } from '../ModelConfigurationDialog'
 import { SettingsRow } from '../../settings/SettingsRow'
 import { descriptionKeyOf, paramsOf } from '../ModelCard'
+import { visualModelName, visualModelDescription, visualSeriesOf } from '../visual-model-display'
 import { ModelMark } from '../modelBrand'
 import { familyOf } from '../modelFamily'
-import { FamilyModelSelect } from '../RecommendedFamilies'
+import { FamilyModelSelect } from '../FamilyModelSelect'
 import { useCloudPreviewCopy } from './cloud-preview-copy'
 import { engineNames, isLocalDownloadActive, previewEngine, type PreviewFamily } from './local-preview-catalog'
 import { localSeriesName, modelWorkspaceText } from './preview-copy'
@@ -41,6 +42,7 @@ export function LocalDetails({ family, installed, onAdd, onRemove, busyIds = [] 
   const { t, language } = useI18n()
   const copy = useCloudPreviewCopy()
   const [editingId, setEditingId] = useState('')
+  const [removingId, setRemovingId] = useState('')
   const records = family.records.filter(record => installed.has(record.resourceId) || isLocalDownloadActive(record))
   const editing = records.find(record => record.resourceId === editingId && installed.has(record.resourceId))
   const hasDownloads = records.some(isLocalDownloadActive)
@@ -58,23 +60,33 @@ export function LocalDetails({ family, installed, onAdd, onRemove, busyIds = [] 
       </div>
       {records.length ? <ul>{records.map(record => {
         const engine = previewEngine(record)
-        const name = record.name.replace(/\s*·\s*(?:llama\.cpp|CrispASR|PyTorch|ONNX Runtime|OpenCV)\s*$/i, '')
+        const name = visualModelName(record).replace(/\s*·\s*(?:llama\.cpp|CrispASR|PyTorch|ONNX Runtime|OpenCV)\s*$/i, '')
         return <li key={record.resourceId}>
           <div className="cpv-model-info">
+            {visualSeriesOf(record) && <ModelMark record={record} kind={record.kind} size={16} brandColors />}
             <span className="type-body">{name}</span>
             <span className="cpv-model-tags">{engine && <Badge variant="outline">{engineNames[engine]}</Badge>}</span>
           </div>
           {isLocalDownloadActive(record) ? <div className="flex min-h-8 items-center">
             <Badge variant="secondary">{t(record.state === 'paused' ? 'models.paused' : record.state === 'cancelling' ? 'models.cancelling' : 'status.downloading')}</Badge>
           </div> : <div className="cpv-actions">
-            <Button variant="bare" size="icon-sm" disabled={busyIds.includes(record.resourceId) || record.state === 'running'}
-              aria-label={`${copy('editModel')} ${name}`} tooltip={copy('editModel')} onClick={() => setEditingId(record.resourceId)}>
-              <Pencil aria-hidden="true" />
-            </Button>
-            <Button variant="bare" size="icon-sm" disabled={busyIds.includes(record.resourceId) || record.state === 'running'}
-              aria-label={`${t('modelsSettingsUi.deleteModel')} ${name}`} tooltip={t('modelsSettingsUi.deleteModel')} onClick={() => onRemove(record)}>
-              <Trash2 aria-hidden="true" />
-            </Button>
+            {removingId === record.resourceId ? <>
+              <span className="type-small">{copy('confirmRemoval')}</span>
+              <Button variant="secondary" size="sm" onClick={() => setRemovingId('')}>{t('common.cancel')}</Button>
+              <Button variant="danger" size="sm" disabled={busyIds.includes(record.resourceId) || record.state === 'running'} onClick={() => {
+                setRemovingId('')
+                onRemove(record)
+              }}>{t('common.confirm')}</Button>
+            </> : <>
+              <Button variant="bare" size="icon-sm" disabled={busyIds.includes(record.resourceId) || record.state === 'running'}
+                aria-label={`${copy('editModel')} ${name}`} tooltip={copy('editModel')} onClick={() => setEditingId(record.resourceId)}>
+                <Pencil aria-hidden="true" />
+              </Button>
+              <Button variant="bare" size="icon-sm" disabled={busyIds.includes(record.resourceId) || record.state === 'running'}
+                aria-label={`${t('modelsSettingsUi.deleteModel')} ${name}`} tooltip={t('modelsSettingsUi.deleteModel')} onClick={() => setRemovingId(record.resourceId)}>
+                <Trash2 aria-hidden="true" />
+              </Button>
+            </>}
           </div>}
         </li>
       })}</ul> : <p className="type-muted">{modelWorkspaceText(language, 'noInstalledModels')}</p>}
@@ -117,7 +129,7 @@ function LocalModelEditor({ record, onClose }: { record: ResourceRecord; onClose
   }
   const label = modelWorkspaceText(language, record.kind === 'ttsModel' ? 'speechLanguages' : 'supportedLanguages')
   return <ModelEditorDialog editing onCancel={onClose}>
-    <SettingsRow label={t('settings.model')}>{record.name}</SettingsRow>
+    <SettingsRow label={t('settings.model')}>{visualModelName(record)}</SettingsRow>
     {record.languages.length > 0
       ? <ModelLanguageSelect label={label} value={record.languages} codes={record.languages} onChange={() => undefined} readOnly genericChinese={record.kind === 'ttsModel'} />
       : (record.kind === 'ttsModel' || record.kind === 'ocrModel') && <SettingsRow label={label}>
@@ -156,7 +168,8 @@ export function LocalDownloadDialog({ family, installed, onClose, onInstall, bus
     && (!showScales || paramsOf(option) === scale))
   const engines = family.engines.filter(option => available.some(record => previewEngine(record) === option))
   const familyId = familyOf(record)
-  const description = familyId === 'other' ? descriptionKeyOf(record) : `models.familyDescriptions.${familyId}` as const
+  const descriptionKey = familyId === 'other' ? descriptionKeyOf(record) : `models.familyDescriptions.${familyId}` as const
+  const description = visualModelDescription(record, language) ?? (descriptionKey ? t(descriptionKey) : undefined)
   const entry = modelImportEntry(record.resourceId)
   const sources = entry ? downloadSourcesFor(record.resourceId) : []
   const activeSource = sources.some(option => option.source === source) ? source : sources[0]?.source ?? 'huggingface'
@@ -167,7 +180,7 @@ export function LocalDownloadDialog({ family, installed, onClose, onInstall, bus
       <DialogCloseButton aria-label={t('common.close')} />
       <DialogHeader>
         <DialogTitle>{copy('addModel')}</DialogTitle>
-        {description && <DialogDescription className="models-family-dialog__intro">{t(description)}</DialogDescription>}
+        {description && <DialogDescription className="models-family-dialog__intro">{description}</DialogDescription>}
       </DialogHeader>
       <div className="models-family-dialog__body">
         <div className="models-family-dialog__filters">
@@ -195,7 +208,7 @@ export function LocalDownloadDialog({ family, installed, onClose, onInstall, bus
           </section>}
         </div>
         <FamilyModelSelect selected={record} records={variants} installedIds={installed}
-          engine={familyId === 'tts' ? undefined : inferenceEngine ?? undefined}
+          engine={familyId === 'tts' || visualSeriesOf(record) ? undefined : inferenceEngine ?? undefined}
           compute={compute} computeSnapshot={computeSnapshot} onChange={setResourceId} />
         {sources.length > 0 && <section>
           <p className="models-family-dialog__label type-body">{t('models.downloadSources.title')}</p>
@@ -204,7 +217,7 @@ export function LocalDownloadDialog({ family, installed, onClose, onInstall, bus
         </section>}
       </div>
       <DialogFooter>
-        {entry && <Button variant="secondary" onClick={() => { onClose(); offlineActions.openDownloads(record.resourceId) }}>{t('offline.manualDownload')}</Button>}
+        {entry && <Button variant="secondary" onClick={() => { onClose(); offlineActions.openDownloads(record.resourceId, activeSource) }}>{t('offline.manualDownload')}</Button>}
         <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
         <Button onClick={() => onInstall(record, sources.length ? activeSource : undefined)}><Download data-icon="inline-start" />{t('models.install')}</Button>
       </DialogFooter>

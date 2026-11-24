@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchCloudChatModels } from '../../../src/main/cloud-model-tools'
+import { cloudModelProbeError, fetchCloudChatModels, probeCloudLanguageModel } from '../../../src/main/cloud-model-tools'
+import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import type { CloudModelListRequest } from '../../../src/shared/cloud-model-tools'
 
 const connection: CloudModelListRequest = {
@@ -7,6 +8,21 @@ const connection: CloudModelListRequest = {
   endpoint: 'https://api.minimaxi.com/anthropic', key: '',
 }
 const signal = new AbortController().signal
+
+describe('cloud speech probe failures', () => {
+  it.each([
+    [new TypeError('fetch failed'), 'NETWORK_UNAVAILABLE'],
+    [new Error('request timed out'), 'REQUEST_TIMEOUT'],
+    [new SyntaxError('Unexpected end of JSON input'), 'SYNTHESISFAILED'],
+  ])('classifies %s as %s', (error, code) => {
+    expect(cloudModelProbeError(error)).toMatchObject({ code })
+  })
+
+  it('keeps a known cloud-model error instead of replacing it with a generic synthesis failure', () => {
+    const error = Object.assign(new Error('Provider returned HTTP 401'), { code: 'CLOUD_MODEL_KEY_REQUIRED' })
+    expect(cloudModelProbeError(error)).toBe(error)
+  })
+})
 
 describe('cloud chat model discovery', () => {
   it('asks for an API key before calling the official OpenAI endpoint', async () => {
@@ -50,4 +66,14 @@ describe('cloud chat model discovery', () => {
       { id: 'gemini-test', contextWindow: 4096, maxOutputTokens: 1024 },
     ])
   })
+})
+
+it('requires an API key before probing a standard OpenAI model', async () => {
+  const profile = { id: 'profile', name: 'Model', model: 'model', endpoint: 'https://api.openai.com/v1',
+    apiFormat: 'chat-responses' as const, contextWindow: 4096, maxOutputTokens: 1024, languages: ['en'] }
+  const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [profile] } }
+  const acquire = vi.fn()
+  await expect(probeCloudLanguageModel('custom:profile', settings, async () => '', acquire, signal))
+    .rejects.toMatchObject({ code: 'CLOUD_MODEL_KEY_REQUIRED' })
+  expect(acquire).not.toHaveBeenCalled()
 })

@@ -126,6 +126,9 @@ class _Item:
 
 
 class AliyunRecognizer:
+    observe_call = None
+    _finish_measurement = None
+
     def __init__(self, config: ModelSelection, *, connector: Connector = connect_websocket,
                  timeout: float = 10, finish_timeout: float = 15, latency_detection: bool = False) -> None:
         self.url, self.model, self.api_key, self.target = resolve_aliyun(config)
@@ -186,6 +189,8 @@ class AliyunRecognizer:
             if self._ws is not None:
                 return
             self.validate_credentials()
+            if self.observe_call is not None:
+                self._finish_measurement = self.observe_call(self.model)
             try:
                 self._ws = await asyncio.wait_for(self.connector(self.url, {"Authorization": f"Bearer {self.api_key}"}), self.timeout)
                 await self._expect("session.created")
@@ -298,6 +303,9 @@ class AliyunRecognizer:
         self.on_error = None
 
     async def _disconnect(self) -> None:
+        if self._finish_measurement is not None:
+            self._finish_measurement()
+            self._finish_measurement = None
         receiver, self._receiver = self._receiver, None
         if receiver is not None and receiver is not asyncio.current_task():
             receiver.cancel()
@@ -316,6 +324,8 @@ class AliyunRecognizer:
                 if not isinstance(event, dict):
                     raise CloudRecognitionError("recognitionInvalidResponse")
                 if event.get("type") == "session.finished":
+                    if self._finish_measurement is not None:
+                        self._finish_measurement()
                     if self.native_translation:
                         for item_id, item in tuple(self._items.items()):
                             if item.translation_state == "pending":
@@ -504,6 +514,9 @@ class AliyunRecognizer:
 class AliyunInferenceRecognizer:
     """Streaming Aliyun ASR models that use the task-based inference WebSocket protocol."""
 
+    observe_call = None
+    _finish_measurement = None
+
     def __init__(self, config: ModelSelection, *, connector: Connector = connect_websocket,
                  timeout: float = 10, finish_timeout: float = 15) -> None:
         self.url, self.model, self.api_key, _ = resolve_aliyun(config)
@@ -539,6 +552,8 @@ class AliyunInferenceRecognizer:
         if self._ws is not None:
             return
         self.validate_credentials()
+        if self.observe_call is not None:
+            self._finish_measurement = self.observe_call(self.model)
         try:
             self._ws = await asyncio.wait_for(self.connector(self.url, {"Authorization": f"Bearer {self.api_key}"}), self.timeout)
             await self._send({"header": {"action": "run-task", "task_id": self._task_id, "streaming": "duplex"},
@@ -633,6 +648,9 @@ class AliyunInferenceRecognizer:
         self.on_error = None
 
     async def _disconnect(self) -> None:
+        if self._finish_measurement is not None:
+            self._finish_measurement()
+            self._finish_measurement = None
         receiver, self._receiver = self._receiver, None
         if receiver is not None and receiver is not asyncio.current_task():
             receiver.cancel()
@@ -681,6 +699,8 @@ class AliyunInferenceRecognizer:
                 event = await self._recv_event()
                 kind = self._event_kind(event)
                 if kind == "task-finished":
+                    if self._finish_measurement is not None:
+                        self._finish_measurement()
                     self._finished.set()
                     return
                 if kind == "task-failed":

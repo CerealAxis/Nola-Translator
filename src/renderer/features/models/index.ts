@@ -5,8 +5,6 @@
  * list, so it is re-exported here for the other features to reuse.
  */
 
-export { ModelsPage } from './ModelsPage'
-export type { ModelsTab } from './ModelsPage'
 export { ModelCard, ModelCardSkeleton } from './ModelCard'
 export type { ModelCardProps } from './ModelCard'
 export { ModelMark, brandOf, brandOfRepo } from './modelBrand'

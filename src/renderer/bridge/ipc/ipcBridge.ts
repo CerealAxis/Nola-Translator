@@ -128,6 +128,8 @@ export function createIpcBridge(): NolaBridge {
       stop: () => call('gateway', api => api.gateway?.stop() ?? Promise.reject(new MissingIpcApiError('gateway.stop'))),
       revealKey: () => call('gateway', api => api.gateway?.revealKey() ?? Promise.reject(new MissingIpcApiError('gateway.revealKey'))),
       rotateKey: () => call('gateway', api => api.gateway?.rotateKey() ?? Promise.reject(new MissingIpcApiError('gateway.rotateKey'))),
+      openPerformanceMonitor: () => call('gateway', api => api.gateway?.openPerformanceMonitor?.() ?? Promise.reject(new MissingIpcApiError('gateway.openPerformanceMonitor'))),
+      performanceSnapshot: () => call('gateway', api => api.gateway?.performanceSnapshot?.() ?? Promise.reject(new MissingIpcApiError('gateway.performanceSnapshot'))),
       onChanged: cb => subscribe('gateway', api => api.gateway?.onChanged ?? (() => () => undefined), cb),
     },
     activity: {

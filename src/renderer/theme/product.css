@@ -441,8 +441,8 @@
 }
 
 .nola-dialog-content.card[data-slot="dialog-content"] {
-  --card-spacing: var(--space-2);
-  gap: var(--card-spacing);
+  --card-spacing: var(--panel-padding);
+  gap: var(--panel-gap);
   padding: var(--card-spacing);
 }
 
@@ -459,7 +459,11 @@
   gap: var(--space-1);
 }
 
-.nola-dialog-content.card:has(> .nola-dialog-close) > :is(.nola-dialog-header, .card__header) {
+.nola-dialog-content.card > .nola-dialog-header:has(> [data-slot="dialog-description"]) {
+  gap: var(--description-gap);
+}
+
+.nola-dialog-content.card:has(> .nola-dialog-close, > .nola-dialog-header > .nola-dialog-close) > :is(.nola-dialog-header, .card__header) {
   padding-inline-end: var(--field-control-height);
 }
 
@@ -478,6 +482,7 @@
 }
 
 .nola-dialog-content [data-slot="dialog-description"] {
+  @apply type-muted;
   color: var(--nola-ui-muted-foreground);
 }
 

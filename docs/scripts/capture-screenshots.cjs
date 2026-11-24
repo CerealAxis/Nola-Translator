@@ -17,7 +17,7 @@ const routes = { home: '#/', workspace: '#/workspace', models: '#/models', 'over
 const sourceComponents = {
   'session-setup': ['src/renderer/features/workspace/SessionSetupDialog.tsx', 'src/renderer/features/workspace/WorkspacePage.tsx'],
   'session-check': ['src/renderer/features/workspace/PreflightDialog.tsx', 'src/renderer/features/workspace/WorkspacePage.tsx'],
-  'download-source': ['src/renderer/features/models/RecommendedFamilies.tsx', 'src/renderer/features/models/ModelsPage.tsx'],
+  'download-source': ['src/renderer/features/models/preview/LocalPreview.tsx', 'src/renderer/features/models/FamilyModelSelect.tsx'],
   'compute-components': ['src/renderer/features/settings/tabs/RuntimeComponents.tsx', 'src/renderer/features/settings/tabs/ComputeTab.tsx'],
   'crisp-loader': ['src/renderer/features/settings/tabs/RuntimeComponents.tsx', 'src/renderer/features/settings/tabs/ComputeTab.tsx'],
   'llama-cuda': ['src/renderer/features/settings/tabs/RuntimeComponents.tsx', 'src/renderer/features/settings/tabs/ComputeTab.tsx'],
@@ -31,7 +31,7 @@ const sourceComponents = {
   'llm-configuration': ['src/renderer/features/settings/tabs/TranslationTab.tsx', 'src/renderer/features/settings/SettingsPage.tsx'],
   home: ['src/renderer/features/home/HomePage.tsx', 'src/renderer/features/home/RecentMeetings.tsx', 'src/renderer/components/home/HeroSection.tsx', 'src/renderer/components/primitives/AppShell.tsx'],
   workspace: ['src/renderer/features/workspace/WorkspacePage.tsx', 'src/renderer/components/caption/CaptionStage.tsx', 'src/renderer/components/notes/NotesPanel.tsx', 'src/renderer/features/workspace/WorkspaceToolbar.tsx'],
-  models: ['src/renderer/features/models/ModelsPage.tsx', 'src/renderer/features/models/ModelCard.tsx', 'src/shared/model-capabilities.ts', 'engine/nola_translator_engine/resources.py'],
+  models: ['src/renderer/features/models/preview/ModelPreviewPage.tsx', 'src/renderer/features/models/preview/LocalPreview.tsx', 'src/shared/model-capabilities.ts', 'engine/nola_translator_engine/resources.py'],
 }
 
 const viewport = guideOnly ? { width: 1920, height: 1080 } : { width: 1440, height: 1000 }
@@ -78,11 +78,23 @@ async function pressGuideButton(win, label) {
   })()`)
 }
 
-async function openModelFamilyDialog(win) {
-  await win.webContents.executeJavaScript(`(() => {
-    const button = document.querySelector('button[data-onboarding="model-family-recognitionModel"]')
-    if (!button || button.disabled) throw new Error('Recognition model family button is missing or disabled')
-    button.click()
+async function openModelDownloadDialog(win) {
+  await win.webContents.executeJavaScript(`(async () => {
+    async function press(selector, label) {
+      const deadline = Date.now() + 4000
+      while (Date.now() < deadline) {
+        const control = Array.from(document.querySelectorAll(selector)).find(element =>
+          element.getBoundingClientRect().width > 0 && !element.disabled && (!label || element.textContent.trim() === label))
+        if (control) { control.click(); return }
+        await new Promise(resolve => setTimeout(resolve, 25))
+      }
+      throw new Error('Model download control missing: ' + selector)
+    }
+    await press('[data-onboarding="models-category"]')
+    await press('[data-onboarding="models-category-ASR"]')
+    await press('[data-onboarding="models-add-source"]')
+    await press('[data-onboarding="models-source-picker"] button[data-family="sensevoice"]')
+    await press('[data-slot="source-details"] button', '添加模型')
   })()`)
 }
 
@@ -182,7 +194,7 @@ async function main() {
           }
           if (guideOnly && page === 'download-source') {
             console.log(`opening download source dialog`)
-            await openModelFamilyDialog(win)
+            await openModelDownloadDialog(win)
             await waitForGuideDialog(win, '选择下载源')
           }
           if (guideOnly) {

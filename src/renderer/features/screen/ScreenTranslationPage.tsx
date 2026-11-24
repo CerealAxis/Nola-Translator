@@ -309,7 +309,7 @@ export function ScreenTranslationPage() {
           <Field className="nola-settings-field">
             <FieldLabel id="screen-opacity-label">{t('screen.blurOpacity')}</FieldLabel>
             <div className="nola-meeting-volume-control">
-              <SliderRoot className="px-4" min={0.35} max={1} step={0.01} value={opacityPreview ?? config.opacity}
+              <SliderRoot min={0.35} max={1} step={0.01} value={opacityPreview ?? config.opacity}
                 disabled={settingsDisabled}
                 locale={language} format={{ style: 'percent' }}
                 onValueChange={setOpacityPreview} onValueCommitted={value => {

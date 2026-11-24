@@ -70,7 +70,7 @@ const config = defineConfig({
     },
     // Base UI components use the existing Tailwind pipeline and product theme cascade.
     // Caption windows share index.html; the agent workbench stays in the main renderer.
-    build: { rollupOptions: { input: { main: resolve('src/renderer/index.html'), onboardingCard: resolve('src/renderer/onboarding-card.html'), latency: resolve('src/renderer/latency.html'), screen: resolve('src/renderer/screen.html') } } },
+    build: { rollupOptions: { input: { main: resolve('src/renderer/index.html'), onboardingCard: resolve('src/renderer/onboarding-card.html'), latency: resolve('src/renderer/latency.html'), performanceMonitor: resolve('src/renderer/performance-monitor.html'), screen: resolve('src/renderer/screen.html') } } },
     plugins: [react(), tailwindcss()]
   }
 })

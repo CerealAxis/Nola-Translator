@@ -458,7 +458,7 @@ export const zhCN = {
     searchPlaceholder: '搜索 Hugging Face 上的模型',
     experimentalNoticeTitle: '实验性功能',
     experimentalNoticeBody: '模型来自 Hugging Face 社区，能否安装和识别效果都不保证。',
-    experimentalNoticeAction: '去看推荐模型',
+    experimentalNoticeAction: '查看模型来源',
     filterAll: '全部',
     filterAsr: '语音识别',
     filterMt: '翻译',

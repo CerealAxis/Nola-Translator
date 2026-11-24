@@ -11,6 +11,9 @@ from typing import Callable
 from .models import catalog
 from .models.crisp_catalog import ADDITIONAL_TTS_SPECS, CRISP_ASR_SPECS, QWEN3_TTS_SPECS
 from .models.manager import ModelIntegrityError, ModelManager, ModelSpec
+from .models.inpaint_catalog import LAMA_MANGA
+from .models.ocr_catalog import (OCR_SPECS, COMIC_DETECTOR, RFDETR_SEG, ANGLENET,
+    COMIC_FONT_CLASSIFIER, COMIC_YUZU_FONT, LAMA_ONNX, LAMA_MANGA_ONNX)
 from .models.qwen35_catalog import QWEN35_SPECS
 from .models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
 from .protocol import NetworkSettings
@@ -26,12 +29,18 @@ class OfflineError(RuntimeError):
         self.issue, self.reason = issue, reason
 
 
+VISUAL_SPECS = {**OCR_SPECS, **{spec.model_id: spec for spec in (
+    COMIC_DETECTOR, RFDETR_SEG, ANGLENET, COMIC_FONT_CLASSIFIER, COMIC_YUZU_FONT,
+    LAMA_MANGA, LAMA_ONNX, LAMA_MANGA_ONNX,
+)}}
+
+
 def catalog_specs() -> dict[str, ModelSpec]:
     specs = {value.model_id: value for value in vars(catalog).values() if isinstance(value, ModelSpec)}
     specs.update((spec.model_id, spec) for spec in (
         CRISP_ASR_SPECS + QWEN3_TTS_SPECS + ADDITIONAL_TTS_SPECS + QWEN35_SPECS + QWEN3_ASR_GGUF_SPECS
     ))
-    return specs
+    return {**specs, **VISUAL_SPECS}
 
 
 def _local(path: Path, root: Path) -> bool:

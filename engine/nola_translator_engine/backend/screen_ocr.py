@@ -126,6 +126,7 @@ class OcrRequest(BaseModel):
 class OcrInstallRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     network: NetworkSettings | None = None
+    source: Literal["huggingface", "hf-mirror", "modelscope"] | None = None
 
 
 def _process_running(pid: int) -> bool:
@@ -413,15 +414,15 @@ class ScreenOcr:
             self._verified = fingerprint
         return directory
 
-    async def install(self, network=None) -> dict:
+    async def install(self, network=None, source=None) -> dict:
         if self._closed or self._loaded or self._lock.locked() or (self._install and not self._install.done()):
             raise ValueError("resourceBusy")
         self._cancel.clear()
         self._publish(state="running", phase="verify", progress=0)
-        self._install = asyncio.create_task(self._run_install(network))
+        self._install = asyncio.create_task(self._run_install(network, source))
         return await asyncio.to_thread(self.status)
 
-    async def _run_install(self, network) -> None:
+    async def _run_install(self, network, source) -> None:
         async with self._lock:
             loop = asyncio.get_running_loop()
             phase = "verify"
@@ -457,7 +458,7 @@ class ScreenOcr:
                             self.models._verify_file(path, entry, lambda: progress(0, 1))
                         except ModelIntegrityError:
                             path.unlink()
-                self.models.ensure(self.spec, progress=progress, on_phase=on_phase, network=network)
+                self.models.ensure(self.spec, progress=progress, on_phase=on_phase, network=network, source=source)
 
             try:
                 await asyncio.to_thread(run)
@@ -1034,7 +1035,7 @@ def build_screen_ocr_router(service: ScreenOcr) -> APIRouter:
 
     @router.post("/install")
     async def install(body: OcrInstallRequest | None = None, resource_id: str = OCR_RESOURCE_ID):
-        return await invoke(service.variant(resource_id).install(body.network if body else None))
+        return await invoke(service.variant(resource_id).install(body.network if body else None, body.source if body else None))
 
     @router.delete("/install")
     async def cancel(resource_id: str = OCR_RESOURCE_ID):

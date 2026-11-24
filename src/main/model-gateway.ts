@@ -1,4 +1,5 @@
 import { inferAstrBotSpeech } from './astrbot-speech'
+import { measureCloudCall } from './gateway-performance'
 import { workspaceChatConnection, workspaceSpeechConnection, workspaceSpeechModel } from '../shared/model-workspace'
 import { astrBotSpeechPreset, astrBotSpeechPresetForBinding } from '../shared/astrbot-speech-presets'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
@@ -302,7 +303,8 @@ export class ModelGateway {
         if (inspect) return { text: '', voices: model.voice ? [model.voice] : [] }
         entry = this.begin(kind, binding)
         const key = preset.keyless ? '' : await this.options.getCredential?.(preset.id === 'mimo' ? 'mimo-tts' : customCredentialSlot(speech.id)) ?? ''
-        return await inferAstrBotSpeech(speech, request, key, signal, probe ? { ...model, enabled: true } : model)
+        return await measureCloudCall(model.id, () =>
+          inferAstrBotSpeech(speech, request, key, signal, probe ? { ...model, enabled: true } : model))
       }
       if (this.options.inferBackend) {
         const enabled = isModelEnabled(settings, kind, binding)
@@ -350,6 +352,8 @@ export class ModelGateway {
       if (slot.retired && !slot.refs) { this.retiredLanguageModels.delete(slot); void slot.runtime.close() }
     } }
   }
+
+  get isRunning(): boolean { return this.state === 'running' && !this.stopping }
 
   snapshot(): ModelGatewaySnapshot {
     return { state: this.state, address: `http://${this.host}:${this.port}/v2`, port: this.port, connections: this.clients.size,

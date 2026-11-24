@@ -53,11 +53,13 @@ import { BackendSupervisor, backendLaunchSpec } from './backend-supervisor'
 import { BackendSession, mapBrowserSessionConfig, mapSessionConfig, type BackendSessionConfig } from './backend-session'
 import { captionPaint, latencyMeta, LatencySession, latencyWavePoint } from './latency-session'
 import { LatencyWindow } from './latency-window'
+import { PerformanceMonitorWindow } from './performance-monitor-window'
+import { gatewayPerformanceSnapshot } from './gateway-performance'
 import { BackendScreenOcr, backendAsrHeaders, backendMtHeaders, backendCloudAsr, backendCloudMt, gatewayMtBackup, inferBackendModel, inferBackendMt, openBackendAsrStream, openBackendLanguageModel, backendGatewayControl, backendGatewayInstances, probeBackendS2s } from './backend-direct-model'
 import { createGatewayLanguageModel } from './gateway-language-model'
 import { ChatGptPlan } from './chatgpt-plan'
 import { CHATGPT_PLAN_SERVICE, chatGptPlanRequest } from '../shared/chatgpt-plan'
-import { cloudModelError, cloudModelHttpError, fetchCloudChatModels } from './cloud-model-tools'
+import { cloudModelError, cloudModelProbeError, fetchCloudChatModels, probeCloudLanguageModel } from './cloud-model-tools'
 import { cloudModelListRequestSchema, cloudModelProbeRequestSchema } from '../shared/cloud-model-tools'
 import { astrBotSpeechPresetForBinding } from '../shared/astrbot-speech-presets'
 import { ALIYUN_S2S_SPEECH_LANGUAGES, fallbackTranslationFieldsOf, recognitionFieldsOf, remoteSourceLanguages, translationOptionsFor } from '../shared/cloud-config'
@@ -838,6 +840,20 @@ if (!hasSingleInstanceLock) {
     const desktopEngine = createSessionEngine()
     const browserEngine = createSessionEngine()
     const latencyWindow = new LatencyWindow(__dirname)
+    const performanceMonitor = new PerformanceMonitorWindow(__dirname, () => gateway?.isRunning === true && !!backend?.ready)
+    ipcMain.handle('model-gateway:performance-snapshot', event => {
+      const signal = performanceMonitor.snapshotSignal(event)
+      if (!backend?.ready) throw new Error('Gateway performance data unavailable')
+      return gatewayPerformanceSnapshot(backend, signal)
+    })
+    loggedHandle('model-gateway:open-performance-monitor', async event => {
+      assertFeatureSender(event, true)
+      if (!gateway?.isRunning) throw new Error('gatewayNotRunning')
+      if (!backend?.ready) await ensureRealtimeBackend()
+      if (!gateway?.isRunning || !backend?.ready) throw new Error('Gateway performance data unavailable')
+      await gatewayPerformanceSnapshot(backend, AbortSignal.timeout(4000))
+      return performanceMonitor.open(settings.current().theme)
+    })
     loggedHandle('latency:open', event => {
       assertFeatureSender(event, true)
       latencyWindow.reopen(settings.current().theme)
@@ -1273,10 +1289,10 @@ if (!hasSingleInstanceLock) {
         }] : [])
       },
       () => gateway?.snapshot().state === 'running',
-      async (resourceId, action) => {
+      async (resourceId, action, source) => {
         if (!isManagedComicVisualResource(resourceId)) return undefined
         if (!screenOcr) throw new Error('backendUnavailable')
-        const status = action === 'install' || action === 'resume' ? await screenOcr.install(resourceId)
+        const status = action === 'install' || action === 'resume' ? await screenOcr.install(resourceId, source)
           : action === 'remove' ? await screenOcr.remove(resourceId) : await screenOcr.cancel(resourceId)
         const resource = status.resource
         if (!resource) throw new Error('resourceUnavailable')
@@ -1458,6 +1474,7 @@ if (!hasSingleInstanceLock) {
       getKey: () => credentials.get('model-gateway'), setKey: value => credentials.set('model-gateway', value),
       chatGptPlanPresence,
       onChanged: snapshot => {
+        if (snapshot.state !== 'running') performanceMonitor.close()
         for (const window of BrowserWindow.getAllWindows()) sendToRenderer(window, 'model-gateway:changed', snapshot)
         if (snapshot.state === 'failed' || snapshot.state === 'stopped') { gatewayLease?.release(); gatewayLease = null }
       },
@@ -1483,24 +1500,8 @@ if (!hasSingleInstanceLock) {
       const { capability, binding } = request
       const signal = AbortSignal.timeout(25_000)
       if (capability === 'LLM' && /^custom:[a-zA-Z0-9_-]{1,64}$/.test(binding)) {
-        const current = settings.current()
-        const profileId = binding.slice('custom:'.length)
-        const profile = customModelsOf(current.translation).find(model => model.id === profileId)
-        const hasKey = Boolean((await credentials.get(customCredentialSlot(profileId, current.modelWorkspace))).trim())
-        if (!hasKey && profile && URL.canParse(profile.endpoint) && new URL(profile.endpoint).origin === 'https://api.openai.com') {
-          throw cloudModelError('CLOUD_MODEL_KEY_REQUIRED')
-        }
-        const lease = await gateway!.acquireLanguageModel(binding, true)
-        let failure: unknown
-        try {
-          await generateText({ model: lease.model('disabled'), prompt: 'Reply with OK.', maxOutputTokens: Math.min(32, lease.profile.maxOutputTokens),
-            maxRetries: 0, abortSignal: AbortSignal.any([signal, lease.signal]) })
-        } catch (error) {
-          const status = error instanceof Error && 'statusCode' in error ? error.statusCode : undefined
-          failure = signal.aborted ? cloudModelError('REQUEST_TIMEOUT') : typeof status === 'number' ? cloudModelHttpError(status, hasKey)
-            : new Error(lease.redact(error instanceof Error ? error.message : 'Model request failed'))
-          throw failure
-        } finally { lease.release(failure) }
+        await probeCloudLanguageModel(binding, settings.current(), provider => credentials.get(provider),
+          (model, probe) => gateway!.acquireLanguageModel(model, probe), signal)
         return {}
       }
       if (capability === 'S2S' && REALTIME_S2S_MODELS.some(model => model === binding)) {
@@ -1527,8 +1528,13 @@ if (!hasSingleInstanceLock) {
       }
       if (capability === 'TTS' && request.text && speech?.capability === 'TTS') {
         if (binding === MIMO_TTS_BINDING && !(await credentials.get('mimo-tts')).trim()) throw cloudModelError('CLOUD_MODEL_KEY_REQUIRED')
-        const voice = binding === MIMO_TTS_BINDING ? settings.current().synthesis.voice : undefined
-        const result = await gateway!.infer({ id: randomUUID(), kind: 'tts', model: binding, text: request.text, voice }, signal, false, true)
+        const voice = request.voice?.trim() || (binding === MIMO_TTS_BINDING ? settings.current().synthesis.voice : undefined)
+        let result
+        try {
+          result = await gateway!.infer({ id: randomUUID(), kind: 'tts', model: binding, text: request.text, voice }, signal, false, true)
+        } catch (error) {
+          throw cloudModelProbeError(error, signal)
+        }
         if (!result.audio?.startsWith('data:audio/')) throw cloudModelError('CLOUD_MODEL_NO_AUDIO')
         return { audio: result.audio }
       }

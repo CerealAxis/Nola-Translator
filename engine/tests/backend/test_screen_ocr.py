@@ -460,6 +460,29 @@ def test_variant_private_api_validates_model_ids_and_reports_language_capabiliti
     assert all(variant._closed for variant in service._variants.values())
 
 
+def test_install_routes_ppocr_to_selected_repository(tmp_path, monkeypatch):
+    service = screen_ocr.ScreenOcr(tmp_path)
+    downloaded = []
+    resource_id = "pp-ocrv5-mobile-korean-onnx"
+    variant = service.variant(resource_id)
+
+    def ensure(spec, *, source, **kwargs):
+        downloaded.extend(spec.url_for(entry, source=source) for entry in spec.files_for(source))
+
+    monkeypatch.setattr(variant.models, "ensure", ensure)
+    with TestClient(create_app(control_token="test", screen_ocr=service)) as client:
+        response = client.post("/api/v2/screen/ocr/install", params={"resource_id": resource_id},
+                               headers={"Authorization": "Bearer test"}, json={"source": "hf-mirror"})
+        assert response.status_code == 200
+        async def wait_for_install():
+            await variant._install
+
+        client.portal.call(wait_for_install)
+        assert len(downloaded) == 2
+        assert all(url.startswith("https://hf-mirror.com/pitapo/rapidocr/") for url in downloaded)
+        assert downloaded[1].endswith("/rec/korean_PP-OCRv5_rec_mobile_infer.onnx")
+
+
 def test_arabic_decoder_retains_number_and_latin_order():
     assert screen_ocr.arabic_logical_order("اب123CDج") == "ج123CDبا"
 

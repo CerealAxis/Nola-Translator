@@ -125,13 +125,13 @@ const PAGE_GROUPS = {
     { name: 'audio-player', selector: '.nola-record-audio', min: 1 },
   ],
   models: [
-    { name: 'models-page', selector: '.models-page', min: 1 },
-    { name: 'heading', selector: '[data-onboarding="models-page-heading"] h1', min: 1 },
-    { name: 'model-management-actions', selector: '[data-onboarding="models-page-heading"] button', min: 2 },
-    { name: 'tabs', selector: '.models-tabs', min: 1 },
-    { name: 'catalog-tab', selector: '.models-tabs [role="tab"]', min: 4 },
-    { name: 'models-grid', selector: '.models-grid', min: 1 },
-    { name: 'model-card', selector: '.models-grid .models-card', min: 3 },
+    { name: 'models-page', selector: '.model-workspace', min: 1 },
+    { name: 'heading', selector: '.model-workspace h1', min: 1 },
+    { name: 'model-management-actions', selector: '.model-workspace__tools button', min: 2 },
+    { name: 'tabs', selector: '.model-workspace__controls [role="tablist"]', min: 1 },
+    { name: 'catalog-tab', selector: '.model-workspace__controls [role="tab"]', min: 3 },
+    { name: 'source-list', selector: '[data-slot="source-list"]', min: 1 },
+    { name: 'source-details', selector: '[data-slot="source-details"]', min: 1 },
   ],
   settings: [
     { name: 'settings-page', selector: '.settings-page', min: 1 },
@@ -318,8 +318,7 @@ async function settle(window) {
 }
 
 /**
- * Sets the hash, then waits for `data-page` to actually reach the target
- * instead of assuming a fixed delay covered the switch.
+ * Wait for both the route wrapper and its lazy content before taking measurements.
  *
  * A reload is no substitute: it re-runs the stub preload, so the in-memory
  * settings fall back to their initial `uiLanguage` — an artefact of the stub
@@ -335,7 +334,11 @@ async function goto(window, hash, page) {
   }
   let reached = false
   for (let attempt = 0; attempt < 40; attempt += 1) {
-    reached = await window.webContents.executeJavaScript(`document.querySelector('[data-page]')?.getAttribute('data-page') === ${JSON.stringify(page)}`)
+    reached = await window.webContents.executeJavaScript(`(() => {
+      const root = document.querySelector('[data-page]');
+      return root?.getAttribute('data-page') === ${JSON.stringify(page)}
+        && !root.querySelector(':scope > [role="status"] [data-slot="spinner"]');
+    })()`)
     if (reached) break
     await delay(50)
   }
@@ -538,7 +541,7 @@ async function main() {
                 '.model-gateway-table .nola-badge': '14px/20px', '[data-onboarding="gateway-fallback"] .type-muted': '14px/20px',
               },
               models: {
-                '.models-page h1': '24px/32px', '.models-section-title': '20px/28px', '.models-card .card__title': body,
+                '.model-workspace h1': '24px/32px', '.model-workspace__rail-heading h2': body,
               },
             }[target.name]
             const actual = await window.webContents.executeJavaScript(`Object.fromEntries(${JSON.stringify(Object.keys(expected))}.map(selector => {

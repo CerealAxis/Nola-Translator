@@ -50,13 +50,13 @@ export interface Route {
   route: RouteId
   /** 仅 `settings` 有。 */
   tab?: SettingsTab
-  /** Only `models` has this optional subtab. */
-  modelsTab?: 'downloads'
+  /** Only `models` has this optional view. */
   modelManagementView?: ModelManagementView
   /** 仅 `record` 有，是 meetingId。 */
   id?: string
   projectId?: string
   gameId?: string
+  gameLibrary?: boolean
   pageId?: string
   reader?: boolean
   glossaryLibraryId?: string
@@ -79,7 +79,7 @@ export function recordPath(id: string): string {
 }
 
 export function modelManagementPath(view: ModelManagementView = 'sources'): string {
-  return view === 'sources' ? '#/model-management' : `#/model-management/${view}`
+  return view === 'sources' ? '#/models' : `#/models/${view}`
 }
 
 export function pathOf(route: RouteId, options?: { tab?: SettingsTab | TextProcessingLibrary; id?: string }): string {
@@ -98,6 +98,8 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab | TextProce
       return '#/screen-translation'
     case 'game-translation':
       return '#/game-translation'
+    case 'game-translation-demo':
+      return '#/game'
     case 'comic-translation':
       return options?.id ? `#/comic-translation/${encodeURIComponent(options.id)}` : '#/comic-translation'
     case 'model-gateway':
@@ -107,8 +109,6 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab | TextProce
     case 'record':
       return options?.id ? recordPath(options.id) : '#/records'
     case 'models':
-      return '#/models'
-    case 'model-management':
       return modelManagementPath()
     case 'settings':
       return options?.tab ? settingsPath(options.tab) : `#/settings/${DEFAULT_SETTINGS_TAB}`
@@ -134,12 +134,12 @@ const PARENT_ROUTES: Record<RouteId, RouteId | null> = {
   meeting: 'home',
   'screen-translation': 'home',
   'game-translation': 'home',
+  'game-translation-demo': 'home',
   'comic-translation': 'home',
   'model-gateway': 'home',
   records: 'home',
   record: 'records',
   models: 'home',
-  'model-management': 'home',
   settings: 'home',
 }
 
@@ -177,6 +177,13 @@ export function parseRoute(hash: string): Route {
     case 'game-translation':
       return { route: 'game-translation', ...(segments[1] ? { gameId: safeDecode(segments[1]) } : {}),
         path: '#/game-translation' + (segments[1] ? `/${encodeURIComponent(safeDecode(segments[1]))}` : '') }
+    case 'game': {
+      const root = pathOf('game-translation-demo')
+      if (segments[1] !== 'library') return { route: 'game-translation-demo', path: root }
+      const gameId = segments[2] ? safeDecode(segments[2]) : undefined
+      return { route: 'game-translation-demo', gameLibrary: true, gameId,
+        path: root + '/library' + (gameId ? '/' + encodeURIComponent(gameId) : '') }
+    }
     case 'comic-translation': {
       const reader = segments[2] === 'reader'
       const page = segments[reader ? 3 : 2]
@@ -193,14 +200,11 @@ export function parseRoute(hash: string): Route {
       return { route: 'record', id: decoded, path: `#/records/${id}` }
     }
     case 'model-management':
-      if (segments[1] === 'search' || segments[1] === 'downloads') {
-        return { route: 'model-management', modelManagementView: segments[1], path: modelManagementPath(segments[1]) }
-      }
-      return { route: 'model-management', path: pathOf('model-management') }
     case 'models':
-      if (segments[1] === 'demo' || segments[1] === 'providers') return { route: 'model-management', path: pathOf('model-management') }
-      if (segments[1] === 'downloads') return { route: 'models', modelsTab: 'downloads', path: '#/models/downloads' }
-      return { route: 'models', path: '#/models' }
+      if (segments[1] === 'search' || segments[1] === 'downloads') {
+        return { route: 'models', modelManagementView: segments[1], path: modelManagementPath(segments[1]) }
+      }
+      return { route: 'models', path: modelManagementPath() }
     case 'settings': {
       const section = segments[1] === 'text-processing' ? segments[2] : segments[1]
       if (section === 'glossary' || section === 'preserve-words' || section === 'subtitle-words') {
@@ -315,12 +319,12 @@ export const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.m
   meeting: 'meeting.title',
   'screen-translation': 'screen.title',
   'game-translation': 'suite.gameTitle',
+  'game-translation-demo': 'suite.gameTitle',
   'comic-translation': 'suite.comicTitle',
   'model-gateway': 'nav.modelGateway',
   records: 'nav.records',
   record: 'nav.records',
   models: 'nav.models',
-  'model-management': 'nav.models',
   settings: 'nav.settings',
 }
 
@@ -340,7 +344,7 @@ export function Routes({ pages }: RoutesProps): ReactNode {
 
   return (
     <div
-      key={route === 'model-management' ? modelManagementPath() : path}
+      key={route === 'models' || route === 'game-translation-demo' ? route : path}
       data-page={route}
       className="nola-page-enter nola-route-content"
     >

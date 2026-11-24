@@ -266,6 +266,8 @@ const api: NolaTranslatorApi = {
     stop: () => invoke('model-gateway:stop'),
     revealKey: () => invoke('model-gateway:reveal-key'),
     rotateKey: () => invoke('model-gateway:rotate-key'),
+    openPerformanceMonitor: () => invoke('model-gateway:open-performance-monitor'),
+    performanceSnapshot: () => ipcRenderer.invoke('model-gateway:performance-snapshot'),
     onChanged: callback => {
       const listener = (_event: Electron.IpcRendererEvent, value: import('../shared/model-gateway').ModelGatewaySnapshot) => callback(value)
       ipcRenderer.on('model-gateway:changed', listener)

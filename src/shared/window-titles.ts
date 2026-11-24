@@ -12,12 +12,18 @@ const titles = {
   en: ['Workbench', 'Comic Translation Editor', 'Latency Monitor', 'Screen Translation', 'Game Captions', 'Live Interpretation', 'Floating Captions', 'Getting Started', 'Data Migration', 'Caption Menu'],
 } satisfies Record<UiLanguage, string[]>
 
+export const performanceMonitorTitles = {
+  'zh-CN': '性能监控', 'zh-TW': '性能監控', 'zh-HK': '性能監控',
+  ko: '성능 모니터', ja: 'パフォーマンス監視', en: 'Performance monitor',
+} satisfies Record<UiLanguage, string>
+
 /** Shared by native windows and renderer documents, including taskbar / Alt-Tab labels. */
 export function windowTitleForUrl(raw: string, language: UiLanguage): string {
   let feature: number | undefined
   try {
     const url = new URL(raw)
     const entry = url.pathname.split('/').at(-1)
+    if (entry === 'performance-monitor.html') return performanceMonitorTitles[language]
     if (entry === 'latency.html') feature = 2
     else if (entry === 'screen.html') feature = url.searchParams.get('role') === 'game-overlay' ? 4 : 3
     else if (entry === 'onboarding-card.html') feature = 7
@@ -26,7 +32,6 @@ export function windowTitleForUrl(raw: string, language: UiLanguage): string {
     else if (url.searchParams.has('workspace')) feature = 5
     else if (url.searchParams.has('overlay') || url.searchParams.has('overlayToast')) feature = 6
   } catch { /* A document loading without a URL retains the product name. */ }
-  const brand = appNameForLanguage(language)
-  return feature === undefined ? brand : `${titles[language][feature]} — ${brand}`
+  return feature === undefined ? appNameForLanguage(language) : titles[language][feature]
 }
 

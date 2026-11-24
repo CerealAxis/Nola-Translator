@@ -129,13 +129,14 @@ class CloudAsrAdapter(Adapter):
             },
         )
 
-    async def transcribe(self, instance, ctx, *, audio, language):
+    async def transcribe(self, instance, ctx, *, audio, language, observe=None):
         import numpy as np
 
         from ...gateway_worker import GatewayWorker, error_code
         from ...recognition.aliyun import CloudRecognitionError
 
         worker = GatewayWorker(lambda _: None)
+        worker.observe_cloud_call = observe
         worker.config = self.selection(ctx.provider_options, language or "auto")
         samples = np.frombuffer(audio, dtype="<i2").astype(np.float32) / 32768
         try:

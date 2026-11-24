@@ -1,0 +1,188 @@
+.gt-tool-dialog.nola-dialog-content {
+  width: min(calc(var(--space-8) * 10), calc(100vw - var(--space-4)));
+}
+.gt-tool-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+  gap: var(--panel-gap);
+  padding: var(--panel-padding);
+  min-height: 0;
+}
+.gt-tool-workspace nav,
+.gt-tool-stack,
+.gt-tool-body,
+.gt-tool-field,
+.gt-tool-list,
+.gt-tool-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.gt-tool-workspace nav {
+  align-self: start;
+}
+.gt-tool-workspace nav .button {
+  justify-content: space-between;
+  white-space: normal;
+  text-align: start;
+  height: auto;
+  min-height: var(--field-control-height);
+}
+.gt-tool-workspace nav svg {
+  flex: none;
+}
+.gt-tool-body {
+  gap: var(--space-3);
+}
+.gt-tool-stack {
+  gap: var(--space-3);
+}
+.gt-tool-switch,
+.gt-tool-actions,
+.gt-tool-list > li,
+.gt-tool-columns {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.gt-tool-switch {
+  justify-content: space-between;
+  min-height: var(--field-control-height);
+}
+.gt-tool-switch label {
+  cursor: pointer;
+}
+.gt-tool-actions,
+.gt-tool-columns {
+  flex-wrap: wrap;
+}
+.gt-tool-columns > * {
+  flex: 1 1 11rem;
+}
+.gt-tool-fit {
+  align-self: start;
+}
+.gt-tool-list,
+.gt-tool-log {
+  padding: 0;
+  list-style: none;
+}
+.gt-tool-list > li {
+  border-bottom: 1px solid var(--nola-ui-border);
+  flex-wrap: wrap;
+}
+.gt-tool-list > li .gt-tool-switch {
+  flex: 1 1 9rem;
+}
+.gt-tool-preview,
+.gt-tool-shot {
+  display: block;
+  max-width: 100%;
+  padding: var(--space-2);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  background: var(--nola-ui-muted);
+  color: var(--nola-ui-foreground);
+  border-radius: var(--radius-lg);
+}
+.gt-tool-preview small,
+.gt-tool-log small {
+  color: var(--nola-ui-muted-foreground);
+}
+.gt-tool-preview svg {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-inline-start: var(--space-2);
+}
+.gt-tool-subtitle[data-align='end'] {
+  text-align: end;
+}
+.gt-tool-transparent {
+  background: transparent;
+}
+.gt-tool-shot {
+  overflow: hidden;
+}
+.gt-tool-shot svg {
+  width: 100%;
+  height: auto;
+}
+.gt-tool-workspace summary {
+  cursor: pointer;
+}
+#game-demo-subtitle-tools {
+  position: absolute;
+  inset: var(--space-2) var(--space-2) auto;
+  z-index: 2;
+  pointer-events: none;
+}
+#game-demo-subtitle-tools[hidden] {
+  display: none;
+}
+.gt-floating-toolbar,
+.gt-toolbar-restore {
+  pointer-events: auto;
+}
+.gt-floating-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-1);
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--nola-ui-border);
+  border-radius: var(--radius-lg);
+  background: var(--nola-ui-popover);
+  color: var(--nola-ui-foreground);
+}
+.gt-floating-toolbar .button {
+  color: inherit;
+}
+.gt-floating-toolbar[data-transparent='true'] {
+  background: transparent;
+}
+.gt-floating-toolbar[data-moved='true'] {
+  margin-inline-start: auto;
+}
+.game-demo-scene-canvas:not(:hover):not(:focus-within) .gt-floating-toolbar[data-locked='false'] {
+  opacity: 0;
+}
+.game-demo-scene-canvas:has(.gt-floating-toolbar[data-transparent='true']) .game-demo-caption {
+  background: transparent;
+}
+.game-demo-scene-canvas:has(.gt-floating-toolbar[data-selectable='true']) .game-demo-caption {
+  user-select: text;
+}
+.game-demo-scene-canvas:has(.gt-floating-toolbar[data-selectable='false']) .game-demo-caption {
+  user-select: none;
+}
+.game-demo-scene-canvas:has(.gt-toolbar-restore[data-through='true']) .game-demo-caption {
+  pointer-events: none;
+}
+.game-demo-scene-canvas:has(.gt-toolbar-restore[data-overlay-hidden='true']) .game-demo-caption {
+  visibility: hidden;
+}
+.game-demo-scene-canvas:has(.gt-floating-toolbar[data-top='true']) .game-demo-caption {
+  z-index: 1;
+}
+@media (max-width: 45rem) {
+  .gt-tool-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .gt-tool-workspace nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .gt-tool-workspace nav svg {
+    display: none;
+  }
+  .gt-tool-workspace {
+    padding: var(--space-2);
+    gap: var(--space-3);
+  }
+}

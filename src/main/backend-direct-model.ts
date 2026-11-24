@@ -4,7 +4,7 @@ import { WebSocket } from 'ws'
 import type { DirectModelRequest, DirectModelResult } from '../shared/agent-workspace'
 import { gatewayConcurrency, normalizeModelBinding } from '../shared/model-gateway'
 import { MIMO_TTS_BINDING, MIMO_TTS_MODEL, type AppSettings, type CredentialProvider, type RecognitionSettings } from '../shared/settings'
-import type { ResourceRecord, SessionConfig } from '../shared/contracts'
+import type { ModelDownloadSource, ResourceRecord, SessionConfig } from '../shared/contracts'
 import type { BackendSupervisor } from './backend-supervisor'
 import { GatewayWorkerError } from './model-gateway-worker'
 import type { GatewayWorkerResult } from './model-gateway-worker'
@@ -406,8 +406,8 @@ export class BackendScreenOcr {
     }, 1000)
     this.poll.unref()
   }
-  async install(resourceId = 'pp-ocrv5-mobile-onnx'): Promise<ScreenOcrStatus> {
-    await this.request('/install', 'POST', { network: await resolveModelNetwork(this.options.settings().network) }, undefined, resourceId)
+  async install(resourceId = 'pp-ocrv5-mobile-onnx', source?: ModelDownloadSource): Promise<ScreenOcrStatus> {
+    await this.request('/install', 'POST', { network: source ? this.options.settings().network : await resolveModelNetwork(this.options.settings().network), source }, undefined, resourceId)
     return this.status(resourceId)
   }
   async cancel(resourceId = 'pp-ocrv5-mobile-onnx'): Promise<ScreenOcrStatus> { await this.request('/install', 'DELETE', undefined, undefined, resourceId); return this.status(resourceId) }

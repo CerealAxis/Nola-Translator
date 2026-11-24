@@ -1,9 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterAll, afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { SettingSelectProps } from '../settings/SettingsPage'
-import { OfflineDialog } from './OfflineResources'
+import { LocalModelImport, OfflineDialog } from './OfflineResources'
 import { offlineActions, offlineStore } from '@/store/offlineStore'
 import { settingsStore } from '@/store/settingsStore'
 import { modelsStore } from '@/store/modelStore'
@@ -30,6 +30,30 @@ beforeEach(() => {
   offlineStore.setState({ available: true, mode: 'prepare', task: null, preview: null, busy: false, failed: false, downloadModelId: undefined, destination: null })
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
+it('opens the folder picker first and shows the checked model only after selection', async () => {
+  const user = userEvent.setup()
+  offlineStore.setState({ mode: null })
+  let finish!: () => void
+  const select = vi.spyOn(offlineActions, 'selectModel').mockImplementation(() => new Promise(resolve => {
+    finish = () => {
+      offlineStore.setState({ preview: { token: 'model', compatible: true, issues: [], items: [], totalBytes: 1024 } })
+      resolve()
+    }
+  }))
+  render(<LocalModelImport />)
+  expect(screen.getByRole('button', { name: '本地导入' })).toHaveAttribute('data-slot', 'button')
+  expect(screen.getByRole('button', { name: '本地导入' }).parentElement).toHaveAttribute('data-variant', 'secondary')
+  await user.hover(screen.getByRole('button', { name: '导入说明' }))
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('ASR GGUF 还需要配套的 mmproj 音频编码器')
+  await user.click(screen.getByRole('button', { name: '导入说明' }))
+  expect(select).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: '本地导入' }))
+  expect(select).toHaveBeenCalledWith('directory')
+  expect(screen.queryByRole('dialog', { name: '本地导入' })).not.toBeInTheDocument()
+  await act(async () => finish())
+  expect(await screen.findByRole('button', { name: '开始安装' })).toBeEnabled()
+  expect(screen.getByText('安装所需空间')).toBeInTheDocument()
+})
 it('starts with explicit loader version choices and no hardware or computer selector', () => {
   render(<OfflineDialog scope="runtime" />)
   for (const name of ['PyTorch', 'llama.cpp', 'CrispASR']) expect(screen.getByRole('combobox', { name })).toHaveValue('')
@@ -61,25 +85,14 @@ it('blocks an invalid import preview and shows available space', () => {
   expect(screen.getByRole('button', { name: '开始安装' })).toBeDisabled()
   expect(screen.getByText('可用空间')).toBeInTheDocument()
 })
-it('hides the supported-model block and keeps explanations inside a tooltip', async () => {
-  const user = userEvent.setup()
-  offlineStore.setState({ mode: 'model', downloadModelId: undefined })
-  render(<OfflineDialog scope="model" />)
-  expect(screen.queryByText('支持的模型')).not.toBeInTheDocument()
-  expect(screen.queryByText('Hy-MT2 · Index-Translate · M2M100')).not.toBeInTheDocument()
-  expect(screen.getByRole('tab', { name: '手动下载' })).toBeInTheDocument()
-  expect(screen.queryByText('导入后复制到模型目录，不会更改当前模型。')).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '导入说明' })).toBeInTheDocument()
-  await waitFor(() => expect(screen.getByRole('dialog')).toHaveFocus())
-  await user.click(screen.getByRole('heading', { name: '本地导入' }))
-  await user.hover(screen.getByRole('button', { name: '导入说明' }))
-  expect(await screen.findByRole('tooltip', { hidden: true })).toHaveTextContent('ASR GGUF 还需要配套的 mmproj 音频编码器')
-})
 it('selects a model and download source, then starts the download to the chosen path', async () => {
   const user = userEvent.setup()
   const download = vi.spyOn(offlineActions, 'downloadModel').mockResolvedValue()
   offlineStore.setState({ mode: 'model', downloadModelId: 'tts-qwen3-tts-pytorch-1.7b-base-bf16' })
   render(<OfflineDialog scope="model" />)
+  expect(screen.getByRole('dialog', { name: '另存为' })).toBeInTheDocument()
+  expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+  expect(screen.queryByText('模型将保存为一个可导入的文件夹')).not.toBeInTheDocument()
   expect(screen.getByRole('combobox', { name: '模型' })).toBeInTheDocument()
   const source = screen.getByRole('combobox', { name: '下载来源' })
   expect(source).toHaveTextContent('Hugging Face')
@@ -92,21 +105,24 @@ it('selects a model and download source, then starts the download to the chosen 
   expect(screen.queryByRole('link')).not.toBeInTheDocument()
 })
 
-it('checks a typed folder and discards an old preview when the path changes', () => {
+it('opens the folder picker again without clearing the current preview', () => {
   const select = vi.spyOn(offlineActions, 'selectModel').mockResolvedValue()
-  offlineStore.setState({ mode: 'model' })
+  const preview = { token: 'old', compatible: true, issues: [], items: [], totalBytes: 0 }
+  offlineStore.setState({ mode: 'model', preview })
   render(<OfflineDialog scope="model" />)
-  expect(screen.queryByPlaceholderText('owner/model')).not.toBeInTheDocument()
-  expect(screen.queryByText('选择模型文件')).not.toBeInTheDocument()
-  const path = screen.getByRole('textbox', { name: '模型路径' })
-  fireEvent.change(path, { target: { value: 'G:\\Models\\ASR' } })
-  fireEvent.click(screen.getByRole('button', { name: '检查模型' }))
-  expect(select).toHaveBeenCalledWith('directory', undefined, 'G:\\Models\\ASR')
-  offlineStore.setState({ preview: { token: 'old', compatible: true, issues: [], items: [], totalBytes: 0 } })
-  fireEvent.change(path, { target: { value: 'G:\\Models\\Other' } })
-  expect(offlineStore.getState().preview).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: '选择文件夹' }))
-  expect(select).toHaveBeenLastCalledWith('directory')
+  expect(screen.queryByRole('textbox', { name: '模型路径' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '重新选择' }))
+  expect(select).toHaveBeenCalledWith('directory')
+  expect(offlineStore.getState().preview).toEqual(preview)
+})
+it('reopens the folder picker after a failed import and closes the dialog if cancelled', async () => {
+  const user = userEvent.setup()
+  const select = vi.spyOn(offlineActions, 'selectModel').mockResolvedValue()
+  offlineStore.setState({ mode: 'model', task: { state: 'failed', phase: 'verify', current: 0, total: 1 }, preview: null })
+  render(<OfflineDialog scope="model" />)
+  await user.click(screen.getByRole('button', { name: '重新选择' }))
+  expect(select).toHaveBeenCalledWith('directory')
+  expect(screen.queryByRole('dialog', { name: '本地导入' })).not.toBeInTheDocument()
 })
 
 it('downloads to a typed path without retaining a previous folder token', () => {

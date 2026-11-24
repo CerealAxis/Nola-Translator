@@ -30,8 +30,7 @@ import { RealtimePipelineLabel, realtimeS2sNames } from '../workspace/RealtimePi
 import { ModelAvailabilityLabel } from '../workspace/ModelAvailabilityLabel'
 import { languageName } from '../../../shared/languages'
 import { useModelOptions } from '@/model-options'
-import { PerformanceMonitor } from './PerformanceMonitor'
-import { useMonitorCopy } from './performance-monitor-copy'
+import { performanceMonitorTitles } from '../../../shared/window-titles'
 import { customModelsOf } from '../../../shared/custom-models'
 import { cloudModelsOf } from '../../../shared/cloud-models'
 import { gatewayBindingPatch } from '@/available-models'
@@ -75,8 +74,6 @@ function GatewayExample({ code, language, copyLabel, onCopy }: {
 
 export function ModelGatewayPage() {
   const { t, language } = useI18n()
-  const monitorCopy = useMonitorCopy()
-  const [showMonitor, setShowMonitor] = useState(false)
   const settings = useStore(stores.settings, state => state.settings)
   const modelOptions = useModelOptions(undefined, settings ? settings.modelGateway.mtModel || defaultModelBinding(settings, 'mt') : undefined)
   const runtimes = useStore(stores.settings, state => state.runtimes)
@@ -110,19 +107,26 @@ export function ModelGatewayPage() {
     }).catch(error => { console.error('[gateway.snapshot]', error); if (alive) setLoadFailed(true) })
     return () => { alive = false; unsubscribe() }
   }, [api])
-  const monitorSwitch = <div className="performance-monitor-switch">
-    <label htmlFor="gateway-performance-monitor">{monitorCopy('title')}</label>
-    <Switch id="gateway-performance-monitor" aria-label={monitorCopy('title')} checked={showMonitor} onCheckedChange={setShowMonitor}><SwitchThumb /></Switch>
-  </div>
-  if (showMonitor) return <div className="model-gateway-page">
-    <PageHeader className="nola-page-heading" title={monitorCopy('title')} actions={monitorSwitch} />
-    <PerformanceMonitor />
-  </div>
-  if (!api) return <div className="model-gateway-page">
-    <PageHeader className="nola-page-heading" title={t('gateway.title')} actions={monitorSwitch} />
-    <Alert><AlertDescription>{t('gateway.unavailable')}</AlertDescription></Alert>
-  </div>
-  if (!settings || !snapshot) return <div className="model-gateway-page"><PageHeader className="nola-page-heading" title={t('gateway.title')} actions={monitorSwitch} /><p>{t(loadFailed ? 'gateway.actionFailed' : 'common.loading')}</p>{loadFailed ? <Button onClick={() => void refresh()}>{t('gateway.refresh')}</Button> : null}</div>
+  const performanceMonitorButton = api?.openPerformanceMonitor && <Button variant="outline" onClick={() => {
+    const state = snapshot?.state
+    if (runtimeBusy || state === 'starting' || state === 'stopping') {
+      notifyWarning(t('gateway.startupWaitHint'))
+      return
+    }
+    if (!state) {
+      notifyWarning(t('gateway.startupStatusUnavailable'))
+      return
+    }
+    if (state !== 'running') {
+      notifyWarning(t('gateway.performanceStartHint'))
+      return
+    }
+    void api.openPerformanceMonitor?.().catch(error => notifyError(t('gateway.actionFailed'), { cause: error }))
+  }}>
+    {performanceMonitorTitles[language]}
+  </Button>
+  if (!api) return <Alert><AlertDescription>{t('gateway.unavailable')}</AlertDescription></Alert>
+  if (!settings || !snapshot) return <div className="model-gateway-page"><PageHeader className="nola-page-heading" title={t('gateway.title')} actions={performanceMonitorButton} /><p>{t(loadFailed ? 'gateway.actionFailed' : 'common.loading')}</p>{loadFailed ? <Button onClick={() => void refresh()}>{t('gateway.refresh')}</Button> : null}</div>
   const config = settings.modelGateway
   const defaultS2sModel = defaultRealtimeS2s(settings)
   const translationMode = defaultS2sModel ? 's2s' : 'cascade'
@@ -300,7 +304,7 @@ socket.on('open', async () => {
   socket.send(JSON.stringify({ type: 'session.finish' }));
 });`
   return <div className="model-gateway-page">
-    <PageHeader className="nola-page-heading" title={t('gateway.title')} actions={<div className="performance-monitor-controls">{monitorSwitch}<Button data-onboarding="gateway-start" variant={running ? 'danger' : 'default'} disabled={pendingSettings > 0 || changing || (!running && (s2sBlocked || config.externalEnabled === false && !CAPABILITIES.some(kind => config[kind])))} onClick={() => void perform(async () => {
+    <PageHeader className="nola-page-heading" title={t('gateway.title')} actions={<div className="model-gateway-header-actions">{performanceMonitorButton}<Button data-onboarding="gateway-start" variant={running ? 'danger' : 'default'} disabled={pendingSettings > 0 || changing || (!running && (s2sBlocked || config.externalEnabled === false && !CAPABILITIES.some(kind => config[kind])))} onClick={() => void perform(async () => {
       const result = running ? await api.stop() : await requestFeatureStart(() => api.start(), 'model-gateway')
       if (result) setSnapshot(result)
     }, 'runtime')}>{t(running ? 'gateway.stop' : 'gateway.start')}</Button></div>} />

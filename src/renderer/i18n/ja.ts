@@ -998,7 +998,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'models.searchPlaceholder': 'Hugging Face でモデルを検索',
   'models.experimentalNoticeTitle': '実験的な機能',
   'models.experimentalNoticeBody': 'モデルは Hugging Face コミュニティから提供されており、インストールの可否や認識品質は保証されません。',
-  'models.experimentalNoticeAction': 'おすすめモデルを見る',
+  'models.experimentalNoticeAction': 'モデルソースを見る',
   'models.filterAll': 'すべて',
   'models.filterAsr': '音声認識',
   'models.filterMt': '翻訳',

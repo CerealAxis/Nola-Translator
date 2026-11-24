@@ -1,3 +1,4 @@
+import type { ModelDownloadSource } from '../../shared/contracts'
 import type { NolaBridge } from '@/bridge'
 import type { OfflinePreview, OfflinePrepareRequest, OfflineTask, OfflineWorkflow } from '../../shared/offline'
 import { createStore } from './createStore'
@@ -12,6 +13,7 @@ export interface OfflineState {
   workflow?: OfflineWorkflow
   failed: boolean
   downloadModelId?: string
+  downloadSource?: ModelDownloadSource
   destination: import('../../shared/offline').OfflineDestination | null
 }
 export const offlineStore = createStore<OfflineState>({ available: false, mode: null, preview: null, task: null, busy: false, failed: false, destination: null })
@@ -68,11 +70,11 @@ async function run<T>(operation: () => Promise<T>, success: (value: T) => void, 
 export const offlineActions = {
   open(mode: OfflineMode): void {
     previewRevision++
-    offlineStore.setState({ mode, preview: null, failed: false, downloadModelId: undefined, destination: null })
+    offlineStore.setState({ mode, preview: null, failed: false, downloadModelId: undefined, downloadSource: undefined, destination: null })
   },
-  openDownloads(modelId: string): void {
+  openDownloads(modelId: string, source?: ModelDownloadSource): void {
     offlineActions.reset()
-    offlineStore.setState({ mode: 'model', preview: null, failed: false, downloadModelId: modelId, destination: null })
+    offlineStore.setState({ mode: 'model', preview: null, failed: false, downloadModelId: modelId, downloadSource: source, destination: null })
   },
   close(): void {
     previewRevision++

@@ -151,8 +151,8 @@
   white-space: nowrap;
 }
 
-.model-workspace .model-workspace__source-choice > :is(svg, .provider-icon-image, .provider-icon-placeholder),
-.model-source-picker .model-source-option > :is(svg, .provider-icon-image, .provider-icon-placeholder) {
+.model-workspace .model-workspace__source-choice > :is(svg, .model-project-logo, .provider-icon-image, .provider-icon-placeholder),
+.model-source-picker .model-source-option > :is(svg, .model-project-logo, .provider-icon-image, .provider-icon-placeholder) {
   width: var(--space-2);
   height: var(--space-2);
   flex: none;
@@ -204,7 +204,7 @@
   overflow-wrap: anywhere;
 }
 
-.model-settings__identity > svg {
+.model-settings__identity > :is(svg, .model-project-logo) {
   width: var(--text-h4);
   height: var(--text-h4);
   flex: none;

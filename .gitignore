@@ -23,6 +23,7 @@ coverage/
 Thumbs.db
 .venv/
 /.codex/
+/.codex-attachments/
 /docs/.vitepress/cache/
 /docs/.vitepress/.temp/
 /docs/.media-dist/

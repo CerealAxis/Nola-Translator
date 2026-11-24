@@ -135,9 +135,18 @@ def create_app(
         if registry is not None:
             registry.manager = ctx.session_manager
         app.state.backend = ctx
+        hardware_sampler = None
+        if enable_gateway:
+            from .gateway.gateway import ModelGateway
+
+            if isinstance(active_gateway, ModelGateway):
+                hardware_sampler = asyncio.create_task(active_gateway.performance.sample_hardware(active_gateway.manager.instances))
         try:
             yield
         finally:
+            if hardware_sampler is not None:
+                hardware_sampler.cancel()
+                await asyncio.gather(hardware_sampler, return_exceptions=True)
             # Shutdown order (doc 09 §10): refuse new sessions, fence outputs,
             # stop inputs, cancel/drain, close providers, terminate workers,
             # journal terminal state, flush diagnostics.

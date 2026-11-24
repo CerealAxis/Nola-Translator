@@ -5,9 +5,7 @@ export interface TourStep {
   id: OnboardingStepId
   path: string
   target: string
-  include?: string
-  scene?: 'sensevoice' | 'hymt2'
-  list?: boolean
+  sourceCategory?: 'ASR' | 'MT'
   via?: string
   title: DictionaryKey
   body: DictionaryKey
@@ -20,23 +18,27 @@ const step = (id: OnboardingStepId, path: string, target: string, title: Diction
 
 export const TOUR_STEPS: readonly TourStep[] = [
   step('H1', '#/', 'home-models', 'onboarding.H1Title', 'onboarding.H1Body'),
-  step('M1', '#/models', 'models-page-heading', 'onboarding.M1Title', 'onboarding.M1Body', { via: `${tourTarget('home-models')} button` }),
-  step('U6', '#/models', 'models-recognition-catalog', 'onboarding.U6Title', 'onboarding.U6Body'),
-  step('H2', '#/models', 'model-family-card-sensevoice', 'onboarding.H2Title', 'onboarding.H2Body'),
-  step('T1', '#/models', 'model-engine', 'onboarding.T1Title', 'onboarding.T1Body', { scene: 'sensevoice' }),
-  step('T2', '#/models', 'model-scale', 'onboarding.T2Title', 'onboarding.T2Body', { scene: 'sensevoice' }),
-  step('T3', '#/models', 'model-version', 'onboarding.T3Title', 'onboarding.T3Body', { scene: 'sensevoice', list: true, include: tourTarget('model-file-options') }),
-  step('T4', '#/models', 'model-sources', 'onboarding.T4Title', 'onboarding.T4Body', { scene: 'sensevoice' }),
-  step('T5', '#/models', 'model-download-actions', 'onboarding.T5Title', 'onboarding.T5Body', { scene: 'sensevoice' }),
-  step('M2', '#/models', 'models-translation-catalog', 'onboarding.M2Title', 'onboarding.M2Body'),
-  step('M3', '#/models', 'model-family-card-hymt2', 'onboarding.M3Title', 'onboarding.M3Body'),
-  step('R1', '#/models', 'model-engine', 'onboarding.R1Title', 'onboarding.R1Body', { scene: 'hymt2' }),
-  step('G1', '#/models', 'model-scale', 'onboarding.G1Title', 'onboarding.G1Body', { scene: 'hymt2' }),
-  step('G3', '#/models', 'model-version', 'onboarding.G3Title', 'onboarding.G3Body', { scene: 'hymt2', list: true, include: tourTarget('model-file-options') }),
-  step('G4', '#/models', 'model-sources', 'onboarding.G4Title', 'onboarding.G4Body', { scene: 'hymt2' }),
+  step('M1', '#/models', 'models-tabs', 'onboarding.M1Title', 'onboarding.M1Body', { via: `${tourTarget('home-models')} button` }),
+  step('U6', '#/models', 'models-category', 'onboarding.U6Title', 'onboarding.U6Body'),
+  step('H2', '#/models', 'models-source-picker', 'onboarding.H2Title', 'onboarding.H2Body', { sourceCategory: 'ASR' }),
+  step('M2', '#/models', 'models-source-picker', 'onboarding.M2Title', 'onboarding.M2Body', { sourceCategory: 'MT' }),
+  step('M4', '#/models', 'models-tools', 'onboarding.M4Title', 'onboarding.M4Body'),
+  step('M5', '#/models', 'models-search-tab', 'onboarding.M5Title', 'onboarding.M5Body'),
+  step('M6', '#/models/downloads', 'models-downloads-tab', 'onboarding.M6Title', 'onboarding.M6Body', { via: tourTarget('models-downloads-tab') }),
   step('U7', '#/model-gateway', 'gateway-asr', 'onboarding.U7Title', 'onboarding.U7Body', { via: tourTarget('nav-model-gateway') }),
   step('U8', '#/model-gateway', 'gateway-mt', 'onboarding.U8Title', 'onboarding.U8Body'),
   step('G2', '#/model-gateway', 'gateway-start', 'onboarding.G2Title', 'onboarding.G2Body'),
   step('U1', '#/workspace', 'quick-settings', 'onboarding.U1Title', 'onboarding.U1Body', { via: tourTarget('nav-workspace') }),
   step('U2', '#/workspace', 'open-workspace', 'onboarding.U2Title', 'onboarding.U2Body'),
 ]
+
+const replacedLessons: Readonly<Partial<Record<string, OnboardingStepId>>> = {
+  T1: 'H2', T2: 'H2', T3: 'H2', T4: 'H2', T5: 'H2',
+  M3: 'M2', R1: 'M2', G1: 'M2', G3: 'M2', G4: 'M2',
+}
+
+export function resumeTourIndex(saved: string | undefined): number {
+  if (saved === 'Z0') return TOUR_STEPS.length
+  const current = replacedLessons[saved ?? ''] ?? saved
+  return Math.max(0, TOUR_STEPS.findIndex(item => item.id === current))
+}

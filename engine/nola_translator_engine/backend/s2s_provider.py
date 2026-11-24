@@ -126,6 +126,7 @@ class QwenS2SSession:
         self._outputs = outputs
         self._writer = asyncio.Lock()
         self._closed = False
+        self.finish_measurement = lambda: None
         self._finishing = False
         self._reading = False
         self._sent_ms = 0.0
@@ -213,6 +214,7 @@ class QwenS2SSession:
     async def close(self) -> None:
         if not self._closed:
             self._closed = True
+            self.finish_measurement()
             try:
                 await self._ws.close()
             except Exception:
@@ -228,7 +230,11 @@ class QwenS2SSession:
         while not self._closed:
             try:
                 event = await self._receive()
+            except asyncio.CancelledError:
+                self.finish_measurement()
+                raise
             except S2SProtocolError:
+                self.finish_measurement()
                 if self._closed:
                     return
                 raise
@@ -236,6 +242,7 @@ class QwenS2SSession:
                 return
             kind = _id(event.get("type"))
             if kind == "session.finished":
+                self.finish_measurement()
                 if not self._finishing:
                     raise S2SProtocolError("provider_finished_unexpectedly")
                 for response_id, response in tuple(self._responses.items()):

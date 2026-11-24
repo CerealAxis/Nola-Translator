@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -25,6 +26,19 @@ class DirectLanguageModelLease:
     _gateway: ModelGateway = field(repr=False)
     _instance: ModelInstance = field(repr=False)
     _lease: Lease = field(repr=False)
+    _concurrency: int = field(default=1, repr=False)
+
+    @asynccontextmanager
+    async def measure_chat(self):
+        gateway = self._gateway
+        with gateway.performance.waiting():
+            queue_ms = await gateway.concurrency.acquire(self._instance.instance_id, self._concurrency)
+        finish = gateway.performance.begin_call(self._instance.definition.model_id, queue_ms)
+        try:
+            yield finish
+        finally:
+            finish()
+            gateway.concurrency.release(self._instance.instance_id)
 
     async def release(self) -> None:
         if self._lease.released:
@@ -74,7 +88,7 @@ async def open_direct_language_model(
                 finally:
                     gateway._exit(instance)
                 opened = True
-                return DirectLanguageModelLease(endpoint, loaded_context, gateway, instance, lease)
+                return DirectLanguageModelLease(endpoint, loaded_context, gateway, instance, lease, max_concurrency)
             finally:
                 if not opened:
                     await _release(gateway, instance, lease)

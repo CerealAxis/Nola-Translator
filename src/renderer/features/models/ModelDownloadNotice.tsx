@@ -11,6 +11,7 @@ const reportedRemoveFailures = new Set<string>()
 
 export function suppressNextDownloadStartNotice(resourceId: string) {
   suppressedStartNotices.add(resourceId)
+  return () => { suppressedStartNotices.delete(resourceId) }
 }
 
 /**

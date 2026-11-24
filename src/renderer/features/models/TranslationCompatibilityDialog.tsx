@@ -40,11 +40,12 @@ export function TranslationCompatibilityDialog(props: TranslationCompatibilityDi
           <p className="text-muted">{t('modelConfig.incompatibleBody', { name: props.translation?.name ?? '', source: label(props.source), target: label(props.target) })}</p>
           {choosingModel ? (
             <Select value={props.translation?.resourceId ?? null} onValueChange={key => { if (typeof key === 'string') { props.onChangeModel(key); props.onClose() } }}>
-              <SelectFieldLabel className="w-fit type-body font-medium text-foreground">{t('session.translationModel')}</SelectFieldLabel>
-              <SelectTrigger className="select__trigger w-full">
-                <SelectValue className="select__value">{value => translationModels.find(model => model.resourceId === value)?.name ?? ''}</SelectValue>
-
-              </SelectTrigger>
+              <div className="flex flex-col gap-[var(--label-gap)]">
+                <SelectFieldLabel className="w-fit type-body font-medium text-foreground">{t('session.translationModel')}</SelectFieldLabel>
+                <SelectTrigger className="select__trigger w-full">
+                  <SelectValue className="select__value">{value => translationModels.find(model => model.resourceId === value)?.name ?? ''}</SelectValue>
+                </SelectTrigger>
+              </div>
               <SelectContent className="select__popover rounded-xl border border-border bg-overlay p-1 shadow-overlay" style={{ minWidth: 'var(--anchor-width)' }}><SelectGroup className="flex flex-col">
                       {translationModels.map(model => (
                         <SelectItem key={model.resourceId} value={model.resourceId} label={model.name} className={ITEM_CLASS}

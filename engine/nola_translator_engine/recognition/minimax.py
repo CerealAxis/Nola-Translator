@@ -97,6 +97,9 @@ class _Segment:
 
 
 class MiniMaxRecognizer:
+    observe_call = None
+    observe_wait = None
+
     def __init__(self, config: ModelSelection, *, timeout: float = REQUEST_TIMEOUT_SECONDS,
                  finish_timeout: float = FLUSH_TIMEOUT_SECONDS, max_inflight: int = MAX_INFLIGHT,
                  latency_detection: bool = False) -> None:
@@ -223,8 +226,22 @@ class MiniMaxRecognizer:
 
     async def _transcribe(self, state: _Segment) -> None:
         try:
-            async with self._inflight:
+            queued = 0.0
+            if self.observe_wait is not None and self._inflight.locked():
+                with self.observe_wait() as elapsed:
+                    await self._inflight.acquire()
+                    queued = elapsed()
+            else:
+                await self._inflight.acquire()
+            finish = None
+            try:
+                if self.observe_call is not None:
+                    finish = self.observe_call(self.model, queued)
                 await self._request(state)
+            finally:
+                self._inflight.release()
+                if finish is not None:
+                    finish()
         except asyncio.CancelledError:
             raise
         except CloudRecognitionError as error:

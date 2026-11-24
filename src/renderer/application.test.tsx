@@ -10,11 +10,11 @@ vi.mock('./routes', async importOriginal => ({ ...await importOriginal<typeof im
 it('shows the application sidebar outside settings', () => {
   const { result } = renderHook(useApplicationNavigation)
   expect(result.current.map(item => item.id)).toEqual([
-    'home', 'models', 'model-management', 'model-gateway', 'workspace', 'meeting', 'screen-translation',
-    'game-translation', 'comic-translation', 'workbench', 'browser', 'settings',
+    'home', 'models', 'model-gateway', 'workspace', 'meeting', 'screen-translation',
+    'game-translation', 'game-translation-demo', 'comic-translation', 'workbench', 'browser', 'settings',
   ])
   expect(result.current.filter(item => item.section === 'features').map(item => item.id)).toEqual([
-    'workspace', 'meeting', 'screen-translation', 'game-translation', 'comic-translation', 'workbench', 'browser',
+    'workspace', 'meeting', 'screen-translation', 'game-translation', 'game-translation-demo', 'comic-translation', 'workbench', 'browser',
   ])
   result.current.find(item => item.id === 'browser')?.onPress?.()
   expect(route.navigate).toHaveBeenLastCalledWith('#/settings/browser')
@@ -28,21 +28,20 @@ it('shows the application sidebar outside settings', () => {
   expect(parseRoute('#/video-captions')).toMatchObject({ route: 'settings', tab: 'browser' })
 })
 
-it('keeps model management and the original catalog on independent sidebar entries', () => {
+it('routes model management through one sidebar entry and resolves existing links', () => {
   const { result, rerender } = renderHook(useApplicationNavigation)
   const original = route
   const oldRoute = { ...original }
   try {
-    Object.assign(route, parseRoute('#/models/downloads'))
+    Object.assign(route, parseRoute('#/model-management/downloads'))
     rerender()
     expect(result.current.filter(item => item.active).map(item => item.id)).toEqual(['models'])
-    const entry = result.current.find(item => item.id === 'model-management')!
+    const entry = result.current.find(item => item.id === 'models')!
     entry.onPress?.()
-    expect(route.navigate).toHaveBeenLastCalledWith('#/model-management')
-    Object.assign(route, parseRoute(entry.path!))
-    rerender()
-    expect(result.current.filter(item => item.active).map(item => item.id)).toEqual(['model-management'])
-    expect(parseRoute('#/models/providers')).toEqual(parseRoute('#/model-management'))
+    expect(route.navigate).toHaveBeenLastCalledWith('#/models')
+    expect(parseRoute('#/model-management/downloads')).toEqual({ route: 'models', modelManagementView: 'downloads', path: '#/models/downloads' })
+    expect(parseRoute('#/model-management/search')).toEqual(parseRoute('#/models/search'))
+    expect(parseRoute('#/models/providers')).toEqual(parseRoute('#/models'))
     expect(parseRoute('#/models')).toEqual({ route: 'models', path: '#/models' })
   } finally {
     Object.assign(route, oldRoute)
@@ -103,7 +102,7 @@ vi.mock('./features/comic/ComicFrontendPage', () => {
   return { ComicFrontendPage: ({ projectId, pageId, reader }: { projectId?: string; pageId?: string; reader?: boolean }) => <div>{projectId}/{pageId}/{reader ? 'reader' : 'editor'}</div> }
 })
 vi.mock('./features/records', () => ({ RecordsPage: () => null, RecordDetailPage: () => null }))
-vi.mock('./features/models', () => ({ ModelsPage: () => null }))
+vi.mock('./features/models/preview/ModelPreviewPage', () => ({ default: () => null }))
 vi.mock('./features/settings', () => ({ SettingsPage: () => null }))
 
 it('keeps screen, game and comic as independent entries and preserves editor deep links', () => {
@@ -120,6 +119,12 @@ it('keeps screen, game and comic as independent entries and preserves editor dee
   })
   expect(parseRoute('#/comic-translation/book-1/page-2')).toMatchObject({ projectId: 'book-1', pageId: 'page-2' })
   expect(parseRoute('#/game-translation/game-1')).toMatchObject({ gameId: 'game-1' })
+  const preview = result.current.find(item => item.id === 'game-translation-demo')!
+  preview.onPress?.()
+  expect(route.navigate).toHaveBeenLastCalledWith(pathOf('game-translation-demo'))
+  expect(preview.label).toBe(result.current.find(item => item.id === 'game-translation')!.label)
+  expect(parseRoute(preview.path!)).toEqual({ route: 'game-translation-demo', path: '#/game' })
+  expect(parseRoute(preview.path + '/library')).toMatchObject({ route: 'game-translation-demo', gameLibrary: true })
   expect(pathOf('settings', { tab: 'glossary' })).toBe('#/settings/glossary')
 })
 

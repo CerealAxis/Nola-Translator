@@ -9,12 +9,13 @@ import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/ta
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { useI18n } from '@/i18n'
-import { modelManagementPath, pathOf, settingsPath, useRoute } from '@/routes'
+import { modelManagementPath, settingsPath, useRoute } from '@/routes'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import type { CredentialProvider } from '../../../../shared/settings'
 import { DownloadsTab } from '../DownloadsTab'
 import { HubSearchTab } from '../HubSearchTab'
 import { notifyModelDownloadFailure } from '../ModelDownloadNotice'
+import { useIndexTranslateVisionSupplement } from '../index-translate-vision-supplement'
 import { LocalModelImport } from '../../offline/OfflineResources'
 import { CloudDetails, useConnectionName } from './CloudPreview'
 import { CloudMark } from './ProviderIconPicker'
@@ -64,27 +65,27 @@ export default function ModelPreviewPage() {
     <h1 className="type-h3">{t('models.title')}</h1>
     <div className="model-workspace__toolbar">
       <div className="model-workspace__controls">
-        <TabsList aria-label={t('models.title')}>
+        <TabsList aria-label={t('models.title')} data-onboarding="models-tabs">
           <TabsTrigger value="sources">{modelWorkspaceText(language, 'sources')}</TabsTrigger>
-          <TabsTrigger value="search">{t('models.tabSearch')}</TabsTrigger>
-          <TabsTrigger value="downloads">{modelWorkspaceText(language, 'downloads')}</TabsTrigger>
+          <TabsTrigger value="search" data-onboarding="models-search-tab">{t('models.tabSearch')}</TabsTrigger>
+          <TabsTrigger value="downloads" data-onboarding="models-downloads-tab">{modelWorkspaceText(language, 'downloads')}</TabsTrigger>
         </TabsList>
         {modelManagementView === 'sources' && <div className="model-workspace__category">
           <Select<ModelType> value={type} disabled={saving} onValueChange={value => { if (value) setType(value) }}>
-            <SelectTrigger aria-label={modelWorkspaceText(language, 'category')}>
+            <SelectTrigger aria-label={modelWorkspaceText(language, 'category')} data-onboarding="models-category" data-category={type}>
               <CategoryIcon aria-hidden="true" />
               <SelectValue>{typeName(type)}</SelectValue>
             </SelectTrigger>
             <SelectContent><SelectGroup>
               {categories.map(({ id, Icon }) => {
                 const label = typeName(id)
-                return <SelectItem key={id} value={id} label={label}><Icon aria-hidden="true" />{label}</SelectItem>
+                return <SelectItem key={id} value={id} label={label} data-onboarding={`models-category-${id}`}><Icon aria-hidden="true" />{label}</SelectItem>
               })}
             </SelectGroup></SelectContent>
           </Select>
         </div>}
       </div>
-      <div className="model-workspace__tools">
+      <div className="model-workspace__tools" data-onboarding="models-tools">
         <Button variant="secondary" onClick={() => navigate(`${settingsPath('engine')}?component=engine`)}>
           {t('modelsSettingsUi.runtimeSetup')}
         </Button>
@@ -95,7 +96,7 @@ export default function ModelPreviewPage() {
       <ModelSources type={type} saving={saving} setSaving={setSaving} />
     </TabsContent>
     <TabsContent value="search">
-      <HubSearchTab onGoRecommended={() => navigate(pathOf('models'))} />
+      <HubSearchTab onGoSources={() => navigate(modelManagementPath())} />
     </TabsContent>
     <TabsContent value="downloads">
       <DownloadsTab />
@@ -120,6 +121,8 @@ function ModelSources({ type, saving, setSaving }: { type: ModelType; saving: bo
   const reportedLoadError = useRef<string | null>(null)
   const loadError = settingsError || (!loading && !loaded ? modelError : null)
   const loadErrorTitle = modelWorkspaceText(language, settingsError ? 'sourceLoadFailed' : 'localModelsLoadFailed')
+
+  useIndexTranslateVisionSupplement(loaded, resources)
 
   useEffect(() => {
     if (loadError && reportedLoadError.current !== loadError) notifyError(loadErrorTitle, { cause: loadError })
@@ -223,7 +226,9 @@ function CategoryWorkspace({ type, connections, families, installed, localSource
   const downloadFamily = categoryFamilies.find(family => family.key === downloadKey)
   const entries: Source[] = connections.filter(item => item.capability === type).map(connection => ({ kind: 'cloud', connection }))
   for (const family of categoryFamilies) {
-    if (localSources[family.key] ?? family.records.some(record => record.installed || isLocalDownloadActive(record))) entries.push({ kind: 'local', family })
+    const legacyVisible = family.records.some(record =>
+      localSources[record.resourceId] ?? (record.installed || isLocalDownloadActive(record)))
+    if (localSources[family.key] ?? legacyVisible) entries.push({ kind: 'local', family })
   }
   const current = draft ?? entries.find(item => sourceId(item) === selected) ?? entries[0]
   const shown = draft ? [...entries.filter(item => sourceId(item) !== sourceId(draft)), draft] : entries
@@ -243,7 +248,7 @@ function CategoryWorkspace({ type, connections, families, installed, localSource
     <aside className="model-workspace__rail" data-slot="source-list" aria-label={modelWorkspaceText(language, 'sources')}>
       <div className="model-workspace__rail-heading">
         <h2 className="type-body font-semibold">{modelWorkspaceText(language, 'sources')}</h2>
-        <Button size="sm" variant="secondary" disabled={!settingsReady || saving} onClick={() => setPicker(true)}>
+        <Button size="sm" variant="secondary" data-onboarding="models-add-source" disabled={!settingsReady || saving} onClick={() => setPicker(true)}>
           <Plus data-icon="inline-start" />{modelWorkspaceText(language, 'add')}
         </Button>
       </div>
@@ -291,7 +296,7 @@ function CategoryWorkspace({ type, connections, families, installed, localSource
         : current?.kind === 'local' ? <LocalDetails key={sourceId(current)} family={current.family} installed={installed}
           busyIds={busyIds}
           onAdd={() => setDownloadKey(current.family.key)}
-          onRemove={record => setRemoving({ name: record.name, confirm: () => onRemoveModel(record.resourceId) })} />
+          onRemove={record => void onRemoveModel(record.resourceId)} />
         : <p className="model-workspace__empty type-muted">{modelWorkspaceText(language, 'empty')}</p>}
     </section>
     {picker && <SourcePicker type={type} families={categoryFamilies} onClose={() => setPicker(false)}

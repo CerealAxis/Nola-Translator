@@ -152,7 +152,7 @@ export function SessionSetupDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-2xl border border-border">
         <DialogHeader><DialogTitle>{t('session.title')}</DialogTitle></DialogHeader>
-        <div className="nola-dialog-body flex flex-col gap-4">
+        <div className="nola-dialog-body flex flex-col gap-[var(--field-gap)]">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-1">
               <Label htmlFor="session-name">{t('session.name')}</Label>

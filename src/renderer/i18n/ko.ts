@@ -998,7 +998,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'models.searchPlaceholder': 'Hugging Face 에서 모델 검색',
   'models.experimentalNoticeTitle': '실험 기능',
   'models.experimentalNoticeBody': '모델은 Hugging Face 커뮤니티에서 제공하며, 설치 가능 여부와 인식 품질을 보장하지 않습니다.',
-  'models.experimentalNoticeAction': '추천 모델 보기',
+  'models.experimentalNoticeAction': '모델 소스 보기',
   'models.filterAll': '모두',
   'models.filterAsr': '음성 인식',
   'models.filterMt': '번역',

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
 import { Switch, SwitchThumb } from '@/components/ui/switch'
@@ -9,7 +9,7 @@ import { normalizeThrownError, restoreIpcError } from '../../../../shared/ipc-er
 import type { ChatGptPlanRequest, ChatGptPlanResult } from '../../../../shared/chatgpt-plan'
 import { customCredentialSlot } from '../../../../shared/custom-models'
 import { SettingsRow } from '../../settings/SettingsRow'
-import { CloudModelListDialog } from './CloudModelTools'
+import { CloudModelListDialog, CloudModelTest } from './CloudModelTools'
 import { CloudSourceHeader } from './CloudPreview'
 import { useCloudPreviewCopy } from './cloud-preview-copy'
 import type { Connection } from './cloud-preview-data'
@@ -45,6 +45,7 @@ export function ChatGptPlanDetails({ connection, creating, saving, onSave, onCan
   const [busy, setBusy] = useState<ChatGptPlanRequest['action']>()
   const [notice, setNotice] = useState('')
   const [needsSignIn, setNeedsSignIn] = useState(false)
+  const [removal, setRemoval] = useState('')
   const id = connection.id
 
   useEffect(() => {
@@ -119,10 +120,23 @@ export function ChatGptPlanDetails({ connection, creating, saving, onSave, onCan
       </div>
       {connection.models.length ? <ul>{connection.models.map(model => <li key={model.id}>
         <span className="cpv-model-info type-body">{model.name}</span>
-        <Switch checked={model.enabled} disabled={saving} aria-label={t('workbench.enable') + ' ' + model.id}
-          onCheckedChange={enabled => void onSave({ ...connection,
-            models: connection.models.map(item => item.id === model.id ? { ...item, enabled } : item),
-          }, 'models').catch(() => undefined)}><SwitchThumb /></Switch>
+        <div className="cpv-actions">
+          {removal === model.id ? <>
+            <span className="type-small">{copy('confirmRemoval')}</span>
+            <Button variant="secondary" size="sm" onClick={() => setRemoval('')}>{t('common.cancel')}</Button>
+            <Button variant="danger" size="sm" disabled={saving} onClick={() => {
+              void onSave({ ...connection, models: connection.models.filter(item => item.id !== model.id) }, 'models')
+                .then(() => setRemoval('')).catch(() => undefined)
+            }}>{t('common.confirm')}</Button>
+          </> : <>
+            <CloudModelTest connection={connection} model={model} disabled={creating || saving || !account?.authorized || needsSignIn || !!busy} />
+            <Button variant="bare" size="icon-sm" disabled={saving} tooltip={t('modelsSettingsUi.deleteModel')} aria-label={t('modelsSettingsUi.deleteModel') + ' ' + model.id} onClick={() => setRemoval(model.id)}><Trash2 /></Button>
+            <Switch checked={model.enabled} disabled={saving} aria-label={t('workbench.enable') + ' ' + model.id}
+              onCheckedChange={enabled => void onSave({ ...connection,
+                models: connection.models.map(item => item.id === model.id ? { ...item, enabled } : item),
+              }, 'models').catch(() => undefined)}><SwitchThumb /></Switch>
+          </>}
+        </div>
       </li>)}</ul> : <p className="type-muted text-muted">{copy('noModels')}</p>}
     </section>
     {models && <CloudModelListDialog connection={connection} models={models} creating={false} onClose={() => setModels(undefined)}

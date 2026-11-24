@@ -96,6 +96,17 @@ it.each([
   if (id === 'fishaudio-tts') expect(decode(fetch.mock.calls[0][1]!.body as Uint8Array)).toMatchObject({ reference_id: 'a'.repeat(32), format: 'wav' })
 })
 
+it('does not add a default MiMo reference text', async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(Response.json({
+    choices: [{ message: { audio: { data: 'UklGRg==' } } }],
+  }))
+  vi.stubGlobal('fetch', fetch)
+  await infer('mimo')
+  expect(JSON.parse(fetch.mock.calls[0][1]!.body as string).messages).toEqual([
+    { role: 'assistant', content: 'Hello & world' },
+  ])
+})
+
 it('exchanges the Azure Speech key for a token and sends escaped SSML', async () => {
   const fetch = vi.fn<typeof globalThis.fetch>()
     .mockResolvedValueOnce(new Response('speech-token')).mockResolvedValueOnce(new Response('RIFF'))
@@ -118,6 +129,11 @@ it('does not return a successful empty audio result or include upstream error bo
   vi.stubGlobal('fetch', fetch)
   await expect(infer('openai-tts-api')).rejects.toThrow('returned HTTP 401')
   await expect(infer('mimo')).rejects.toThrow('returned no audio')
+})
+
+it('classifies a speech provider network failure before it reaches IPC', async () => {
+  vi.stubGlobal('fetch', vi.fn<typeof globalThis.fetch>().mockRejectedValue(new TypeError('fetch failed')))
+  await expect(infer('mimo')).rejects.toMatchObject({ code: 'NETWORK_UNAVAILABLE' })
 })
 
 it('wraps MiMo PCM in a 24 kHz mono WAV for playback', async () => {

@@ -1,271 +1,164 @@
-import { useState } from 'react'
-import { ArrowRight, ChevronRight } from 'lucide-react'
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
-import { Badge, type BadgeVariant } from '@/components/ui/badge'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Clock3, Pause, Play, RefreshCw, Settings2, ZoomIn, ZoomOut } from 'lucide-react'
+import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from 'recharts'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Dialog, DialogCloseButton, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { devices, isCloud, models, sessions, sharedProcess, sum, type MonitorModel } from './performance-monitor-data'
+import { performanceWindow, type Sample } from './performance-monitor-data'
 import { useMonitorCopy } from './performance-monitor-copy'
+import type { GatewayPerformanceSnapshot } from '../../../shared/gateway-performance'
 
-const stateTone: Record<MonitorModel['state'], BadgeVariant> = {
-  running: 'success', resident: 'secondary', loading: 'warning', unloaded: 'outline',
-}
-const stateOrder: MonitorModel['state'][] = ['running', 'loading', 'resident', 'unloaded']
+type Series = { id: string; label: string; color: number }
+const Appearance = createContext({ grid: true, legend: true, start: 0, end: 0 })
+const panelScales = [{ columns: 4, height: 9 }, { columns: 3, height: 11 }, { columns: 2, height: 14 }, { columns: 1, height: 19 }]
+const axisTime = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+const timeFormat = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+const time = (value: number) => timeFormat.format(value)
 
-const gb = (value: number) => `${value.toFixed(2)} GB`
-const ms = (value?: number) => value === undefined ? '—' : `${value} ms`
-
-function Filter({ label, value, options, onChange }: {
-  label: string
-  value: string
-  options: { value: string; label: string }[]
-  onChange: (value: string) => void
+function Filter({ label, value, options, change, clock }: {
+  label: string; value: string; options: { value: string; label: string }[]; change: (value: string) => void; clock?: boolean
 }) {
-  return <Select value={value} items={options} onValueChange={next => { if (next !== null) onChange(next) }}>
-    <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
+  return <Select value={value} items={options} onValueChange={next => { if (next !== null) change(next) }}>
+    <SelectTrigger aria-label={label}>{clock && <Clock3 aria-hidden="true" />}<SelectValue /></SelectTrigger>
     <SelectContent><SelectGroup>{options.map(option =>
       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
     )}</SelectGroup></SelectContent>
   </Select>
 }
 
-const historyFactors = [0.82, 0.96, 0.92, 1.03, 0.97, 1]
-function ResourceHistory({ value, label }: { value: number; label: string }) {
-  const c = useMonitorCopy()
-  const data = historyFactors.map((factor, index) => ({
-    time: `14:${22 + index * 2}`,
-    usage: Number((value * factor).toFixed(2)),
-  }))
-  return <div className="performance-monitor-stack">
-    <div className="performance-monitor-summary type-muted text-muted">
-      <span>{label}</span><span>{c('peak')} · {gb(Math.max(...data.map(point => point.usage)))}</span>
-    </div>
-    <ChartContainer className="aspect-auto h-40 w-full" config={{ usage: { label, color: 'var(--chart-1)' } }}>
-    <LineChart accessibilityLayer data={data}>
-      <CartesianGrid vertical={false} />
-      <XAxis dataKey="time" tickLine={false} axisLine={false} />
-      <YAxis unit=" GB" tickLine={false} axisLine={false} width={64} />
-      <ChartTooltip content={<ChartTooltipContent />} />
-      <Line type="linear" dataKey="usage" stroke="var(--color-usage)" strokeWidth={2} dot={false} isAnimationActive={false} />
-    </LineChart>
+function Plot({ title, data, series, unit = '', max, events = false, steps = false }: {
+  title: string; data: Sample[]; series: Series[]; unit?: string; max?: number; events?: boolean; steps?: boolean
+}) {
+  const { grid, legend, start, end } = useContext(Appearance)
+  const config = Object.fromEntries(series.map(s => [s.id, { label: s.label, color: 'var(--chart-' + s.color + ')' }]))
+  const value = series[0] && data.at(-1)?.[series[0].id]
+  const reading = max !== undefined && unit === 'GiB'
+    ? (value == null ? '' : value + ' / ') + max + ' ' + unit
+    : value == null ? '' : [value, unit].filter(v => v !== '').join(' ')
+  const minute = 60_000
+  const interval = Math.max(1, Math.ceil((end - start) / (5 * minute))) * minute
+  const firstTick = Math.ceil(start / interval) * interval
+  const ticks = Array.from({ length: Math.floor((end - firstTick) / interval) + 1 }, (_, i) => firstTick + i * interval)
+  return <section aria-label={title} className="monitor-tile">
+    <header className="monitor-tile-header">
+      <h3 className="type-small">{title}</h3>
+      <span className="type-small tabular-nums text-muted-foreground">
+        {events ? unit : reading}
+      </span>
+    </header>
+    <ChartContainer config={config} className="performance-monitor-trend-chart">
+      <LineChart accessibilityLayer data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+        {grid && <CartesianGrid stroke="var(--border)" />}
+        <XAxis dataKey="at" type="number" domain={[start, end]} allowDataOverflow ticks={ticks} tickFormatter={value => axisTime.format(value)} height={22} minTickGap={32} axisLine={false} tickLine={false} />
+        <YAxis width="auto" domain={[0,max || 'auto']} tickCount={4} allowDecimals={unit === 'GiB'} axisLine={false} tickLine={false} />
+        {max && unit === 'GiB' && <ReferenceLine y={max} stroke="var(--muted-foreground)" strokeDasharray="4 4" />}
+        <ChartTooltip content={<ChartTooltipContent
+          labelFormatter={(_, payload) => payload[0] ? time(payload[0].payload.at) : ''}
+          formatter={(reading, name, item) => <div className="monitor-tooltip-reading">
+            <span aria-hidden="true" className="size-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
+            <span className="truncate text-muted-foreground">{config[name ?? '']?.label ?? name}</span>
+            <span className="font-medium tabular-nums">{typeof reading === 'number' ? reading.toLocaleString() : String(reading)}</span>
+          </div>}
+        />} />
+        {series.map(s => <Line key={s.id} name={s.id} dataKey={s.id} type={steps ? 'stepAfter' : 'linear'}
+          stroke={'var(--color-' + s.id + ')'} strokeWidth={s.id === 'total' ? 2.5 : 1.8}
+          dot={events ? { r: 1.5, fill: 'var(--color-' + s.id + ')' } : false}
+          isAnimationActive={false} connectNulls={false} />)}
+      </LineChart>
     </ChartContainer>
-  </div>
+    {legend && <div className="monitor-legend flex flex-wrap gap-x-3 gap-y-1 type-muted">{series.map(s =>
+      <span key={s.id} className="inline-flex items-center gap-2">
+        <i aria-hidden="true" className="inline-block h-0.5 w-3" style={{ background: 'var(--chart-' + s.color + ')' }} />{s.label}
+      </span>)}</div>}
+  </section>
 }
 
-export function PerformanceMonitor() {
+export function PerformanceMonitor({ read }: { read?: () => Promise<GatewayPerformanceSnapshot> }) {
   const c = useMonitorCopy()
-  const [source, setSource] = useState('all')
-  const [capability, setCapability] = useState('all')
-  const [sort, setSort] = useState('state')
-  const [selectedModel, setSelectedModel] = useState<MonitorModel | null>(null)
-  const [sessionId, setSessionId] = useState('cascade')
-  const [scope, setScope] = useState('whole')
-  const [deviceName, setDeviceName] = useState(devices[0].name)
-  const session = sessions.find(item => item.id === sessionId) ?? sessions[0]
-  const device = devices.find(item => item.name === deviceName) ?? devices[0]
-  const capabilities = [...new Set(models.map(model => model.capability))]
-  const visibleModels = models.filter(model =>
-    (source === 'all' || isCloud(model) === (source === 'cloud')) &&
-    (capability === 'all' || model.capability === capability)
-  )
-  if (sort === 'dedicated') visibleModels.sort((a, b) => sum(b, 'dedicated') - sum(a, 'dedicated'))
-  else visibleModels.sort((a, b) => stateOrder.indexOf(a.state) - stateOrder.indexOf(b.state))
-  const deviceModels = models.filter(model => model.instances.some(instance => instance.device === device.name))
-  const sharedOnDevice = device.name === sharedProcess.device
-  const deviceProcesses = [
-    ...deviceModels.flatMap(model => model.instances.filter(instance => instance.device === device.name)),
-    ...(sharedOnDevice ? [sharedProcess] : []),
+  const [model, setModel] = useState('all')
+  const [gpu, setGpu] = useState('all')
+  const [minutes, setMinutes] = useState('5')
+  const [paused, setPaused] = useState(false)
+  const [scale, setScale] = useState(2)
+  const [grid, setGrid] = useState(true)
+  const [legend, setLegend] = useState(true)
+  const [snapshot, setSnapshot] = useState<GatewayPerformanceSnapshot>(() =>
+    ({ end: Date.now(), calls: [], tasks: [], hardware: [] }))
+  const [readFailed, setReadFailed] = useState(!read)
+  const [refresh, setRefresh] = useState(0)
+  const previousRefresh = useRef(refresh)
+  useEffect(() => {
+    const manuallyRefreshed = previousRefresh.current !== refresh
+    previousRefresh.current = refresh
+    if (!read || (paused && !manuallyRefreshed)) return
+    let stopped = false
+    let timer: number
+    const poll = async () => {
+      try {
+        const next = await read()
+        if (!stopped) {
+          setSnapshot(next)
+          setReadFailed(false)
+        }
+      } catch {
+        if (!stopped) setReadFailed(true)
+      }
+      if (!stopped && !paused) timer = window.setTimeout(poll, 5000)
+    }
+    void poll()
+    return () => { stopped = true; window.clearTimeout(timer) }
+  }, [paused, read, refresh])
+  const shared = c('shared')
+  const data = useMemo(() => performanceWindow(snapshot, Number(minutes), model, shared), [snapshot, minutes, model, shared])
+  useEffect(() => { if (model !== 'all' && !data.models.has(model)) setModel('all') }, [data.models, model])
+  useEffect(() => { if (gpu !== 'all' && !data.adapters.some(device => device.id === gpu)) setGpu('all') }, [data.adapters, gpu])
+  const modelLines = [
+    ...data.modelLines,
+    ...(data.eventData.some(point => point.queue != null) ? [{ id: 'queue', label: c('queueTime'), color: 5 }] : []),
+    ...(data.eventData.some(point => point.total != null) ? [{ id: 'total', label: c('total'), color: 1 }] : []),
   ]
-  const dedicated = scope === 'whole' ? device.dedicated : deviceProcesses.reduce((total, item) => total + item.dedicated, 0)
-  const shared = scope === 'whole' ? device.shared : deviceProcesses.reduce((total, item) => total + item.shared, 0)
-  const selectedInstances = selectedModel?.group ? [sharedProcess] : selectedModel?.instances ?? []
-
-  return <>
-    <Tabs defaultValue="models" className="performance-monitor">
-      <TabsList className="w-fit max-w-full" aria-label={c('title')}>
-        <TabsTrigger value="models">{c('models')}</TabsTrigger>
-        <TabsTrigger value="pipeline">{c('pipeline')}</TabsTrigger>
-        <TabsTrigger value="devices">{c('devices')}</TabsTrigger>
-      </TabsList>
-      <TabsContent value="models">
-        <Card className="performance-monitor-card">
-          <CardHeader>
-            <div className="performance-monitor-toolbar">
-              <CardTitle>{c('models')}</CardTitle>
-              <div className="performance-monitor-controls">
-                <Filter label={c('all')} value={source} onChange={setSource} options={[
-                  { value: 'all', label: c('all') }, { value: 'local', label: c('local') }, { value: 'cloud', label: c('cloud') },
-                ]} />
-                <Filter label={c('capability')} value={capability} onChange={setCapability} options={[
-                  { value: 'all', label: c('kinds') },
-                  ...capabilities.map(kind => ({ value: kind, label: c(kind) })),
-                ]} />
-                <Filter label={c('sort')} value={sort} onChange={setSort} options={[
-                  { value: 'state', label: c('state') }, { value: 'dedicated', label: c('dedicated') },
-                ]} />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table className="performance-monitor-table" aria-label={c('models')}>
-              <TableHeader><TableRow>
-                <TableHead scope="col">{c('models')}</TableHead>
-                <TableHead scope="col">{c('state')}</TableHead>
-                <TableHead scope="col" className="performance-monitor-wide">{c('devices')}</TableHead>
-                <TableHead scope="col" className="text-end">{c('dedicated')}</TableHead>
-                <TableHead scope="col" className="performance-monitor-wide text-end">{c('shared')}</TableHead>
-                <TableHead scope="col" className="text-end">{c('ram')}</TableHead>
-                <TableHead scope="col" className="performance-monitor-wide text-end">{c('tasks')}</TableHead>
-                <TableHead scope="col" className="performance-monitor-wide text-end">{c('latency')}</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {visibleModels.map(model => {
-                  const location = isCloud(model) ? c('cloud') : model.group ? c('group') : model.instances.map(item => item.device).join(', ') || '—'
-                  const footprint = model.instances.length > 0
-                  return <TableRow key={model.id}>
-                    <TableCell className="performance-monitor-model-cell">
-                      <Button variant="tertiary" className="performance-monitor-model-link" onClick={() => setSelectedModel(model)}>
-                        <span className="min-w-0 whitespace-normal text-start">{model.name}</span><ChevronRight data-icon="inline-end" aria-hidden="true" />
-                      </Button>
-                      <div className="type-muted text-muted">{c(model.capability)} · {model.runtime}</div>
-                    </TableCell>
-                    <TableCell><Badge variant={stateTone[model.state]}>{c(model.state)}</Badge></TableCell>
-                    <TableCell className="performance-monitor-wide">{location}</TableCell>
-                    <TableCell className="text-end tabular-nums">{footprint ? gb(sum(model, 'dedicated')) : isCloud(model) ? c('cloud') : '—'}</TableCell>
-                    <TableCell className="performance-monitor-wide text-end tabular-nums">{footprint ? gb(sum(model, 'shared')) : '—'}</TableCell>
-                    <TableCell className="text-end tabular-nums">{footprint ? gb(sum(model, 'ram')) : '—'}</TableCell>
-                    <TableCell className="performance-monitor-wide text-end tabular-nums">
-                      {model.active}{model.queued > 0 && <span className="text-muted"> · {c('queued')} {model.queued}</span>}
-                    </TableCell>
-                    <TableCell className="performance-monitor-wide text-end tabular-nums">{ms(model.latency)}</TableCell>
-                  </TableRow>
-                })}
-              </TableBody>
-            </Table>
-            {visibleModels.length === 0 && <p className="py-6 text-center text-muted">{c('empty')}</p>}
-          </CardContent>
-        </Card>
-      </TabsContent>
-      <TabsContent value="pipeline">
-        <Card>
-          <CardHeader>
-            <div className="performance-monitor-toolbar">
-              <CardTitle>{c('pipeline')}</CardTitle>
-              <Filter label={c('session')} value={sessionId} onChange={setSessionId}
-                options={sessions.map(item => ({ value: item.id, label: `${item.start} · ${c(item.id === 'cascade' ? 'cascade' : 'direct')}` }))} />
-            </div>
-          </CardHeader>
-          <CardContent className="performance-monitor-stack">
-            <div className="performance-monitor-summary">
-              <div><span className="type-muted text-muted">{c('total')}</span><div className="type-h3 tabular-nums">{ms(session.stages.reduce((total, stage) => total + stage.ms, 0))}</div></div>
-              <Badge variant={session.active ? 'success' : 'outline'}>{c(session.active ? 'running' : 'ended')}</Badge>
-            </div>
-            <ol className="performance-monitor-stages">
-              {session.stages.map((stage, index) => {
-                const model = models.find(item => item.id === stage.model)
-                return <li key={stage.key} className="performance-monitor-stage">
-                  <div className="performance-monitor-stage-body">
-                    <span className="type-small text-muted">{c(stage.key)}</span>
-                    <span className="type-h4 tabular-nums">{stage.key === 'input' ? 'PCM' : ms(stage.ms)}</span>
-                    {model && <Button variant="outline" onClick={() => setSelectedModel(model)} className="h-auto min-h-[var(--control-height)] whitespace-normal text-start">{model.name}</Button>}
-                  </div>
-                  {index < session.stages.length - 1 && <ArrowRight className="performance-monitor-stage-arrow" aria-hidden="true" />}
-                </li>
-              })}
-            </ol>
-          </CardContent>
-        </Card>
-      </TabsContent>
-      <TabsContent value="devices">
-        <Card>
-          <CardHeader>
-            <div className="performance-monitor-toolbar">
-              <CardTitle>{c('devices')}</CardTitle>
-              <div className="performance-monitor-controls">
-                <Filter label={c('devices')} value={device.name} onChange={setDeviceName} options={devices.map(item => ({ value: item.name, label: item.name }))} />
-                <Filter label={c('scope')} value={scope} onChange={setScope} options={[{ value: 'whole', label: c('whole') }, { value: 'nola', label: 'Nola' }]} />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="performance-monitor-stack">
-            <dl className="performance-monitor-metrics">
-              <div><dt>GPU · {c('load')}</dt><dd>{scope === 'whole' ? device.load : device.nolaLoad}%</dd></div>
-              <div><dt>{c('dedicated')}</dt><dd>{gb(dedicated)}{device.capacity > 0 && <small> / {device.capacity} GB</small>}</dd></div>
-              <div><dt>{c('shared')}</dt><dd>{gb(shared)}</dd></div>
-              <div><dt>CPU</dt><dd>{scope === 'whole' ? '31%' : '33%'}</dd></div>
-              <div><dt>{c('ram')}</dt><dd>{scope === 'whole' ? '14.28 / 32 GB' : gb(models.reduce((total, model) => total + sum(model, 'ram'), sharedProcess.ram))}</dd></div>
-            </dl>
-            <ResourceHistory value={dedicated || shared} label={c(dedicated ? 'dedicated' : 'shared')} />
-            {(deviceModels.length > 0 || sharedOnDevice) && <div className="performance-monitor-controls">
-              {deviceModels.map(model => <Button key={model.id} variant="outline" onClick={() => setSelectedModel(model)}>{model.name}</Button>)}
-              {sharedOnDevice && <Button variant="outline" onClick={() => setSelectedModel(models.find(model => model.group) ?? null)}>OCR Worker · {c('group')}</Button>}
-            </div>}
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
-    <Dialog open={selectedModel !== null} onOpenChange={open => { if (!open) setSelectedModel(null) }}>
-      {selectedModel && <DialogContent className="model-detail-drawer performance-monitor-detail">
-        <DialogCloseButton />
-        <DialogHeader>
-          <DialogTitle>{selectedModel.name}</DialogTitle>
-          <DialogDescription>{c(selectedModel.capability)} · {selectedModel.runtime}</DialogDescription>
-        </DialogHeader>
-        <CardContent className="performance-monitor-stack">
-          <div className="performance-monitor-controls">
-            <Badge variant={stateTone[selectedModel.state]}>{c(selectedModel.state)}</Badge>
-            {isCloud(selectedModel) && <Badge variant="outline">{c('cloud')}</Badge>}
-          </div>
-          <dl className="performance-monitor-metrics">
-            <div><dt>{c('tasks')}</dt><dd>{selectedModel.active}</dd></div>
-            <div><dt>{c('queued')}</dt><dd>{selectedModel.queued}</dd></div>
-            {selectedModel.speed && <div><dt>{c('speed')}</dt><dd>{selectedModel.speed}</dd></div>}
-          </dl>
-          {selectedModel.latency !== undefined && <section className="performance-monitor-instance">
-            <div className="performance-monitor-summary">
-              <h3 className="type-h4">{c('lastRequest')}</h3>
-              <Badge variant="success">{c('completed')}</Badge>
-            </div>
-            <dl className="performance-monitor-metrics">
-              <div><dt>{c('latency')}</dt><dd>{ms(selectedModel.latency)}</dd></div>
-              {selectedModel.capability === 'llm' && <>
-                <div><dt>{c('queued')}</dt><dd>{ms(42)}</dd></div>
-                <div><dt>{c('firstOutput')}</dt><dd>{ms(218)}</dd></div>
-              </>}
-            </dl>
-          </section>}
-          {selectedModel.id === 'tts' && <div className="performance-monitor-controls">
-            <Badge variant="danger">{c('failed')}</Badge><span className="type-muted">{c('timeout')}</span>
-          </div>}
-          {selectedInstances.length > 0 && <section className="performance-monitor-stack">
-            <h3 className="type-h4">{c(selectedModel.group ? 'group' : 'instances')}</h3>
-            {selectedModel.group && <div className="type-muted text-muted">
-              {selectedModel.group} · {models.filter(model => model.group === selectedModel.group).map(model => model.name).join(' / ')}
-            </div>}
-            {selectedInstances.map((instance, index) => <div className="performance-monitor-instance" key={`${instance.device}-${index}`}>
-              <div className="type-small">{instance.device}</div>
-              <dl className="performance-monitor-metrics">
-                <div><dt>{c('dedicated')}</dt><dd>{gb(instance.dedicated)}</dd></div>
-                <div><dt>{c('shared')}</dt><dd>{gb(instance.shared)}</dd></div>
-                <div><dt>{c('ram')}</dt><dd>{gb(instance.ram)}</dd></div>
-                <div><dt>CPU</dt><dd>{instance.cpu}%</dd></div>
-                {instance.device !== 'CPU' && <div><dt>GPU</dt><dd>{instance.gpu}%</dd></div>}
-              </dl>
-            </div>)}
-            <h3 className="type-h4">{c('history')}</h3>
-            <ResourceHistory value={selectedInstances.reduce((total, instance) => total + instance.ram, 0)} label={c('ram')} />
-            {(['dedicated', 'shared'] as const).map(field => {
-              const value = selectedInstances.reduce((total, instance) => total + instance[field], 0)
-              return value > 0 && <ResourceHistory key={field} value={value} label={c(field)} />
-            })}
-          </section>}
-        </CardContent>
-      </DialogContent>}
-    </Dialog>
-  </>
+  const pauseLabel = c(paused ? 'resume' : 'pause')
+  const { columns, height } = panelScales[scale]
+  return <main aria-label={c('title')} className="performance-monitor-window monitor-dashboard"><div className="performance-monitor">
+    <header className="performance-monitor-header">
+      <div className="performance-monitor-toolbar">
+        <Filter label={c('models')} value={model} change={setModel} options={[{ value: 'all', label: c('models') }, ...Array.from(data.models, ([value, s]) => ({ value, label: s.label }))]} />
+        <Filter label={c('devices')} value={gpu} change={setGpu} options={[{ value: 'all', label: c('devices') }, ...data.adapters.map(s => ({ value: s.id, label: s.label }))]} />
+        <Filter clock label={c('period')} value={minutes} change={setMinutes} options={['1','5','15','30'].map(value => ({ value, label: value + ' ' + c('minute') }))} />
+      </div>
+      <div className="performance-monitor-toolbar monitor-time-tools">
+        <Button variant="bare" size="icon-sm" aria-label={c('smaller')} tooltip={c('smaller')} disabled={scale === 0} onClick={() => setScale(s => s - 1)}><ZoomOut /></Button>
+        <Button variant="bare" size="icon-sm" aria-label={c('larger')} tooltip={c('larger')} disabled={scale === panelScales.length - 1} onClick={() => setScale(s => s + 1)}><ZoomIn /></Button>
+        <Button variant="bare" size="icon-sm" aria-label={c('refresh')} tooltip={c('refresh')} onClick={() => setRefresh(value => value + 1)}><RefreshCw /></Button>
+        <Button variant="bare" size="icon-sm" aria-label={pauseLabel} tooltip={pauseLabel} onClick={() => setPaused(!paused)}>{paused ? <Play /> : <Pause />}</Button>
+        <Popover>
+          <PopoverTrigger render={<Button variant="bare" size="icon-sm" aria-label={c('display')} tooltip={c('display')} />}><Settings2 /></PopoverTrigger>
+          <PopoverContent align="end" sideOffset={8} aria-label={c('display')} className="w-max min-w-40 gap-[var(--label-gap)] p-[var(--section-heading-gap)] [&>label]:gap-[var(--field-gap)]">
+            <label className="flex items-center justify-between">{c('grid')}<Switch checked={grid} onCheckedChange={setGrid}><SwitchThumb /></Switch></label>
+            <label className="flex items-center justify-between">{c('legend')}<Switch checked={legend} onCheckedChange={setLegend}><SwitchThumb /></Switch></label>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </header>
+    {readFailed && <Alert><AlertDescription>{c('readFailed')}</AlertDescription></Alert>}
+    <Appearance.Provider value={{ grid, legend, start: data.start, end: data.end }}>
+    <div className="monitor-tiles" data-compact={scale === 0} style={{ '--monitor-columns': columns, '--monitor-chart-height': `${height}rem` } as CSSProperties}>
+      <Plot title={c('latency')} data={data.eventData} series={modelLines} events unit="ms" />
+      <Plot title={c('tasks')} data={data.tasks} series={[{ id: 'active', label: c('active'), color: 1 }, { id: 'queued', label: c('queued'), color: 4 }]} steps />
+    {data.adapters.filter(device => gpu === 'all' || device.id === gpu).map(device =>
+      <section key={device.id} aria-label={device.label} className="contents">
+          <Plot title={device.label + ' · ' + c('gpuMemory')} data={device.data} series={[
+            { id: 'used', label: c('used'), color: 1 },
+            ...device.allocations,
+          ]} unit="GiB" max={device.capacity} />
+          <Plot title={device.label + ' · ' + c('load')} data={device.data} series={[{ id: 'load', label: device.label, color: 2 }]} unit="%" max={100} />
+      </section>)}
+      <Plot title={c('cpu')} data={data.system} series={[{ id: 'cpu', label: 'CPU', color: 3 }]} unit="%" max={100} />
+      <Plot title={c('ram')} data={data.system} series={[{ id: 'ram', label: c('ram'), color: 4 }]} unit="GiB" max={data.ramCapacity} />
+    </div>
+    </Appearance.Provider>
+  </div></main>
 }

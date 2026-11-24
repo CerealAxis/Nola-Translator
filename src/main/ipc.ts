@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 
 import { BrowserWindow, ipcMain, net, screen } from 'electron'
 
-import type { AudioDevice, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmResult, ResourceRecord, SessionConfig } from '../shared/contracts'
+import type { AudioDevice, EngineEvent, EngineProcessState, ModelDownloadSource, PrewarmConfig, PrewarmResult, ResourceRecord, SessionConfig } from '../shared/contracts'
 import type { EngineChannelEvent } from '../shared/bridge'
 import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
@@ -91,7 +91,7 @@ export function registerEngineIpc(
   resourceInUse: (resourceId: string) => boolean = () => false,
   listProcessSources: () => Promise<AudioDevice[]> = async () => [],
   canOpenOverlay: () => boolean = () => true,
-  manageSpecialResource?: (resourceId: string, action: 'install' | 'remove' | 'cancel' | 'pause' | 'resume') => Promise<ResourceRecord | undefined>,
+  manageSpecialResource?: (resourceId: string, action: 'install' | 'remove' | 'cancel' | 'pause' | 'resume', source?: ModelDownloadSource) => Promise<ResourceRecord | undefined>,
 ): () => void {
   const controller = sharedController ?? new SessionController({ engine, meetings, getSettings, getCredential: getTranslationCredential, prepare: prepareEnvironment, whenReady: whenRuntimeReady, startingChanged: onStartingChanged, hideOverlay: () => getOverlayWindow()?.hide() })
   let overlayCloseStopsSession = false
@@ -153,7 +153,8 @@ export function registerEngineIpc(
         throw new Error('INVALID_ARGUMENT')
       }
       if ((action === 'remove' || action === 'install') && resourceInUse(resourceId)) throw new Error('resourceInUse')
-      const special = await manageSpecialResource?.(resourceId, action as 'install' | 'remove' | 'cancel' | 'pause' | 'resume')
+      const source = downloadSource as ModelDownloadSource | undefined
+      const special = await manageSpecialResource?.(resourceId, action as 'install' | 'remove' | 'cancel' | 'pause' | 'resume', source)
       if (special) return special
       await ensureReady()
       const response = await engine.request(

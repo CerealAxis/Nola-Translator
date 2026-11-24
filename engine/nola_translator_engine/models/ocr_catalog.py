@@ -3,9 +3,27 @@
 from .manager import FileEntry, ModelSpec
 
 
+HF_OCR_REPO = "pitapo/rapidocr"
+HF_OCR_REVISION = "212a3cfa5f2205f170fa7a0401a8a0a694138259"
+HF_OCR_GROUPS = frozenset(("ch", "korean", "latin", "eslav", "en", "th", "el"))
+
+
 class OcrModelSpec(ModelSpec):
+    @property
+    def has_hf_snapshot(self):
+        return all(entry.path == OCR_DETECTOR or entry.path.split("_", 1)[0] in HF_OCR_GROUPS
+                   for entry in self.files)
+
     def url_for(self, entry, network=None, source=None):
-        # RapidAI publishes these artifacts on ModelScope, not Hugging Face.
+        if source in ("huggingface", "hf-mirror"):
+            if not self.has_hf_snapshot:
+                raise ValueError("downloadSourceUnavailable")
+            if entry.path == OCR_DETECTOR:
+                path = "det/ch_PP-OCRv5_mobile_det.onnx"
+            else:
+                path = f"rec/{entry.path.removesuffix('.onnx')}_infer.onnx"
+            return super().url_for(FileEntry(f"onnx/PP-OCRv5/{path}", entry.size, entry.sha256,
+                                            repo=HF_OCR_REPO, revision=HF_OCR_REVISION), network, source)
         task = "det" if "_det_" in entry.path else "rec"
         return f"https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/{OCR_REVISION}/onnx/PP-OCRv5/{task}/{entry.path}"
 

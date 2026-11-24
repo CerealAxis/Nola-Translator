@@ -64,7 +64,7 @@ export function DesktopDataGroup() {
         <DialogTitle>{t(mode === 'restore' ? 'desktopData.restore' : 'desktopData.backup')}</DialogTitle>
         <DialogDescription>{t(mode === 'restore' ? 'desktopData.restoreHint' : 'desktopData.backupHint')}</DialogDescription>
         <DialogCloseButton disabled={busy} />
-      </DialogHeader><CardContent className="flex flex-col gap-4">
+      </DialogHeader><CardContent className="flex flex-col gap-[var(--field-gap)]">
         {mode === 'backup' && <>
           <SettingsRow label={t('desktopData.audio')}><SettingSwitch ariaLabel={t('desktopData.audio')} isSelected={audio} onChange={setAudio} /></SettingsRow>
           <SettingsRow label={t('desktopData.models')}><SettingSwitch ariaLabel={t('desktopData.models')} isSelected={models} onChange={setModels} /></SettingsRow>

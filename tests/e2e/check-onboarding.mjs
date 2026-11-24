@@ -201,15 +201,19 @@ async function run() {
       })()`)
       const scene = await window.webContents.executeJavaScript(`(() => {
         const target = document.querySelector(${JSON.stringify(lesson.target)});
-        const detail = document.querySelector('[data-onboarding="model-detail"]:not([data-closed])');
+        const picker = document.querySelector('[data-onboarding="models-source-picker"]:not([data-closed])');
+        const category = document.querySelector('[data-onboarding="models-category"]')?.dataset.category;
+        const family = picker?.querySelector(category === 'ASR' ? '[data-family="sensevoice"]' : '[data-family="hymt2"]');
         const rect = target.getBoundingClientRect();
-        return { path: location.hash, kind: detail?.dataset.modelFamily ?? null, rect: rect.toJSON(),
-          list: !!document.querySelector('[data-onboarding="model-file-options"]:not([data-closed])'),
+        return { path: location.hash, picker: !!picker, category, family: family?.dataset.family, rect: rect.toJSON(),
           outline: document.querySelector('.onboarding-tour__outline').getBoundingClientRect().toJSON() };
       })()`)
       assert.equal(scene.path, lesson.path, JSON.stringify({ configuration, step, scene }))
-      assert.equal(scene.kind, lesson.scene ?? null)
-      if (lesson.list) assert.equal(scene.list, true)
+      assert.equal(scene.picker, !!lesson.sourceCategory)
+      if (lesson.sourceCategory) {
+        assert.equal(scene.category, lesson.sourceCategory)
+        assert.equal(scene.family, lesson.sourceCategory === 'ASR' ? 'sensevoice' : 'hymt2')
+      }
       assert.ok(scene.outline.width > 0 && scene.outline.height > 0)
       // Verify that each small lesson actually highlights its own control, rather than a previous scene.
       const intersection = Math.max(0, Math.min(scene.rect.right, scene.outline.right) - Math.max(scene.rect.left, scene.outline.left))
@@ -235,7 +239,7 @@ async function run() {
       assert.ok(cardGeometry.rect.x >= 0 && cardGeometry.rect.y >= 0
         && cardGeometry.rect.right <= cardGeometry.window.width + 1
         && cardGeometry.rect.bottom <= cardGeometry.window.height + 1, info)
-      if (['H1', 'M1', 'T1', 'T2', 'T3', 'T4', 'M2', 'R1', 'U1', 'U4'].includes(step)) {
+      if (['H1', 'M1', 'H2', 'M2', 'M4', 'M6', 'U1'].includes(step)) {
         await writeFile(resolve(output, `${language}-${theme}-${width}-${step}.png`), (await window.webContents.capturePage()).toPNG())
         await writeFile(resolve(output, `${language}-${theme}-${width}-${step}-card.png`), (await cardWindowOf().webContents.capturePage()).toPNG())
       }

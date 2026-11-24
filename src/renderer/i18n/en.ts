@@ -448,7 +448,7 @@ export const en: Dictionary = {
     searchPlaceholder: 'Search models on Hugging Face',
     experimentalNoticeTitle: 'Experimental feature',
     experimentalNoticeBody: 'These models come from the Hugging Face community, so neither installability nor recognition quality is guaranteed.',
-    experimentalNoticeAction: 'See recommended models',
+    experimentalNoticeAction: 'View model sources',
     filterAll: 'All',
     filterAsr: 'Recognition',
     filterMt: 'Translation',

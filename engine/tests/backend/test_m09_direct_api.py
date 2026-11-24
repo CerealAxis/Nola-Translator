@@ -241,8 +241,10 @@ def test_gateway_asr_stream_reports_an_unavailable_model_before_closing():
 
 def test_workbench_lease_is_held_until_explicit_release(monkeypatch):
     from nola_translator_engine.backend import direct_language_model
+    from nola_translator_engine.backend.gateway.gateway import ModelGateway
 
     releases = []
+    gateway = ModelGateway()
 
     async def release():
         releases.append(True)
@@ -251,10 +253,12 @@ def test_workbench_lease_is_held_until_explicit_release(monkeypatch):
         assert model == "qwen-fixture"
         assert max_concurrency == 1
         assert context_window == 4096
-        return SimpleNamespace(endpoint="http://127.0.0.1:5000/v1", context_window=4096, release=release)
-
-    async def shutdown():
-        pass
+        lease = direct_language_model.DirectLanguageModelLease(
+            "http://127.0.0.1:5000/v1", 4096, gateway,
+            SimpleNamespace(instance_id="instance", definition=SimpleNamespace(model_id="llm:qwen-fixture")), None,
+        )
+        lease.release = release
+        return lease
 
     monkeypatch.setattr(direct_language_model, "open_direct_language_model", acquire)
     client_class = httpx.AsyncClient
@@ -269,7 +273,7 @@ def test_workbench_lease_is_held_until_explicit_release(monkeypatch):
     auth = {"Authorization": "Bearer local-control"}
     body = {"model": "qwen-fixture", "lease_id": str(uuid4()), "context_window": 4096}
     route = "/api/v2/gateway/language-models"
-    with TestClient(create_app(control_token="local-control", gateway=SimpleNamespace(shutdown=shutdown))) as client:
+    with TestClient(create_app(control_token="local-control", gateway=gateway)) as client:
         opened = client.post(route, headers=auth, json=body)
         assert opened.status_code == 200 and opened.json()["lease_id"] == body["lease_id"]
         assert "endpoint" not in opened.json()
@@ -278,6 +282,11 @@ def test_workbench_lease_is_held_until_explicit_release(monkeypatch):
         assert client.post(chat, json={}).status_code == 401
         response = client.post(chat, headers=auth, json={"model": "qwen-fixture", "stream": True})
         assert response.status_code == 200 and response.text == "data: [DONE]\n\n"
+        snapshot = "/api/v2/gateway/performance"
+        assert client.get(snapshot).status_code == 401
+        history = client.get(snapshot, headers=auth).json()
+        assert [point["model"] for point in history["calls"]] == ["llm:qwen-fixture"]
+        assert history["tasks"][-1]["active"] == history["tasks"][-1]["queued"] == 0
         assert not releases
         for _ in range(2):
             assert client.delete(route + "/" + body["lease_id"], headers=auth).status_code == 200

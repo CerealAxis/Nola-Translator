@@ -324,7 +324,8 @@ def test_production_asr_pipeline_commits_accepted_pcm_on_eof_or_pause(monkeypatc
 
         async def synthesize(self, ctx, *, text, voice, request):
             assert text == "zh:Recognized audio."
-            assert ctx.provider_options == ({"api_key": "mimo-test-key"} if output == "mimo" else {})
+            assert ctx.provider_options == ({"api_key": "mimo-test-key", "endpoint": "", "model": ""}
+                                            if output == "mimo" else {})
             return SynthesisResult([SynthesisChunk(b"\x00\x01" * 240, 24000, terminal=True)])
 
         async def acquire(self, request):

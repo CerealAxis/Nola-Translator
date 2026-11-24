@@ -17,11 +17,13 @@ from nola_translator_engine.translation.llama_server import LlamaServerError
 class FakeManager:
     def __init__(self, result: str = "你好。", error: Exception | None = None) -> None:
         self.calls: list[list[dict]] = []
+        self.timeouts: list[float] = []
         self.result = result
         self.error = error
 
     def chat_sync(self, messages: list[dict], *, timeout_s: float = 10.0) -> str:
         self.calls.append(messages)
+        self.timeouts.append(timeout_s)
         if self.error is not None:
             raise self.error
         return self.result
@@ -52,6 +54,7 @@ async def test_translate_builds_official_prompt_with_full_names() -> None:
     assert provider.name == "hymt2"
     assert result.text == "今天天气很好。"
     assert result.path == ("en", "zh")
+    assert manager.timeouts == [180]
     assert manager.calls[0] == [{
         "role": "user",
         "content": "Translate the following text into Chinese. Note that you should only output "

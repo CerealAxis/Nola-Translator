@@ -5,7 +5,7 @@ import { WebSocket } from 'ws'
 import type { DirectModelRequest, DirectModelResult } from '../shared/agent-workspace'
 import { astrBotSpeechPreset } from '../shared/astrbot-speech-presets'
 import type { WorkspaceConnection } from '../shared/model-workspace'
-import { cloudModelError, cloudModelHttpError } from './cloud-model-tools'
+import { cloudModelError, cloudModelHttpError, cloudModelProbeError } from './cloud-model-tools'
 
 function audio(data: Buffer | string, mime = 'audio/wav'): DirectModelResult {
   const encoded = typeof data === 'string' ? data : data.toString('base64')
@@ -88,7 +88,9 @@ export async function inferAstrBotSpeech(connection: WorkspaceConnection, reques
   const text = request.text ?? ''
   const bearer = { Authorization: 'Bearer ' + apiKey }
   const http = async (url: string, init: RequestInit) => {
-    const response = await fetch(url, { ...init, signal, redirect: 'error' })
+    let response: Response
+    try { response = await fetch(url, { ...init, signal, redirect: 'error' }) }
+    catch (error) { throw cloudModelProbeError(error, signal) }
     if (!response.ok) throw cloudModelHttpError(response.status, Boolean(apiKey))
     return response
   }

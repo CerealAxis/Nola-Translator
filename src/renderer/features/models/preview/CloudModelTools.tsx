@@ -1,4 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { AudioPlayer } from '@/components/assistant-ui/native/media-player'
 import { useId, useState } from 'react'
 import { LoaderCircle, PlugZap } from 'lucide-react'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
@@ -6,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useI18n } from '@/i18n'
 import { getBridge, stores, useStore } from '@/store'
@@ -14,6 +16,7 @@ import { customModelsOf } from '../../../../shared/custom-models'
 import type { CloudModelListRequest, CloudModelProbeRequest, RemoteChatModel } from '../../../../shared/cloud-model-tools'
 import { CHATGPT_PLAN_SERVICE } from '../../../../shared/chatgpt-plan'
 import { normalizeThrownError, restoreIpcError } from '../../../../shared/ipc-error'
+import { ttsVoicePresets } from '../../../../shared/tts-voice-presets'
 import speechSample from '../../workbench/assets/speech-preview.wav?url'
 import { pcmWavData } from '../../workbench/audio-attachment'
 import type { CloudModel, Connection } from './cloud-preview-data'
@@ -152,43 +155,61 @@ export function CloudModelTest({ connection, model, disabled }: { connection: Co
   const tts = connection.capability === 'TTS'
   const label = copy(tts ? 'audition' : 'testConnection')
   return <>
-    <Button variant={tts ? 'secondary' : 'bare'} size={tts ? 'sm' : 'icon-sm'} disabled={disabled || !binding || testing}
-      tooltip={tts ? undefined : copy(testing ? 'testingConnection' : 'testConnection')}
+    <Button variant="bare" size="icon-sm" disabled={disabled || !binding || testing}
+      tooltip={tts ? label : copy(testing ? 'testingConnection' : 'testConnection')}
       aria-label={label + ' ' + model.id} onClick={tts ? () => setPreview(true) : () => void test()}>
-      {tts ? label : testing ? <LoaderCircle className="motion-safe:animate-spin" /> : <PlugZap />}
+      {testing ? <LoaderCircle className="motion-safe:animate-spin" /> : <PlugZap />}
     </Button>
-    {preview && <CloudVoicePreview model={model} onClose={() => setPreview(false)} generate={async text => {
-      const { audio } = await run({ capability: 'TTS', binding, text })
+    {preview && <CloudVoicePreview connection={connection} model={model} onClose={() => setPreview(false)} generate={async (text, voice) => {
+      const { audio } = await run({ capability: 'TTS', binding, text, ...(voice ? { voice } : {}) })
       if (!audio) throw Object.assign(new Error(), { code: 'CLOUD_MODEL_NO_AUDIO' })
       return audio
     }} />}
   </>
 }
 
-function CloudVoicePreview({ model, onClose, generate }: { model: CloudModel; onClose: () => void; generate: (text: string) => Promise<string> }) {
+function CloudVoicePreview({ connection, model, onClose, generate }: {
+  connection: Connection; model: CloudModel; onClose: () => void; generate: (text: string, voice: string) => Promise<string>
+}) {
   const copy = useCloudPreviewCopy()
   const notifyFailure = useCloudModelFailure()
   const { t } = useI18n()
-  const fieldId = useId()
+  const textId = useId()
+  const voiceId = useId()
+  const speech = astrBotSpeechPreset(connection.service)
+  const presets = speech ? ttsVoicePresets(speech.id, model.id) : []
+  const initialVoice = model.voice?.trim() || speech?.voice || ''
+  const voices = presets.length
+    ? initialVoice && !presets.some(option => option.value === initialVoice) ? [{ value: initialVoice, label: initialVoice }, ...presets] : presets
+    : initialVoice ? [{ value: initialVoice, label: initialVoice }] : []
   const [text, setText] = useState(() => copy('auditionSample'))
+  const [voice, setVoice] = useState(initialVoice)
   const [audio, setAudio] = useState('')
   const [loading, setLoading] = useState(false)
   const play = async () => {
     setLoading(true)
     setAudio('')
-    try { setAudio(await generate(text.trim())) }
+    try { setAudio(await generate(text.trim(), voice.trim())) }
     catch (error) { notifyFailure('previewFailed', error) }
     finally { setLoading(false) }
   }
-  return <ModelEditorDialog title={copy('audition') + ' · ' + model.name} saveLabel={copy('generatePreview')} canSave={!!text.trim() && !loading}
+  return <ModelEditorDialog title={copy('audition')} saveLabel={<>{loading && <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" />}{copy('generatePreview')}</>} canSave={!!text.trim() && !loading}
     onCancel={onClose} onSave={() => void play()}>
     <Field>
-      <FieldLabel htmlFor={fieldId}>{copy('auditionText')}</FieldLabel>
-      <Textarea id={fieldId} value={text} maxLength={1000} onChange={event => setText(event.currentTarget.value)} />
+      <FieldLabel htmlFor={textId}>{copy('auditionText')}</FieldLabel>
+      <Textarea id={textId} value={text} maxLength={1000} onChange={event => setText(event.currentTarget.value)} />
     </Field>
-    {model.voice && <p className="type-muted">{t('workbench.voice')} · {model.voice}</p>}
-    {loading && <p role="status">{t('common.loading')}</p>}
-    {audio && <audio className="w-full" controls aria-label={copy('audition')} src={audio}
-      onError={() => { setAudio(''); notifyError(copy('playbackFailed')) }} />}
+    <Field>
+      <FieldLabel htmlFor={voiceId}>{t('workbench.voice')}</FieldLabel>
+      <Select value={voice || null} disabled={!voices.length || loading} onValueChange={value => { if (typeof value === 'string') setVoice(value) }}>
+        <SelectTrigger id={voiceId} aria-label={t('workbench.voice')}>
+          <SelectValue>{voices.find(option => option.value === voice)?.label ?? voice}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>{voices.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup>
+        </SelectContent>
+      </Select>
+    </Field>
+    {audio && <AudioPlayer src={audio} title={copy('audition')} className="max-w-none" />}
   </ModelEditorDialog>
 }

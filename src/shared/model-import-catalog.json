@@ -5365,5 +5365,1063 @@
         ]
       }
     }
+  },
+  {
+    "id": "pp-ocrv5-mobile-onnx",
+    "name": "PP-OCRv5 Mobile (CJK)",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://huggingface.co/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "ch_PP-OCRv5_rec_mobile.onnx",
+            "size": 16631306,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile_infer.onnx"
+          },
+          {
+            "path": "korean_PP-OCRv5_rec_mobile.onnx",
+            "size": 13488748,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://hf-mirror.com/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "ch_PP-OCRv5_rec_mobile.onnx",
+            "size": 16631306,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile_infer.onnx"
+          },
+          {
+            "path": "korean_PP-OCRv5_rec_mobile.onnx",
+            "size": 13488748,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "ch_PP-OCRv5_rec_mobile.onnx",
+            "size": 16631306,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx"
+          },
+          {
+            "path": "korean_PP-OCRv5_rec_mobile.onnx",
+            "size": 13488748,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-ch-onnx",
+    "name": "PP-OCRv5 Mobile · ZH / EN / JA",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://huggingface.co/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "ch_PP-OCRv5_rec_mobile.onnx",
+            "size": 16631306,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://hf-mirror.com/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "ch_PP-OCRv5_rec_mobile.onnx",
+            "size": 16631306,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "ch_PP-OCRv5_rec_mobile.onnx",
+            "size": 16631306,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-korean-onnx",
+    "name": "PP-OCRv5 Mobile · Korean",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://huggingface.co/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "korean_PP-OCRv5_rec_mobile.onnx",
+            "size": 13488748,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://hf-mirror.com/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "korean_PP-OCRv5_rec_mobile.onnx",
+            "size": 13488748,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "korean_PP-OCRv5_rec_mobile.onnx",
+            "size": 13488748,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-latin-onnx",
+    "name": "PP-OCRv5 Mobile · Latin",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://huggingface.co/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "latin_PP-OCRv5_rec_mobile.onnx",
+            "size": 7904513,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://hf-mirror.com/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "latin_PP-OCRv5_rec_mobile.onnx",
+            "size": 7904513,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "latin_PP-OCRv5_rec_mobile.onnx",
+            "size": 7904513,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-eslav-onnx",
+    "name": "PP-OCRv5 Mobile · East Slavic",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://huggingface.co/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "eslav_PP-OCRv5_rec_mobile.onnx",
+            "size": 7911802,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/eslav_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://hf-mirror.com/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "eslav_PP-OCRv5_rec_mobile.onnx",
+            "size": 7911802,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/eslav_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "eslav_PP-OCRv5_rec_mobile.onnx",
+            "size": 7911802,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/eslav_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-en-onnx",
+    "name": "PP-OCRv5 Mobile · English",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://huggingface.co/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "en_PP-OCRv5_rec_mobile.onnx",
+            "size": 7872351,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/en_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://hf-mirror.com/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "en_PP-OCRv5_rec_mobile.onnx",
+            "size": 7872351,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/en_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "en_PP-OCRv5_rec_mobile.onnx",
+            "size": 7872351,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/en_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-th-onnx",
+    "name": "PP-OCRv5 Mobile · Thai",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://huggingface.co/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "th_PP-OCRv5_rec_mobile.onnx",
+            "size": 7915294,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/th_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://hf-mirror.com/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "th_PP-OCRv5_rec_mobile.onnx",
+            "size": 7915294,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/th_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "th_PP-OCRv5_rec_mobile.onnx",
+            "size": 7915294,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/th_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-el-onnx",
+    "name": "PP-OCRv5 Mobile · Greek",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://huggingface.co/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "el_PP-OCRv5_rec_mobile.onnx",
+            "size": 7832350,
+            "url": "https://huggingface.co/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/el_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "repositoryUrl": "https://hf-mirror.com/pitapo/rapidocr/tree/212a3cfa5f2205f170fa7a0401a8a0a694138259",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx"
+          },
+          {
+            "path": "el_PP-OCRv5_rec_mobile.onnx",
+            "size": 7832350,
+            "url": "https://hf-mirror.com/pitapo/rapidocr/resolve/212a3cfa5f2205f170fa7a0401a8a0a694138259/onnx/PP-OCRv5/rec/el_PP-OCRv5_rec_mobile_infer.onnx"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "el_PP-OCRv5_rec_mobile.onnx",
+            "size": 7832350,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/el_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-arabic-onnx",
+    "name": "PP-OCRv5 Mobile · Arabic",
+    "family": "visual",
+    "sources": {
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "arabic_PP-OCRv5_rec_mobile.onnx",
+            "size": 8023828,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/arabic_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-cyrillic-onnx",
+    "name": "PP-OCRv5 Mobile · Cyrillic",
+    "family": "visual",
+    "sources": {
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "cyrillic_PP-OCRv5_rec_mobile.onnx",
+            "size": 8074092,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/cyrillic_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-devanagari-onnx",
+    "name": "PP-OCRv5 Mobile · Devanagari",
+    "family": "visual",
+    "sources": {
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "devanagari_PP-OCRv5_rec_mobile.onnx",
+            "size": 7940361,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/devanagari_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-ta-onnx",
+    "name": "PP-OCRv5 Mobile · Tamil",
+    "family": "visual",
+    "sources": {
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "ta_PP-OCRv5_rec_mobile.onnx",
+            "size": 7909926,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/ta_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv5-mobile-te-onnx",
+    "name": "PP-OCRv5 Mobile · Telugu",
+    "family": "visual",
+    "sources": {
+      "modelscope": {
+        "revision": "d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "repositoryUrl": "https://modelscope.cn/models/RapidAI/RapidOCR/files?Revision=d298462ac20a2e994f433151b5fe6cc1180e9a09",
+        "files": [
+          {
+            "path": "ch_PP-OCRv5_det_mobile.onnx",
+            "size": 4819576,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx"
+          },
+          {
+            "path": "te_PP-OCRv5_rec_mobile.onnx",
+            "size": 7923102,
+            "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/d298462ac20a2e994f433151b5fe6cc1180e9a09/onnx/PP-OCRv5/rec/te_PP-OCRv5_rec_mobile.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "manga-ocr-onnx",
+    "name": "Manga OCR",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "24b12778d85800835e2ca409236de281b8ab7b9f",
+        "repositoryUrl": "https://huggingface.co/mayocream/manga-ocr-onnx/tree/24b12778d85800835e2ca409236de281b8ab7b9f",
+        "files": [
+          {
+            "path": "encoder_model.onnx",
+            "size": 343454249,
+            "url": "https://huggingface.co/mayocream/manga-ocr-onnx/resolve/24b12778d85800835e2ca409236de281b8ab7b9f/encoder_model.onnx"
+          },
+          {
+            "path": "decoder_model.onnx",
+            "size": 117480262,
+            "url": "https://huggingface.co/mayocream/manga-ocr-onnx/resolve/24b12778d85800835e2ca409236de281b8ab7b9f/decoder_model.onnx"
+          },
+          {
+            "path": "vocab.txt",
+            "size": 30216,
+            "url": "https://huggingface.co/mayocream/manga-ocr-onnx/resolve/24b12778d85800835e2ca409236de281b8ab7b9f/vocab.txt"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "24b12778d85800835e2ca409236de281b8ab7b9f",
+        "repositoryUrl": "https://hf-mirror.com/mayocream/manga-ocr-onnx/tree/24b12778d85800835e2ca409236de281b8ab7b9f",
+        "files": [
+          {
+            "path": "encoder_model.onnx",
+            "size": 343454249,
+            "url": "https://hf-mirror.com/mayocream/manga-ocr-onnx/resolve/24b12778d85800835e2ca409236de281b8ab7b9f/encoder_model.onnx"
+          },
+          {
+            "path": "decoder_model.onnx",
+            "size": 117480262,
+            "url": "https://hf-mirror.com/mayocream/manga-ocr-onnx/resolve/24b12778d85800835e2ca409236de281b8ab7b9f/decoder_model.onnx"
+          },
+          {
+            "path": "vocab.txt",
+            "size": 30216,
+            "url": "https://hf-mirror.com/mayocream/manga-ocr-onnx/resolve/24b12778d85800835e2ca409236de281b8ab7b9f/vocab.txt"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "baberu-ocr-onnx",
+    "name": "Baberu OCR",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "b9868433dbda3ed9ba1357d008599ff4ada873d5",
+        "repositoryUrl": "https://huggingface.co/genshiai-daichi/baberu-ocr/tree/b9868433dbda3ed9ba1357d008599ff4ada873d5",
+        "files": [
+          {
+            "path": "onnx/vision_int4.onnx",
+            "size": 52293486,
+            "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/onnx/vision_int4.onnx"
+          },
+          {
+            "path": "onnx/decoder_prefill_int8.onnx",
+            "size": 35133596,
+            "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/onnx/decoder_prefill_int8.onnx"
+          },
+          {
+            "path": "onnx/decoder_step_int8.onnx",
+            "size": 34715466,
+            "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/onnx/decoder_step_int8.onnx"
+          },
+          {
+            "path": "tokenizer/vocab.json",
+            "size": 130761,
+            "url": "https://huggingface.co/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/tokenizer/vocab.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "b9868433dbda3ed9ba1357d008599ff4ada873d5",
+        "repositoryUrl": "https://hf-mirror.com/genshiai-daichi/baberu-ocr/tree/b9868433dbda3ed9ba1357d008599ff4ada873d5",
+        "files": [
+          {
+            "path": "onnx/vision_int4.onnx",
+            "size": 52293486,
+            "url": "https://hf-mirror.com/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/onnx/vision_int4.onnx"
+          },
+          {
+            "path": "onnx/decoder_prefill_int8.onnx",
+            "size": 35133596,
+            "url": "https://hf-mirror.com/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/onnx/decoder_prefill_int8.onnx"
+          },
+          {
+            "path": "onnx/decoder_step_int8.onnx",
+            "size": 34715466,
+            "url": "https://hf-mirror.com/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/onnx/decoder_step_int8.onnx"
+          },
+          {
+            "path": "tokenizer/vocab.json",
+            "size": 130761,
+            "url": "https://hf-mirror.com/genshiai-daichi/baberu-ocr/resolve/b9868433dbda3ed9ba1357d008599ff4ada873d5/tokenizer/vocab.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "pp-ocrv6-medium-onnx",
+    "name": "PP-OCRv6 Medium",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "50c7eacafc52fa7bcf4194e8cd08e46f8558504b",
+        "repositoryUrl": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx/tree/50c7eacafc52fa7bcf4194e8cd08e46f8558504b",
+        "files": [
+          {
+            "path": "inference.onnx",
+            "size": 76554979,
+            "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/50c7eacafc52fa7bcf4194e8cd08e46f8558504b/inference.onnx"
+          },
+          {
+            "path": "inference.yml",
+            "size": 150580,
+            "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/50c7eacafc52fa7bcf4194e8cd08e46f8558504b/inference.yml"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "50c7eacafc52fa7bcf4194e8cd08e46f8558504b",
+        "repositoryUrl": "https://hf-mirror.com/PaddlePaddle/PP-OCRv6_medium_rec_onnx/tree/50c7eacafc52fa7bcf4194e8cd08e46f8558504b",
+        "files": [
+          {
+            "path": "inference.onnx",
+            "size": 76554979,
+            "url": "https://hf-mirror.com/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/50c7eacafc52fa7bcf4194e8cd08e46f8558504b/inference.onnx"
+          },
+          {
+            "path": "inference.yml",
+            "size": 150580,
+            "url": "https://hf-mirror.com/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/50c7eacafc52fa7bcf4194e8cd08e46f8558504b/inference.yml"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "paddleocr-vl-1.6-onnx",
+    "name": "PaddleOCR-VL 1.6",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "869fb2eb047f49830805b32a0c53f3e370e5be7e",
+        "repositoryUrl": "https://huggingface.co/iaa2005/PaddleOCR-VL-1.6-ONNX/tree/869fb2eb047f49830805b32a0c53f3e370e5be7e",
+        "files": [
+          {
+            "path": "onnx/vision_encoder_q8.onnx",
+            "size": 446261993,
+            "url": "https://huggingface.co/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/onnx/vision_encoder_q8.onnx"
+          },
+          {
+            "path": "onnx/decoder_q8.onnx",
+            "size": 363265016,
+            "url": "https://huggingface.co/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/onnx/decoder_q8.onnx"
+          },
+          {
+            "path": "onnx/embedding.onnx",
+            "size": 423624912,
+            "url": "https://huggingface.co/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/onnx/embedding.onnx"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 11189060,
+            "url": "https://huggingface.co/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/tokenizer.json"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 641,
+            "url": "https://huggingface.co/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/preprocessor_config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 133,
+            "url": "https://huggingface.co/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/generation_config.json"
+          },
+          {
+            "path": "config.json",
+            "size": 2059,
+            "url": "https://huggingface.co/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/config.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "869fb2eb047f49830805b32a0c53f3e370e5be7e",
+        "repositoryUrl": "https://hf-mirror.com/iaa2005/PaddleOCR-VL-1.6-ONNX/tree/869fb2eb047f49830805b32a0c53f3e370e5be7e",
+        "files": [
+          {
+            "path": "onnx/vision_encoder_q8.onnx",
+            "size": 446261993,
+            "url": "https://hf-mirror.com/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/onnx/vision_encoder_q8.onnx"
+          },
+          {
+            "path": "onnx/decoder_q8.onnx",
+            "size": 363265016,
+            "url": "https://hf-mirror.com/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/onnx/decoder_q8.onnx"
+          },
+          {
+            "path": "onnx/embedding.onnx",
+            "size": 423624912,
+            "url": "https://hf-mirror.com/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/onnx/embedding.onnx"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 11189060,
+            "url": "https://hf-mirror.com/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/tokenizer.json"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 641,
+            "url": "https://hf-mirror.com/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/preprocessor_config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 133,
+            "url": "https://hf-mirror.com/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/generation_config.json"
+          },
+          {
+            "path": "config.json",
+            "size": 2059,
+            "url": "https://hf-mirror.com/iaa2005/PaddleOCR-VL-1.6-ONNX/resolve/869fb2eb047f49830805b32a0c53f3e370e5be7e/config.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "comic-rtdetr-onnx",
+    "name": "RT-DETR v2",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "4269a0e53d40419f4746e8b3e30ae7faef3a26c6",
+        "repositoryUrl": "https://huggingface.co/ogkalu/comic-text-and-bubble-detector/tree/4269a0e53d40419f4746e8b3e30ae7faef3a26c6",
+        "files": [
+          {
+            "path": "detector.onnx",
+            "size": 168481531,
+            "url": "https://huggingface.co/ogkalu/comic-text-and-bubble-detector/resolve/4269a0e53d40419f4746e8b3e30ae7faef3a26c6/detector.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "4269a0e53d40419f4746e8b3e30ae7faef3a26c6",
+        "repositoryUrl": "https://hf-mirror.com/ogkalu/comic-text-and-bubble-detector/tree/4269a0e53d40419f4746e8b3e30ae7faef3a26c6",
+        "files": [
+          {
+            "path": "detector.onnx",
+            "size": 168481531,
+            "url": "https://hf-mirror.com/ogkalu/comic-text-and-bubble-detector/resolve/4269a0e53d40419f4746e8b3e30ae7faef3a26c6/detector.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "comic-rfdetr-seg-onnx",
+    "name": "Koharu RF-DETR 2XL",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "586b723a019e9370eefad169050609b03e0fe9a4",
+        "repositoryUrl": "https://huggingface.co/Kiznavierr/koharu-layout-rfdetr-seg-2xl-1152-onnx-fp16/tree/586b723a019e9370eefad169050609b03e0fe9a4",
+        "files": [
+          {
+            "path": "koharu-layout-rfdetr-seg-2xl-1152-fp16.onnx",
+            "size": 74471165,
+            "url": "https://huggingface.co/Kiznavierr/koharu-layout-rfdetr-seg-2xl-1152-onnx-fp16/resolve/586b723a019e9370eefad169050609b03e0fe9a4/koharu-layout-rfdetr-seg-2xl-1152-fp16.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "586b723a019e9370eefad169050609b03e0fe9a4",
+        "repositoryUrl": "https://hf-mirror.com/Kiznavierr/koharu-layout-rfdetr-seg-2xl-1152-onnx-fp16/tree/586b723a019e9370eefad169050609b03e0fe9a4",
+        "files": [
+          {
+            "path": "koharu-layout-rfdetr-seg-2xl-1152-fp16.onnx",
+            "size": 74471165,
+            "url": "https://hf-mirror.com/Kiznavierr/koharu-layout-rfdetr-seg-2xl-1152-onnx-fp16/resolve/586b723a019e9370eefad169050609b03e0fe9a4/koharu-layout-rfdetr-seg-2xl-1152-fp16.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "comic-anglenet-onnx",
+    "name": "AngleNet",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "e981a2b1925d649b5bb12b700c6c0d71f4c1f38a",
+        "repositoryUrl": "https://huggingface.co/Kellenok/anglenet/tree/e981a2b1925d649b5bb12b700c6c0d71f4c1f38a",
+        "files": [
+          {
+            "path": "anglenet_v0_1_distill_64x64.onnx",
+            "size": 2102682,
+            "url": "https://huggingface.co/Kellenok/anglenet/resolve/e981a2b1925d649b5bb12b700c6c0d71f4c1f38a/anglenet_v0_1_distill_64x64.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "e981a2b1925d649b5bb12b700c6c0d71f4c1f38a",
+        "repositoryUrl": "https://hf-mirror.com/Kellenok/anglenet/tree/e981a2b1925d649b5bb12b700c6c0d71f4c1f38a",
+        "files": [
+          {
+            "path": "anglenet_v0_1_distill_64x64.onnx",
+            "size": 2102682,
+            "url": "https://hf-mirror.com/Kellenok/anglenet/resolve/e981a2b1925d649b5bb12b700c6c0d71f4c1f38a/anglenet_v0_1_distill_64x64.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "comic-font-classifier-onnx",
+    "name": "Storia Font",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "86a4e773157cfc4db41844742851385bd5e5d1ca",
+        "repositoryUrl": "https://huggingface.co/storia/font-classify-onnx/tree/86a4e773157cfc4db41844742851385bd5e5d1ca",
+        "files": [
+          {
+            "path": "model.onnx",
+            "size": 64057660,
+            "url": "https://huggingface.co/storia/font-classify-onnx/resolve/86a4e773157cfc4db41844742851385bd5e5d1ca/model.onnx"
+          },
+          {
+            "path": "model_config.yaml",
+            "size": 76406,
+            "url": "https://huggingface.co/storia/font-classify-onnx/resolve/86a4e773157cfc4db41844742851385bd5e5d1ca/model_config.yaml"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "86a4e773157cfc4db41844742851385bd5e5d1ca",
+        "repositoryUrl": "https://hf-mirror.com/storia/font-classify-onnx/tree/86a4e773157cfc4db41844742851385bd5e5d1ca",
+        "files": [
+          {
+            "path": "model.onnx",
+            "size": 64057660,
+            "url": "https://hf-mirror.com/storia/font-classify-onnx/resolve/86a4e773157cfc4db41844742851385bd5e5d1ca/model.onnx"
+          },
+          {
+            "path": "model_config.yaml",
+            "size": 76406,
+            "url": "https://hf-mirror.com/storia/font-classify-onnx/resolve/86a4e773157cfc4db41844742851385bd5e5d1ca/model_config.yaml"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "comic-yuzu-font-onnx",
+    "name": "YuzuMarker Font",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "7f6d0bdd51140ddb9f08356519cc024c1452483a",
+        "repositoryUrl": "https://huggingface.co/ogkalu/yuzumarker-font-detection-onnx/tree/7f6d0bdd51140ddb9f08356519cc024c1452483a",
+        "files": [
+          {
+            "path": "font-detector.onnx",
+            "size": 144464880,
+            "url": "https://huggingface.co/ogkalu/yuzumarker-font-detection-onnx/resolve/7f6d0bdd51140ddb9f08356519cc024c1452483a/font-detector.onnx"
+          },
+          {
+            "path": "font-labels-ex.json",
+            "size": 715294,
+            "url": "https://huggingface.co/fffonion/yuzumarker-font-detection/resolve/7484242bb840f39e27f10df8ade1f8a9a8fa8f53/font-labels-ex.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "7f6d0bdd51140ddb9f08356519cc024c1452483a",
+        "repositoryUrl": "https://hf-mirror.com/ogkalu/yuzumarker-font-detection-onnx/tree/7f6d0bdd51140ddb9f08356519cc024c1452483a",
+        "files": [
+          {
+            "path": "font-detector.onnx",
+            "size": 144464880,
+            "url": "https://hf-mirror.com/ogkalu/yuzumarker-font-detection-onnx/resolve/7f6d0bdd51140ddb9f08356519cc024c1452483a/font-detector.onnx"
+          },
+          {
+            "path": "font-labels-ex.json",
+            "size": 715294,
+            "url": "https://hf-mirror.com/fffonion/yuzumarker-font-detection/resolve/7484242bb840f39e27f10df8ade1f8a9a8fa8f53/font-labels-ex.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "lama-manga",
+    "name": "LaMa Manga",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "f91c85b26913b3e83f9877867b4c336da3675238",
+        "repositoryUrl": "https://huggingface.co/mayocream/lama-manga/tree/f91c85b26913b3e83f9877867b4c336da3675238",
+        "files": [
+          {
+            "path": "lama-manga.safetensors",
+            "size": 204332996,
+            "url": "https://huggingface.co/mayocream/lama-manga/resolve/f91c85b26913b3e83f9877867b4c336da3675238/lama-manga.safetensors"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "f91c85b26913b3e83f9877867b4c336da3675238",
+        "repositoryUrl": "https://hf-mirror.com/mayocream/lama-manga/tree/f91c85b26913b3e83f9877867b4c336da3675238",
+        "files": [
+          {
+            "path": "lama-manga.safetensors",
+            "size": 204332996,
+            "url": "https://hf-mirror.com/mayocream/lama-manga/resolve/f91c85b26913b3e83f9877867b4c336da3675238/lama-manga.safetensors"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "comic-lama-onnx",
+    "name": "LaMa",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "aee6d22f0a13e5e35af1c9a1c3afd62841fc6f3f",
+        "repositoryUrl": "https://huggingface.co/opencv/inpainting_lama/tree/aee6d22f0a13e5e35af1c9a1c3afd62841fc6f3f",
+        "files": [
+          {
+            "path": "inpainting_lama_2025jan.onnx",
+            "size": 92591623,
+            "url": "https://huggingface.co/opencv/inpainting_lama/resolve/aee6d22f0a13e5e35af1c9a1c3afd62841fc6f3f/inpainting_lama_2025jan.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "aee6d22f0a13e5e35af1c9a1c3afd62841fc6f3f",
+        "repositoryUrl": "https://hf-mirror.com/opencv/inpainting_lama/tree/aee6d22f0a13e5e35af1c9a1c3afd62841fc6f3f",
+        "files": [
+          {
+            "path": "inpainting_lama_2025jan.onnx",
+            "size": 92591623,
+            "url": "https://hf-mirror.com/opencv/inpainting_lama/resolve/aee6d22f0a13e5e35af1c9a1c3afd62841fc6f3f/inpainting_lama_2025jan.onnx"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "comic-lama-manga-onnx",
+    "name": "LaMa Manga",
+    "family": "visual",
+    "sources": {
+      "huggingface": {
+        "revision": "b55497aadbfcb9740e1ed16f008268d71b4f3f79",
+        "repositoryUrl": "https://huggingface.co/mayocream/lama-manga-onnx/tree/b55497aadbfcb9740e1ed16f008268d71b4f3f79",
+        "files": [
+          {
+            "path": "lama-manga.onnx",
+            "size": 207482644,
+            "url": "https://huggingface.co/mayocream/lama-manga-onnx/resolve/b55497aadbfcb9740e1ed16f008268d71b4f3f79/lama-manga.onnx"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "b55497aadbfcb9740e1ed16f008268d71b4f3f79",
+        "repositoryUrl": "https://hf-mirror.com/mayocream/lama-manga-onnx/tree/b55497aadbfcb9740e1ed16f008268d71b4f3f79",
+        "files": [
+          {
+            "path": "lama-manga.onnx",
+            "size": 207482644,
+            "url": "https://hf-mirror.com/mayocream/lama-manga-onnx/resolve/b55497aadbfcb9740e1ed16f008268d71b4f3f79/lama-manga.onnx"
+          }
+        ]
+      }
+    }
   }
 ]

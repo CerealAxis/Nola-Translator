@@ -112,5 +112,5 @@ class HyMt2TranslationProvider:
         return [ProviderTranslation(content, (source, target)) for content in results]
 
     async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
-        content = await asyncio.to_thread(self.manager.chat_sync, self._messages(text, source, target))
+        content = await asyncio.to_thread(self.manager.chat_sync, self._messages(text, source, target), timeout_s=180)
         return ProviderTranslation(content, (source, target))

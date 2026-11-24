@@ -4,7 +4,7 @@ import catalog from './model-import-catalog.json'
 export interface ModelImportEntry {
   id: string
   name: string
-  family: 'recognition' | 'translation' | 'tts'
+  family: 'recognition' | 'translation' | 'tts' | 'visual'
   sources: Partial<Record<ModelDownloadSource, {
     revision: string
     repositoryUrl: string

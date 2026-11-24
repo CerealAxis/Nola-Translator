@@ -1,7 +1,6 @@
 import { Spinner } from '@/components/ui/spinner'
 import { Progress } from '@base-ui/react/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardAction, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
@@ -17,7 +16,8 @@ import type { ResourceRecord, ResourceState } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
-import { ModelMark } from './modelBrand'
+import { visualModelName, visualModelDescription } from './visual-model-display'
+import { hasModelMark, ModelMark } from './modelBrand'
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
 
@@ -125,8 +125,6 @@ export interface ModelCardProps {
   record: ResourceRecord
   /** The engine is installing, removing or cancelling this record. */
   busy: boolean
-  /** A confirmed missing loader prevents this installed model from being enabled. */
-  loaderUnavailableReason?: string;
   /** Hub result: whether it can be installed. False disables the install button. */
   installable?: boolean
   onInstall: () => void
@@ -143,7 +141,6 @@ export interface ModelCardProps {
 export function ModelCard({
   record,
   busy,
-  loaderUnavailableReason,
   installable = true,
   onInstall,
   onCancel,
@@ -154,23 +151,23 @@ export function ModelCard({
   descriptionFallback = '',
   supportedEngines,
 }: ModelCardProps) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const state: ResourceState = resourceStateOf(record)
   const removal = record.phase === 'remove' && (state === 'removing' || state === 'failed')
   const inFlight = state === 'queued' || state === 'downloading' || state === 'verifying'
   const descriptionKey = descriptionKeyOf(record)
-  const description = descriptionKey ? t(descriptionKey) : record.description || descriptionFallback
+  const description = visualModelDescription(record, language) ?? (descriptionKey ? t(descriptionKey) : record.description || descriptionFallback)
 
-  const card = <Card data-loader-unavailable={loaderUnavailableReason ? 'true' : undefined} className={`models-card h-full ${className}`}>
+  return <Card className={`models-card h-full ${className}`}>
       {/*
        * The status pills get a row of their own rather than sharing the title's width: the model
        * name is the first thing on the card to be read, and state is the secondary fact.
        */}
       <CardHeader>
-        <CardAction><span aria-hidden="true" className={`models-card__icon models-card__icon--${record.kind === 'translationModel' ? 'translation' : 'recognition'}`}>
+        {hasModelMark(record) && <CardAction><span aria-hidden="true" className={`models-card__icon models-card__icon--${record.kind === 'translationModel' ? 'translation' : 'recognition'}`}>
           <ModelMark record={record} kind={record.kind} />
-        </span></CardAction>
-          <CardTitle className="card__title">{record.name}</CardTitle>
+        </span></CardAction>}
+          <CardTitle className="card__title">{visualModelName(record)}</CardTitle>
           {descriptionLoading ? <div className="models-card__description-loading" aria-hidden="true">
             <Skeleton className="h-3 w-full rounded-[6px]" />
             <Skeleton className="h-3 w-3/4 rounded-[6px]" />
@@ -202,15 +199,6 @@ export function ModelCard({
       </CardFooter>
     </Card>
 
-  if (!loaderUnavailableReason) return card
-  return <Tooltip>
-    <TooltipTrigger delay={250} render={<div />} role="group" tabIndex={0} aria-label={record.name} className="h-full min-w-0">
-      {card}
-    </TooltipTrigger>
-    <TooltipContent  role="tooltip" className="settings-row__tooltip z-popup max-w-96 whitespace-normal">
-      {loaderUnavailableReason}
-    </TooltipContent>
-  </Tooltip>
 }
 
 /**
@@ -317,7 +305,6 @@ function Actions({
     <Button
       variant="default"
       size="sm"
-      data-onboarding="download-model"
 
       disabled={(!installable) || (busy)} aria-busy={busy}
 

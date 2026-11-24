@@ -27,12 +27,14 @@ class _CloudSegment:
 
 
 class CloudAsrPipeline:
-    def __init__(self, session, config, emit, *, latency_detection=False):
+    def __init__(self, session, config, emit, *, latency_detection=False, observe=None):
         self.session = session
         self.emit = emit
         self.final_only = config.recognitionProvider == "minimax"
         self.latency_detection = latency_detection
         self.recognizer = create_cloud_recognizer(config, latency_detection=latency_detection)
+        if observe is not None:
+            self.recognizer.observe_call, self.recognizer.observe_wait = observe
         self.recognizer.on_update = self._update
         self.recognizer.on_error = self._on_error
         self.error = None

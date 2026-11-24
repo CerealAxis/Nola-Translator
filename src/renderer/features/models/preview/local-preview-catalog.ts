@@ -1,5 +1,6 @@
 import type { ResourceRecord } from '../../../../shared/contracts'
 import { modelEngines, type InferenceEngine } from '../../../../shared/model-engines'
+import { visualModelName, visualSeriesOf } from '../visual-model-display'
 import { FAMILY_NAMES, familyOf } from '../modelFamily'
 
 const categories = {
@@ -46,15 +47,15 @@ export function localModelFamilies(resources: readonly ResourceRecord[]): Previe
     const family = id.startsWith('hub:') ? 'other' : familyOf(record)
     if (!record.installed && !isLocalDownloadActive(record)
       && (id.startsWith('hub:') || id === 'm2m100-418m' || id === 'pp-ocrv5-mobile-onnx' || family === 'kokoro' || family === 'piper')) continue
-    const ocrFamily = record.kind === 'ocrModel' && record.provider === 'pp-ocrv5'
-    const key = ocrFamily ? 'pp-ocrv5' : family === 'other' ? id : family
+    const visual = visualSeriesOf(record)
+    const key = visual?.key ?? (family === 'other' ? id : family)
     const existing = families.get(key)
     if (existing) {
       existing.records.push(record)
       if (!existing.engines.includes(engine)) existing.engines.push(engine)
     } else {
-      const name = ocrFamily ? 'PP-OCRv5 mobile' : family === 'other' ? record.name
-        : family === 'qwen35' ? 'Qwen 3.5' : family === 'hymt2' ? 'HY-MT2' : FAMILY_NAMES[family]
+      const name = visual?.name ?? (family === 'other' ? visualModelName(record)
+        : family === 'qwen35' ? 'Qwen 3.5' : family === 'hymt2' ? 'HY-MT2' : FAMILY_NAMES[family])
       const category = family === 'qwen35' ? 'LLM' : categories[record.kind]
       families.set(key, { key, name, category, records: [record], engines: [engine] })
     }

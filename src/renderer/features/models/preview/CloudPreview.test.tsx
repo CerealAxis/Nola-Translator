@@ -79,14 +79,60 @@ it('tests the selected model and generates audio only after the user submits the
     const tts = { ...newConnection('mimo', 'TTS', 'speech-test'),
       models: [{ id: 'mimo-v2.5-tts', name: 'MiMo', enabled: true, voice: 'mimo_default' }] }
     rerender(<CloudDetails key={tts.id} connection={tts} creating={false} onSave={onSave} onCancel={vi.fn()} />)
-    await user.click(screen.getByRole('button', { name: '试听 mimo-v2.5-tts' }))
+    const audition = screen.getByRole('button', { name: '试听 mimo-v2.5-tts' })
+    expect(audition).toHaveAttribute('data-variant', 'bare')
+    expect(audition).toHaveAttribute('data-size', 'icon-sm')
+    await user.click(audition)
     expect(probeCloudModel).toHaveBeenCalledTimes(1)
-    const dialog = within(screen.getByRole('dialog', { name: /试听.*MiMo/ }))
+    const dialog = within(screen.getByRole('dialog', { name: '试听' }))
     fireEvent.change(dialog.getByRole('textbox', { name: '试听文本' }), { target: { value: '试听这句话' } })
+    await user.click(dialog.getByRole('combobox', { name: '音色' }))
+    await user.click(screen.getByRole('option', { name: '冰糖' }))
     await user.click(dialog.getByRole('button', { name: '生成试听' }))
-    await waitFor(() => expect(dialog.getByLabelText('试听')).toHaveAttribute('src', 'data:audio/wav;base64,AA=='))
-    expect(probeCloudModel).toHaveBeenLastCalledWith({ capability: 'TTS', binding: 'cloud:mimo-v2.5-tts', text: '试听这句话' })
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Play 试听' })).toBeInTheDocument())
+    expect(probeCloudModel).toHaveBeenLastCalledWith({ capability: 'TTS', binding: 'cloud:mimo-v2.5-tts', text: '试听这句话', voice: '冰糖' })
     expect(onSave).not.toHaveBeenCalled()
+  } finally { bridge.mockRestore(); notice.mockRestore() }
+})
+
+it('shows audition loading on the submit button without adding a status line to the form', async () => {
+  let resolveProbe!: (value: { audio: string }) => void
+  const probeCloudModel = vi.fn(() => new Promise<{ audio: string }>(resolve => { resolveProbe = resolve }))
+  const bridge = vi.spyOn(store, 'getBridge').mockReturnValue({ app: { probeCloudModel } } as unknown as ReturnType<typeof store.getBridge>)
+  try {
+    const user = userEvent.setup()
+    const connection = { ...newConnection('mimo', 'TTS', 'speech_test'),
+      models: [{ id: 'mimo-v2.5-tts', name: 'MiMo', enabled: true, voice: 'mimo_default' }] }
+    render(<CloudDetails connection={connection} creating={false} onSave={vi.fn()} onCancel={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: '试听 mimo-v2.5-tts' }))
+    const dialog = within(screen.getByRole('dialog', { name: '试听' }))
+    const button = dialog.getByRole('button', { name: '生成试听' })
+    await user.click(button)
+    expect(button).toBeDisabled()
+    expect(button.querySelector('svg')).toHaveClass('motion-safe:animate-spin')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    resolveProbe({ audio: 'data:audio/wav;base64,AA==' })
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Play 试听' })).toBeInTheDocument())
+  } finally { bridge.mockRestore() }
+})
+
+it('shows the synthesis support code instead of ERR-999 when audition generation fails', async () => {
+  const probeCloudModel = vi.fn().mockRejectedValue(new Error(encodeIpcError('SYNTHESISFAILED', {
+    code: 'SYNTHESISFAILED', supportCode: 'TTS-001', retryable: true, correlationId: 'test',
+  })))
+  const bridge = vi.spyOn(store, 'getBridge').mockReturnValue({ app: { probeCloudModel } } as unknown as ReturnType<typeof store.getBridge>)
+  const notice = vi.spyOn(toast, 'showToast').mockReturnValue('preview-toast')
+  try {
+    const user = userEvent.setup()
+    const connection = { ...newConnection('mimo', 'TTS', 'speech_test'),
+      models: [{ id: 'mimo-v2.5-tts', name: 'MiMo', enabled: true, voice: 'mimo_default' }] }
+    render(<CloudDetails connection={connection} creating={false} onSave={vi.fn()} onCancel={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: '试听 mimo-v2.5-tts' }))
+    const dialog = within(screen.getByRole('dialog', { name: '试听' }))
+    await user.click(dialog.getByRole('button', { name: '生成试听' }))
+    await waitFor(() => expect(notice).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'error', title: '生成试听失败', description: 'Could not generate translated speech. Try again. (TTS-001)',
+    })))
   } finally { bridge.mockRestore(); notice.mockRestore() }
 })
 

@@ -46,25 +46,28 @@ afterEach(() => {
 
 function TutorialApp() {
   const { path, navigate } = useRoute()
-  const [detail, setDetail] = useState<string | null>(null)
-  const [list, setList] = useState(false)
-  const targets = [...new Set(TOUR_STEPS.filter(step => step.path === path && !step.scene).map(step => step.target.match(/"(.+)"/)![1]))]
+  const [category, setCategory] = useState('LLM')
+  const [categoriesOpen, setCategoriesOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const targets = [...new Set(TOUR_STEPS.filter(step => step.path === path && !step.sourceCategory)
+    .map(step => step.target.match(/"(.+)"/)![1]))]
   return <div className="nola-app-shell">
     <div className="nola-app-body" />
-    {targets.map(target => <div key={target} data-onboarding={target}>
+    {targets.filter(target => target !== 'models-category').map(target => <div key={target} data-onboarding={target}>
       {target === 'home-models' ? <button onClick={() => navigate('#/models')}>manage</button> : null}
-      {target === 'models-translation-catalog' ? <button data-onboarding="model-family-hymt2" onClick={() => setDetail('hymt2')}>configure translation</button> : null}
-      {target === 'models-recognition-catalog' ? <button data-onboarding="model-family-sensevoice" onClick={() => setDetail('sensevoice')}>configure recognition</button> : null}
       <button onClick={harmfulAction}>start service</button>
     </div>)}
-    {detail ? <div data-onboarding="model-detail" data-model-family={detail}>
-      <button data-onboarding="model-detail-close" onClick={() => { setList(false); setDetail(null) }}>close</button>
-      <section data-onboarding="model-engine">engine</section>
-      <section data-onboarding="model-scale">scale</section>
-      <section data-onboarding="model-version"><button aria-haspopup="listbox" aria-expanded={list} onClick={() => setList(value => !value)}>files</button></section>
-      {list ? <div data-onboarding="model-file-options" onKeyDown={event => { if (event.key === 'Escape') setList(false) }}>recommended file</div> : null}
-      <section data-onboarding="model-sources">sources</section>
-      <section data-onboarding="model-download-actions"><button onClick={harmfulAction}>download</button></section>
+    {path === '#/models' && <>
+      <button data-onboarding="models-category" data-category={category} onClick={() => setCategoriesOpen(true)}>{category}</button>
+      {categoriesOpen && ['ASR', 'MT'].map(value => <button key={value} data-onboarding={`models-category-${value}`} onClick={() => {
+        setCategory(value)
+        setCategoriesOpen(false)
+      }}>{value}</button>)}
+      <button data-onboarding="models-add-source" onClick={() => setPickerOpen(true)}>add</button>
+    </>}
+    {pickerOpen ? <div data-onboarding="models-source-picker">
+      <button data-onboarding="models-source-picker-close" onClick={() => setPickerOpen(false)}>close</button>
+      <button onClick={harmfulAction}>save source</button>
     </div> : null}
   </div>
 }
@@ -97,9 +100,8 @@ it('demonstrates every scene with Next alone without downloads, recording or ser
     await expectStep(step.id)
     expect(window.location.hash).toBe(step.path)
     expect(document.querySelector(step.target)).toBeInTheDocument()
-    if (step.scene) expect(document.querySelector('[data-onboarding="model-detail"]')).toHaveAttribute('data-model-family', step.scene)
-    if (step.list) expect(document.querySelector('[data-onboarding="model-file-options"]')).toBeInTheDocument()
-    if (!step.scene) expect(document.querySelector('[data-onboarding="model-detail"]')).toBeNull()
+    if (step.sourceCategory) expect(document.querySelector('[data-onboarding="models-category"]')).toHaveAttribute('data-category', step.sourceCategory)
+    else expect(document.querySelector('[data-onboarding="models-source-picker"]')).toBeNull()
     await next()
   }
   await waitFor(() => expect(saved.onboardingCompletedVersion).toBe(2))
@@ -108,25 +110,25 @@ it('demonstrates every scene with Next alone without downloads, recording or ser
   expect(harmfulAction).not.toHaveBeenCalled()
 })
 
-it('reconstructs the configuration scene when resuming a saved file-selection lesson', async () => {
+it('resumes a retired file-selection lesson at the speech recognition source picker', async () => {
   saved = { ...saved, onboardingSeen: true, onboardingVersion: 2, onboardingStep: 'T3' }
   settingsStore.setState({ settings: saved })
   fixture()
-  await expectStep('T3')
+  await expectStep('H2')
   expect(window.location.hash).toBe('#/models')
-  expect(document.querySelector('[data-onboarding="model-file-options"]')).toBeInTheDocument()
+  expect(document.querySelector('[data-onboarding="models-source-picker"]')).toBeInTheDocument()
 })
 
-it('cleans up its configuration and list when a replay exits', async () => {
+it('closes the source picker when a replay exits', async () => {
   saved = { ...saved, onboardingSeen: true, onboardingCompletedVersion: 2, onboardingStep: 'Z0' }
   settingsStore.setState({ settings: saved })
   fixture()
   act(() => startOnboarding('tour'))
   await expectStep('H1')
-  for (const step of TOUR_STEPS.slice(0, 6)) { await expectStep(step.id); await next() }
-  await expectStep('T3')
+  for (const step of TOUR_STEPS.slice(0, 3)) { await expectStep(step.id); await next() }
+  await expectStep('H2')
   fireEvent.click(screen.getByRole('button', { name: '退出教程' }))
-  await waitFor(() => expect(document.querySelector('[data-onboarding="model-detail"]')).toBeNull())
+  await waitFor(() => expect(document.querySelector('[data-onboarding="models-source-picker"]')).toBeNull())
   expect(saved.onboardingStep).toBe('Z0')
 })
 
@@ -150,8 +152,8 @@ it('ignores repeated native-card actions during a transition and stale previous-
   act(() => receive({ step: 'U6', action: 'next' }))
   await expectStep('H2')
   act(() => receive({ step: 'H2', action: 'next' }))
-  await expectStep('T1')
-  expect(sendState.mock.lastCall?.[0]).toMatchObject({ step: 'T1', busy: false, missing: false })
+  await expectStep('M2')
+  expect(sendState.mock.lastCall?.[0]).toMatchObject({ step: 'M2', busy: false, missing: false })
   // StrictMode replays setup once; moving between scenes must keep the native window alive.
   expect(show.mock.calls.length - hide.mock.calls.length).toBe(1)
 })

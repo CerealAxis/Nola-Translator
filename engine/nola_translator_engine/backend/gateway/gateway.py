@@ -33,6 +33,7 @@ from .operations import (
     SynthesisResult,
     TranslationResult,
 )
+from .performance import PerformanceHistory
 from .resources import ConcurrencyGate, ResourceAdmission, ResourceExhausted
 from .worker import LocalModelWorker
 
@@ -133,6 +134,7 @@ class ModelGateway:
         self.adapters = adapters or AdapterRegistry()
         self.admission = admission or ResourceAdmission()
         self.concurrency = ConcurrencyGate()
+        self.performance = PerformanceHistory()
         self._worker_factory = worker_factory
         self._resolve_configuration = resolve_configuration
         self.compute_options: dict[str, Any] = {}
@@ -185,7 +187,7 @@ class ModelGateway:
         instance, lease = await self.manager.acquire(definition, configuration)
         return instance, lease, adapter, matched
 
-    async def _enter(self, instance: ModelInstance, ctx: CallContext | None = None) -> None:
+    async def _enter(self, instance: ModelInstance, ctx: CallContext | None = None) -> float:
         realtime = ctx is None or ctx.task_mode == "realtime"
         crisp = not instance.configuration.is_cloud and instance.configuration.runtime in ("crisp", "crisp-asr", "crisp-tts")
         limit = 1 if realtime or crisp else max(1, ctx.max_concurrency)
@@ -196,7 +198,7 @@ class ModelGateway:
                 self.admission.reserve_parallel(instance.instance_id, instance.configuration.device, limit, slot_mb)
             except ResourceExhausted as error:
                 raise GatewayError(GatewayErrorCode.RESOURCE_EXHAUSTED, stage="admission", message="Insufficient memory for concurrency") from error
-        await self.concurrency.acquire(instance.instance_id, limit, realtime=realtime)
+        return await self.concurrency.acquire(instance.instance_id, limit, realtime=realtime)
 
     def _exit(self, instance: ModelInstance) -> None:
         self.concurrency.release(instance.instance_id)
@@ -209,34 +211,49 @@ class ModelGateway:
         if isinstance(worker, LocalModelWorker) and worker.exited:
             await self.manager.mark_worker_exited(instance)
 
+    @asynccontextmanager
+    async def _execution(self, request: MatchRequest, ctx: CallContext | None = None, *, stream=False):
+        lease = None
+        try:
+            with self.performance.waiting():
+                instance, lease, adapter, _ = await self.acquire(request)
+                if stream:
+                    queue_ms = await self.concurrency.acquire(instance.instance_id, instance.definition.capabilities.concurrency.max_streams)
+                else:
+                    queue_ms = await self._enter(instance, ctx)
+            try:
+                yield instance, adapter, queue_ms
+            finally:
+                self._exit(instance)
+        finally:
+            if lease is not None:
+                await self.release(instance, lease)
+
     async def transcribe(
         self, ctx: CallContext, *, audio: bytes, language: str | None, request: MatchRequest | None = None
     ) -> AsrObservation:
         match_request = request or MatchRequest(operation=Operation.TRANSCRIBE, source_language=language)
-        instance, lease, adapter, _ = await self.acquire(match_request)
-        try:
-            await self._enter(instance, ctx)
-            try:
+        async with self._execution(match_request, ctx) as (instance, adapter, queued):
+            if isinstance(adapter, CloudAsrAdapter):
+                return await adapter.transcribe(instance, ctx, audio=audio, language=language,
+                    observe=self.performance.cloud_observer(queued))
+            with self.performance.executing(instance.definition.model_id, queued):
                 return await adapter.transcribe(instance, ctx, audio=audio, language=language)  # type: ignore[attr-defined]
-            finally:
-                self._exit(instance)
-        finally:
-            await self.release(instance, lease)
 
     @asynccontextmanager
-    async def cloud_asr_session(self, request: MatchRequest, options: dict[str, str]):
-        instance, lease, adapter, _ = await self.acquire(request)
-        try:
+    async def cloud_asr_session(self, request: MatchRequest, options: dict[str, str], *, observe=None):
+        async with self._execution(request, stream=True) as (instance, adapter, queued):
             if not isinstance(adapter, CloudAsrAdapter):
                 raise GatewayError(GatewayErrorCode.NOT_SUPPORTED, stage="asr", message="Cloud ASR adapter required")
-            # A stream lease covers the connection; each stream preserves its own frame order.
-            await self.concurrency.acquire(instance.instance_id, instance.definition.capabilities.concurrency.max_streams)
-            try:
-                yield adapter.selection(options, request.source_language or "auto")
-            finally:
-                self._exit(instance)
-        finally:
-            await self.release(instance, lease)
+            if observe is not None:
+                observe(self.performance.cloud_observer(queued))
+            yield adapter.selection(options, request.source_language or "auto")
+
+    @staticmethod
+    def _metric_model(instance, ctx):
+        if instance.configuration.is_cloud:
+            return ctx.provider_options.get("model") or instance.definition.model_id
+        return instance.definition.model_id
 
     async def translate(
         self, ctx: CallContext, *, text: str, source: str, target: str, request: MatchRequest | None = None
@@ -247,29 +264,17 @@ class ModelGateway:
         provisional = ctx.source_is_provisional or match_request.source_is_provisional
         match_request = replace(match_request, source_is_provisional=provisional)
         ctx = replace(ctx, source_is_provisional=provisional)
-        instance, lease, adapter, _ = await self.acquire(match_request)
-        try:
-            await self._enter(instance, ctx)
-            try:
+        async with self._execution(match_request, ctx) as (instance, adapter, queued):
+            with self.performance.executing(self._metric_model(instance, ctx), queued):
                 return await adapter.translate(instance, ctx, text=text, source=source, target=target)  # type: ignore[attr-defined]
-            finally:
-                self._exit(instance)
-        finally:
-            await self.release(instance, lease)
 
     async def synthesize(
         self, ctx: CallContext, *, text: str, voice: str | None, request: MatchRequest | None = None
     ) -> SynthesisResult:
         match_request = request or MatchRequest(operation=Operation.SYNTHESIZE)
-        instance, lease, adapter, _ = await self.acquire(match_request)
-        try:
-            await self._enter(instance, ctx)
-            try:
+        async with self._execution(match_request, ctx) as (instance, adapter, queued):
+            with self.performance.executing(self._metric_model(instance, ctx), queued):
                 return await adapter.synthesize(instance, ctx, text=text, voice=voice)  # type: ignore[attr-defined]
-            finally:
-                self._exit(instance)
-        finally:
-            await self.release(instance, lease)
 
     async def tts_voices(self, ctx: CallContext, request: MatchRequest) -> list[str]:
         instance, lease, adapter, _ = await self.acquire(request)
@@ -286,19 +291,19 @@ class ModelGateway:
 
     @asynccontextmanager
     async def s2s_session(self, ctx: CallContext, *, request: MatchRequest, config: dict):
-        instance, lease, adapter, _ = await self.acquire(request)
-        try:
-            await self.concurrency.acquire(instance.instance_id, instance.definition.capabilities.concurrency.max_streams)
+        async with self._execution(request, stream=True) as (instance, adapter, queued):
+            finish = self.performance.begin_call(instance.definition.model_id, queued)
             try:
                 session = await adapter.open(instance, ctx, config=config)
                 try:
+                    if hasattr(session, "finish_measurement"):
+                        session.finish_measurement = finish
                     yield session
                 finally:
+                    finish()
                     await session.close()
             finally:
-                self._exit(instance)
-        finally:
-            await self.release(instance, lease)
+                finish()
 
     async def llm_endpoint(self, ctx: CallContext, *, model_id: str) -> dict[str, Any]:
         request = MatchRequest(operation=Operation.GENERATE, model_id=model_id)

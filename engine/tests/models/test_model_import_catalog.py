@@ -5,7 +5,8 @@ import subprocess
 import sys
 
 from nola_translator_engine.models.crisp_catalog import ADDITIONAL_TTS_SPECS, QWEN3_TTS_SPECS
-from nola_translator_engine.offline_models import catalog_specs
+from nola_translator_engine.models.ocr_catalog import HF_OCR_REPO, HF_OCR_REVISION, OcrModelSpec
+from nola_translator_engine.offline_models import VISUAL_SPECS, catalog_specs
 
 ROOT = Path(__file__).resolve().parents[3]
 OUTPUT = ROOT / "src/shared/model-import-catalog.json"
@@ -18,13 +19,24 @@ def test_manual_catalog_matches_every_supported_source_and_file():
     assert entries.keys() == specs.keys()
     for model_id, spec in specs.items():
         assert entries[model_id]["name"]
-        assert entries[model_id]["family"] in (("tts",) if model_id in tts_ids else ("recognition", "translation"))
+        family = entries[model_id]["family"]
+        if model_id in VISUAL_SPECS:
+            assert family == "visual"
+        elif model_id in tts_ids:
+            assert family == "tts"
+        else:
+            assert family in ("recognition", "translation")
         expected_sources = {"huggingface", "hf-mirror"}
+        if isinstance(spec, OcrModelSpec) and not spec.has_hf_snapshot:
+            expected_sources.clear()
         if spec.modelscope_repo:
             expected_sources.add("modelscope")
         assert entries[model_id]["sources"].keys() == expected_sources
         for source, record in entries[model_id]["sources"].items():
             revision = spec.modelscope_revision if source == "modelscope" else spec.revision
+            repo = spec.repo
+            if source != "modelscope" and isinstance(spec, OcrModelSpec):
+                repo, revision = HF_OCR_REPO, HF_OCR_REVISION
             assert record["revision"] == revision
             if source == "modelscope":
                 assert record["repositoryUrl"] == (
@@ -32,7 +44,7 @@ def test_manual_catalog_matches_every_supported_source_and_file():
                 )
             else:
                 host = "huggingface.co" if source == "huggingface" else "hf-mirror.com"
-                assert record["repositoryUrl"] == f"https://{host}/{spec.repo}/tree/{revision}"
+                assert record["repositoryUrl"] == f"https://{host}/{repo}/tree/{revision}"
             assert record["files"] == [
                 {"path": file.path, "size": file.size, "url": spec.url_for(file, source=source)}
                 for file in spec.files_for(source)

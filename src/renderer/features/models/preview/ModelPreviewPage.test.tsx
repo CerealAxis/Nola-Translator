@@ -10,7 +10,7 @@ import { normalizeModelBinding } from '../../../../shared/model-gateway'
 import { workspaceSpeechModel } from '../../../../shared/model-workspace'
 import { configuredBatchSpeechModels } from '../../../../shared/model-availability'
 import { customCredentialSlot } from '../../../../shared/custom-models'
-import { offlineStore } from '@/store/offlineStore'
+import { offlineActions, offlineStore } from '@/store/offlineStore'
 import { Routes } from '@/routes'
 import ModelPreviewPage from './ModelPreviewPage'
 import { configuredConnections, createWorkspaceConnection, saveWorkspaceConnection } from './model-workspace-settings'
@@ -53,28 +53,58 @@ async function chooseCategory(user: ReturnType<typeof userEvent.setup>, name: st
 it('opens search, download management, local import and runtime settings from the new page', async () => {
   const user = userEvent.setup()
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const selectFolder = vi.spyOn(offlineActions, 'selectModel').mockResolvedValue()
   vi.spyOn(actions.models, 'searchHub').mockResolvedValue({ query: '', candidates: 0, models: [], rateLimited: false })
-  window.history.replaceState(null, '', '#/model-management')
-  render(<Routes pages={{ 'model-management': () => <ModelPreviewPage />, settings: () => <p>Runtime settings</p> }} />)
+  window.history.replaceState(null, '', '#/models')
+  render(<Routes pages={{ models: () => <ModelPreviewPage />, settings: () => <p>Runtime settings</p> }} />)
   await chooseCategory(user, '文本翻译')
   expect(screen.getByRole('button', { name: 'Index Translate', pressed: true })).toBeVisible()
 
   await user.click(screen.getByRole('tab', { name: '搜索' }))
   expect(await screen.findByRole('searchbox')).toBeVisible()
-  expect(window.location.hash).toBe('#/model-management/search')
+  expect(window.location.hash).toBe('#/models/search')
   await user.click(screen.getByRole('tab', { name: '下载管理' }))
   expect(await screen.findByText('没有进行中的下载')).toBeVisible()
-  expect(window.location.hash).toBe('#/model-management/downloads')
+  expect(window.location.hash).toBe('#/models/downloads')
   await user.click(screen.getByRole('tab', { name: '模型来源' }))
   expect(await screen.findByRole('button', { name: 'Index Translate', pressed: true })).toBeVisible()
   expect(screen.getByRole('combobox', { name: '模型分类' })).toHaveTextContent('文本翻译')
 
   await user.click(screen.getByRole('button', { name: '本地导入' }))
-  expect(await screen.findByRole('dialog', { name: '本地导入' })).toBeVisible()
-  await user.keyboard('{Escape}')
+  expect(selectFolder).toHaveBeenCalledWith('directory')
+  expect(screen.queryByRole('dialog', { name: '本地导入' })).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: '推理环境配置' }))
   expect(await screen.findByText('Runtime settings')).toBeVisible()
   expect(window.location.hash).toBe('#/settings/engine?component=engine')
+})
+
+it('supplements an existing Index-Translate weight once, including when opening download management directly', async () => {
+  const base = {
+    kind: 'translationModel', provider: 'index-translate', name: 'Index-Translate',
+    description: '', languages: [], state: 'idle', cancellable: false, installed: false,
+  } as const
+  const legacy = { ...base, resourceId: 'index-translate-2b-q4-k-m', installedBytes: 1_312_164_352 }
+  const records = [
+    legacy,
+    { ...base, resourceId: 'index-translate-9b-q4-k-m', installed: true, installedBytes: 6_000_000_000 },
+    { ...base, resourceId: 'index-translate-35b-a3b-q4-k-m', installedBytes: 0 },
+  ].map(record => ({ ...record, languages: [] }))
+  const key = `nola:index-translate-vision-supplement:${legacy.resourceId}:v1`
+  const manage = vi.spyOn(actions.models, 'manageResource').mockResolvedValue({ ...legacy, languages: [] })
+  const write = vi.spyOn(Storage.prototype, 'setItem')
+  window.history.replaceState(null, '', '#/models/downloads')
+  const page = render(<ModelPreviewPage />)
+  try {
+    expect(manage).not.toHaveBeenCalled()
+    act(() => stores.models.setState({ resources: records }))
+    expect(manage).toHaveBeenCalledExactlyOnceWith(legacy.resourceId, 'install')
+    expect(write).toHaveBeenCalledWith(key, 'started')
+    page.unmount()
+    render(<ModelPreviewPage />)
+    expect(manage).toHaveBeenCalledTimes(1)
+  } finally {
+    localStorage.removeItem(key)
+  }
 })
 
 async function addChatModel(user: ReturnType<typeof userEvent.setup>, id: string) {
@@ -92,7 +122,8 @@ it('adds ChatGPT as a dialogue supplier and saves a model returned for the authe
   const account = { email: 'user@example.test', name: '', authorized: true }
   const chatGptPlan = vi.fn(async ({ action }: { action: string }) =>
     action === 'sign-in' ? { account } : action === 'models' ? { models: [{ id: 'plan-model', name: 'Plan Model' }] } : {})
-  vi.spyOn(store, 'getBridge').mockReturnValue({ app: { chatGptPlan } } as unknown as ReturnType<typeof store.getBridge>)
+  const probeCloudModel = vi.fn(async () => ({}))
+  vi.spyOn(store, 'getBridge').mockReturnValue({ app: { chatGptPlan, probeCloudModel } } as unknown as ReturnType<typeof store.getBridge>)
   render(<ModelPreviewPage />)
   await user.click(screen.getByRole('button', { name: '新增' }))
   await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Continue with ChatGPT' }))
@@ -112,6 +143,16 @@ it('adds ChatGPT as a dialogue supplier and saves a model returned for the authe
   await user.click(dialog.getByRole('button', { name: '添加所选模型' }))
   await waitFor(() => expect(stores.settings.getState().settings?.modelWorkspace?.connections[0])
     .toMatchObject({ name: '个人 ChatGPT', service: 'chatgpt-plan', protocol: 'chat-responses', models: [{ id: 'plan-model', name: 'Plan Model' }] }))
+  const model = stores.settings.getState().settings!.modelWorkspace!.connections[0].models[0]
+  await user.click(screen.getByRole('button', { name: '测试连接 plan-model' }))
+  expect(probeCloudModel).toHaveBeenCalledWith({ capability: 'LLM', binding: `custom:${model.profileId}`, audio: undefined })
+  await user.click(screen.getByRole('button', { name: '删除模型 plan-model' }))
+  await user.click(screen.getByRole('button', { name: '取消' }))
+  expect(stores.settings.getState().settings!.modelWorkspace!.connections[0].models).toHaveLength(1)
+  await user.click(screen.getByRole('button', { name: '删除模型 plan-model' }))
+  await user.click(screen.getByRole('button', { name: '确定' }))
+  await waitFor(() => expect(stores.settings.getState().settings!.modelWorkspace!.connections[0].models).toEqual([]))
+  expect(stores.settings.getState().settings!.translation.customModels).toEqual([])
 })
 
 it('lists same-name sources without showing their endpoints in the sidebar', async () => {
@@ -239,8 +280,8 @@ it('shows language chips in each saved cloud ASR model editor', async () => {
     await saveWorkspaceConnection({ ...createWorkspaceConnection(service, 'ASR'),
       workspace: 'test-workspace', models: [{ id: model, name: model, enabled: true }] })
   }
-  window.history.replaceState(null, '', '#/model-management')
-  render(<Routes pages={{ 'model-management': () => <ModelPreviewPage /> }} />)
+  window.history.replaceState(null, '', '#/models')
+  render(<Routes pages={{ models: () => <ModelPreviewPage /> }} />)
   await chooseCategory(user, '语音识别')
   const sources = within(screen.getByRole('complementary'))
   for (const { name, model, language, service } of providers) {
@@ -294,7 +335,7 @@ it('filters cloud and local templates together within the selected capability', 
   expect(screen.getByText('尚未安装模型')).toBeVisible()
   await user.click(screen.getByRole('button', { name: '添加模型' }))
   const manual = within(screen.getByRole('dialog', { name: '添加模型' }))
-  await user.click(manual.getByRole('button', { name: '手动下载' }))
+  await user.click(manual.getByRole('button', { name: '另存为' }))
   expect(offlineStore.getState().downloadModelId).toBe('qwen3-asr-0.6b-hf')
   act(() => offlineStore.setState(initialOffline))
   await user.click(screen.getByRole('button', { name: '添加模型' }))
@@ -320,7 +361,8 @@ it('filters cloud and local templates together within the selected capability', 
   })))
   expect(within(row).queryByText('下载中')).toBeNull()
   await user.click(screen.getByRole('button', { name: '删除模型 Qwen3-ASR 0.6B' }))
-  await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '移除' }))
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: '确定' }))
   expect(manage).toHaveBeenLastCalledWith('qwen3-asr-0.6b-hf', 'remove')
 }, 15_000)
 

@@ -48,7 +48,7 @@ export type { HubCompatibility, HubInspectResult, HubModelSummary, HubSearchResu
 export type { PrewarmErrorCode, PrewarmResult } from '../../shared/contracts'
 
 /** Route id for this app's multi-window UI; `routes.tsx` holds the hash mapping. */
-export type RouteId = 'workbench' | 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'game-translation' | 'comic-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'model-management' | 'settings'
+export type RouteId = 'workbench' | 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'game-translation' | 'game-translation-demo' | 'comic-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
 
 export interface NolaBridge {
   desktopData?: import('../../shared/desktop-data').DesktopDataApi

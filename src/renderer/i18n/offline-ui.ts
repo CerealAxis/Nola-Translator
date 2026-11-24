@@ -108,7 +108,7 @@ export const offlineZh: OfflineCopy = {
   modelPath: '模型路径', pathPlaceholder: '输入或选择文件夹路径', inspectPath: '检查模型',
   repositoryHelp: '可选填 Hugging Face 仓库 ID（owner/model）以获取介绍。留空时尝试读取本地元数据；无法联网仍可检查与导入。',
   importTab: '导入模型',
-  manualDownload: '手动下载',
+  manualDownload: '另存为',
   supportedModels: '支持的模型',
 
   supportedHint: '按架构、格式与必需文件检查兼容性，不限制推荐版本。自定义模型导入后请配置用途、引擎与语言能力。',
@@ -202,7 +202,7 @@ export const offlineEn: OfflineCopy = {
   modelPath: 'Model path', pathPlaceholder: 'Enter or choose a folder path', inspectPath: 'Check model',
   repositoryHelp: 'Optionally enter a Hugging Face repository ID (owner/model) to fetch its description. Otherwise local metadata is used when available. Compatibility checks and import also work offline.',
   importTab: 'Import model',
-  manualDownload: 'Manual download',
+  manualDownload: 'Save as',
   supportedModels: 'Supported models',
 
   supportedHint: 'Compatibility is checked from architecture, format and required files, without a recommended-version restriction. Configure custom model tasks, engines and languages after import.',
@@ -296,7 +296,7 @@ export const offlineTw: OfflineCopy = {
   modelPath: '模型路徑', pathPlaceholder: '輸入或選擇資料夾路徑', inspectPath: '檢查模型',
   repositoryHelp: '可選填 Hugging Face 儲存庫 ID（owner/model）取得介紹。留白時讀取本機中繼資料；離線仍可檢查與匯入。',
   importTab: '匯入模型',
-  manualDownload: '手動下載',
+  manualDownload: '另存新檔',
   supportedModels: '支援的模型',
 
   supportedHint: '依架構、格式與必要檔案檢查相容性，不限推薦版本。匯入後請設定自訂模型的用途、引擎與語言。',
@@ -390,7 +390,7 @@ export const offlineHk: OfflineCopy = {
   modelPath: '模型路徑', pathPlaceholder: '輸入或選擇資料夾路徑', inspectPath: '檢查模型',
   repositoryHelp: '可填 Hugging Face 倉庫 ID（owner/model）取得介紹。留空時讀取本機資料；離線仍可檢查及匯入。',
   importTab: '匯入模型',
-  manualDownload: '手動下載',
+  manualDownload: '另存新檔',
   supportedModels: '支援的模型',
 
   supportedHint: '按架構、格式及必要檔案檢查兼容性，不限推薦版本。匯入後請設定自訂模型的用途、引擎及語言。',
@@ -484,7 +484,7 @@ export const offlineJa: OfflineCopy = {
   modelPath: 'モデルの場所', pathPlaceholder: 'フォルダーのパスを入力または選択', inspectPath: 'モデルを確認',
   repositoryHelp: 'Hugging Face リポジトリ ID（owner/model）を任意で入力して紹介を取得できます。空欄はローカル情報を使用します。オフラインでも確認とインポートができます。',
   importTab: 'モデルをインポート',
-  manualDownload: '手動ダウンロード',
+  manualDownload: '別名で保存',
   supportedModels: '対応モデル',
 
   supportedHint: '構造、形式と必須ファイルで互換性を確認します。推奨版以外も対象です。インポート後に用途、エンジンと言語を設定してください。',
@@ -578,7 +578,7 @@ export const offlineKo: OfflineCopy = {
   modelPath: '모델 경로', pathPlaceholder: '폴더 경로 입력 또는 선택', inspectPath: '모델 확인',
   repositoryHelp: 'Hugging Face 저장소 ID(owner/model)를 입력해 설명을 가져올 수 있습니다. 비워 두면 로컬 메타데이터를 사용합니다. 오프라인에서도 검사하고 가져올 수 있습니다.',
   importTab: '모델 가져오기',
-  manualDownload: '수동 다운로드',
+  manualDownload: '다른 이름으로 저장',
   supportedModels: '지원 모델',
 
   supportedHint: '모델 구조, 형식 및 필수 파일로 호환성을 확인하며 권장 버전으로 제한하지 않습니다. 가져온 뒤 용도, 엔진과 언어를 설정하세요.',

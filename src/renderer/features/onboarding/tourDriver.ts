@@ -83,25 +83,17 @@ export async function scrollTourTarget(target: HTMLElement, signal: AbortSignal,
   scroller.scrollTo({ top, behavior })
 }
 
-export function closeTourList(): void {
-  findTourTarget(tourTarget('model-file-options'))?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }))
-}
-
-export function closeTourDialog(): void {
-  closeTourList()
-  findTourTarget(tourTarget('model-detail-close'))?.click()
+export function closeTourSourcePicker(): void {
+  findTourTarget(tourTarget('models-source-picker-close'))?.click()
 }
 
 /** Only these UI openers are automated. Downloads, settings writes and service starts are excluded. */
 export async function prepareTourStep(step: TourStep, navigate: (path: string) => void, signal: AbortSignal): Promise<void> {
-  const dialog = findTourTarget(tourTarget('model-detail'))
-  if (dialog && dialog.dataset.modelFamily !== step.scene) {
-    closeTourDialog()
-    await waitForTourRemoval(tourTarget('model-detail'), signal)
-  }
-  if (!step.list) {
-    closeTourList()
-    await waitForTourRemoval(tourTarget('model-file-options'), signal)
+  const picker = tourTarget('models-source-picker')
+  const category = tourTarget('models-category')
+  if (findTourTarget(picker) && (!step.sourceCategory || findTourTarget(category)?.dataset.category !== step.sourceCategory)) {
+    closeTourSourcePicker()
+    await waitForTourRemoval(picker, signal)
   }
   if (window.location.hash !== step.path) {
     const opener = step.via ? findTourTarget(step.via) : null
@@ -113,18 +105,19 @@ export async function prepareTourStep(step: TourStep, navigate: (path: string) =
     signal.throwIfAborted()
     if (window.location.hash !== step.path) navigate(step.path)
   }
-  if (step.scene && !findTourTarget(tourTarget('model-detail'))) {
-    const opener = await waitForTourTarget(tourTarget(`model-family-${step.scene}`), signal)
+  if (step.sourceCategory && !findTourTarget(picker)) {
+    const trigger = await waitForTourTarget(category, signal)
+    if (trigger.dataset.category !== step.sourceCategory) {
+      await demonstrateClick(trigger, signal)
+      const option = await waitForTourTarget(tourTarget(`models-category-${step.sourceCategory}`), signal)
+      await demonstrateClick(option, signal)
+      await waitForTourTarget(`${category}[data-category="${step.sourceCategory}"]`, signal)
+    }
+    const opener = await waitForTourTarget(`${tourTarget('models-add-source')}:not(:disabled)`, signal)
     await scrollTourTarget(opener, signal)
     await demonstrateClick(opener, signal)
-    await waitForTourTarget(`${tourTarget('model-detail')}[data-model-family="${step.scene}"]`, signal)
-  }
-  if (step.list && !findTourTarget(tourTarget('model-file-options'))) {
-    const trigger = await waitForTourTarget(`${tourTarget('model-version')} [aria-haspopup="listbox"]`, signal)
-    await demonstrateClick(trigger, signal)
-    await waitForTourTarget(tourTarget('model-file-options'), signal)
   }
   const target = await waitForTourTarget(step.target, signal)
-  void scrollTourTarget(target, signal)
+  await scrollTourTarget(target, signal)
   signal.throwIfAborted()
 }

@@ -3,7 +3,7 @@ import { lessonsZh, lessonsEn, lessonsTW, lessonsHK, lessonsJa, lessonsKo } from
 export const onboardingZh = {
   ...lessonsZh,
   welcomeTitle: '欢迎使用 Nola Translator',
-  welcomeIntro: '本教程介绍模型选择、模型网关、快速同传和浏览器字幕。',
+  welcomeIntro: '本教程介绍模型管理、模型网关和快速同传。',
   starRequest: '若您觉得软件还不错，可以在 Github 给本项目点一个 Star 嘛，谢谢😊',
   later: '稍后再看', begin: '开始了解', helpDocs: '帮助文档', github: 'GitHub',
   title: '新手教程', replay: '再次查看', replayHint: '重新查看各个功能入口和配置方法。',
@@ -21,7 +21,7 @@ export function onboardingEntries(messages: OnboardingMessages): { [K in keyof O
 export const onboardingEn: OnboardingMessages = {
   ...lessonsEn,
   welcomeTitle: 'Welcome to Nola Translator',
-  welcomeIntro: 'This tour covers model selection, the model gateway, live interpretation, and browser captions.',
+  welcomeIntro: 'This tour covers model management, the model gateway, and quick interpretation.',
   starRequest: 'If you enjoy the app, please give this project a Star on GitHub. Thank you! 😊',
   later: 'Not now', begin: 'Start tutorial', helpDocs: 'Help docs', github: 'GitHub',
   title: 'Getting started', replay: 'View again', replayHint: 'Review the main features and where to configure them.',
@@ -33,7 +33,7 @@ export const onboardingEn: OnboardingMessages = {
 export const onboardingTW: OnboardingMessages = {
   ...lessonsTW,
   welcomeTitle: '歡迎使用 Nola Translator',
-  welcomeIntro: '本教學介紹模型選擇、模型閘道、快速口譯和瀏覽器字幕。',
+  welcomeIntro: '本教學介紹模型管理、模型閘道和快速口譯。',
   starRequest: '若您覺得軟體還不錯，可以在 Github 為本專案點一個 Star，謝謝😊',
   later: '稍後再看', begin: '進入教程', helpDocs: '說明文件', github: 'GitHub',
   title: '新手教學', replay: '再次查看', replayHint: '重新查看各個功能入口和設定方法。',
@@ -46,7 +46,7 @@ export const onboardingHK: OnboardingMessages = {
   ...onboardingTW,
   ...lessonsHK,
   welcomeTitle: '歡迎使用 Nola Translator',
-  welcomeIntro: '本教學介紹模型選擇、模型閘道、快速口譯和瀏覽器字幕。',
+  welcomeIntro: '本教學介紹模型管理、模型閘道及快速傳譯。',
   starRequest: '若您覺得軟件還不錯，可以在 Github 為本項目點一個 Star，謝謝😊',
   title: '新手教學', replayHint: '重新查看各個功能入口和設定方法。',
 }
@@ -54,7 +54,7 @@ export const onboardingHK: OnboardingMessages = {
 export const onboardingJa: OnboardingMessages = {
   ...lessonsJa,
   welcomeTitle: 'Nola Translator へようこそ',
-  welcomeIntro: 'モデル選択、モデルゲートウェイ、同時通訳、ブラウザー字幕を紹介します。',
+  welcomeIntro: 'モデル管理、モデルゲートウェイ、クイック通訳を紹介します。',
   starRequest: 'このアプリを気に入っていただけたら、GitHub で Star をお願いします。ありがとうございます😊',
   later: '後で見る', begin: 'チュートリアルに進む', helpDocs: 'ヘルプ', github: 'GitHub',
   title: '使い方ガイド', replay: 'もう一度見る', replayHint: '機能の入口と設定方法を確認します。',
@@ -66,7 +66,7 @@ export const onboardingJa: OnboardingMessages = {
 export const onboardingKo: OnboardingMessages = {
   ...lessonsKo,
   welcomeTitle: 'Nola Translator 에 오신 것을 환영합니다',
-  welcomeIntro: '모델 선택, 모델 게이트웨이, 실시간 통역과 브라우저 자막을 소개합니다.',
+  welcomeIntro: '모델 관리, 모델 게이트웨이, 빠른 통역을 소개합니다.',
   starRequest: '앱이 마음에 드신다면 GitHub 에서 Star 를 눌러 주세요. 감사합니다😊',
   later: '나중에 보기', begin: '튜토리얼 시작', helpDocs: '도움말 문서', github: 'GitHub',
   title: '시작 안내', replay: '다시 보기', replayHint: '기능 위치와 설정 방법을 다시 확인합니다.',

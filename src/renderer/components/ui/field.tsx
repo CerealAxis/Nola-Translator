@@ -7,7 +7,7 @@ export interface FieldLabelProps extends LabelHTMLAttributes<HTMLLabelElement> {
 export interface FieldDescriptionProps extends HTMLAttributes<HTMLParagraphElement> {}
 
 export function FieldGroup({ className, ...props }: FieldGroupProps) {
-  return <div data-slot="field-group" className={cn('flex flex-col gap-4', className)} {...props} />
+  return <div data-slot="field-group" className={cn('flex flex-col gap-[var(--field-gap)]', className)} {...props} />
 }
 
 export function Field({ className, ...props }: FieldProps) {

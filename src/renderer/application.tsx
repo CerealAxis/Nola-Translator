@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type Reac
 import { AppShell } from './components/primitives/AppShell'
 import { ErrorBoundary } from './components/primitives/ErrorBoundary'
 import { Spinner } from './components/ui/spinner'
-import { ArrowLeft, AudioLines, LayoutDashboard, SlidersHorizontal, Settings, MessagesSquare, Network, Headphones, ScanText, BookOpen, Gamepad2 } from 'lucide-react'
+import { ArrowLeft, AudioLines, LayoutDashboard, Settings, MessagesSquare, Network, Headphones, ScanText, BookOpen, Gamepad2, Joystick } from 'lucide-react'
 import { useI18n } from './i18n'
 import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, ROUTE_TITLES, Routes, pathOf, settingsPath, useRoute } from './routes'
 import { HomePage } from './features/home'
@@ -19,10 +19,10 @@ const MeetingModePage = lazy(() => import('./features/meeting/MeetingModePage').
 const ScreenTranslationPage = lazy(() => import('./features/screen/ScreenTranslationPage').then(module => ({ default: module.ScreenTranslationPage })))
 const ComicTranslationPage = lazy(() => import('./features/comic/ComicFrontendPage').then(module => ({ default: module.ComicFrontendPage })))
 const GameTranslationPage = lazy(() => import('./features/game/GameTranslationPage').then(module => ({ default: module.GameTranslationPage })))
+const GameTranslationDemoPage = lazy(() => import('./features/game/demo/GameTranslationDemoPage'))
 const RecordsPage = lazy(() => import('./features/records').then(module => ({ default: module.RecordsPage })))
 const RecordDetailPage = lazy(() => import('./features/records').then(module => ({ default: module.RecordDetailPage })))
-const ModelsPage = lazy(() => import('./features/models').then(module => ({ default: module.ModelsPage })))
-const ModelPreviewPage = lazy(() => import('./features/models/preview/ModelPreviewPage'))
+const ModelsPage = lazy(() => import('./features/models/preview/ModelPreviewPage'))
 const SettingsPage = lazy(() => import('./features/settings').then(module => ({ default: module.SettingsPage })))
 
 /** Keep the Assistant-ui runtime outside the route element that is keyed by path. */
@@ -62,11 +62,11 @@ export const APPLICATION_PAGES = {
   'screen-translation': () => <ScreenTranslationPage />,
   'comic-translation': () => <ComicRoutePage />,
   'game-translation': () => <GameRoutePage />,
+  'game-translation-demo': () => <GameTranslationDemoPage />,
   'model-gateway': () => <ModelGatewayPage />,
   records: () => <RecordsPage />,
   record: () => <RecordDetailPage />,
   models: () => <ModelsPage />,
-  'model-management': () => <ModelPreviewPage />,
   settings: () => <SettingsPage />,
   workbench: () => null, // ApplicationShell owns the persistent instance.
 } satisfies RoutesProps['pages']
@@ -117,13 +117,13 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
   }
   const entries = [
     ['overview', 'home', 'nav.home', LayoutDashboard, '#/'],
-    ['overview', 'models', 'nav.models', SlidersHorizontal, '#/models'],
-    ['overview', 'model-management', 'nav.models', Settings, pathOf('model-management')],
+    ['overview', 'models', 'nav.models', Settings, pathOf('models')],
     ['overview', 'model-gateway', 'nav.modelGateway', Network, '#/model-gateway'],
     ['features', 'workspace', 'nav.workspace', AudioLines, '#/workspace'],
     ['features', 'meeting', 'meeting.navTitle', Headphones, '#/meeting'],
     ['features', 'screen-translation', 'screen.navTitle', ScanText, '#/screen-translation'],
     ['features', 'game-translation', 'suite.gameTitle', Gamepad2, '#/game-translation'],
+    ['features', 'game-translation-demo', 'suite.gameTitle', Joystick, pathOf('game-translation-demo')],
     ['features', 'comic-translation', 'suite.comicTitle', BookOpen, '#/comic-translation'],
   ] as const
   return [

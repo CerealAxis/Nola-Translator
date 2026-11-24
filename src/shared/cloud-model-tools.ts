@@ -22,5 +22,6 @@ export const cloudModelProbeRequestSchema = z.object({
   binding: z.string().min(1).max(512),
   audio: z.string().startsWith('data:audio/wav;base64,').max(1024 * 1024).optional(),
   text: z.string().trim().min(1).max(1000).optional(),
+  voice: z.string().trim().max(256).optional(),
 }).strict()
 export type CloudModelProbeRequest = z.input<typeof cloudModelProbeRequestSchema>

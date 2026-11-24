@@ -130,10 +130,10 @@ function SearchSkeletons() {
 }
 
 export interface HubSearchTabProps {
-  onGoRecommended: () => void
+  onGoSources: () => void
 }
 
-export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
+export function HubSearchTab({ onGoSources }: HubSearchTabProps) {
   const { t } = useI18n()
   const [query, setQuery] = useState('')
   const [configuring, setConfiguring] = useState<ResourceRecord | null>(null)
@@ -333,7 +333,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
       <AlertTitle>{t('models.experimentalNoticeTitle')}</AlertTitle>
       <AlertDescription>
         {t('models.experimentalNoticeBody')}
-        <Button variant="tertiary" size="sm" onClick={onGoRecommended}>{t('models.experimentalNoticeAction')}</Button>
+        <Button variant="tertiary" size="sm" onClick={onGoSources}>{t('models.experimentalNoticeAction')}</Button>
       </AlertDescription>
     </Alert>
     <TabsRoot value={filter} onValueChange={value => { if (value) setFilter(value as Filter) }}>

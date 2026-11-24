@@ -68,7 +68,8 @@ from .direct_inference import PUBLIC_PROVIDER_CODES, DirectInferenceRequest, Dir
 from .glossary import RealtimeGlossaryUpdate
 from .gateway.adapters import MIMO_TTS_MODEL
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
-from .gateway.gateway import MatchRequest
+from .gateway.gateway import MatchRequest, ModelGateway
+from .gateway.performance import PerformanceSnapshot
 from .meeting import Meeting, MeetingRequest, MeetingPauseRequest, _error as meeting_error, _key_reader, validate_route
 
 #: WsClientFrame is an Annotated union alias, not a model class.
@@ -457,6 +458,26 @@ def build_router() -> APIRouter:
             ), ctx.server_instance_id)
         ctx.gateway.compute_options = body.model_dump(exclude_defaults=True)
 
+    @router.get("/gateway/performance", response_model=PerformanceSnapshot)
+    async def gateway_performance(request: Request):
+        ctx = backend(request)
+        if not isinstance(ctx.gateway, ModelGateway):
+            return _error_response(503, ErrorPayload(
+                code="RESOURCE_BUSY", stage="gateway", message_key="backend.gatewayDisabled",
+            ), ctx.server_instance_id)
+        from ..resources import RESOURCE_BY_ID
+        from .gateway.definitions import InstanceState
+
+        snapshot = ctx.gateway.performance.snapshot()
+        loaded = {}
+        for instance in ctx.gateway.manager.instances():
+            if instance.configuration.is_cloud or instance.state not in (InstanceState.READY, InstanceState.BUSY):
+                continue
+            model_id = instance.definition.model_id
+            resource = RESOURCE_BY_ID.get(instance.configuration.resource_id)
+            loaded[model_id] = resource.name if resource is not None else model_id
+        return {**snapshot, "loadedModels": loaded}
+
     @router.post("/gateway/infer", response_model=DirectInferenceResult, response_model_exclude_none=True)
     async def gateway_infer(request: Request):
         ctx = backend(request)
@@ -485,9 +506,13 @@ def build_router() -> APIRouter:
                 options = cloud_asr_options(request.headers)
             if parsed.kind == "mt" and parsed.model in ("google", "microsoft", "mymemory", "index-translate", "custom-mt"):
                 options = cloud_mt_options(request.headers)
-            result = await _run_while_connected(request, run_direct_inference(
-                ctx.gateway, parsed, provider_options=options or None,
-            ))
+            async def infer():
+                if parsed.kind == "tts-voices" or not isinstance(ctx.gateway, ModelGateway):
+                    return await run_direct_inference(ctx.gateway, parsed, provider_options=options or None)
+                with ctx.gateway.performance.task(parsed.id):
+                    return await run_direct_inference(ctx.gateway, parsed, provider_options=options or None)
+
+            result = await _run_while_connected(request, infer())
             return result if result is not None else JSONResponse(status_code=499, content={})
         except GatewayError as error:
             return _gateway_error_response(error, ctx.server_instance_id)
@@ -579,39 +604,52 @@ def build_router() -> APIRouter:
                 ), ctx.server_instance_id)
             body.extend(block)
 
-        async def completions():
-            client = httpx.AsyncClient(trust_env=False, timeout=httpx.Timeout(600.0, connect=5.0))
-            try:
-                upstream = await client.send(client.build_request(
-                    "POST", lease.endpoint + "/chat/completions",
-                    headers={"Content-Type": "application/json"}, content=bytes(body),
-                ), stream=True)
-                return client, upstream
-            except BaseException:
-                await client.aclose()
-                raise
+        stack = AsyncExitStack()
 
+        async def completions():
+            finish = await stack.enter_async_context(lease.measure_chat())
+            client = httpx.AsyncClient(trust_env=False, timeout=httpx.Timeout(600.0, connect=5.0))
+            stack.push_async_callback(client.aclose)
+            upstream = await client.send(client.build_request(
+                "POST", lease.endpoint + "/chat/completions",
+                headers={"Content-Type": "application/json"}, content=bytes(body),
+            ), stream=True)
+            stack.push_async_callback(upstream.aclose)
+            return upstream, finish
+
+        connection = None
         try:
             connection = await _run_while_connected(request, completions())
         except httpx.HTTPError:
             return _error_response(502, ErrorPayload(
                 code="PROVIDER_DISCONNECTED", stage="llm", message_key="gateway.languageModelUnavailable",
             ), ctx.server_instance_id)
+        finally:
+            if connection is None:
+                with CancelScope(shield=True):
+                    await stack.aclose()
         if connection is None:
             return JSONResponse(status_code=499, content={})
-        client, upstream = connection
+        upstream, finish = connection
 
         async def chunks():
             try:
                 async for chunk in upstream.aiter_bytes():
                     yield chunk
             finally:
-                with CancelScope(shield=True):
-                    await upstream.aclose()
-                    await client.aclose()
+                finish()
 
-        return StreamingResponse(chunks(), status_code=upstream.status_code,
-                                 media_type=upstream.headers.get("content-type", "application/json"))
+        class CompletionStream(StreamingResponse):
+            async def __call__(self, scope, receive, send):
+                try:
+                    await super().__call__(scope, receive, send)
+                finally:
+                    finish()
+                    with CancelScope(shield=True):
+                        await stack.aclose()
+
+        return CompletionStream(chunks(), status_code=upstream.status_code,
+                                media_type=upstream.headers.get("content-type", "application/json"))
 
     @router.delete("/gateway/language-models/{lease_id}")
     async def close_language_model(request: Request, lease_id: UUID):
@@ -952,7 +990,10 @@ async def gateway_asr_ws(ws: WebSocket, gateway, model: str) -> None:
                 match = MatchRequest(Operation.TRANSCRIBE, model_id=model, source_language=language)
                 gateway.match(match)
                 if model in ("aliyun", "minimax"):
-                    worker.config = await lease.enter_async_context(gateway.cloud_asr_session(match, cloud_asr_options(ws.headers)))
+                    observations = []
+                    worker.config = await lease.enter_async_context(gateway.cloud_asr_session(
+                        match, cloud_asr_options(ws.headers), observe=observations.append))
+                    worker.observe_cloud_call = observations[0]
                     worker.config = worker.config.model_copy(update={"max_segment_ms": duration, "silence_end_ms": silence})
                 request.update(language=language, silenceMs=silence, maxSegmentMs=duration, manual=message.get("manual") is True)
             elif op == "session.append":

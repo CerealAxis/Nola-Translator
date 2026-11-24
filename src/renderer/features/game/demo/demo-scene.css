@@ -1,0 +1,257 @@
+.game-demo-scene-content,
+.game-demo-clipboard-field,
+.game-demo-region-settings {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.game-demo-scene-canvas {
+  position: relative;
+  container-type: inline-size;
+  overflow: hidden;
+}
+
+.game-demo-titlebar {
+  position: relative;
+}
+
+.game-demo-titlebar:has(.game-demo-titlebar-action) {
+  padding-inline-end: var(--space-4);
+}
+
+.game-demo-titlebar-action {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--space-1);
+  display: flex;
+  align-items: center;
+}
+
+.game-demo-artwork {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 35%;
+  scale: var(--game-scene-zoom, 1);
+}
+
+.game-demo-dialogue-panel {
+  position: absolute;
+  background: color-mix(in srgb, var(--game-dialogue-surface) 96%, transparent);
+  border-block: 1px solid #a2c9d5;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.game-demo-scene-canvas {
+  --game-dialogue-surface: #182732;
+  --game-dialogue-ink: #f5f8fa;
+  --game-scan-ink: #9edbfa;
+}
+
+.game-demo-game-text {
+  position: absolute;
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--game-dialogue-ink);
+  line-height: 1.3;
+  white-space: pre-line;
+}
+
+.game-demo-quest {
+  align-content: end;
+  justify-items: end;
+  padding-block-end: calc(var(--space-1) / 2);
+  font-size: .75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-demo-game-dialogue {
+  justify-items: start;
+  font-size: clamp(.875rem, 1.6cqw, 1.25rem);
+}
+
+.game-demo-game-dialogue > b {
+  margin-inline-start: var(--space-1);
+  color: #bbe1e9;
+  font-size: .75rem;
+}
+
+.game-demo-game-dialogue > span:not(.game-demo-dialogue-scan),
+.game-demo-scan-text {
+  padding: calc(var(--space-1) / 2) var(--space-1);
+}
+
+.game-demo-dialogue-scan,
+.game-demo-scan-translation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.game-demo-dialogue-scan {
+  position: relative;
+  max-width: 100%;
+  color: var(--game-dialogue-ink);
+  overflow: hidden;
+}
+
+.game-demo-dialogue-scan > :is(.game-demo-scan-text, .game-demo-scan-translation),
+.game-demo-scan-translation > .game-demo-scan-text {
+  grid-area: 1 / 1;
+}
+
+.game-demo-scan-definitions { position: absolute; }
+
+.game-demo-scan-translation { background: var(--game-dialogue-surface); }
+
+.game-demo-scan-text[lang]:last-child { z-index: 1; }
+
+.game-demo-scan-frame,
+.game-demo-scan-line {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  color: var(--game-scan-ink);
+}
+
+.game-demo-scan-frame {
+  --scan-arm: .5rem;
+  background:
+    linear-gradient(currentColor 0 0) top left / var(--scan-arm) 2px,
+    linear-gradient(currentColor 0 0) top left / 2px var(--scan-arm),
+    linear-gradient(currentColor 0 0) top right / var(--scan-arm) 2px,
+    linear-gradient(currentColor 0 0) top right / 2px var(--scan-arm),
+    linear-gradient(currentColor 0 0) bottom left / var(--scan-arm) 2px,
+    linear-gradient(currentColor 0 0) bottom left / 2px var(--scan-arm),
+    linear-gradient(currentColor 0 0) bottom right / var(--scan-arm) 2px,
+    linear-gradient(currentColor 0 0) bottom right / 2px var(--scan-arm);
+  background-repeat: no-repeat;
+}
+
+.game-demo-scan-line { --scan-distance: 100%; }
+
+.game-demo-scan-line::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: currentColor;
+  content: '';
+}
+
+.game-demo-scene-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.game-demo-scene-layer[data-selecting="true"] {
+  cursor: crosshair;
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.game-demo-region {
+  fill: transparent;
+  stroke: var(--primary);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.game-demo-region-draft {
+  fill: color-mix(in srgb, var(--primary) 15%, transparent);
+  stroke-dasharray: 6 3;
+}
+
+.game-demo-region[data-focused="true"] {
+  stroke-dasharray: 6 3;
+  stroke-width: 3;
+}
+
+.game-demo-captions {
+  position: absolute;
+  inset-inline: var(--space-2);
+  bottom: 29%;
+  max-height: 24%;
+  display: grid;
+  gap: calc(var(--space-1) / 2);
+  overflow: auto;
+}
+
+.game-demo-caption {
+  display: grid;
+  justify-items: start;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: calc(var(--space-1) / 2) var(--space-2);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--overlay);
+  color: var(--overlay-foreground);
+  box-shadow: var(--shadow-sm);
+  text-align: start;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.game-demo-caption span {
+  color: var(--muted-foreground);
+  font-size: .82em;
+}
+
+.game-demo-caption strong { font-weight: 600; }
+.game-demo-clipboard-field { grid-column: 1 / -1; }
+.game-demo-close-inline {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  inset-inline-end: var(--space-1);
+}
+.game-demo-caption[data-embedded="true"] {
+  width: 90%;
+  text-align: start;
+  justify-items: start;
+  padding: var(--space-1) var(--space-2);
+}
+
+.game-demo-scene-actions,
+.game-demo-scene-field,
+.game-demo-sheet > summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.game-demo-scene-actions [aria-pressed="true"] {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.game-demo-sheet > summary {
+  cursor: pointer;
+  width: fit-content;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  list-style: none;
+}
+
+.game-demo-sheet > summary::-webkit-details-marker { display: none; }
+.game-demo-sheet > summary:focus-visible { outline: 2px solid var(--ring); }
+.game-demo-sheet > summary > svg { width: var(--space-2); height: var(--space-2); }
+.game-demo-sheet[open] > summary > svg { transform: rotate(90deg); }
+.game-demo-region-settings { padding-block-start: var(--space-2); }
+.game-demo-region-settings { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+.game-demo-region-settings > button { justify-self: start; }
+.game-demo-scene-field { justify-content: space-between; }
+.game-demo-scene-field :is(input, [data-slot="select-trigger"]) { width: auto; max-width: 100%; min-width: 0; }
+.game-demo-scene-field input { width: 7ch; }

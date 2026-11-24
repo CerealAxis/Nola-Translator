@@ -13,7 +13,8 @@ from nola_translator_engine.models.crisp_catalog import (ADDITIONAL_TTS_NAMES, A
     CRISP_ASR_SPECS, QWEN3_TTS_NAMES, QWEN3_TTS_SPECS)
 from nola_translator_engine.models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
 from nola_translator_engine.models.qwen35_catalog import QWEN35_NAMES
-from nola_translator_engine.offline_models import catalog_specs
+from nola_translator_engine.models.ocr_catalog import HF_OCR_REPO, HF_OCR_REVISION, OCR_NAMES, OcrModelSpec
+from nola_translator_engine.offline_models import VISUAL_SPECS, catalog_specs
 
 NAMES = {
     "qwen3-asr-1.7b-hf": "Qwen3-ASR 1.7B",
@@ -63,6 +64,19 @@ NAMES = {
 NAMES.update(QWEN3_TTS_NAMES)
 NAMES.update(ADDITIONAL_TTS_NAMES)
 NAMES.update(QWEN35_NAMES)
+NAMES.update({model_id: name.replace("mobile", "Mobile").replace(" (Japanese)", "")
+              for model_id, name in OCR_NAMES.items()})
+NAMES["pp-ocrv5-mobile-ch-onnx"] = "PP-OCRv5 Mobile · ZH / EN / JA"
+NAMES.update({
+    "comic-rtdetr-onnx": "RT-DETR v2",
+    "comic-rfdetr-seg-onnx": "Koharu RF-DETR 2XL",
+    "comic-anglenet-onnx": "AngleNet",
+    "comic-font-classifier-onnx": "Storia Font",
+    "comic-yuzu-font-onnx": "YuzuMarker Font",
+    "lama-manga": "LaMa Manga",
+    "comic-lama-onnx": "LaMa",
+    "comic-lama-manga-onnx": "LaMa Manga",
+})
 RECOGNITION_IDS = {"qwen3-asr-1.7b-hf", "qwen3-asr-0.6b-hf", "sensevoice-small", *(spec.model_id for spec in CRISP_ASR_SPECS), *(spec.model_id for spec in QWEN3_ASR_GGUF_SPECS)}
 TTS_IDS = {spec.model_id for spec in QWEN3_TTS_SPECS + ADDITIONAL_TTS_SPECS}
 
@@ -76,6 +90,8 @@ def generate() -> str:
         spec = specs[model_id]
         sources = {}
         for source in ("huggingface", "hf-mirror", "modelscope"):
+            if source != "modelscope" and isinstance(spec, OcrModelSpec) and not spec.has_hf_snapshot:
+                continue
             if source == "modelscope" and not spec.modelscope_repo:
                 continue
             revision = spec.modelscope_revision if source == "modelscope" else spec.revision
@@ -83,7 +99,10 @@ def generate() -> str:
                 repository_url = f"https://modelscope.cn/models/{spec.modelscope_repo}/files?Revision={revision}"
             else:
                 host = "huggingface.co" if source == "huggingface" else "hf-mirror.com"
-                repository_url = f"https://{host}/{spec.repo}/tree/{revision}"
+                repo = spec.repo
+                if isinstance(spec, OcrModelSpec):
+                    repo, revision = HF_OCR_REPO, HF_OCR_REVISION
+                repository_url = f"https://{host}/{repo}/tree/{revision}"
             sources[source] = {
                 "revision": revision,
                 "repositoryUrl": repository_url,
@@ -91,7 +110,7 @@ def generate() -> str:
                           for file in spec.files_for(source)],
             }
         entries.append({"id": model_id, "name": name,
-                        "family": "recognition" if model_id in RECOGNITION_IDS else "tts" if model_id in TTS_IDS else "translation",
+                        "family": "visual" if model_id in VISUAL_SPECS else "recognition" if model_id in RECOGNITION_IDS else "tts" if model_id in TTS_IDS else "translation",
                         "sources": sources})
     return json.dumps(entries, ensure_ascii=False, indent=2) + "\n"
 

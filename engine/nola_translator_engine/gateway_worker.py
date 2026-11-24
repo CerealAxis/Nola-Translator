@@ -176,6 +176,8 @@ class PersistentSynthesizer:
 
 
 class GatewayWorker:
+    observe_cloud_call = None
+
     def __init__(self, emit):
         self.emit = emit
         self.runtime = None
@@ -231,7 +233,10 @@ class GatewayWorker:
     def remote_recognizer(self, config=None):
         from .recognition.base import create_cloud_recognizer
 
-        return create_cloud_recognizer(config or self.config)
+        recognizer = create_cloud_recognizer(config or self.config)
+        if self.observe_cloud_call is not None:
+            recognizer.observe_call, recognizer.observe_wait = self.observe_cloud_call
+        return recognizer
 
     async def initialize(self, request):
         from .runtime import EngineRuntime

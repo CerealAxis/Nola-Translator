@@ -1,6 +1,13 @@
 import { z } from 'zod'
+import { generateText, streamText } from 'ai'
 import { astrBotChatPresets } from '../shared/astrbot-chat-presets'
+import { CHATGPT_PLAN_SERVICE } from '../shared/chatgpt-plan'
+import { customCredentialSlot, customModelsOf } from '../shared/custom-models'
+import { workspaceChatConnection } from '../shared/model-workspace'
+import { supportErrorCodeForCause } from '../shared/error-catalog'
 import type { CloudModelListRequest, RemoteChatModel } from '../shared/cloud-model-tools'
+import type { AppSettings, CredentialProvider } from '../shared/settings'
+import type { ModelGateway } from './model-gateway'
 
 const remoteModel = z.object({
   id: z.string().trim().min(1).max(256),
@@ -27,6 +34,57 @@ export function cloudModelHttpError(status: number, hasKey?: boolean) {
     : status >= 500 ? 'CLOUD_MODEL_PROVIDER_UNAVAILABLE'
     : 'CLOUD_MODEL_REQUEST_REJECTED'
   return cloudModelError(code, `Provider returned HTTP ${status}`)
+}
+
+/** Keep provider failures actionable when they cross the cloud-model IPC boundary. */
+export function cloudModelProbeError(error: unknown, signal?: AbortSignal) {
+  const source = error && typeof error === 'object' ? error as { code?: unknown; message?: unknown } : undefined
+  if (typeof source?.code === 'string' && source.code
+    && source.code !== 'UNKNOWN_ERROR'
+    && (source.code.startsWith('CLOUD_MODEL_') || supportErrorCodeForCause(source.code) !== 'ERR-999')) return error
+  const message = typeof source?.message === 'string' ? source.message : String(error ?? '')
+  if (signal?.aborted || /(?:abort|timeout|timed out)/i.test(message)) return cloudModelError('REQUEST_TIMEOUT')
+  if (/invalid\s+url/i.test(message)) return cloudModelError('CLOUD_MODEL_INVALID_ADDRESS')
+  if (error instanceof TypeError || /(?:fetch failed|network|socket|connection|dns|econn|enotfound)/i.test(message)) {
+    return cloudModelError('NETWORK_UNAVAILABLE')
+  }
+  if (error instanceof SyntaxError || /(?:json|response).*(?:invalid|parse|unexpected)/i.test(message)) {
+    return cloudModelError('SYNTHESISFAILED')
+  }
+  return cloudModelError('SYNTHESISFAILED')
+}
+
+export async function probeCloudLanguageModel(
+  binding: string,
+  settings: AppSettings,
+  getCredential: (provider: CredentialProvider) => Promise<string>,
+  acquire: ModelGateway['acquireLanguageModel'],
+  signal: AbortSignal,
+): Promise<void> {
+  const profileId = binding.slice('custom:'.length)
+  const profile = customModelsOf(settings.translation).find(model => model.id === profileId)
+  const isPlan = workspaceChatConnection(settings.modelWorkspace, profileId)?.service === CHATGPT_PLAN_SERVICE
+  const hasKey = isPlan || Boolean((await getCredential(customCredentialSlot(profileId, settings.modelWorkspace))).trim())
+  if (!hasKey && profile && URL.canParse(profile.endpoint) && new URL(profile.endpoint).origin === 'https://api.openai.com') {
+    throw cloudModelError('CLOUD_MODEL_KEY_REQUIRED')
+  }
+  const lease = await acquire(binding, true)
+  let failure: unknown
+  try {
+    const options = { model: lease.model('disabled'), prompt: 'Reply with OK.', maxOutputTokens: Math.min(32, lease.profile.maxOutputTokens),
+      maxRetries: 0, abortSignal: AbortSignal.any([signal, lease.signal]) }
+    if (isPlan) {
+      let streamError: unknown
+      const result = streamText({ ...options, onError: ({ error }) => { streamError = error } })
+      try { await result.text } catch (error) { throw streamError ?? error }
+      if (streamError) throw streamError
+    } else await generateText(options)
+  } catch (error) {
+    const status = error instanceof Error && 'statusCode' in error ? error.statusCode : undefined
+    failure = signal.aborted ? cloudModelError('REQUEST_TIMEOUT') : typeof status === 'number' ? cloudModelHttpError(status, hasKey)
+      : new Error(lease.redact(error instanceof Error ? error.message : 'Model request failed'))
+    throw failure
+  } finally { lease.release(failure) }
 }
 
 export async function fetchCloudChatModels(request: CloudModelListRequest, key: string, signal: AbortSignal, fetcher = fetch): Promise<RemoteChatModel[]> {

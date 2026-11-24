@@ -651,6 +651,74 @@ async def test_concurrency_gate_bounds_active_inference() -> None:
     ]
 
 
+async def test_performance_records_each_finished_call_and_recovers_task_counts(monkeypatch):
+    from nola_translator_engine.backend.gateway.operations import AsrObservation
+
+    gateway, _ = gateway_with()
+    entered = asyncio.Event()
+    finish = asyncio.Event()
+
+    async def transcribe(_adapter, _instance, _context, *, audio, language):
+        entered.set()
+        if audio == b"hold":
+            await finish.wait()
+        if audio == b"failure":
+            raise RuntimeError("provider failed")
+        return AsrObservation("done", language)
+
+    monkeypatch.setattr(LocalWorkerAdapter, "transcribe", transcribe)
+    ctx = CallContext(operation=Operation.TRANSCRIBE, task_id="request")
+
+    async def invoke(audio):
+        return await gateway.transcribe(ctx, audio=audio, language="en")
+
+    first = asyncio.create_task(invoke(b"hold"))
+    try:
+        await entered.wait()
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(invoke(b"queued"), 0.02)
+        assert not gateway.performance.snapshot()["calls"]
+        assert (gateway.performance.active, gateway.performance.queued) == (1, 0)
+        second = asyncio.create_task(invoke(b"queued"))
+        await asyncio.sleep(0.02)
+        assert gateway.performance.queued == 1
+        finish.set()
+        await asyncio.gather(first, second)
+        with pytest.raises(RuntimeError):
+            await invoke(b"failure")
+        finish.clear()
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(invoke(b"hold"), 0.02)
+        finish_at = gateway.performance.snapshot()
+        assert [point["model"] for point in finish_at["calls"]] == ["sensevoice-small"] * 4
+        assert all(point["at"] <= finish_at["end"] and point["queue"] >= 0 for point in finish_at["calls"])
+        assert finish_at["calls"][0]["duration"] >= 15
+        assert finish_at["calls"][0]["queue"] == 0
+        assert finish_at["calls"][1]["queue"] >= 15
+        assert any(point["active"] == 1 and point["queued"] == 1 for point in finish_at["tasks"])
+        assert (gateway.performance.active, gateway.performance.queued) == (0, 0)
+    finally:
+        first.cancel()
+        await asyncio.gather(first, return_exceptions=True)
+        await gateway.shutdown()
+
+
+def test_performance_retains_thirty_minutes_and_the_previous_task_state(monkeypatch):
+    from nola_translator_engine.backend.gateway import performance
+
+    now = 500.0
+    monkeypatch.setattr(performance, "epoch_ms", lambda: now)
+    history = performance.PerformanceHistory()
+    history.begin_call("expired")()
+    now += 1000
+    history.begin_call("retained")()
+    now += performance.HISTORY_MS
+    snapshot = history.snapshot()
+    assert [point["model"] for point in snapshot["calls"]] == ["retained"]
+    assert snapshot["tasks"][0]["at"] == 500
+    assert snapshot["tasks"][0]["active"] == 0
+
+
 # ---------------------------------------------------------------------------
 # MyMemory committed-only boundary (decision 5 / doc 08 §3)
 # ---------------------------------------------------------------------------

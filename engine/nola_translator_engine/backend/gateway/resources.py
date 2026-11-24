@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 from dataclasses import dataclass, field
 
 
@@ -157,8 +158,9 @@ class ConcurrencyGate:
         self._realtime_waiters: dict[str, int] = {}
         self._events: dict[str, asyncio.Event] = {}
 
-    async def acquire(self, instance_id: str, limit: int, *, realtime: bool = False) -> None:
+    async def acquire(self, instance_id: str, limit: int, *, realtime: bool = False) -> float:
         event = self._events.setdefault(instance_id, asyncio.Event())
+        blocked_at = None
         if realtime:
             self._realtime_waiters[instance_id] = self._realtime_waiters.get(instance_id, 0) + 1
         try:
@@ -172,7 +174,9 @@ class ConcurrencyGate:
                     self._active[instance_id] = current + 1
                     if realtime:
                         self._realtime.add(instance_id)
-                    return
+                    return 0.0 if blocked_at is None else (time.perf_counter_ns() - blocked_at) / 1_000_000
+                if blocked_at is None:
+                    blocked_at = time.perf_counter_ns()
                 event.clear()
                 await event.wait()
         finally:

@@ -197,13 +197,15 @@ class RealtimePipelines:
                 stage = "asr"
                 if config.asr_model in ("aliyun", "minimax"):
                     request = MatchRequest(Operation.TRANSCRIBE, model_id=config.asr_model, source_language=session.config.source_language)
-                    context = self.gateway.cloud_asr_session(request, connection.get("asr_options", {}))
+                    observations = []
+                    context = self.gateway.cloud_asr_session(request, connection.get("asr_options", {}), observe=observations.append)
                     provider_config = await context.__aenter__()
                     provider_context = context
                     provider_config = provider_config.model_copy(update={
                         "max_segment_ms": session.config.max_segment_ms, "silence_end_ms": session.config.silence_end_ms,
                     })
-                    pipeline = CloudAsrPipeline(session, provider_config, emit, latency_detection=latency_detection)
+                    pipeline = CloudAsrPipeline(session, provider_config, emit, latency_detection=latency_detection,
+                                                observe=observations[0] if observations else None)
                 else:
                     pipeline = AsrPipeline(session, self.gateway, emit, latency_detection=latency_detection)
                 await pipeline.prepare()

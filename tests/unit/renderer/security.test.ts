@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('renderer content security policy', () => {
-  it.each(['onboarding-card.html'])('protects the %s entry document', entry => {
+  it.each(['onboarding-card.html', 'performance-monitor.html'])('protects the %s entry document', entry => {
     const content = readFileSync(resolve(process.cwd(), 'src/renderer', entry), 'utf8')
     expect(content).toContain('http-equiv="Content-Security-Policy"')
     expect(content).toContain("script-src 'self'")

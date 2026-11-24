@@ -1831,6 +1831,24 @@
         }
       }
     },
+    "/api/v2/gateway/performance": {
+      "get": {
+        "summary": "Gateway Performance",
+        "operationId": "gateway_performance_api_v2_gateway_performance_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformanceSnapshot"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/gateway/language-models/{lease_id}/chat/completions": {
       "post": {
         "summary": "Language Model Chat",
@@ -4016,6 +4034,22 @@
                 "type": "null"
               }
             ]
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "huggingface",
+                  "hf-mirror",
+                  "modelscope"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
           }
         },
         "additionalProperties": false,
@@ -4170,6 +4204,211 @@
         },
         "type": "object",
         "title": "ComputeOptions"
+      },
+      "AllocationReading": {
+        "properties": {
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "used": {
+            "type": "number",
+            "title": "Used"
+          }
+        },
+        "type": "object",
+        "required": [
+          "models",
+          "used"
+        ],
+        "title": "AllocationReading"
+      },
+      "CallReading": {
+        "properties": {
+          "at": {
+            "type": "number",
+            "title": "At"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
+          },
+          "queue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          },
+          "taskId": {
+            "type": "string",
+            "title": "Taskid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at"
+        ],
+        "title": "CallReading"
+      },
+      "GpuReading": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "used": {
+            "type": "number",
+            "title": "Used"
+          },
+          "sharedUsed": {
+            "type": "number",
+            "title": "Sharedused"
+          },
+          "integrated": {
+            "type": "boolean",
+            "title": "Integrated"
+          },
+          "capacity": {
+            "type": "number",
+            "title": "Capacity"
+          },
+          "load": {
+            "type": "number",
+            "title": "Load"
+          },
+          "allocations": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationReading"
+            },
+            "type": "array",
+            "title": "Allocations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "GpuReading"
+      },
+      "HardwareReading": {
+        "properties": {
+          "at": {
+            "type": "number",
+            "title": "At"
+          },
+          "cpu": {
+            "type": "number",
+            "title": "Cpu"
+          },
+          "ram": {
+            "type": "number",
+            "title": "Ram"
+          },
+          "ramCapacity": {
+            "type": "number",
+            "title": "Ramcapacity"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/GpuReading"
+            },
+            "type": "array",
+            "title": "Gpus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "gpus"
+        ],
+        "title": "HardwareReading"
+      },
+      "PerformanceSnapshot": {
+        "properties": {
+          "end": {
+            "type": "number",
+            "title": "End"
+          },
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/CallReading"
+            },
+            "type": "array",
+            "title": "Calls"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskReading"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "hardware": {
+            "items": {
+              "$ref": "#/components/schemas/HardwareReading"
+            },
+            "type": "array",
+            "title": "Hardware"
+          },
+          "loadedModels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Loadedmodels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "end",
+          "calls",
+          "tasks",
+          "hardware"
+        ],
+        "title": "PerformanceSnapshot"
+      },
+      "TaskReading": {
+        "properties": {
+          "at": {
+            "type": "number",
+            "title": "At"
+          },
+          "active": {
+            "type": "integer",
+            "title": "Active"
+          },
+          "queued": {
+            "type": "integer",
+            "title": "Queued"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "active",
+          "queued"
+        ],
+        "title": "TaskReading"
       }
     }
   }

@@ -9,10 +9,10 @@ import { actions, getBridge, stores, useStore } from '@/store'
 import { reportSettingsFailure } from '@/features/settings/settingsErrorChannel'
 import { placeTourCard } from './tourLayout'
 import type { TourRect, TourSize } from './tourLayout'
-import { TOUR_STEPS } from './tourSteps'
+import { resumeTourIndex, TOUR_STEPS } from './tourSteps'
 import type { OnboardingCardState } from '../../../shared/onboarding-card'
 import { TourLesson } from './TourLesson'
-import { closeTourDialog, findTourTarget, prepareTourStep } from './tourDriver'
+import { closeTourSourcePicker, findTourTarget, prepareTourStep } from './tourDriver'
 
 export interface OnboardingTourProps {
   /** Website demos can opt into manual presentation without writing a first-run marker. */
@@ -83,7 +83,7 @@ function TourSteps() {
   const required = useStore(stores.settings, state => state.onboardingRequired)
   const [index, setIndex] = useState(() => {
     const saved = required ? stores.settings.getState().settings?.onboardingStep : 'H1'
-    return saved === 'Z0' ? TOUR_STEPS.length : Math.max(0, TOUR_STEPS.findIndex(item => item.id === saved))
+    return resumeTourIndex(saved)
   })
   const [shownIndex, setShownIndex] = useState(index)
   const [busy, setBusy] = useState(true)
@@ -116,7 +116,7 @@ function TourSteps() {
     return () => controller.abort()
   }, [index, attempt, finished, navigate, required, t])
 
-  useEffect(() => () => closeTourDialog(), [])
+  useEffect(() => () => closeTourSourcePicker(), [])
 
   const next = useCallback(() => {
     if (busyRef.current) return
@@ -125,7 +125,7 @@ function TourSteps() {
     setBusy(true)
     if (index === TOUR_STEPS.length - 1) {
       void actions.settings.completeOnboarding().then(() => {
-        closeTourDialog()
+        closeTourSourcePicker()
         returnToHome(navigate)
       }).catch(error => {
         reportSettingsFailure(t('onboarding.saveFailed'), error)
@@ -141,22 +141,17 @@ function TourSteps() {
     const measure = () => {
       const target = findTourTarget(step.target)
       const rect = target?.getBoundingClientRect()
-      const included = step.include ? findTourTarget(step.include)?.getBoundingClientRect() : null
       const viewport = { width: window.innerWidth, height: window.innerHeight }
       const style = getComputedStyle(document.documentElement)
       const space = parseFloat(style.getPropertyValue('--space-1')) || 8
       const gap = space * 2
       const topInset = document.querySelector('.nola-app-body')?.getBoundingClientRect().top ?? 0
-      const bounds = rect && included ? {
-        left: Math.min(rect.left, included.left), top: Math.min(rect.top, included.top),
-        right: Math.max(rect.right, included.right), bottom: Math.max(rect.bottom, included.bottom),
-      } : rect
       let spotlight: TourRect | null = null
-      if (bounds && path === step.path) {
-        const x = Math.max(space, bounds.left - space)
-        const y = Math.max(topInset + space, bounds.top - space)
-        const right = Math.min(viewport.width - space, bounds.right + space)
-        const bottom = Math.min(viewport.height - space, bounds.bottom + space)
+      if (rect && path === step.path) {
+        const x = Math.max(space, rect.left - space)
+        const y = Math.max(topInset + space, rect.top - space)
+        const right = Math.min(viewport.width - space, rect.right + space)
+        const bottom = Math.min(viewport.height - space, rect.bottom + space)
         if (right > x && bottom > y) spotlight = { x, y, width: right - x, height: bottom - y }
       }
       const card = cardRef.current?.getBoundingClientRect()

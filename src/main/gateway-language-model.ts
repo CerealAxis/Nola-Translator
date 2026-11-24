@@ -10,6 +10,7 @@ import { CHATGPT_PLAN_ENDPOINT, CHATGPT_PLAN_SERVICE } from '../shared/chatgpt-p
 import { localChatSettingsOf } from '../shared/language-model'
 import type { CustomTranslationModel } from '../shared/settings'
 import type { DirectModelServices } from './direct-model'
+import { measureCloudFetch } from './gateway-performance'
 
 export interface GatewayLanguageModel {
   profile: Pick<CustomTranslationModel, 'id' | 'model' | 'endpoint' | 'apiFormat' | 'contextWindow' | 'maxOutputTokens'>
@@ -57,7 +58,8 @@ export async function createGatewayLanguageModel(services: DirectModelServices, 
           init.signal?.throwIfAborted()
           const headers = new Headers(init.headers)
           headers.set('Authorization', 'Bearer ' + token)
-          return fetch(CHATGPT_PLAN_ENDPOINT + '/responses', { ...init, headers, body: JSON.stringify(body), redirect: 'error' })
+          return measureCloudFetch(profile.model, fetch)(CHATGPT_PLAN_ENDPOINT + '/responses',
+            { ...init, headers, body: JSON.stringify(body), redirect: 'error' })
         } }).responses(profile.model)
       return { profile: planProfile, local: false, name: saved?.name ?? profile.model, redact: message => message.slice(0, 1000),
         model: () => wrapLanguageModel({ model: planModel,
@@ -93,12 +95,13 @@ export async function createGatewayLanguageModel(services: DirectModelServices, 
       ...(preset?.id === 'kimi-code' || preset?.id === 'kimi-code-global' ? { 'User-Agent': 'astrbot/4.29.4' } : {}),
       ...(tokenPlan ? { Authorization: 'Bearer ' + apiKey } : {}),
     }
-    const providerFetch: typeof fetch = (input, init) => {
+    const providerFetch = measureCloudFetch(profile.model, (input, init) => {
       const outgoingHeaders = new Headers(init?.headers)
       for (const [key, value] of Object.entries(headers)) if (value !== undefined) outgoingHeaders.set(key, value)
       return fetch(input, { ...init, headers: outgoingHeaders, redirect: 'error',
         signal: AbortSignal.any([...(init?.signal ? [init.signal] : []), AbortSignal.timeout((preset && 'timeout' in preset ? preset.timeout : 120) * 1000)]) })
-    }
+    })
+    const standardFetch = preset ? providerFetch : measureCloudFetch(profile.model, fetch)
     const baseURL = profile.endpoint.replace(/\/+$/, '')
     return { profile, local, name: saved?.name ?? profile.model, redact: message => (apiKey ? message.replaceAll(apiKey, '[redacted]') : message).slice(0, 1000),
       onFailed: listener => { failures.add(listener); if (failed) queueMicrotask(listener); return () => { failures.delete(listener) } },
@@ -141,10 +144,10 @@ export async function createGatewayLanguageModel(services: DirectModelServices, 
           } }).chat(profile.model)
         }
         if (profile.apiFormat === 'anthropic') return createAnthropic({ apiKey: apiKey || 'no-key',
-          baseURL: baseURL.endsWith('/v1') ? baseURL : `${baseURL}/v1`, headers, ...(preset ? { fetch: providerFetch } : {}) })(profile.model)
+          baseURL: baseURL.endsWith('/v1') ? baseURL : `${baseURL}/v1`, headers, fetch: standardFetch })(profile.model)
         // Preserve the workbench's existing Ollama OpenAI-compatible transport. MT retains its native adapter.
-        if (profile.apiFormat === 'ollama') return createOpenAICompatible({ name: 'ollama', baseURL: `${baseURL}/v1`, apiKey: apiKey || 'no-key' }).chatModel(profile.model)
-        const provider = createOpenAI({ apiKey: apiKey || 'no-key', baseURL, headers, ...(preset ? { fetch: providerFetch } : {}) })
+        if (profile.apiFormat === 'ollama') return createOpenAICompatible({ name: 'ollama', baseURL: `${baseURL}/v1`, apiKey: apiKey || 'no-key', fetch: standardFetch }).chatModel(profile.model)
+        const provider = createOpenAI({ apiKey: apiKey || 'no-key', baseURL, headers, fetch: standardFetch })
         return profile.apiFormat === 'chat-responses' ? provider.responses(profile.model) : provider.chat(profile.model)
       }, close: async () => {
         closed = true

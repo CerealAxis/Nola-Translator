@@ -36,9 +36,9 @@ export function SourcePicker({ type, families, onCloud, onLocal, onClose }: Sour
       .some(value => value.toLowerCase().includes(query)))
 
   return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-    <DialogContent className="model-source-picker" initialFocus={false}>
+    <DialogContent className="model-source-picker" data-onboarding="models-source-picker" initialFocus={false}>
       <DialogHeader><DialogTitle>{modelWorkspaceText(language, 'addSource')}</DialogTitle></DialogHeader>
-      <DialogCloseButton />
+      <DialogCloseButton data-onboarding="models-source-picker-close" />
       <InputGroup>
         <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
         <InputGroupInput type="search" aria-label={modelWorkspaceText(language, 'search')}

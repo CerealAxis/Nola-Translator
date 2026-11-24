@@ -23,7 +23,7 @@ it('opens download management from the download-start notification', () => {
   const notice = showToast.mock.calls.find(([payload]) => payload.title === '模型下载已开始')?.[0]
   expect(notice?.actionProps?.children).toBe('查看进度')
   act(() => notice?.actionProps?.onClick())
-  expect(window.location.hash).toBe('#/model-management/downloads')
+  expect(window.location.hash).toBe('#/models/downloads')
 })
 
 it('notifies on completion, failure with a reason, and cancellation', () => {

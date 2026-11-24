@@ -2,6 +2,7 @@ import { astrBotSpeechPresetForBinding } from './astrbot-speech-presets'
 import { z } from 'zod'
 import type { SessionConfig } from './contracts'
 import type { ResourceRecord } from './contracts'
+import type { GatewayPerformanceSnapshot } from './gateway-performance'
 
 export type GatewayCapability = 'asr' | 'mt' | 'tts' | 'llm' | 'ocr'
 export function gatewayConcurrency(binding: string, saved: number | undefined, resource?: Pick<ResourceRecord, 'provider'>): number {
@@ -173,5 +174,7 @@ export interface ModelGatewayApi {
   stop(): Promise<ModelGatewaySnapshot>
   revealKey(): Promise<string>
   rotateKey(): Promise<string>
+  openPerformanceMonitor?(): Promise<void>
+  performanceSnapshot?(): Promise<GatewayPerformanceSnapshot>
   onChanged(callback: (snapshot: ModelGatewaySnapshot) => void): () => void
 }

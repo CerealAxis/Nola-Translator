@@ -577,7 +577,7 @@ export function GlossaryTab({ libraryId }: { libraryId?: string }) {
           </DialogHeader>
           {csv && (
             <>
-              <CardContent className="flex flex-col gap-4 px-0 pb-4">
+              <CardContent className="flex flex-col gap-[var(--field-gap)] px-0 pb-4">
                 <Field>
                   <FieldLabel htmlFor="glossary-csv">{t('suite.importCsv')}</FieldLabel>
                   <Input id="glossary-csv" type="file" accept=".csv,text/csv" disabled={busy} onChange={event => {

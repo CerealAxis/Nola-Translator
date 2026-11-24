@@ -8,7 +8,7 @@ import { llmPreviewCopy } from './llm-preview-copy'
 export function ModelEditorDialog({ editing, title, saveLabel, canSave, initialFocus, onSave, onCancel, onReset, children }: {
   editing?: boolean
   title?: string
-  saveLabel?: string
+  saveLabel?: ReactNode
   canSave?: boolean
   initialFocus?: DialogContentProps['initialFocus']
   onSave?: () => void
