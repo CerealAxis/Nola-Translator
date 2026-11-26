@@ -4,19 +4,17 @@ import { cn } from "@/lib/utils"
 import { TooltipHint } from "./tooltip"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-[var(--radius-xl)] border border-transparent bg-clip-padding type-body font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-nola-ui-ring focus-visible:ring-3 focus-visible:ring-nola-ui-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-nola-ui-destructive aria-invalid:ring-3 aria-invalid:ring-nola-ui-destructive/20 dark:aria-invalid:border-nola-ui-destructive/50 dark:aria-invalid:ring-nola-ui-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-[var(--radius-xl)] border border-transparent bg-clip-padding type-body font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform,translate] outline-none select-none    active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-nola-ui-destructive aria-invalid:ring-3 aria-invalid:ring-nola-ui-destructive/20 dark:aria-invalid:border-nola-ui-destructive/50 dark:aria-invalid:ring-nola-ui-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bg-nola-ui-primary text-nola-ui-primary-foreground hover:bg-[var(--primary-hover)]",
-        outline:
-          "border-nola-ui-border bg-nola-ui-background hover:bg-nola-ui-muted hover:text-nola-ui-foreground aria-expanded:bg-nola-ui-muted aria-expanded:text-nola-ui-foreground dark:border-nola-ui-input dark:bg-nola-ui-input/30 dark:hover:bg-nola-ui-input/50",
         secondary:
           "border-nola-ui-border bg-nola-ui-background text-nola-ui-foreground hover:bg-nola-ui-muted hover:text-nola-ui-foreground aria-expanded:bg-nola-ui-muted aria-expanded:text-nola-ui-foreground dark:border-nola-ui-input dark:bg-nola-ui-input/30 dark:hover:bg-nola-ui-input/50",
         bare: "bg-transparent text-nola-ui-muted-foreground hover:text-nola-ui-foreground",
         nav:
           "border-0 bg-transparent text-nola-ui-foreground data-[active=false]:hover:bg-surface-tertiary aria-expanded:bg-surface-tertiary data-[active=true]:bg-[image:var(--nola-primary-gradient)] data-[active=true]:text-nola-ui-primary-foreground data-[active=true]:shadow-[0_3px_12px_color-mix(in_oklch,var(--accent)_17%,transparent)]",
-        destructive:
+        danger:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-nola-ui-primary underline-offset-4 hover:underline",
       },
@@ -39,7 +37,7 @@ const buttonVariants = cva(
   }
 )
 
-export type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>["variant"]> | "danger" | "tertiary"
+export type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>["variant"]>
 export type ButtonSize = NonNullable<VariantProps<typeof buttonVariants>["size"]>
 export interface ButtonProps extends Omit<ButtonPrimitive.Props, "className" | "title"> {
   className?: string
@@ -59,8 +57,8 @@ function Button({
     <ButtonPrimitive
       data-slot="button"
       data-size={size}
-      data-variant={variant === "danger" ? "destructive" : variant === "tertiary" ? "outline" : variant}
-      className={cn("button", buttonVariants({ variant: variant === "danger" ? "destructive" : variant === "tertiary" ? "outline" : variant, size, className }))}
+      data-variant={variant}
+      className={cn("button", buttonVariants({ variant, size, className }))}
       {...props}
     />
   )

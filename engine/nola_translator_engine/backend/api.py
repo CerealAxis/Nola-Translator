@@ -140,7 +140,7 @@ def _configure_realtime_provider(registry, session, headers):
         connection.setdefault("fallback_mt_options", cloud_mt_options(headers, "x-nola-fallback-"))
     if pipeline.asr_model in ("aliyun", "minimax"):
         connection.setdefault("asr_options", cloud_asr_options(headers))
-    if pipeline.tts_model == MIMO_TTS_MODEL:
+    if pipeline.tts_model and pipeline.tts_model.startswith(MIMO_TTS_MODEL):
         tts_key = headers.get("x-nola-tts-key", "")
         if 0 < len(tts_key) <= 4096:
             connection["tts_options"] = {
@@ -148,6 +148,9 @@ def _configure_realtime_provider(registry, session, headers):
                 "endpoint": headers.get("x-nola-tts-endpoint", "")[:2048],
                 "model": headers.get("x-nola-tts-model", "")[:256],
             }
+    if pipeline.tts_model == "nola-provider-tts":
+        connection["tts_options"] = {"relay_url": headers.get("x-nola-tts-relay-url", "")[:2048],
+            "relay_token": headers.get("x-nola-tts-relay-token", "")[:128]}
 
 
 async def _run_while_connected(request: Request, operation):
@@ -500,7 +503,8 @@ def build_router() -> APIRouter:
             ), ctx.server_instance_id)
 
         try:
-            tts_key = request.headers.get("x-nola-tts-key", "") if parsed.model == MIMO_TTS_MODEL and parsed.kind in ("tts", "tts-voices") else ""
+            tts_key = request.headers.get("x-nola-tts-key", "") if parsed.model in (
+                MIMO_TTS_MODEL, f"{MIMO_TTS_MODEL}-voicedesign", f"{MIMO_TTS_MODEL}-voiceclone") and parsed.kind in ("tts", "tts-voices") else ""
             options = {"api_key": tts_key} if 0 < len(tts_key) <= 4096 else {}
             if parsed.kind == "asr" and parsed.model in ("aliyun", "minimax"):
                 options = cloud_asr_options(request.headers)

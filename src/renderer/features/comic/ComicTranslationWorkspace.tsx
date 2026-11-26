@@ -1004,7 +1004,7 @@ export function ComicTranslationWorkspace({
         180,
       )}
       <Button
-        variant="outline"
+        variant="secondary"
         disabled={!region.textQuad && !region.style.angle}
         onClick={() => {
           const { textQuad: _quad, ...plain } = region
@@ -1090,13 +1090,13 @@ export function ComicTranslationWorkspace({
         </div>
         <div className="comic-workflow__actions">
           {Boolean(saveFailure) && (
-            <Button variant="outline" size="sm" onClick={() => setDialog('discard')}>
+            <Button variant="secondary" size="sm" onClick={() => setDialog('discard')}>
               {t('suite.discard')}
             </Button>
           )}
           {book.quick && (
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => {
                 void saveQuickComicToLibrary(projectId)
@@ -1111,7 +1111,7 @@ export function ComicTranslationWorkspace({
             </Button>
           )}
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => setDialog('tasks')}
           >
@@ -1129,7 +1129,7 @@ export function ComicTranslationWorkspace({
             )}
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => setDialog('settings')}
           >
@@ -1137,7 +1137,7 @@ export function ComicTranslationWorkspace({
             {p('settings')}
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => {
               setDialog('export')
@@ -1147,7 +1147,7 @@ export function ComicTranslationWorkspace({
             {t('suite.export')}
           </Button>
           <Button
-            variant={editing ? 'destructive' : 'default'}
+            variant={editing ? 'danger' : 'default'}
             size="sm"
             onClick={() => {
               void flushComicSaves(projectId)
@@ -1288,7 +1288,7 @@ export function ComicTranslationWorkspace({
                   </ToggleGroupItem>
                 </ToggleGroup>
                 <Button
-                  variant={sync ? 'secondary' : 'outline'}
+                  variant={sync ? 'secondary' : 'secondary'}
                   size="sm"
                   aria-pressed={sync}
                   onClick={() => setSync((value) => !value)}
@@ -1643,7 +1643,7 @@ export function ComicTranslationWorkspace({
               )}
             </FieldGroup>
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => {
                 saveComicBook({
                   ...book,
@@ -1826,7 +1826,7 @@ export function ComicTranslationWorkspace({
                               ...'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんっゃゅょー',
                             ].map((char, index) => (
                               <Button
-                                variant="outline"
+                                variant="secondary"
                                 size="sm"
                                 key={`${char}${index}`}
                                 onClick={() =>
@@ -1918,14 +1918,14 @@ export function ComicTranslationWorkspace({
                     {textStyleFields}
                     <div className="comic-workflow__actions">
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => run('repair', [page.id], [region.id])}
                       >
                         {p('repair')}
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => setDialog('style')}
                       >
@@ -1941,7 +1941,7 @@ export function ComicTranslationWorkspace({
                             variant={
                               selected.includes(item.id)
                                 ? 'secondary'
-                                : 'outline'
+                                : 'secondary'
                             }
                             size="sm"
                             onClick={(event) =>
@@ -2072,8 +2072,8 @@ export function ComicTranslationWorkspace({
           <CardContent className="comic-workflow__dialog-content">
             {dialog === 'discard' && (
               <div className="comic-workflow__actions">
-                <Button variant="outline" onClick={() => setDialog(null)}>{p('keep')}</Button>
-                <Button variant="destructive" onClick={() => {
+                <Button variant="secondary" onClick={() => setDialog(null)}>{p('keep')}</Button>
+                <Button variant="danger" onClick={() => {
                   void discardComicSaves(projectId).then(() => setDialog(null)).catch(report)
                 }}>{t('suite.discard')}</Button>
               </div>
@@ -2511,7 +2511,7 @@ export function ComicTranslationWorkspace({
                     </div>
                   ))}
                 <div className="comic-workflow__actions">
-                  <Button variant="outline" onClick={() => setDialog(null)}>
+                  <Button variant="secondary" onClick={() => setDialog(null)}>
                     {p('keep')}
                   </Button>
                   <Button

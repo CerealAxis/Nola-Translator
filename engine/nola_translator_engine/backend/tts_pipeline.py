@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import copy
 import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
-from .gateway.capabilities import CallContext, Operation
+from .gateway.capabilities import CallContext, Operation, GatewayError
 from .gateway.gateway import MatchRequest, ModelGateway
 from .gateway.operations import SynthesisResult
 from .latency import unix_ms
 from .playback_queue import PlaybackClaim, PlaybackQueue, TtsJob
+from .tts_contracts import SynthesisRequest
+from .tts_history import TtsGenerationHistory
 
 
 @dataclass(frozen=True)
@@ -36,6 +39,7 @@ class TtsPipeline:
         epoch: int,
         model_id: str,
         voice: str | None = None,
+        snapshot: dict | None = None,
         event_sink: EventSink | None = None,
         deadline_s: float = 30.0,
         provider_options: dict[str, str] | None = None,
@@ -44,6 +48,8 @@ class TtsPipeline:
         self.gateway, self.queue = gateway, queue
         self.pipeline_id, self.epoch = pipeline_id, epoch
         self.model_id, self.voice = model_id, voice
+        self.snapshot = copy.deepcopy(snapshot or {})
+        self.history = TtsGenerationHistory.from_environment() if self.snapshot.get("resolved_request") else None
         self.event_sink, self.deadline_s = event_sink, deadline_s
         self.provider_options = provider_options or {}
         self.latency_detection = latency_detection
@@ -82,7 +88,7 @@ class TtsPipeline:
     def translation_committed(self, payload: dict[str, Any]) -> bool:
         text = payload.get("text")
         commit_id = payload.get("commit_id")
-        if not isinstance(text, str) or not text.strip() or not isinstance(commit_id, str):
+        if not isinstance(text, str) or not text.strip() or not isinstance(commit_id, str) or not payload.get("target_language"):
             return False
         self._order += 1
         job = TtsJob(
@@ -95,10 +101,13 @@ class TtsPipeline:
             text=text,
             model_id=self.model_id,
             voice=self.voice,
+            synthesis_options=copy.deepcopy(self.snapshot),
             origin_epoch=self.epoch,
         )
         accepted = self.queue.enqueue(job)
         if accepted:
+            if self.history:
+                self.history.enqueue(job)
             if self.event_sink:
                 notified = self.event_sink("synthesis_state", self._state(job, "queued"))
                 if inspect.isawaitable(notified):
@@ -128,19 +137,26 @@ class TtsPipeline:
                     CallContext(operation=Operation.SYNTHESIZE, task_id=job.job_id,
                                 pipeline_id=self.pipeline_id, epoch=self.epoch,
                                 deadline=time.monotonic() + self.deadline_s, provider_options=self.provider_options),
-                    text=job.text, voice=job.voice,
+                    synthesis=SynthesisRequest(text=job.text, language=job.target_language,
+                        **({key: value for key, value in job.synthesis_options.items() if key != "resolved_request"} or {"conditioning": {"kind": "preset", "voiceId": job.voice}
+                            if job.voice else {"kind": "engine-default"}})),
                     request=MatchRequest(operation=Operation.SYNTHESIZE, model_id=job.model_id,
                                          target_language=job.target_language, required_outputs=["speech"]),
                 ), timeout=self.deadline_s)
                 samples = sum(len(chunk.pcm) // (2 * chunk.channels) for chunk in result.chunks)
                 if samples <= 0:
                     raise ValueError("Synthesis returned no audio")
+                if self.history:
+                    self.history.complete(job, result)
             except Exception as error:
                 from ..debug_log import log_exception
                 log_exception("backend", "synthesis.failed", error, jobId=job.job_id, pipelineId=self.pipeline_id,
                               attempt=job.synthesis_attempt)
-                if self.queue.fail(job.job_id, attempt=job.synthesis_attempt) and job.synthesis_attempt < 2:
+                retryable = not isinstance(error, GatewayError) or error.retryable
+                if self.queue.fail(job.job_id, attempt=job.synthesis_attempt) and job.synthesis_attempt < 2 and retryable:
                     self.queue.retry(job.job_id)
+                elif self.history:
+                    self.history.fail(job, getattr(error, "provider_code", None) or getattr(error, "code", "ttsFailed"))
                 self._play_wake.set()
                 continue
             if self.queue.mark_ready(job.job_id, job.synthesis_attempt):
@@ -258,4 +274,6 @@ class TtsPipeline:
                 if isinstance(outcome, BaseException) and not isinstance(outcome, asyncio.CancelledError):
                     raise outcome
         finally:
+            if self.history:
+                self.history.close()
             self.queue.close()

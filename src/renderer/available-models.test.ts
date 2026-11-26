@@ -6,12 +6,32 @@ import { stores } from './store'
 import { buildAvailableModels, modelBindingPatch, resolveModelBinding, savedBindingOf, type AvailableModel } from './available-models'
 import { DEFAULT_SETTINGS, MIMO_TTS_BINDING, type AppSettings, type CredentialProvider } from '../shared/settings'
 import { buildConfiguredCloudModels } from '../shared/model-availability'
+import { astrBotSpeechBinding } from '../shared/astrbot-speech-presets'
+import type { WorkspaceConnection } from '../shared/model-workspace'
 import type { ModelGatewaySnapshot } from '../shared/model-gateway'
 import type { ResourceRecord } from '../shared/contracts'
 
 /** The catalog only reads which slots hold a key, so a sparse record is enough for a fixture. */
 const credentials = (stored: CredentialProvider[]): Readonly<Record<CredentialProvider, boolean>> =>
   Object.fromEntries(stored.map(slot => [slot, true])) as Record<CredentialProvider, boolean>
+
+it('exposes configured cloud TTS in both realtime catalogs with account and model isolation', () => {
+  const connections: WorkspaceConnection[] = [
+    { id: 'openai-account', name: 'Speech', service: 'openai-tts-api', capability: 'TTS', protocol: '', workspace: '', region: '', endpoint: 'https://api.openai.com/v1',
+      models: [{ id: 'gpt-4o-mini-tts', name: 'Mini speech', profileId: 'mini-speech', enabled: true }] },
+    { id: 'mimo-account', name: 'MiMo', service: 'mimo', capability: 'TTS', protocol: '', workspace: '', region: '', endpoint: 'https://api.xiaomimimo.com/v1',
+      models: [{ id: 'mimo-v2.5-tts-voiceclone', name: 'MiMo clone', profileId: 'mimo-clone', enabled: true }] },
+  ]
+  const configured = settings({ modelWorkspace: { connections, localSources: {} } })
+  const stored = credentials(['cloud-model:openai-account', 'mimo-tts'])
+  const binding = astrBotSpeechBinding('openai-tts-api', 'mini-speech')
+  for (const list of [buildAvailableModels({ settings: configured, credentials: stored, resources: [], snapshot: null }).tts,
+    buildConfiguredCloudModels(configured, stored).tts]) {
+    expect(list).toContainEqual(expect.objectContaining({ binding, targetLanguages: expect.arrayContaining(['en', 'zh']) }))
+    expect(list).toContainEqual(expect.objectContaining({ binding: astrBotSpeechBinding('mimo', 'mimo-clone') }))
+  }
+  expect(buildAvailableModels({ settings: configured, credentials: credentials([]), resources: [], snapshot: null }).tts).toEqual([])
+})
 
 it('includes both Chinese scripts for the built-in MiMo speech model', () => {
   const configured = settings({ modelPolicy: { enabled: { [`tts:${MIMO_TTS_BINDING}`]: true }, defaults: {}, selections: {} } })

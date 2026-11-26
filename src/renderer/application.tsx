@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, ROUTE_TITLES, Routes, pathOf, sett
 import { HomePage } from './features/home'
 import { ComicBooksLoading, ComicProjectLoading } from './features/comic/ComicLoading'
 import { SETTINGS_NAVIGATION } from './features/settings/settingsNavigation'
+import { ttsText } from './i18n/tts-ui'
 import { ScreenTranslationNotice } from './features/screen/ScreenTranslationNotice'
 import type { RoutesProps } from './routes'
 import type { AppShellNavigationItem } from './components/primitives/AppShell'
@@ -24,6 +25,7 @@ const RecordsPage = lazy(() => import('./features/records').then(module => ({ de
 const RecordDetailPage = lazy(() => import('./features/records').then(module => ({ default: module.RecordDetailPage })))
 const ModelsPage = lazy(() => import('./features/models/preview/ModelPreviewPage'))
 const SettingsPage = lazy(() => import('./features/settings').then(module => ({ default: module.SettingsPage })))
+const VoiceLibraryPage = lazy(() => import('./features/voices/VoiceLibraryPage').then(module => ({ default: module.VoiceLibraryPage })))
 
 /** Keep the Assistant-ui runtime outside the route element that is keyed by path. */
 export function ApplicationShell({ children, pages = APPLICATION_PAGES }: { children?: ReactNode; pages?: RoutesProps['pages'] }) {
@@ -55,6 +57,7 @@ export function ApplicationShell({ children, pages = APPLICATION_PAGES }: { chil
 
 /** The documentation demo uses the same page registry as the desktop app. */
 export const APPLICATION_PAGES = {
+  voices: () => <VoiceLibraryPage />,
   home: () => <HomePage />,
   workspace: () => <OverlayPage />,
   overlay: () => <OverlayPage />,
@@ -86,7 +89,7 @@ function GameRoutePage() {
 }
 
 export function useApplicationNavigation(): AppShellNavigationItem[] {
-  const { t, dictionary } = useI18n()
+  const { t, dictionary, language } = useI18n()
   const { route, path, tab, navigate } = useRoute()
   const returnPath = useRef('#/')
   const workbenchReturnPath = useRef('#/')
@@ -132,6 +135,8 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
       active: route === id || id === 'workspace' && route === 'overlay',
       onPress: () => navigate(path),
     })),
+    { section: 'features', id: 'voices', label: ttsText(language, 'title'), icon: AudioLines, path: '#/voices', active: route === 'voices',
+      onPress: () => navigate('#/voices') },
     { section: 'features', id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#/workbench',
       onPress: () => navigate('#/workbench'),
     },

@@ -3,11 +3,11 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const codeBlockVariants = cva(
-  'group/code-block relative flex w-full min-w-0 flex-col overflow-hidden rounded-xl text-sm has-[>[data-slot=code-block-content]:focus-visible]:ring-[3px] has-[>[data-slot=code-block-content]:focus-visible]:ring-ring/50 data-[size=sm]:rounded-lg data-[size=sm]:text-xs',
+  'group/code-block relative flex w-full min-w-0 flex-col overflow-hidden rounded-xl text-sm   data-[size=sm]:rounded-lg data-[size=sm]:text-xs',
   {
     variants: {
       variant: {
-        default: 'border border-input bg-card text-card-foreground has-[>[data-slot=code-block-content]:focus-visible]:border-ring',
+        default: 'border border-input bg-card text-card-foreground ',
         destructive: 'border border-destructive/30 text-destructive dark:border-destructive/40',
       },
     },

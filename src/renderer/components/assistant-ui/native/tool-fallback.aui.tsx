@@ -623,7 +623,7 @@ function ToolFallbackApprovalQuestions({
                     <Button
                       key={option.id}
                       size="sm"
-                      variant={pressed ? "default" : "outline"}
+                      variant={pressed ? "default" : "secondary"}
                       className={cn(
                         pressable,
                         described &&
@@ -676,7 +676,7 @@ function ToolFallbackApprovalQuestions({
         {dismissible ? (
           <Button
             size="sm"
-            variant="outline"
+            variant="secondary"
             className={pressable}
             onClick={onDismiss}
             disabled={locked}
@@ -950,7 +950,7 @@ function ToolFallbackApprovalImpl({
   const dismissButton = dismissible ? (
     <Button
       size="sm"
-      variant="outline"
+      variant="secondary"
       className={pressable}
       onClick={dismiss}
       disabled={locked}
@@ -1066,7 +1066,7 @@ function ToolFallbackApprovalImpl({
           </Button>
           <Button
             size="sm"
-            variant="outline"
+            variant="secondary"
             className={pressable}
             onClick={() => {
               focusPendingGroup();
@@ -1105,7 +1105,7 @@ function ToolFallbackApprovalImpl({
               <Button
                 key={option.id}
                 size="sm"
-                variant={option === allowOptions[0] ? "default" : "outline"}
+                variant={option === allowOptions[0] ? "default" : "secondary"}
                 className={pressable}
                 onClick={() => handleOption(option)}
                 disabled={locked}
@@ -1117,7 +1117,7 @@ function ToolFallbackApprovalImpl({
           {rejectOptions.length === 0 && !question && (
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               className={pressable}
               onClick={() => respond(false)}
               disabled={locked}
@@ -1180,7 +1180,7 @@ function ToolFallbackApprovalImpl({
         </Button>
         <Button
           size="sm"
-          variant="outline"
+          variant="secondary"
           className={pressable}
           onClick={() => respond(false)}
           disabled={locked}

@@ -300,7 +300,7 @@ export function ProcessingTools({
         <h3>{label('result')}</h3>
         <output className="gt-tool-preview">{result || '—'}</output>
       </div>
-      <Button variant="outline" onClick={() => setOpen(!open)} aria-expanded={open}>
+      <Button variant="secondary" onClick={() => setOpen(!open)} aria-expanded={open}>
         {label('order')}
       </Button>
       {open && (

@@ -17,13 +17,12 @@ describe('extension preferences', () => {
     expect(settings).toMatchObject({ pageLanguage: 'en', videoLanguage: 'ja', pipeline: 's2s', pageProvider: 'index-translate', autoSites: ['https://example.com'], contextAware: false })
     expect(settings).not.toHaveProperty('liquidGlass')
   })
-  it('validates imported values and discards malformed terms and rules', () => {
-    const settings = readPreferences({ sourceLanguage: '<invalid>', subtitleSize: 900, ttsRate: NaN, batchSize: -2, glossary: [null, { source: 'API', target: '接口', sites: '' }, { source: 4 }], siteRules: [null, { host: 'example.com', includeSelectors: 'article', excludeSelectors: '.ad' }] })
+  it('validates imported values and discards malformed site rules', () => {
+    const settings = readPreferences({ sourceLanguage: '<invalid>', subtitleSize: 900, ttsRate: NaN, batchSize: -2, siteRules: [null, { host: 'example.com', includeSelectors: 'article', excludeSelectors: '.ad' }] })
     expect(settings.sourceLanguage).toBe('auto')
     expect(settings.subtitleSize).toBe(60)
     expect(settings.ttsRate).toBe(1)
     expect(settings.batchSize).toBe(1)
-    expect(settings.glossary).toHaveLength(1)
     expect(settings.siteRules).toHaveLength(1)
     expect(readPreferences({ autoSites: ['http://localhost:8080', 'https://example.com'] }).autoSites).toEqual(['http://localhost:8080', 'https://example.com'])
     expect(readPreferences({ pipeline: 'desktop' }).pipeline).toBe('cascade')

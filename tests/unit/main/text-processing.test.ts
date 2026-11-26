@@ -23,22 +23,6 @@ function openSettings() {
   return new TextProcessing(filename, async () => null, () => {}, () => {})
 }
 
-it('migrates preview drafts once and requires explicit activation of existing scripts', async () => {
-  const service = openSettings()
-  await service.migrate({
-    enabled: { normalize: true, 'python-pre': true },
-    'tables:python-pre': [{ rules: [{ script: 'def POSTSOLVE(text): return text' }] }],
-    'scene:screen': false,
-  })
-  const reopened = openSettings()
-  const config = await reopened.migrate({ 'scene:screen': true })
-  expect(config.values).toMatchObject({
-    enabled: { normalize: true, 'python-pre': false },
-    'script:python-pre': 'def POSTSOLVE(text): return text',
-    'scene:screen': false,
-  })
-  expect(await reopened.prepare('screen', { text: 'Ａ' })).toMatchObject({ text: 'Ａ', glossary: false, protect: false })
-})
 
 it('keeps the last valid VNDB import if the remote request fails', async () => {
   const remote = vi.fn()

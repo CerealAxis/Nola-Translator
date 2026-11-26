@@ -242,7 +242,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
         if record.kind in ("detectModel", "inpaintModel"):
             assert record.languages == []
         else:
-            assert 0 < len(record.languages) <= 200
+            assert record.languages
         assert ResourceRecord.model_validate(record.model_dump()) == record
 
 

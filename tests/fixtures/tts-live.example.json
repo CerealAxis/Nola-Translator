@@ -1,0 +1,5 @@
+[
+  { "providerId": "mimo", "modelId": "mimo-v2.5-tts", "keyEnv": "MIMO_API_KEY", "endpoint": "https://api.xiaomimimo.com/v1", "voiceId": "Mia", "text": "Hello. This is a voice test.", "targetLanguage": "en" },
+  { "providerId": "mimo", "modelId": "mimo-v2.5-tts-voicedesign", "keyEnv": "MIMO_API_KEY", "endpoint": "https://api.xiaomimimo.com/v1", "description": "A warm adult narrator with clear articulation.", "text": "Hello. This is a voice design test.", "targetLanguage": "en" },
+  { "providerId": "mimo", "modelId": "mimo-v2.5-tts-voiceclone", "keyEnv": "MIMO_API_KEY", "endpoint": "https://api.xiaomimimo.com/v1", "referencePath": "reference.wav", "text": "Hello. This is a voice cloning test.", "targetLanguage": "en" }
+]

@@ -46,7 +46,7 @@ export function RecordDeleteDialog({
             </AlertDialog.Description>
           </DialogHeader>
           <DialogFooter>
-            <AlertDialog.Close render={<Button variant="tertiary" size="sm" />} disabled={isPending}>
+            <AlertDialog.Close render={<Button variant="secondary" size="sm" />} disabled={isPending}>
               {t('common.cancel')}
             </AlertDialog.Close>
             <Button variant="danger" size="sm" disabled={isPending} onClick={onConfirm}>

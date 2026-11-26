@@ -10,6 +10,21 @@ import { GITHUB_PROXY_AUTO } from '../../../src/shared/github-proxies'
 import { PYPI_MIRROR_AUTO, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO } from '../../../src/shared/pypi-mirrors'
 
 describe('设置存储', () => {
+  it.each(['', 'speaker_1', ' unknown:旧音色 '])('upgrades the v1.2.3 synthesis fields without dropping voice %j', async voice => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-tts-release-upgrade-'))
+    const path = join(directory, 'settings.json')
+    try {
+      await writeFile(path, JSON.stringify({ version: 3, synthesis: { modelId: 'local-tts', voice } }))
+      const store = new SettingsStore(path)
+      const loaded = await store.load()
+      expect(loaded.synthesis.voiceRef).toEqual(voice ? { kind: 'preset', modelBinding: 'resource:local-tts', voiceId: voice } : { kind: 'engine-default' })
+      await store.update({ theme: 'dark' })
+      const persisted = JSON.parse(await readFile(path, 'utf8'))
+      expect(persisted.synthesis.voice).toBeUndefined()
+      expect(persisted.synthesis.voiceRef).toEqual(loaded.synthesis.voiceRef)
+      expect((await new SettingsStore(path).load()).synthesis.voiceRef).toEqual(loaded.synthesis.voiceRef)
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
   it('restores the model workspace while rejecting credentials in its settings payload', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-model-management-'))
     const path = join(directory, 'settings.json')
@@ -82,12 +97,12 @@ describe('设置存储', () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-vad-settings-'))
     const path = join(directory, 'settings.json')
     try {
-      await writeFile(path, JSON.stringify({ version: 2, recognition: { modelId: 'sensevoice-small' } }))
+      await writeFile(path, JSON.stringify({ version: 3, recognition: { modelId: 'sensevoice-small' } }))
       const store = new SettingsStore(path)
       expect((await store.load()).recognition).toMatchObject({ max_segment_ms: 10000, silence_end_ms: 800 })
       await store.update({ recognition: { max_segment_ms: 15000, silence_end_ms: 1200 } })
       expect((await new SettingsStore(path).load()).recognition).toMatchObject({ max_segment_ms: 15000, silence_end_ms: 1200 })
-      await writeFile(path, JSON.stringify({ version: 2, recognition: { max_segment_ms: -1, silence_end_ms: 'bad' } }))
+      await writeFile(path, JSON.stringify({ version: 3, recognition: { max_segment_ms: -1, silence_end_ms: 'bad' } }))
       expect((await new SettingsStore(path).load()).recognition).toMatchObject({ max_segment_ms: 10000, silence_end_ms: 800 })
     } finally { await rm(directory, { recursive: true, force: true }) }
   })
@@ -146,13 +161,13 @@ describe('设置存储', () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')
     try {
-      await writeFile(path, JSON.stringify({ version: 1, theme: 'system', overlay: { mode: 'top' } }), 'utf8')
+      await writeFile(path, JSON.stringify({ version: 3, theme: 'system', overlay: { mode: 'top' } }), 'utf8')
       const legacy = await new SettingsStore(path).load()
       expect(legacy.uiLanguage).toBe('auto')
       expect(legacy.modelStoragePath).toBe('')
       expect(legacy.overlay.mode).toBe('top')
 
-      await writeFile(path, JSON.stringify({ version: 1, uiLanguage: 'fr', modelStoragePath: 'relative/models' }), 'utf8')
+      await writeFile(path, JSON.stringify({ version: 3, uiLanguage: 'fr', modelStoragePath: 'relative/models' }), 'utf8')
       const garbage = await new SettingsStore(path).load()
       expect(garbage.uiLanguage).toBe('auto')
       expect(garbage.modelStoragePath).toBe('')
@@ -161,205 +176,11 @@ describe('设置存储', () => {
     }
   })
 
-  it('将现有用户的镜像和加速节点迁移为启用及自动选择，并只执行一次', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
-    const path = join(directory, 'settings.json')
-    try {
-      await writeFile(path, JSON.stringify({
-        version: 1,
-        network: {
-          usePypiMirror: false,
-          pypiMirrorUrl: 'https://mirrors.aliyun.com/pypi/simple/',
-          pytorchWheelMirrorUrl: 'https://mirror.sjtu.edu.cn/pytorch-wheels/',
-          useHuggingFaceMirror: false,
-          useGithubAccelerate: false,
-          githubAccelerateUrl: 'https://gh-proxy.org/',
-        },
-      }), 'utf8')
 
-      const migrated = await new SettingsStore(path).load()
-      expect(migrated.version).toBe(3)
-      expect(migrated.network).toMatchObject({
-        usePypiMirror: true,
-        pypiMirrorUrl: PYPI_MIRROR_AUTO,
-        pytorchWheelMirrorUrl: PYTORCH_WHEEL_MIRROR_AUTO,
-        useHuggingFaceMirror: true,
-        useGithubAccelerate: true,
-        githubAccelerateUrl: GITHUB_PROXY_AUTO,
-      })
 
-      const store = new SettingsStore(path)
-      await store.load()
-      await store.update({ network: {
-        usePypiMirror: false,
-        pypiMirrorUrl: PYPI_MIRROR_OFF,
-        pytorchWheelMirrorUrl: 'https://mirror.sjtu.edu.cn/pytorch-wheels/',
-        githubAccelerateUrl: 'https://gh-proxy.org/',
-      } })
-      const reloaded = await new SettingsStore(path).load()
-      expect(reloaded.network.usePypiMirror).toBe(false)
-      expect(reloaded.network.pypiMirrorUrl).toBe(PYPI_MIRROR_OFF)
-      expect(reloaded.network.pytorchWheelMirrorUrl).toBe('https://mirror.sjtu.edu.cn/pytorch-wheels/')
-      expect(reloaded.network.githubAccelerateUrl).toBe('https://gh-proxy.org/')
-    } finally {
-      await rm(directory, { recursive: true, force: true })
-    }
-  })
 
-  it('迁移旧版字幕默认配色但保留用户自定义颜色', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
-    const path = join(directory, 'settings.json')
-    try {
-      await writeFile(path, JSON.stringify({
-        version: 1,
-        overlay: { backgroundColor: '#202020', translationColor: '#E6F2FF', fontSize: 30 },
-      }), 'utf8')
-      const migrated = await new SettingsStore(path).load()
-      expect(migrated.overlay.backgroundColor).toBe(DEFAULT_SETTINGS.overlay.backgroundColor)
-      expect(migrated.overlay.translationColor).toBe(DEFAULT_SETTINGS.overlay.translationColor)
-      expect(migrated.overlay.fontSize).toBe(30)
 
-      await writeFile(path, JSON.stringify({
-        version: 1,
-        overlay: { backgroundColor: '#111111', backgroundOpacity: 0.84, fontSize: 26, translationFontSize: 22, locked: true },
-      }), 'utf8')
-      const oldDefault = await new SettingsStore(path).load()
-      expect(oldDefault.overlay.backgroundColor).toBe(DEFAULT_SETTINGS.overlay.backgroundColor)
-      expect(oldDefault.overlay.fontSize).toBe(DEFAULT_SETTINGS.overlay.fontSize)
-      // 锁定是会话级状态，旧文件里残留的值不再被读回，也不会被下一次写盘带回去。
-      expect(oldDefault.overlay).not.toHaveProperty('locked')
 
-      await writeFile(path, JSON.stringify({
-        version: 1,
-        overlay: { backgroundColor: '#30343A', backgroundOpacity: 0.62, fontSize: 20, sourceColor: '#FFFFFF', translationColor: '#FFFFFF' },
-      }), 'utf8')
-      const previousBar = await new SettingsStore(path).load()
-      expect(previousBar.overlay.backgroundColor).toBe(DEFAULT_SETTINGS.overlay.backgroundColor)
-      expect(previousBar.overlay.backgroundOpacity).toBe(DEFAULT_SETTINGS.overlay.backgroundOpacity)
-      expect(previousBar.overlay.fontSize).toBe(DEFAULT_SETTINGS.overlay.fontSize)
-
-      await writeFile(path, JSON.stringify({
-        version: 1,
-        overlay: { backgroundColor: '#202020', translationColor: '#123456' },
-      }), 'utf8')
-      const customized = await new SettingsStore(path).load()
-      expect(customized.overlay.backgroundColor).toBe('#202020')
-      expect(customized.overlay.translationColor).toBe('#123456')
-
-      await writeFile(path, JSON.stringify({ version: 1, overlay: { translationColor: '#BFC2C8' } }), 'utf8')
-      const priorDefault = await new SettingsStore(path).load()
-      expect(priorDefault.overlay.translationColor).toBe(DEFAULT_SETTINGS.overlay.translationColor)
-    } finally {
-      await rm(directory, { recursive: true, force: true })
-    }
-  })
-
-  it('迁移旧识别模型 ID 与翻译 provider，并丢弃旧中转开关', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
-    const path = join(directory, 'settings.json')
-    try {
-      for (const legacyModelId of ['sherpa-zh-en-small', 'faster-whisper-small', 'totally-unknown-model']) {
-        await writeFile(path, JSON.stringify({
-          version: 1,
-          recognition: { modelId: legacyModelId },
-          translation: { provider: 'argos', allowIntermediate: true, translateIntermediate: true },
-        }), 'utf8')
-        const migrated = await new SettingsStore(path).load()
-        expect(migrated.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
-        expect(migrated.translation.provider).toBe('local')
-        expect(migrated.translation).not.toHaveProperty('allowIntermediate')
-        expect(migrated.translation.translateIntermediate).toBe(true)
-      }
-
-      // 'microsoft' keeps its name; 'openai' and 'ollama' collapse into 'cloud' as an apiFormat.
-      for (const [legacy, expected] of [
-        ['microsoft', 'microsoft'],
-        ['openai', 'cloud'],
-        ['ollama', 'cloud'],
-      ] as const) {
-        await writeFile(path, JSON.stringify({ version: 1, translation: { provider: legacy } }), 'utf8')
-        const preserved = await new SettingsStore(path).load()
-        expect(preserved.translation.provider).toBe(expected)
-      }
-
-      await writeFile(path, JSON.stringify({ version: 1, translation: { provider: 'unknown-provider' } }), 'utf8')
-      const unknown = await new SettingsStore(path).load()
-      expect(unknown.translation.provider).toBe('local')
-
-      await writeFile(path, JSON.stringify({ version: 1, translation: { allowIntermediate: true } }), 'utf8')
-      const pivotDropped = await new SettingsStore(path).load()
-      expect(pivotDropped.translation).not.toHaveProperty('allowIntermediate')
-      expect(pivotDropped.translation.translateIntermediate).toBe(DEFAULT_SETTINGS.translation.translateIntermediate)
-
-      await writeFile(path, JSON.stringify({ version: 1 }), 'utf8')
-      const defaults = await new SettingsStore(path).load()
-      expect(defaults.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
-      expect(defaults.recognition.sourceLanguage).toBe('auto')
-      expect(defaults.translation.provider).toBe('local')
-      expect(defaults.translation.localModelId).toBe('hy-mt2-1.8b-q3-k-m')
-      expect(defaults.translation.targetLanguage).toBe('zh')
-      expect(defaults.translation.translateIntermediate).toBe(DEFAULT_SETTINGS.translation.translateIntermediate)
-    } finally {
-      await rm(directory, { recursive: true, force: true })
-    }
-  })
-
-  it.each([
-    ['qwen3.8-livetranslate-flash-realtime', 'qwen3.8-livetranslate-flash-realtime'],
-    ['qwen3.5-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime'],
-  ] as const)('migrates v2 LiveTranslate %s without enabling speech playback', async (aliyunModel, expectedModel) => {
-    const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-migration-'))
-    const path = join(directory, 'settings.json')
-    try {
-      await writeFile(path, JSON.stringify({
-        version: 2,
-        recognition: { provider: 'aliyun', aliyunModel, aliyunWorkspaceId: 'kept-workspace', aliyunRegion: 'ap-southeast-1' },
-        translation: { provider: 'mymemory', targetLanguage: 'ja', mymemoryEmail: 'kept@example.test' },
-        realtime: { speakerDetection: false },
-        customUserField: { keep: true },
-      }))
-
-      const store = new SettingsStore(path)
-      const migrated = await store.load()
-      expect(migrated).toMatchObject({ version: 3, realtime: { outputMode: 'translation', s2sModel: expectedModel } })
-      expect(migrated.realtime).not.toHaveProperty('speakerDetection')
-      expect(migrated.recognition).toMatchObject({ provider: 'aliyun', aliyunModel, aliyunWorkspaceId: 'kept-workspace', aliyunRegion: 'ap-southeast-1' })
-      expect(migrated.translation).toMatchObject({ provider: 'mymemory', targetLanguage: 'ja', mymemoryEmail: 'kept@example.test' })
-      expect(JSON.parse(await readFile(path, 'utf8')).customUserField).toEqual({ keep: true })
-      expect(await readFile(`${path}.migration-v3.bak`).catch(() => '')).toBe('')
-
-      const again = await new SettingsStore(path).load()
-      expect(again.realtime).toEqual(migrated.realtime)
-    } finally { await rm(directory, { recursive: true, force: true }) }
-  })
-
-  it.each(['translation', 'speech'] as const)('preserves explicitly saved %s playback during migration', async outputMode => {
-    const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-playback-'))
-    const path = join(directory, 'settings.json')
-    try {
-      await writeFile(path, JSON.stringify({ version: 2,
-        recognition: { provider: 'aliyun', aliyunModel: 'qwen3.5-livetranslate-flash-realtime' },
-        translation: { provider: 'mymemory', targetLanguage: 'en' }, realtime: { outputMode },
-      }))
-      expect((await new SettingsStore(path).load()).realtime).toMatchObject({ outputMode, s2sModel: 'qwen3.5-livetranslate-flash-realtime' })
-    } finally { await rm(directory, { recursive: true, force: true }) }
-  })
-
-  it('keeps source-only and pure-ASR configurations out of speech migration', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-migration-'))
-    const path = join(directory, 'settings.json')
-    try {
-      await writeFile(path, JSON.stringify({ version: 2, recognition: { provider: 'aliyun', aliyunModel: 'qwen3.8-livetranslate-flash-realtime' }, translation: { targetLanguage: 'none' } }))
-      expect((await new SettingsStore(path).load()).realtime?.outputMode).toBe('source')
-
-      await writeFile(path, JSON.stringify({ version: 2, recognition: { provider: 'aliyun', aliyunModel: 'qwen3-asr-flash-realtime' }, translation: { provider: 'mymemory', targetLanguage: 'ja' } }))
-      expect((await new SettingsStore(path).load()).realtime).toMatchObject({ outputMode: 'translation' })
-      expect((await new SettingsStore(path).load()).realtime).not.toHaveProperty('s2sModel')
-
-      await writeFile(path, JSON.stringify({ version: 2, recognition: { provider: 'aliyun', aliyunModel: 'unknown-live-model' }, translation: { targetLanguage: 'ja' } }))
-      expect((await new SettingsStore(path).load()).realtime?.outputMode).toBe('translation')
-    } finally { await rm(directory, { recursive: true, force: true }) }
-  })
 
   it('preserves implicit LiveTranslate selection and a later explicit cascade choice', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-selection-'))
@@ -377,21 +198,6 @@ describe('设置存储', () => {
     } finally { await rm(directory, { recursive: true, force: true }) }
   })
 
-  it('restores the byte-for-byte backup after an interrupted settings migration', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-recovery-'))
-    const path = join(directory, 'settings.json')
-    const legacy = JSON.stringify({ version: 2, uiLanguage: 'ja', extra: 'preserve' })
-    try {
-      await writeFile(path, JSON.stringify({ version: 3, uiLanguage: 'en' }))
-      await writeFile(`${path}.migration-v3.bak`, legacy)
-      await writeFile(`${path}.migration-v3.json`, JSON.stringify({ from: 2, to: 3 }))
-      const recovered = await new SettingsStore(path).load()
-      expect(recovered.uiLanguage).toBe('ja')
-      expect(JSON.parse(await readFile(path, 'utf8'))).toMatchObject({ version: 3, extra: 'preserve' })
-      await expect(readFile(`${path}.migration-v3.json`, 'utf8')).rejects.toThrow()
-      await expect(readFile(`${path}.migration-v3.bak`, 'utf8')).rejects.toThrow()
-    } finally { await rm(directory, { recursive: true, force: true }) }
-  })
 
   it.each(['fr', 'none'])('preserves the saved source and %s target language after reloading', async targetLanguage => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
@@ -417,24 +223,13 @@ describe('设置存储', () => {
     const path = join(directory, 'settings.json')
     try {
       await writeFile(path, JSON.stringify({
-        version: 1,
+        version: 3,
         recognition: { sourceLanguage: 'klingon' },
         translation: { targetLanguage: 'klingon' },
       }), 'utf8')
       const read = await new SettingsStore(path).load()
       expect(read.recognition.sourceLanguage).toBe('auto')
       expect(read.translation.targetLanguage).toBe('zh')
-
-      // Old files hold an array from when target languages were multi-select: take the first entry still in the allowlist.
-      for (const [stored, expected] of [
-        [['fr', 'en'], 'fr'],
-        [['xx', 'fr'], 'fr'],
-        [['xx', 'yy'], 'zh'],
-        [[], 'zh'],
-      ] as const) {
-        await writeFile(path, JSON.stringify({ version: 1, translation: { targetLanguages: stored } }), 'utf8')
-        expect((await new SettingsStore(path).load()).translation.targetLanguage).toBe(expected)
-      }
 
       const store = new SettingsStore(path)
       const written = await store.update({ translation: { targetLanguage: 'klingon' } })
@@ -465,28 +260,9 @@ describe('设置存储', () => {
         expect(JSON.parse(await readFile(path, 'utf8')).translation.localModelId).toBe('hy-mt2-1.8b-q3-k-m')
       }
 
-      await writeFile(path, JSON.stringify({ version: 1, translation: { provider: 'hymt2' } }), 'utf8')
-      expect((await new SettingsStore(path).load()).translation.localModelId).toBe('hy-mt2-1.8b-q3-k-m')
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
   })
 
-  it('迁移旧识别模型 ID 时保留同级的源语言', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
-    const path = join(directory, 'settings.json')
-    try {
-      await writeFile(path, JSON.stringify({
-        version: 1,
-        recognition: { modelId: 'sherpa-zh-en-small', sourceLanguage: 'ko' },
-      }), 'utf8')
-
-      const migrated = await new SettingsStore(path).load()
-
-      expect(migrated.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
-      expect(migrated.recognition.sourceLanguage).toBe('ko')
-    } finally {
-      await rm(directory, { recursive: true, force: true })
-    }
-  })
 })

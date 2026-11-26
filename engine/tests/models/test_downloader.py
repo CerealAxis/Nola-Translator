@@ -33,6 +33,7 @@ class _RangeServer:
         self.active = 0
         self.max_active = 0
         self.resolutions = 0
+        self.full_requests = 0
 
         owner = self
 
@@ -45,6 +46,8 @@ class _RangeServer:
                     self.end_headers()
                     return
                 value = self.headers.get("Range")
+                if not value:
+                    owner.full_requests += 1
                 if value:
                     start_text, end_text = value.removeprefix("bytes=").split("-")
                     start = int(start_text)
@@ -248,7 +251,7 @@ def test_server_without_range_support_falls_back_to_one_stream(tmp_path: Path) -
         thread.join()
 
 
-def test_progress_callback_cancellation_keeps_verified_chunks(tmp_path: Path) -> None:
+def test_progress_callback_cancellation_discards_verified_chunks(tmp_path: Path) -> None:
     payload = bytes(range(32))
     server = _RangeServer(payload)
     downloader = ResumableParallelDownloader(
@@ -266,16 +269,16 @@ def test_progress_callback_cancellation_keeps_verified_chunks(tmp_path: Path) ->
         with pytest.raises(RuntimeError, match="cancelled"):
             downloader.download(server.url, tmp_path / "cancelled.bin", _entry(payload), cancel)
 
-        assert (tmp_path / "models" / ".downloads").is_dir()
+        assert not (tmp_path / "models" / ".downloads").exists()
         server.fail_enabled = False
         downloader.download(server.url, tmp_path / "resumed.bin", _entry(payload), lambda *_: None)
         assert (tmp_path / "resumed.bin").read_bytes() == payload
-        assert server.counts[(0, 7)] == 1
+        assert server.counts[(0, 7)] == 2
     finally:
         server.close()
 
 
-def test_small_download_resumes_from_its_saved_byte_offset(tmp_path: Path) -> None:
+def test_small_download_restarts_after_explicit_cancellation(tmp_path: Path) -> None:
     payload = b"x" * (2 * 1024 * 1024 + 17)
     server = _RangeServer(payload)
     downloader = ResumableParallelDownloader(
@@ -292,7 +295,9 @@ def test_small_download_resumes_from_its_saved_byte_offset(tmp_path: Path) -> No
         downloader.download(server.url, tmp_path / "resumed.bin", _entry(payload), lambda *_: None)
 
         assert (tmp_path / "resumed.bin").read_bytes() == payload
-        assert server.counts[(1024 * 1024, len(payload) - 1)] == 1
+        assert not (tmp_path / "models" / ".downloads").exists()
+        assert server.full_requests == 2
+        assert not server.counts
     finally:
         server.close()
 

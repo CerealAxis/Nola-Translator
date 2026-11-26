@@ -59,29 +59,20 @@ describe('SecureCredentialStore', () => {
     expect(await readFile(path, 'utf8')).not.toContain('private-key')
   })
 
-  it('解不开的密文会被剔除并给出可操作的错误', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'fluent-secrets-'))
+  it('preserves ciphertext byte-for-byte after decryption failure and can read it in the original context', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-stale-secrets-'))
     const path = join(directory, 'credentials.json')
     try {
-      // After moving to another machine or Windows user, or renaming productName, old ciphertext no longer decrypts.
-      await writeFile(path, JSON.stringify({ openai: Buffer.from('undecryptable').toString('base64') }), 'utf8')
-      const store = new SecureCredentialStore(path, {
-        ...workingEncryption,
-        decryptString: () => {
-          throw new Error('Error while decrypting the ciphertext provided to safeStorage.decryptString.')
-        },
-      })
-
-      await expect(store.get('openai')).rejects.toBeInstanceOf(StaleCredentialError)
-      expect(await store.has('openai')).toBe(false)
-      // Purging matters: without it every startSession would hit the same decryption failure.
-      expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({})
-
-      // Once purged, reads treat the key as unset and return '' rather than throwing.
-      expect(await store.get('openai')).toBe('')
-    } finally {
-      await rm(directory, { recursive: true, force: true })
-    }
+      const original = JSON.stringify({ cloud: workingEncryption.encryptString('original-key').toString('base64'), other: 'untouched' }, null, 2)
+      await writeFile(path, original)
+      const store = new SecureCredentialStore(path, { ...workingEncryption, decryptString: () => { throw new Error('wrong encryption context') } })
+      await expect(store.get('cloud')).rejects.toBeInstanceOf(StaleCredentialError)
+      expect(await store.has('cloud')).toBe(false)
+      expect(await readFile(path, 'utf8')).toBe(original)
+      const restored = new SecureCredentialStore(path, workingEncryption)
+      expect(await restored.get('cloud')).toBe('original-key')
+      expect(await readFile(path, 'utf8')).toBe(original)
+    } finally { await rm(directory, { recursive: true, force: true }) }
   })
 
   it('没有保存过密钥时直接返回空，不抛错', async () => {

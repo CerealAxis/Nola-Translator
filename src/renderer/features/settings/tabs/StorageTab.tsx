@@ -57,7 +57,7 @@ export function StorageTab({ settings }: SettingsPanelProps) {
             <Input readOnly value={path} aria-label={t('modelsSettingsUi.dataFolder')} className="settings-control-field" />
           </div>
           <Button
-            variant="tertiary"
+            variant="secondary"
             size="sm"
             disabled={busy}
             onClick={() => {

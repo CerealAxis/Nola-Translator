@@ -15,7 +15,9 @@ class FakeGateway:
         self.failures = failures
         self.synthesized = asyncio.Queue()
 
-    async def synthesize(self, ctx, *, text, voice, request):
+    async def synthesize(self, ctx, *, synthesis, request):
+        text = synthesis.text
+        assert synthesis.language == request.target_language
         self.calls.append(text)
         if len(self.calls) <= self.failures:
             raise RuntimeError("temporary synthesis failure")
@@ -34,7 +36,7 @@ async def test_committed_sentences_are_granted_in_order_once(tmp_path):
     async def sink(grant):
         await grants.put(grant)
 
-    assert pipeline.translation_committed({"commit_id": "c1", "text": "one", "segment_id": "s1"})
+    assert pipeline.translation_committed({"commit_id": "c1", "text": "one", "segment_id": "s1", "target_language": "en"})
     assert await asyncio.wait_for(gateway.synthesized.get(), 1) == "one"
     assert pipeline.attach("owner", sink)
     assert not pipeline.attach("other", sink)
@@ -47,7 +49,7 @@ async def test_committed_sentences_are_granted_in_order_once(tmp_path):
     assert ready["at_ms"] >= start["at_ms"]
     assert pipeline.ack(first.job.job_id, "owner", first.claim.claim_id,
                         first.claim.generation, "started")
-    assert pipeline.translation_committed({"commit_id": "c2", "text": "two", "segment_id": "s2"})
+    assert pipeline.translation_committed({"commit_id": "c2", "text": "two", "segment_id": "s2", "target_language": "en"})
     assert await asyncio.wait_for(gateway.synthesized.get(), 1) == "two"
     assert grants.empty()
     assert pipeline.ack(first.job.job_id, "owner", first.claim.claim_id,
@@ -71,7 +73,7 @@ async def test_one_synthesis_failure_retries_before_playback(tmp_path):
                           event_sink=lambda name, payload: events.append((name, payload)))
     grants = asyncio.Queue()
     pipeline.attach("owner", grants.put)
-    assert pipeline.translation_committed({"commit_id": "retry", "text": "retry me"})
+    assert pipeline.translation_committed({"commit_id": "retry", "text": "retry me", "target_language": "en"})
 
     grant = await asyncio.wait_for(grants.get(), 1)
     assert gateway.calls == ["retry me", "retry me"]
@@ -86,8 +88,8 @@ async def test_second_synthesis_failure_exposes_only_oldest_blocked_job(tmp_path
     pipeline = TtsPipeline(gateway, queue, pipeline_id="pipe", epoch=0, model_id="voice")
     grants = asyncio.Queue()
     pipeline.attach("owner", grants.put)
-    assert pipeline.translation_committed({"commit_id": "blocked", "text": "blocked"})
-    assert pipeline.translation_committed({"commit_id": "later", "text": "later"})
+    assert pipeline.translation_committed({"commit_id": "blocked", "text": "blocked", "target_language": "en"})
+    assert pipeline.translation_committed({"commit_id": "later", "text": "later", "target_language": "en"})
     await asyncio.wait_for(pipeline.wait_idle(), 1)
     assert await asyncio.wait_for(gateway.synthesized.get(), 1) == "later"
     assert grants.empty()

@@ -45,7 +45,7 @@ export function LatencyWindow() {
       {snapshot ? <>
         <LatencyTrend snapshot={snapshot} />
         {snapshot.speech && snapshot.available !== false && <AudioTimeline snapshot={snapshot} />}
-      </> : <Card size="sm"><Empty><EmptyHeader><EmptyTitle>{t(failed ? 'latency.connectionFailed' : 'latency.loading')}</EmptyTitle></EmptyHeader>{failed && <Button variant="outline" onClick={() => { setFailed(false); setAttempt(value => value + 1) }}>{t('common.retry')}</Button>}</Empty></Card>}
+      </> : <Card size="sm"><Empty><EmptyHeader><EmptyTitle>{t(failed ? 'latency.connectionFailed' : 'latency.loading')}</EmptyTitle></EmptyHeader>{failed && <Button variant="secondary" onClick={() => { setFailed(false); setAttempt(value => value + 1) }}>{t('common.retry')}</Button>}</Empty></Card>}
     </div>
   </main>
 }

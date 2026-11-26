@@ -72,7 +72,7 @@ function HomeReleaseRow({ release }: { release: ReleaseAnnouncement }) {
         detail={published}
         action={
           <DialogTrigger
-            render={<Button variant="outline" size="sm" />}
+            render={<Button variant="secondary" size="sm" />}
             aria-label={open + ' ' + release.tag}
           >
             {open}<ChevronRight data-icon="inline-end" aria-hidden="true" />
@@ -90,8 +90,8 @@ function HomeReleaseRow({ release }: { release: ReleaseAnnouncement }) {
             : <p className="type-body">{t('appUpdate.notesUnavailable')}</p>}
         </div>
         <DialogFooter className="app-update-dialog-footer">
-          <DialogClose render={<Button variant="outline" size="sm" onClick={() => actions.settings.startOnboarding('welcome')}>{replay}</Button>} />
-          <DialogClose render={<Button variant="outline" size="sm">{t('common.close')}</Button>} />
+          <DialogClose render={<Button variant="secondary" size="sm" onClick={() => actions.settings.startOnboarding('welcome')}>{replay}</Button>} />
+          <DialogClose render={<Button variant="secondary" size="sm">{t('common.close')}</Button>} />
           <Button size="sm" disabled={opening} onClick={() => void openOnGitHub()}>
             {github}<ArrowRight data-icon="inline-end" aria-hidden="true" />
           </Button>
@@ -135,7 +135,7 @@ export function HomeReleaseAnnouncements() {
           {feed.status === 'error' && (
             <div className="flex flex-wrap items-center gap-2">
               <p className="type-body" role="status">{t('appUpdate.checkFailed')}</p>
-              <Button variant="outline" size="sm" onClick={retry}>{t('common.retry')}</Button>
+              <Button variant="secondary" size="sm" onClick={retry}>{t('common.retry')}</Button>
             </div>
           )}
           {feed.status === 'ready' && (feed.releases.length > 0 ? (

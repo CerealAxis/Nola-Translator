@@ -32,7 +32,7 @@ export function MeetingReader({ snapshot }: { snapshot: MeetingModeSnapshot }) {
     <Card><CardHeader><CardTitle>{t('meeting.conversation')}</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">
       <WorkspaceViewControls />
       <Button disabled={snapshot.state !== 'running'} variant="secondary" onClick={() => void getBridge()?.meetingMode?.setPaused(!snapshot.paused).catch(error => notifyError(t('meeting.pauseFailed'), { cause: error }))}>{t(snapshot.paused ? 'workspace.resume' : 'workspace.pause')}</Button>
-      <Button variant="outline" onClick={() => void actions.settings.showOverlay('workspace').then(opened => { if(opened === false) notifyError(t('workspaceUi.overlayFailed')) }).catch(error => notifyError(t('workspaceUi.overlayFailed'), { cause: error }))}><Captions data-icon="inline-start" />{t('workspaceUi.openOverlay')}</Button>
+      <Button variant="secondary" onClick={() => void actions.settings.showOverlay('workspace').then(opened => { if(opened === false) notifyError(t('workspaceUi.overlayFailed')) }).catch(error => notifyError(t('workspaceUi.overlayFailed'), { cause: error }))}><Captions data-icon="inline-start" />{t('workspaceUi.openOverlay')}</Button>
       <Button disabled={!active || snapshot.state === 'starting' || snapshot.state === 'stopping'} onClick={() => void getBridge()?.meetingMode?.stop().catch(error => notifyError(t('meeting.stopFailed'), { cause: error }))}>{t('meeting.stop')}</Button>
     </CardContent></Card>
     {snapshot.error ? <Alert variant="danger"><AlertDescription>{t(errorKey)}</AlertDescription></Alert> : null}

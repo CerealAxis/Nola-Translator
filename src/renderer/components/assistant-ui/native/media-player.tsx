@@ -16,6 +16,7 @@ export interface AudioPlayerProps extends Omit<
   "children"
 > {
   src: string;
+  onTimeChange?: (milliseconds: number) => void;
   title?: string | undefined;
   artwork?: string | undefined;
   durationMs?: number | undefined;
@@ -79,6 +80,7 @@ export function AudioPlayer({
   title,
   artwork,
   durationMs,
+  onTimeChange,
   className,
   ...props
 }: AudioPlayerProps) {
@@ -115,6 +117,11 @@ export function AudioPlayer({
     if (audioRef.current?.error) {
       setPlayback({ src, currentTime: 0, playing: false, hasError: true });
     }
+  }, [src]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    return () => { if (audio && !audio.paused) audio.pause(); };
   }, [src]);
 
   const togglePlayback = () => {
@@ -188,6 +195,7 @@ export function AudioPlayer({
             const resolvedTime = Math.min(nextTime, duration ?? nextTime);
             if (audioRef.current) audioRef.current.currentTime = resolvedTime;
             update({ currentTime: resolvedTime });
+            onTimeChange?.(resolvedTime * 1000);
           }}
           className="accent-foreground w-full cursor-pointer disabled:cursor-default"
         />
@@ -203,9 +211,10 @@ export function AudioPlayer({
         onLoadedMetadata={(event) => {
           setDurationFromMetadata(event.currentTarget.duration);
         }}
-        onTimeUpdate={(event) =>
-          update({ currentTime: event.currentTarget.currentTime })
-        }
+        onTimeUpdate={(event) => {
+          update({ currentTime: event.currentTarget.currentTime });
+          onTimeChange?.(event.currentTarget.currentTime * 1000);
+        }}
         onPlay={() => update({ playing: true })}
         onPause={() => update({ playing: false })}
         onError={() => update({ hasError: true, playing: false })}

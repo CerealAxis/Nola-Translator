@@ -24,7 +24,7 @@ export function DialogCloseButton({ className, ...props }: DialogCloseButtonProp
     <BaseDialog.Close
       {...props}
       aria-label={label}
-      render={<Button variant="tertiary" size="icon" className={cn('nola-dialog-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent', className)} />}
+      render={<Button variant="secondary" size="icon" className={cn('nola-dialog-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent', className)} />}
     >
       <X aria-hidden="true" />
     </BaseDialog.Close>
@@ -42,8 +42,8 @@ export function DialogDescription(props: DialogDescriptionProps) {
 
 export interface DialogContentProps extends Omit<ComponentProps<typeof BaseDialog.Popup>, 'render'> {}
 
-export function DialogContent({ className, ...props }: DialogContentProps) {
-  return <BaseDialog.Portal><BaseDialog.Backdrop data-slot="dialog-backdrop" className="fixed inset-0 z-overlay bg-nola-ui-backdrop" /><BaseDialog.Popup className={cn('nola-dialog-content z-overlay', className)} render={<Card data-slot="dialog-content" />} {...props} /></BaseDialog.Portal>
+export function DialogContent({ className, hidden, style, ...props }: DialogContentProps) {
+  return <BaseDialog.Portal><BaseDialog.Backdrop data-slot="dialog-backdrop" className="fixed inset-0 z-overlay bg-nola-ui-backdrop" /><BaseDialog.Popup hidden={hidden} style={hidden ? { ...style, display: 'none' } : style} className={cn('nola-dialog-content z-overlay', className)} render={<Card data-slot="dialog-content" />} {...props} /></BaseDialog.Portal>
 }
 
 export interface AlertDialogContentProps extends Omit<ComponentProps<typeof BaseAlertDialog.Popup>, 'render'> {}

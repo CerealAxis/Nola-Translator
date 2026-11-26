@@ -10,7 +10,8 @@ it.each(['http://localhost:3000/read', 'http://example.test/read', 'https://exam
 })
 it('classifies privileged browser pages without reporting a permission failure', async () => {
   vi.stubGlobal('chrome', { tabs: { query: async () => [{ id: 1, url: 'chrome://settings' }] } })
-  const store = createPopupStore(); await store.init(); expect(store.getSnapshot()).toMatchObject({ availability: 'restricted', enabled: false, error: undefined })
+  const store = createPopupStore(); await store.init(); expect(store.getSnapshot()).toMatchObject({ availability: 'restricted', enabled: false })
+  expect(store.getSnapshot().error).toBeUndefined()
 })
 
 it('does not report site activation when background registration failed', async () => {
@@ -22,12 +23,14 @@ it('does not report site activation when background registration failed', async 
 it('does not mistake a programmatic popup without activeTab URL metadata for a denied webpage', async () => {
   vi.stubGlobal('chrome', { tabs: { query: async () => [{ id: 1 }] } })
   const store = createPopupStore();await store.init()
-  expect(store.getSnapshot()).toMatchObject({ availability: 'unavailable', tabId: 1, enabled: false, error: undefined })
+  expect(store.getSnapshot()).toMatchObject({ availability: 'unavailable', tabId: 1, enabled: false })
+  expect(store.getSnapshot().error).toBeUndefined()
 })
 it('reports unavailable metadata when the browser has no active tab', async () => {
   vi.stubGlobal('chrome', { tabs: { query: async () => [] } })
   const store = createPopupStore();await store.init()
-  expect(store.getSnapshot()).toMatchObject({ availability: 'unavailable', enabled: false, error: undefined })
+  expect(store.getSnapshot()).toMatchObject({ availability: 'unavailable', enabled: false })
+  expect(store.getSnapshot().error).toBeUndefined()
 })
 it('reinjects an already-open ordinary page when static content is not present yet', async () => {
   const sendMessage = vi.fn().mockRejectedValueOnce(new Error('Receiving end does not exist')).mockResolvedValue({ pageActive: false })
@@ -35,12 +38,14 @@ it('reinjects an already-open ordinary page when static content is not present y
   vi.stubGlobal('chrome', { tabs: { query: async () => [{ id: 2, url: 'https://ordinary.test/read' }], sendMessage }, permissions: { contains: async () => true }, scripting: { executeScript } })
   const store = createPopupStore();await store.init()
   expect(store.getSnapshot()).toMatchObject({ availability: 'ready', enabled: true })
+  expect(store.getSnapshot().error).toBeUndefined()
   expect(executeScript).toHaveBeenCalledTimes(2)
 })
 it('keeps browser-protected HTTPS pages unavailable without a misleading grant-permission error', async () => {
   vi.stubGlobal('chrome', { tabs: { query: async () => [{ id: 2, url: 'https://chromewebstore.google.com/' }], sendMessage: async () => { throw new Error('No receiver') } }, permissions: { contains: async () => true }, scripting: { executeScript: async () => { throw new Error('Cannot access extensions gallery') } } })
   const store = createPopupStore();await store.init()
-  expect(store.getSnapshot()).toMatchObject({ availability: 'restricted', enabled: false, error: undefined })
+  expect(store.getSnapshot()).toMatchObject({ availability: 'restricted', enabled: false })
+  expect(store.getSnapshot().error).toBeUndefined()
 })
 
 it('clears old tab data and ignores a late status response after a sidebar tab switch', async () => {
@@ -53,6 +58,7 @@ it('clears old tab data and ignores a late status response after a sidebar tab s
   await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledOnce())
   await store.init()
   completeOld({ pageActive: true, video: true, pageError: 'old-error' });await old
-  expect(store.getSnapshot()).toMatchObject({ tabId: 2, url: 'https://new.test/', pageActive: false, video: false, error: undefined })
+  expect(store.getSnapshot()).toMatchObject({ tabId: 2, url: 'https://new.test/', pageActive: false, video: false })
+  expect(store.getSnapshot().error).toBeUndefined()
   expect(store.getSnapshot().pageError).toBeUndefined()
 })

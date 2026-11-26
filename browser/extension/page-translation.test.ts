@@ -371,7 +371,7 @@ it('does not include text from descendants hidden by CSS', async () => {
   } finally { page.stop() }
 })
 
-it('continues translating later paragraphs and retries only failed work when requested', async () => {
+it('continues translating later paragraphs and automatically retries only failed work', async () => {
   document.body.innerHTML = '<main><p>Some text</p><p>Later paragraph</p></main>'
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
   const translate = vi.fn(async (text: string) => 'Translated ' + text).mockRejectedValueOnce(new Error('providerNetwork'))
@@ -380,10 +380,7 @@ it('continues translating later paragraphs and retries only failed work when req
     page.configure({ ...DEFAULT_PREFERENCES, translateTitle: false })
     page.setConcurrency(1)
     page.start()
-    await waitFor(() => expect(page.state().pageError).toBe('providerNetwork'))
     await waitFor(() => expect(document.querySelector('p:nth-child(2) [data-nola-translation]')?.textContent).toBe('Translated Later paragraph'))
-    expect(translate).toHaveBeenCalledTimes(2)
-    page.start()
     await waitFor(() => expect(document.querySelector('p:first-child [data-nola-translation]')?.textContent).toBe('Translated Some text'))
     expect(translate).toHaveBeenCalledTimes(3)
   } finally { page.stop() }

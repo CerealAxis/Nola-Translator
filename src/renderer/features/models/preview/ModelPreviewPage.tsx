@@ -317,7 +317,7 @@ function CategoryWorkspace({ type, connections, families, installed, localSource
         <AlertDialogHeader><AlertDialogTitle>{modelWorkspaceText(language, 'removeSource').replace('{name}', removing.name)}</AlertDialogTitle></AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => { void removing.confirm(); setRemoving(null) }}>{modelWorkspaceText(language, 'remove')}</AlertDialogAction>
+          <AlertDialogAction variant="danger" onClick={() => { void removing.confirm(); setRemoving(null) }}>{modelWorkspaceText(language, 'remove')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>}

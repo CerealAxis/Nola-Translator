@@ -112,6 +112,7 @@ function subscribe<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTrans
 export function createIpcBridge(): NolaBridge {
   return {
     screenTranslation: adaptFeature(injectedApi()?.screenTranslation),
+    voices: adaptFeature(injectedApi()?.voices),
     desktopData: adaptFeature(injectedApi()?.desktopData),
     glossary: adaptFeature(injectedApi()?.glossary),
     comic: adaptFeature(injectedApi()?.comic),

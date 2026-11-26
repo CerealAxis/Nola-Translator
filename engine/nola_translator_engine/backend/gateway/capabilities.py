@@ -45,6 +45,9 @@ class Operation(str, Enum):
     GENERATE = "generate"
     SYNTHESIZE = "synthesize"
     SYNTHESIZE_STREAM = "synthesize_stream"
+    CONVERT_VOICE = "convert_voice"
+    DESIGN_VOICE = "design_voice"
+    INSPECT_VOICES = "inspect_voices"
     S2S_SESSION = "s2s_session"
 
 
@@ -54,7 +57,7 @@ KIND_OPERATIONS: dict[ModelKind, frozenset[Operation]] = {
     ModelKind.ASR: frozenset({Operation.TRANSCRIBE, Operation.TRANSCRIBE_STREAM}),
     ModelKind.MT: frozenset({Operation.TRANSLATE, Operation.TRANSLATE_STREAM}),
     ModelKind.LLM: frozenset({Operation.GENERATE, Operation.TRANSLATE, Operation.TRANSLATE_STREAM}),
-    ModelKind.TTS: frozenset({Operation.SYNTHESIZE, Operation.SYNTHESIZE_STREAM}),
+    ModelKind.TTS: frozenset({Operation.SYNTHESIZE, Operation.SYNTHESIZE_STREAM, Operation.CONVERT_VOICE, Operation.DESIGN_VOICE, Operation.INSPECT_VOICES}),
     ModelKind.S2S: frozenset({Operation.S2S_SESSION}),
 }
 
@@ -163,6 +166,22 @@ class CapabilityEvidence(GatewayModel):
     limitation: str | None = None
 
 
+class VoiceDescriptor(GatewayModel):
+    id: str
+    name: str
+    languages: list[str] = Field(default_factory=list)
+    locale: str | None = None
+    styles: list[str] = Field(default_factory=list)
+
+
+class VoiceCapabilities(GatewayModel):
+    preset_voices: list[VoiceDescriptor] = Field(default_factory=list)
+    default_voice: str | None = None
+    supports_cloning: bool | None = None
+    supports_voice_design: bool | None = None
+    supports_voice_conversion: bool | None = None
+
+
 class ModelCapabilities(GatewayModel):
     """Capability declaration keyed by operation × runtime × model version."""
 
@@ -175,6 +194,7 @@ class ModelCapabilities(GatewayModel):
     operations: list[Operation] = Field(default_factory=list)
     operation_profiles: dict[Operation, OperationProfile] = Field(default_factory=dict)
     languages: LanguageCapabilities = Field(default_factory=LanguageCapabilities)
+    voices: VoiceCapabilities = Field(default_factory=VoiceCapabilities)
     context: ContextCapabilities = Field(default_factory=ContextCapabilities)
     concurrency: ConcurrencyCapabilities = Field(default_factory=ConcurrencyCapabilities)
     limits: LimitCapabilities = Field(default_factory=LimitCapabilities)

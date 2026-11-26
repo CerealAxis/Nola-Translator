@@ -99,7 +99,7 @@ export function SubtitleToolbar({
   if (flags.through || flags.overlay || flags.hide)
     return (
       <Button
-        variant="outline"
+        variant="secondary"
         className="gt-toolbar-restore"
         size="icon-sm"
         data-through={flags.through}

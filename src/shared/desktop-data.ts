@@ -4,9 +4,9 @@ export const desktopDataKinds = ['configuration', 'content', 'audio', 'models', 
 export type DesktopDataKind = typeof desktopDataKinds[number]
 export interface DesktopDataEntry { name: string; kind: DesktopDataKind }
 export const DESKTOP_DATA_ENTRIES: readonly DesktopDataEntry[] = [
-  ...['settings.json', 'screen-translation.json', 'glossary.json', 'word-rules.json', 'text-processing.json', 'game-translation.json', 'workspace-window.json',
-    'settings.json.migration-v3.json', 'settings.json.migration-v3.bak'].map(name => ({ name, kind: 'configuration' as const })),
+  ...['settings.json', 'screen-translation.json', 'glossary.json', 'word-rules.json', 'text-processing.json', 'game-translation.json', 'workspace-window.json'].map(name => ({ name, kind: 'configuration' as const })),
   ...['history.jsonl', 'meetings', 'comics', 'local-call'].map(name => ({ name, kind: 'content' as const })),
+  { name: 'voices.sqlite3', kind: 'content' }, { name: 'voices', kind: 'audio' },
   { name: 'credentials.json', kind: 'credentials' }, { name: 'session-journal', kind: 'runtime' },
   { name: 'models', kind: 'models' }, { name: 'runtimes', kind: 'models' },
   { name: 'cache', kind: 'cache' }, { name: 'logs', kind: 'logs' },

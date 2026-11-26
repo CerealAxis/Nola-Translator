@@ -30,7 +30,7 @@ export function ResetCaptionAppearanceButton() {
       .catch((error: unknown) => reportSettingsFailure(t('settings.resetAppearanceFailed'), error))
   }
 
-  return <Button variant="outline" size="sm" disabled={pending} onClick={restore}>{t('modelsSettingsUi.resetAppearance')}</Button>
+  return <Button variant="secondary" size="sm" disabled={pending} onClick={restore}>{t('modelsSettingsUi.resetAppearance')}</Button>
 }
 
 export function AppearanceTab({ settings }: SettingsPanelProps) {

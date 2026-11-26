@@ -6,7 +6,7 @@ import { SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { notifyError, notifyInfo, notifySuccess } from './notify'
-import type { ModelGatewaySnapshot } from '../../../shared/model-gateway'
+import { gatewayStartupHint, type ModelGatewaySnapshot } from '../../../shared/model-gateway'
 
 /** Independent consumers share gateway capabilities without stopping another feature. */
 export async function requestFeatureStart<T>(action: () => Promise<T>, _feature?: ActiveFeature): Promise<T> {
@@ -36,15 +36,15 @@ export function FeatureActivityNotice() {
             console.error(`[gateway.${kind}]`, service.error)
             const code = supportErrorCodeForCause(service.errorCode)
             const outOfMemory = code === 'ERR-999' && /out of memory|\boom\b|cuda.*alloc/i.test(service.error ?? '')
-            notifyError(t('gateway.capabilityFailed', { name: t(`gateway.${kind}`) }), {
+            notifyError(t('gateway.startupFailed'), {
               supportCode: outOfMemory ? 'MDL-020' : code,
-              description: t(code !== 'ERR-999' ? SUPPORT_ERROR_CATALOG[code].messageKey
-                : outOfMemory ? 'gateway.memoryFailed' : 'gateway.serviceFailed'),
+              description: `${t(`gateway.${kind}`)}：${t(code !== 'ERR-999' ? SUPPORT_ERROR_CATALOG[code].messageKey
+                : outOfMemory ? 'gateway.memoryFailed' : 'gateway.serviceFailed')}`,
             })
           }
         }
         if (!stopping && snapshot.state === 'failed' && previous.state !== 'failed' && !Object.values(snapshot.services).some(service => service.state === 'failed')) {
-          notifyError(t('gateway.startupFailed'), { description: t('gateway.startupRetryHint') })
+          notifyError(t('gateway.startupFailed'), { description: t(gatewayStartupHint(snapshot.errorCode)) })
         }
         if (snapshot.state === 'running' && previous.state !== 'running') notifySuccess(t('gateway.startedNotice'))
         if (snapshot.state === 'stopped' && previous.state !== 'stopped') notifyInfo(t('gateway.stoppedNotice'))

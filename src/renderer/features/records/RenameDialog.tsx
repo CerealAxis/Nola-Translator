@@ -88,7 +88,7 @@ export function RenameDialog({ meetingId, initialTitle = '', onClose }: RenameDi
           </Field>
 
           <DialogFooter>
-            <Button variant="tertiary" size="sm" disabled={pending} onClick={onClose}>
+            <Button variant="secondary" size="sm" disabled={pending} onClick={onClose}>
               {t('common.cancel')}
             </Button>
             <Button size="sm" disabled={pending || empty} aria-busy={pending} onClick={submit}>

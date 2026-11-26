@@ -299,12 +299,11 @@ export function DemoScene({ onSelectionEnd, savedRegions, onRegionsChange, simpl
   const inlineDialogue = showInPlace && inlineRegions.some(area => covers(area, dialogueArea))
   const inlineQuest = showInPlace && inlineRegions.some(area => covers(area, questArea))
   const embedLine = embedded && source === 'hook' && active
-  const legacyEmbedded = embedLine && embeddedLine === undefined
   const animateDialogue = !active && !kind && !showInPlace && !line.original && !line.translation && showTranslation
     && dialogueLine.original !== dialogueLine.translation
   const gameNameLabel = gameName || 'Lantern Letters'
   const drawOriginal = showOriginal && !!line.original
-  const drawTranslation = (showTranslation || legacyEmbedded) && !!line.translation
+  const drawTranslation = showTranslation && !!line.translation
   return <div className="game-demo-scene-content" onKeyDown={event => {
     if (event.key === 'Escape' && kind) { event.stopPropagation(); cancel() }
   }}>
@@ -352,12 +351,12 @@ export function DemoScene({ onSelectionEnd, savedRegions, onRegionsChange, simpl
             {kind && draft && <rect {...draft} className="game-demo-region game-demo-region-draft" />}
           </svg>
           {!kind && !showInPlace && <div className="game-demo-captions">
-            {(drawOriginal || drawTranslation) && <div className="game-demo-caption" data-embedded={legacyEmbedded} style={{ fontSize }}>
+            {(drawOriginal || drawTranslation) && <div className="game-demo-caption" style={{ fontSize }}>
               {drawOriginal && <span style={originalFontSize ? { fontSize: originalFontSize } : undefined}>{line.original}</span>}
               {drawTranslation && <strong lang={targetLanguage}>{line.translation}</strong>}
             </div>}
           </div>}
-          {temporaryRegion && !kind && <Button className="game-demo-close-inline" variant="outline" size="icon-sm"
+          {temporaryRegion && !kind && <Button className="game-demo-close-inline" variant="secondary" size="icon-sm"
             aria-label={s('closeInline')} tooltip={s('closeInline')} onClick={() => setTemporaryRegion(null)}><X /></Button>}
           <div id="game-demo-subtitle-tools" hidden={!active || !!kind || source === 'hook' && !line.original && !line.translation && !(embedLine && embeddedLine)} />
         </div>
@@ -366,10 +365,10 @@ export function DemoScene({ onSelectionEnd, savedRegions, onRegionsChange, simpl
       {kind && <div className="game-demo-scene-actions" role="group" aria-label={s(kind === 'once' ? 'once' : 'ongoing')}>
         <span className="type-small">{s(kind === 'once' ? 'once' : 'ongoing')}</span>
         <Button variant="bare" size="icon-sm" aria-label={s('drag')} tooltip={s('drag')}><HelpCircle /></Button>
-        <Button ref={dialogueButton} variant="outline" size="sm" aria-pressed={draft === dialogueArea} onClick={() => setDraft(dialogueArea)}>{s('dialogue')}</Button>
-        <Button variant="outline" size="sm" aria-pressed={draft === questArea} onClick={() => setDraft(questArea)}>{s('quest')}</Button>
+        <Button ref={dialogueButton} variant="secondary" size="sm" aria-pressed={draft === dialogueArea} onClick={() => setDraft(dialogueArea)}>{s('dialogue')}</Button>
+        <Button variant="secondary" size="sm" aria-pressed={draft === questArea} onClick={() => setDraft(questArea)}>{s('quest')}</Button>
         <Button size="sm" disabled={!draft} onClick={confirm}>{s('confirm')}</Button>
-        <Button variant="outline" size="sm" onClick={cancel}>{s('cancel')}</Button>
+        <Button variant="secondary" size="sm" onClick={cancel}>{s('cancel')}</Button>
       </div>}
       {source === 'ocr' && !simplified && <details className="game-demo-sheet">
         <summary><ChevronRight aria-hidden="true" />{s('regions')}</summary>
@@ -400,7 +399,7 @@ export function DemoScene({ onSelectionEnd, savedRegions, onRegionsChange, simpl
             change={method === 'image' ? setStability : setTriggerStability} min={0} max={1} step={.001} />}
           {method === 'image' && <NumberField label={s('similarity')} value={similarity} change={setSimilarity} min={0} max={1} step={.001} />}
           <NumberField label={s('textDifference')} value={textDifference} change={setTextDifference} min={0} max={100000} step={1} />
-          <Button variant="outline" size="sm" disabled={!regions.length} onClick={() => dispatchDemoSceneTool('clear-regions')}><Trash2 />{s('clear')}</Button>
+          <Button variant="secondary" size="sm" disabled={!regions.length} onClick={() => dispatchDemoSceneTool('clear-regions')}><Trash2 />{s('clear')}</Button>
         </div>
       </details>}
   </div>

@@ -1,5 +1,3 @@
-import json
-from dataclasses import replace
 
 import pytest
 
@@ -50,28 +48,6 @@ def test_configuration_is_persisted_and_broadcast(tmp_path, monkeypatch):
     assert supports_translation(config, "ja", "en")
     assert not supports_translation(config, "en", "ja")
     assert not supports_translation(config, "zh", "en")
-
-
-def test_v1_registry_persists_auto_detection_migration_once(tmp_path):
-    manager = ResourceManager(tmp_path, lambda event: None)
-    entry = register(manager)
-    legacy_configuration = bilingual(supportsAutoDetection=False, sourceLanguages=["en", "ja"])
-    legacy_entry = replace(entry, configuration=legacy_configuration)
-    registry = CustomModelRegistry(tmp_path)
-    registry.path.write_text(json.dumps({"version": 1, "models": [legacy_entry.to_json()]}), encoding="utf-8")
-
-    migrated = registry.get(entry.resource_id)
-
-    assert migrated.configuration.supportsAutoDetection is True
-    assert migrated.configuration.sourceLanguages == ["auto", "en", "ja"]
-    assert supports_translation(migrated.configuration, "auto", "en")
-    saved = json.loads(registry.path.read_text(encoding="utf-8"))
-    assert saved["version"] == 2
-    assert saved["models"][0]["configuration"]["sourceLanguages"] == ["auto", "en", "ja"]
-
-    edited = replace(migrated, configuration=migrated.configuration.model_copy(update={"supportsAutoDetection": False, "sourceLanguages": ["en", "ja"]}))
-    registry.put(edited)
-    assert CustomModelRegistry(tmp_path).get(entry.resource_id).configuration.sourceLanguages == ["en", "ja"]
 
 
 @pytest.mark.parametrize("changes", [dict(engine="pytorch"), dict(slot="recognition"), dict(sourceLanguages=[]), dict(sourceLanguages=["zz"]), dict(translationPairs=[]), dict(translationPairs=[dict(source="zh", target="en")])])

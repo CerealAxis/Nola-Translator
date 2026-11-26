@@ -584,8 +584,7 @@ def _probe_runtime(root: Path, entry: CustomModelEntry, adapter: str) -> tuple[s
 
         mode = _json(root / 'config.json').get('tts_model_type')
         model = load_qwen3_tts(root, device or 'cpu')
-        # Base requires reference speech, so only verify that its local snapshot loads.
-        if mode != 'base':
+        if mode == 'custom_voice':
             wavs, rate = generate_qwen3_tts(model, mode, 'Hello.')
             if rate <= 0 or not len(wavs) or not np.asarray(wavs[0]).size or not np.isfinite(wavs[0]).all():
                 raise ValueError('Qwen3-TTS returned no valid synthesized audio')

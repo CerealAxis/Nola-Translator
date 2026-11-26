@@ -59,6 +59,14 @@ Object.assign(LANGUAGE_LABELS, Object.fromEntries(Object.entries(INDEX_TRANSLATE
   specialLabel(code, zh, english?.of(code) ?? code),
 ])))
 Object.assign(LANGUAGE_LABELS, {
+  'nrm-latn': specialLabel('nrm-latn', '诺曼语', 'Norman', { zhTW: '諾曼語', zhHK: '諾曼語', ko: '노르만어', ja: 'ノルマン語' }),
+  'pbt-arab': specialLabel('pbt-arab', '普什图语', 'Southern Pashto', { zhTW: '普什圖語', zhHK: '普什圖語', ko: '남부 파슈토어', ja: '南部パシュトー語' }),
+  'bew-latn': specialLabel('bew-latn', '贝塔维语', 'Betawi', { zhTW: '貝塔維語', zhHK: '貝塔維語', ko: '베타위어', ja: 'ベタウィ語' }),
+  'mww-latn': specialLabel('mww-latn', '白苗语', 'Hmong Daw', { zhTW: '白苗語', zhHK: '白苗語', ko: '흰몽어', ja: '白モン語' }),
+  'hyw-armn': specialLabel('hyw-armn', '西亚美尼亚语', 'Western Armenian', { zhTW: '西亞美尼亞語', zhHK: '西亞美尼亞語', ko: '서부 아르메니아어', ja: '西アルメニア語' }),
+  'azb-arab': specialLabel('azb-arab', '南阿塞拜疆语', 'South Azerbaijani', { zhTW: '南亞塞拜然語', zhHK: '南阿塞拜疆語', ko: '남아제르바이잔어', ja: '南アゼルバイジャン語' }),
+  'cnh-latn': specialLabel('cnh-latn', '钦语（哈卡）', 'Hakha Chin', { zhTW: '欽語（哈卡）', zhHK: '欽語（哈卡）', ko: '하카 친어', ja: 'ハカ・チン語' }),
+  'apc-arab': specialLabel('apc-arab', '黎凡特阿拉伯语', 'Levantine Arabic', { zhTW: '黎凡特阿拉伯語', zhHK: '黎凡特阿拉伯語', ko: '레반트 아랍어', ja: 'レバント・アラビア語' }),
   auto: specialLabel('auto', '自动检测', 'Auto detect', { zhTW: '自動偵測', zhHK: '自動偵測', ko: '자동 감지', ja: '自動検出' }),
   none: specialLabel('none', '不翻译', 'No translation', { zhTW: '不翻譯', zhHK: '不翻譯', ko: '번역 안 함', ja: '翻訳しない' }),
   zh: specialLabel('zh', '中文（简体）', 'Chinese (Simplified)', { zhTW: '簡體中文', zhHK: '簡體中文', ko: '중국어(간체)', ja: '中国語（簡体字）' }),

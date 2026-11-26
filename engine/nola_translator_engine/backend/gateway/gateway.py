@@ -25,6 +25,7 @@ from .capabilities import (
     ModelKind,
     Operation,
     OperationProfile,
+    VoiceDescriptor,
 )
 from .definitions import ModelDefinition, ModelInstance, ProviderConfiguration
 from .lifecycle import InstanceManager, Lease
@@ -36,6 +37,8 @@ from .operations import (
 from .performance import PerformanceHistory
 from .resources import ConcurrencyGate, ResourceAdmission, ResourceExhausted
 from .worker import LocalModelWorker
+from ..tts_contracts import SynthesisRequest, PresetVoice, ReferenceVoice, DesignVoice, hydrate_reference, tts_language_matches
+from .operations import VoiceInventoryOperation
 
 
 # ---------------------------------------------------------------------------
@@ -269,21 +272,45 @@ class ModelGateway:
                 return await adapter.translate(instance, ctx, text=text, source=source, target=target)  # type: ignore[attr-defined]
 
     async def synthesize(
-        self, ctx: CallContext, *, text: str, voice: str | None, request: MatchRequest | None = None
+        self, ctx: CallContext, *, synthesis: SynthesisRequest | None = None,
+        text: str | None = None, voice: str | None = None, request: MatchRequest | None = None
     ) -> SynthesisResult:
+        synthesis = synthesis or SynthesisRequest(text=text or "", language=request.target_language if request and request.target_language else "auto",
+            conditioning=PresetVoice(kind="preset", voiceId=voice) if voice else {"kind": "engine-default"})
         match_request = request or MatchRequest(operation=Operation.SYNTHESIZE)
+        if synthesis.language != "auto":
+            match_request = replace(match_request, target_language=synthesis.language)
+        capabilities = self.match(match_request).entry.definition.capabilities
+        voice_id = synthesis.conditioning.voice_id if isinstance(synthesis.conditioning, PresetVoice) else capabilities.voices.default_voice if synthesis.conditioning.kind == "engine-default" else None
+        if voice_id and capabilities.voices.preset_voices:
+            voice = next((voice for voice in capabilities.voices.preset_voices if voice.id == voice_id), None)
+            if voice is None:
+                raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="tts", message="Voice does not belong to this model", provider_code="VOICE_UNVERIFIED")
+            if synthesis.language != "auto" and voice.languages and not any(tts_language_matches(language, synthesis.language) for language in voice.languages):
+                raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="tts", message=f"Voice {voice_id} does not support {synthesis.language}", provider_code="VOICE_LANGUAGE_UNSUPPORTED")
+        if isinstance(synthesis.conditioning, ReferenceVoice) and capabilities.voices.supports_cloning is not True:
+            raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="tts", message="Voice cloning is unsupported")
+        if isinstance(synthesis.conditioning, DesignVoice) and capabilities.voices.supports_voice_design is not True:
+            raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="tts", message="Voice design is unsupported")
+        synthesis = hydrate_reference(synthesis)
         async with self._execution(match_request, ctx) as (instance, adapter, queued):
             with self.performance.executing(self._metric_model(instance, ctx), queued):
-                return await adapter.synthesize(instance, ctx, text=text, voice=voice)  # type: ignore[attr-defined]
+                return await adapter.synthesize(instance, ctx, synthesis=synthesis)  # type: ignore[attr-defined]
 
-    async def tts_voices(self, ctx: CallContext, request: MatchRequest) -> list[str]:
+    async def tts_voices(self, ctx: CallContext, request: MatchRequest) -> list[VoiceDescriptor]:
+        declared = self.match(request).entry.definition.capabilities.voices.preset_voices
+        if declared:
+            return [voice.model_copy(deep=True) for voice in declared]
         instance, lease, adapter, _ = await self.acquire(request)
         try:
             await self._enter(instance, ctx)
             try:
-                if not isinstance(adapter, LocalWorkerAdapter):
+                if not isinstance(adapter, VoiceInventoryOperation):
                     raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="tts", message="Voice inspection is unavailable")
-                return await adapter.tts_voices(instance, ctx)
+                inventory = await adapter.tts_voices(instance, ctx)
+                return [VoiceDescriptor(id=item, name=item) if isinstance(item, str)
+                        else item if isinstance(item, VoiceDescriptor) else VoiceDescriptor.model_validate(item)
+                        for item in inventory]
             finally:
                 self._exit(instance)
         finally:
@@ -438,7 +465,7 @@ def _check_match(
         if output == "speech" and (
             not languages.speech_output_available
             or request.target_language and languages.speech_output
-            and request.target_language not in languages.speech_output
+            and not any(tts_language_matches(language, request.target_language) for language in languages.speech_output)
         ):
             return "speech output required but unavailable"
         if output == "source_text" and profile.source_transcript == "unavailable":

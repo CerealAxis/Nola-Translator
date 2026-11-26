@@ -3,11 +3,13 @@ import { LANGUAGE_CODES } from './languages'
 import { isSupportedShortcut } from './keyboard-shortcuts'
 import type { EngineErrorCode } from './contracts'
 import type { CaptionSegment } from './contracts'
+import { ttsVoiceRefSchema } from './tts/voice-ref'
 
 const deviceId = z.string().max(512)
 const language = z.string().refine(code => LANGUAGE_CODES.includes(code))
 
 export const meetingModeSettingsSchema = z.object({
+  voiceRef: ttsVoiceRefSchema.optional(),
   uplinkEnabled: z.boolean().default(true),
   downlinkEnabled: z.boolean().default(true),
   downlinkSource: z.enum(['cable', 'application']).default('cable'),

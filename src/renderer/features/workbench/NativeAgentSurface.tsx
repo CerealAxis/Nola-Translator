@@ -38,13 +38,17 @@ import { useAttachmentSrc } from '@/hooks/use-attachment-src'
 import { ghostButton, iconSwap, iconSwapIn, iconSwapOut } from '@/components/assistant-ui/native/surfaces'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/components/primitives/notify'
-import { languageName } from '../../../shared/languages'
+import { LANGUAGE_CODES, languageName } from '../../../shared/languages'
 import { intersectLanguages, modelTranslationLanguages } from '@/model-options'
 import { stores, useStore } from '@/store'
 import type { CustomTranslationModel } from '../../../shared/settings'
 import type { AgentWorkspaceSnapshot, WorkspaceAction } from '../../../shared/agent-workspace'
 import type { PlaygroundConfig } from './demo-runtime'
 import type { PlaygroundModel } from './installed-models'
+import { TtsVoiceSelector } from '@/components/tts/TtsVoiceSelector'
+import { synthesisVoiceRef } from '../../../shared/tts/settings-migration'
+import { SettingSelect } from '../settings/SettingsPage'
+import { ttsText } from '@/i18n/tts-ui'
 
 export interface WorkbenchPageProps {
   active: boolean
@@ -60,8 +64,6 @@ export interface NativeAgentSurfaceProps extends WorkbenchPageProps {
   profiles: readonly CustomTranslationModel[]
   models: readonly PlaygroundModel[]
   modelCatalog: readonly PlaygroundModel[]
-  voices: string[]
-  onVoices: (names: string[]) => void
   onConfigure: () => void
   snapshot: AgentWorkspaceSnapshot | null
   onAction: (action: WorkspaceAction) => Promise<boolean>
@@ -267,7 +269,7 @@ function NativeUserEditComposer() {
       <Button type="button" variant="bare" size="icon-sm" aria-label={t('workbench.addAttachment')} onClick={() => inputRef.current?.click()}><Plus aria-hidden="true" /></Button>
       <input ref={inputRef} type="file" multiple className="hidden" onChange={event => { for (const file of event.target.files ?? []) void aui.composer.addAttachment(file).catch(error => notifyError(t('workbench.actionFailed'), { cause: error })); event.target.value = '' }} />
       <div className="ms-auto flex gap-2">
-        <ComposerPrimitive.Cancel render={<Button type="button" variant="outline" size="sm" />}>{t('workbench.cancel')}</ComposerPrimitive.Cancel>
+        <ComposerPrimitive.Cancel render={<Button type="button" variant="secondary" size="sm" />}>{t('workbench.cancel')}</ComposerPrimitive.Cancel>
         <Button type="button" size="sm" onClick={() => { if (!modelReady) notifyError(t('workbench.noModels')); else void aui.composer.send() }}>{t('workbench.send')}</Button>
       </div>
     </div>
@@ -510,6 +512,7 @@ function NativeTool(props: ToolCallMessagePartProps) {
 }
 
 function NativeComposer(props: NativeAgentSurfaceProps) {
+  const settings = useStore(stores.settings, state => state.settings)
   const resources = useStore(stores.models, state => state.resources)
   const { t, language } = useI18n()
   const aui = useAui()
@@ -529,6 +532,8 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
     } catch { /* Draft persistence is optional when browser storage is unavailable. */ }
   }, [text, threadId])
   const [menu, setMenu] = useState('')
+  const [voiceMenuOpen, setVoiceMenuOpen] = useState(false)
+  useEffect(() => { if (!props.active || props.config.kind !== 'tts') setVoiceMenuOpen(false) }, [props.active, props.config.kind])
   const [seconds, setSeconds] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -598,24 +603,16 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
       <TooltipContent>{t('gateway.languageModelsHint')}</TooltipContent>
     </Tooltip>
   }
-  const chooseVoices = () => {
-    setMenu(menu === 'voice' ? '' : 'voice')
-    if (!props.voices.length) void import('@/store').then(async ({ getBridge }) => {
-      const result = await getBridge()?.app.directModel?.({ id: crypto.randomUUID(), model: props.config.model, kind: 'tts' }, true)
-      props.onVoices(result?.voices ?? [])
-    }).catch(error => notifyError(t('workbench.actionFailed'), { cause: error }))
-  }
   return <Composer className="max-w-none" data-testid="native-composer">
     {!!savedDraft && !text && <DraftRestore draft={savedDraft} savedAt={t('workbench.nativeDraft')} onRestore={() => { aui.thread.composer().setText(savedDraft); setSavedDraft('') }} onDiscard={() => { setSavedDraft(''); try { localStorage.removeItem(`nola.native.draft:${threadId}`) } catch { /* Keep dismissing usable when storage is unavailable. */ } }} />}
     {menu === 'models' && <ComposerMenu open anchor="models" className="max-h-[min(70vh,32rem)] overflow-y-auto"><p className="px-2.5 py-2 type-muted text-muted-foreground"><ModelAvailabilityLabel label={t('nav.modelGateway')} hint={t('gateway.modelNoneHint')} /></p><TooltipProvider>{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 type-muted text-muted-foreground">{t(`workbench.${kind}`)}</p>{props.modelCatalog.filter(model => model.kind === kind).map(model => {
       const available = props.models.some(item => item.id === model.id && item.kind === model.kind)
-      const item = <ComposerMenuItem className="nola-menu-item" active={props.config.model === model.id} aria-disabled={!available} onClick={() => { if (available) pick({ model: model.id, kind: model.kind, images: model.images, voice: '' }) }}><span className="min-w-0 flex-1 truncate text-start">{model.name}</span><Badge variant={available ? 'success' : 'secondary'}>{t(available ? 'workbench.modelAvailable' : 'workbench.modelNotStarted')}</Badge></ComposerMenuItem>
+      const item = <ComposerMenuItem className="nola-menu-item" active={props.config.model === model.id} aria-disabled={!available} onClick={() => { if (available) pick({ model: model.id, kind: model.kind, images: model.images }) }}><span className="min-w-0 flex-1 truncate text-start">{model.name}</span><Badge variant={available ? 'success' : 'secondary'}>{t(available ? 'workbench.modelAvailable' : 'workbench.modelNotStarted')}</Badge></ComposerMenuItem>
       return available ? <div key={model.id}>{item}</div> : <Tooltip key={model.id}><TooltipTrigger render={item} /><TooltipContent>{t('gateway.modelGatewayStartHint')}</TooltipContent></Tooltip>
     })}</div>)}</TooltipProvider><ComposerMenuItem className="nola-menu-item" onClick={props.onConfigure}><Settings2 className="size-4" aria-hidden="true" />{t('nav.modelGateway')}</ComposerMenuItem></ComposerMenu>}
     {menu === 'effort' && <ComposerMenu open anchor="effort" className="w-80 gap-3 p-3"><ReasoningEffort variant={selected?.reasoningLevels ? 'segments' : 'slider'} levels={effortOptions.map(key => ({ key, label: effortLabel(key) }))} selectedKey={effort} title={t('workbench.reasoningTokens')} onSelect={effort => pick({ effort }, false)} /></ComposerMenu>}
     {menu === 'language' && languageMenuCodes.length > 0 && <ComposerMenu open anchor="language">{languageMenuCodes.map(code => <ComposerMenuItem key={code} active={code === (props.config.kind === 'mt' ? props.config.target : props.config.source)} onClick={() => props.config.kind === 'mt' ? pick({ target: code }) : chooseSource(code)}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'source' && sourceCodes.length > 0 && <ComposerMenu open anchor="source">{sourceCodes.map(code => <ComposerMenuItem key={code} active={code === props.config.source} onClick={() => chooseSource(code)}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
-    {menu === 'voice' && <ComposerMenu open anchor="voice">{props.voices.map(voice => <ComposerMenuItem key={voice} active={voice === props.config.voice} onClick={() => pick({ voice })}>{voice}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'context' && <ComposerMenu open align="end"><ContextBreakdown limit={contextWindow} segments={[{ label: t('workbench.inputTokens'), tokens: usage?.inputTokens ?? 0, tint: 'bg-chart-2' }, { label: t('workbench.outputTokens'), tokens: usage?.outputTokens ?? 0, tint: 'bg-chart-1' }]} /></ComposerMenu>}
     <ComposerBar>
       {attachments.length > 0 && <ComposerAttachments><ComposerPrimitive.Attachments components={{ Attachment: NativeComposerAttachment }} /></ComposerAttachments>}
@@ -651,7 +648,15 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
         {props.config.kind === 'llm' && <NativeComicSelector active={props.active} value={props.config.comicProjectId ?? null} disabled={preparing || running} onChange={comicProjectId => { cancelComicReads(); if (comicProjectId === null) props.onChange({ ...props.config, comicProjectId }); else pick({ comicProjectId }) }} />}
         {props.config.kind === 'mt' && languageTrigger('source', props.config.source === 'auto' ? t('workbench.auto') : languageName(props.config.source, language), sourceCodes)}
         {(props.config.kind === 'asr' || props.config.kind === 'mt') && languageTrigger('language', languageName(props.config.kind === 'mt' ? props.config.target : props.config.source, language), languageMenuCodes)}
-        {props.config.kind === 'tts' && <ComposerModelTrigger data-menu-anchor="voice" model={props.config.voice || t('workbench.voice')} open={menu === 'voice'} onClick={chooseVoices} />}
+        {props.config.kind === 'tts' && <Popover open={props.active && voiceMenuOpen} onOpenChange={setVoiceMenuOpen}><PopoverTrigger render={<Button variant="secondary" size="sm">{t('workbench.voice')}</Button>} /><PopoverContent className="grid gap-3">
+          <label className="grid gap-2 type-small" htmlFor="workbench-tts-language">{ttsText(language, 'language')}<SettingSelect id="workbench-tts-language"
+            ariaLabel={ttsText(language, 'language')} value={props.config.target} isDisabled={running || preparing}
+            options={(targetCodes.length ? targetCodes : LANGUAGE_CODES).map(value => ({ value, label: languageName(value, language) }))}
+            onChange={target => pick({ target }, false)} /></label>
+          <TtsVoiceSelector modelBinding={props.config.model} targetLanguage={props.config.target}
+            value={props.config.voiceRef ?? (settings ? synthesisVoiceRef(settings) : { kind: 'engine-default' })}
+            onChange={voiceRef => pick({ voiceRef }, false)} disabled={running || preparing} />
+        </PopoverContent></Popover>}
       </ComposerActions><ComposerActions className="ms-auto shrink-0">
         {props.config.kind === 'llm' && <div><ComposerContext labels={{ context: t('workbench.contextUsage'), system: t('workbench.contextSystem'), tools: t('workbench.contextTools'), messages: t('workbench.contextMessages'), total: t('workbench.contextTotal') }} usage={{ system: 0, tools: 0, messages: (usage?.totalTokens ?? 0) / 1000, total: contextWindow / 1000 }} /></div>}
         <ComposerVoiceButton active={!!dictation} aria-label={t(dictation ? 'workbench.stopDictation' : 'workbench.record')} onClick={() => { if (dictation) aui.thread.composer().stopDictation(); else aui.thread.composer().startDictation() }} />

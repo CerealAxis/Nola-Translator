@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ChoiceField } from './ChoiceField'
@@ -35,7 +35,9 @@ describe('inline choice field', () => {
     const view = render(<ChoiceField label="Language" value="en" options={[{ value: 'en', label: 'English' }]} onChange={vi.fn()} />, { container: panel })
     try {
       await userEvent.setup().click(within(panel).getByRole('combobox', { name: 'Language' }))
-      const option = await within(mount).findByRole('option', { name: 'English' })
+      await waitFor(() => expect(shadow.querySelector('[role="option"]')).not.toBeNull())
+      const option = shadow.querySelector('[role="option"]')!
+      expect(option).toHaveTextContent('English')
       expect(option.getRootNode()).toBe(shadow)
       expect(panel.contains(option)).toBe(false)
     } finally {

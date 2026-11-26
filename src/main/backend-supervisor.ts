@@ -108,12 +108,15 @@ export class BackendSupervisor extends EventEmitter {
         detachStartup()
         this.state = 'failed'
         child.kill('SIGKILL')
-        const error = new Error(`Backend did not report ready within ${this.options.readyTimeoutMs ?? READY_FRAME_TIMEOUT_MS}ms`)
+        const error = Object.assign(new Error(`Backend did not report ready within ${this.options.readyTimeoutMs ?? READY_FRAME_TIMEOUT_MS}ms`), { code: 'BACKEND_START_TIMEOUT' })
         logDiagnostic('backend.start.failed', { instanceId, error })
         reject(error)
       }, this.options.readyTimeoutMs ?? READY_FRAME_TIMEOUT_MS)
 
       let stdoutBuffer = ''
+      let stderrTail = ''
+      const onStderr = (chunk: Buffer) => { stderrTail = (stderrTail + chunk.toString('utf8')).slice(-8192) }
+      child.stderr.on('data', onStderr)
       const onData = (chunk: Buffer) => {
         stdoutBuffer += chunk.toString('utf8')
         while (!settled) {
@@ -140,6 +143,7 @@ export class BackendSupervisor extends EventEmitter {
           child.stdout.off('data', onData)
           this.readyFrame = frame
           this.state = 'ready'
+          child.stderr.off('data', onStderr)
           logActivity('backend.ready', { address: frame.address, instance: frame.instance_id })
           resolve(frame)
         }
@@ -164,7 +168,10 @@ export class BackendSupervisor extends EventEmitter {
           child.stdout.off('data', onData)
           this.state = 'failed'
           logDiagnostic('backend.start.failed', { instanceId, code, signal })
-          reject(new Error(`Backend exited during startup (code=${code} signal=${signal})`))
+          const reason = stderrTail.trim().split(/\r?\n/).at(-1)
+          reject(Object.assign(new Error(reason || `Backend exited during startup (code=${code} signal=${signal})`), {
+            code: /DLL load failed|ModuleNotFoundError|ImportError/i.test(stderrTail) ? 'BACKEND_DEPENDENCY_MISSING' : 'BACKEND_START_FAILED',
+          }))
           return
         }
         if (this.child !== child) return
@@ -177,6 +184,7 @@ export class BackendSupervisor extends EventEmitter {
       const detachStartup = () => {
         child.stdout.off('data', onData)
         child.off('error', onError)
+        child.stderr.off('data', onStderr)
       }
 
       child.stdout.on('data', onData)

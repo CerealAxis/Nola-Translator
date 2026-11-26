@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "valid": [
+    { "kind": "engine-default" },
+    { "kind": "preset", "voiceId": "serena" },
+    { "kind": "reference-audio", "assetId": "recording", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "purpose": "human-reference", "recordedLanguage": "en", "transcript": "Hello" },
+    { "kind": "design", "description": "A calm voice", "recipe": {}, "recipeSchema": "nola-description-v1", "authoringModelBinding": "resource:design", "seed": 42 },
+    { "kind": "provider-voice", "bindingId": "binding", "bindingRevision": 1, "voiceId": "remote", "scopeId": "account" }
+  ],
+  "invalid": [
+    { "kind": "gallery", "id": "candidate" },
+    { "kind": "preset" },
+    { "kind": "reference-audio", "assetId": "../escape", "sha256": "invalid", "purpose": "human-reference" }
+  ]
+}

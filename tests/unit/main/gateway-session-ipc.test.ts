@@ -22,7 +22,7 @@ it('routes OCR resource management to its active backend without starting a seco
   const dispose = registerEngineIpc(engine, () => null, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, manage)
   try {
     await expect(handlers.get('engine:manage-resource')!({}, resource.resourceId, 'install')).resolves.toEqual(resource)
-    expect(manage).toHaveBeenCalledWith(resource.resourceId, 'install')
+    expect(manage).toHaveBeenCalledWith(resource.resourceId, 'install', undefined)
     expect(request).not.toHaveBeenCalled()
   } finally { dispose() }
 })

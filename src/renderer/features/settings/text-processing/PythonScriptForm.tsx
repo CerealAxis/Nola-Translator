@@ -38,10 +38,7 @@ export default function PythonScriptForm({
   const fileId = useId()
   const preprocessing = feature.id === 'python-pre'
   const template = preprocessing ? preprocessingExample : optimizationExample
-  const [oldOptions] = usePreviewSetting<{ script?: string } | null>('options:' + feature.id, null)
-  const [oldTables] = usePreviewSetting<{ rules: { script?: string }[] }[]>('tables:' + feature.id, [])
-  const previous = oldTables.flatMap(table => table.rules).find(rule => rule.script?.trim())?.script
-  const [saved, save] = usePreviewSetting<string | null>('script:' + feature.id, previous ?? oldOptions?.script ?? null)
+  const [saved, save] = usePreviewSetting<string | null>('script:' + feature.id, null)
   const [editorSeed, setEditorSeed] = useState(0)
   const [initialCode, setInitialCode] = useState(() => saved?.trim() ? saved : template)
   const [draft, setDraft] = useState(initialCode)
@@ -90,10 +87,10 @@ export default function PythonScriptForm({
                 if (file) void file.text().then(loadCode).catch(cause => notifyError(t('suite.actionFailed'), { cause }))
                 event.currentTarget.value = ''
               }} />
-            <Button variant="outline" size="sm" onClick={() => document.getElementById(fileId)?.click()}>
+            <Button variant="secondary" size="sm" onClick={() => document.getElementById(fileId)?.click()}>
               <Upload data-icon="inline-start" />{t('suite.textImportScript')}
             </Button>
-            <Button variant="outline" size="sm" disabled={draft === template} onClick={() => loadCode(template)}>
+            <Button variant="secondary" size="sm" disabled={draft === template} onClick={() => loadCode(template)}>
               <RotateCcw data-icon="inline-start" />{t('suite.textResetTemplate')}
             </Button>
           </>
@@ -168,7 +165,7 @@ export default function PythonScriptForm({
           </Alert>
         )}
         <div className="flex justify-end gap-2">
-          <Button variant="outline" nativeButton={false} render={<a href={back} />}>{t('common.cancel')}</Button>
+          <Button variant="secondary" nativeButton={false} render={<a href={back} />}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={draft === saved}>{t('suite.save')}</Button>
         </div>
       </form>

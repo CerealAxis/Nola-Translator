@@ -1,5 +1,8 @@
 import { z } from 'zod'
 import { glossaryTermsSchema } from './glossary'
+import { ttsVoiceRefSchema } from './tts/voice-ref'
+import { resolvedVoiceConditioningSchema, ttsControlsSchema, ttsOutputSchema } from './tts/synthesis'
+import type { TtsPresetVoiceDescriptor } from './tts/capabilities'
 
 export const translationGlossarySchema = glossaryTermsSchema
 
@@ -9,12 +12,14 @@ export const directModelRequestSchema = z.object({
   kind: z.enum(['asr', 'mt', 'tts']), text: z.string().max(64000).default(''),
   source: z.string().max(32).default('auto'), target: z.string().max(32).default('zh'),
   voice: z.string().max(256).default(''), audio: z.string().max(32 * 1024 * 1024 + 64).optional(),
+  voiceRef: ttsVoiceRefSchema.optional(), conditioning: resolvedVoiceConditioningSchema.optional(),
+  controls: ttsControlsSchema.optional(), output: ttsOutputSchema.optional(),
   image: z.string().max(16000000).optional(),
   glossary: translationGlossarySchema.optional(),
   skipUnsupportedGlossary: z.boolean().optional(),
 })
 export type DirectModelRequest = z.input<typeof directModelRequestSchema>
-export interface DirectModelResult { text: string; audio?: string; voices?: string[] }
+export interface DirectModelResult { text: string; audio?: string; voices?: string[]; voiceInventory?: TtsPresetVoiceDescriptor[] }
 export interface AgentProject { id: string; name: string; path: string }
 export interface AgentSkill { name: string; description: string; path: string; enabled: boolean }
 export interface SubagentDefinition { id: string; name: string; instructions: string; enabled: boolean }

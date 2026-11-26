@@ -4,6 +4,8 @@ import { translationLanguages } from '../../../shared/model-capabilities'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { FieldGroup } from '@/components/ui/field'
+import { TtsVoiceSelector } from '@/components/tts/TtsVoiceSelector'
+import { synthesisVoiceRef } from '../../../shared/tts/settings-migration'
 import { Card, CardContent } from '@/components/ui/card'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
@@ -81,7 +83,7 @@ export function OverlayPage() {
   const [overlayVisible, setOverlayVisible] = useState(false)
   const config = settings.overlay
   const display = translationDisabled ? 'source' : config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
-  const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch(() => notifyOverlayError(t('errors.settingsSaveFailed'))) }
+  const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch(cause => notifyOverlayError(t('errors.settingsSaveFailed'), { cause })) }
   useEffect(() => {
     const bridge = getBridge()
     if (!bridge) return
@@ -126,8 +128,8 @@ export function OverlayPage() {
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-heading" title={t('home.quickStart')}
         actions={<div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate('#/settings/appearance')}>{t('shellUi.appearance')}</Button>
-          <Button data-onboarding="open-workspace" variant="outline" onClick={() => {
+          <Button variant="secondary" onClick={() => navigate('#/settings/appearance')}>{t('shellUi.appearance')}</Button>
+          <Button data-onboarding="open-workspace" variant="secondary" onClick={() => {
             void actions.settings.showWorkspace().catch(error => notifyOverlayError(t('workspaceUi.windowFailed'), { cause: error }))
           }}><ExternalLink aria-hidden="true" />{t('home.quickStart')}</Button>
           <Button data-onboarding="open-overlay" onClick={() => void open()} disabled={opening || (!overlayVisible && !!s2sModel && !translationDisabled && !s2sReady)} aria-busy={opening}>{opening ? <Spinner /> : <ExternalLink aria-hidden="true" />}{t(overlayVisible ? 'overlay.close' : 'shellUi.openOverlay')}</Button>
@@ -194,25 +196,31 @@ export function OverlayPage() {
                   <ToggleGroupItem value="sentence">{t('workspace.layoutSentence')}</ToggleGroupItem>
               </ToggleGroup>
             </div>}
-            <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2" data-slot="quick-toggles">
-              <div className="flex items-center gap-3">
-                <span>{t('session.speakTranslation')}</span>
-                <SettingSwitch ariaLabel={t('session.speakTranslation')} isSelected={speechEnabled} isDisabled={sessionActive || translationDisabled || !speechEnabled && !!s2sModel && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(targetLanguage)}
-                  onChange={enabled => patch({ realtime: { outputMode: enabled ? 'speech' : 'translation' } })} />
-              </div>
-              <div className="flex items-center gap-3">
-                <ModelAvailabilityLabel label={t('latency.title')} hint={t('latency.toggleHint')} />
-                <SettingSwitch ariaLabel={t('latency.title')} isSelected={settings.realtime?.latencyDetection === true}
-                  isDisabled={sessionActive} onChange={latencyDetection => patch({ realtime: { latencyDetection } })} />
-              </div>
+            <div className="nola-settings-fields col-span-full" data-slot="quick-toggles">
+            <div className="nola-settings-field" data-slot="quick-latency">
+              <ModelAvailabilityLabel label={t('latency.title')} hint={t('latency.toggleHint')} />
+              <SettingSwitch ariaLabel={t('latency.title')} isSelected={settings.realtime?.latencyDetection === true}
+                isDisabled={sessionActive} onChange={latencyDetection => patch({ realtime: { latencyDetection } })} />
             </div>
+            <div className="nola-settings-field" data-slot="quick-speech">
+              {s2sModel && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(targetLanguage)
+                ? <ModelAvailabilityLabel label={t('session.speakTranslation')} hint={t('session.speechLanguageUnavailable')} />
+                : <span>{t('session.speakTranslation')}</span>}
+              <SettingSwitch ariaLabel={t('session.speakTranslation')} isSelected={speechEnabled} isDisabled={sessionActive || translationDisabled || !speechEnabled && !!s2sModel && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(targetLanguage)}
+                onChange={enabled => patch({ realtime: { outputMode: enabled ? 'speech' : 'translation' } })} />
+            </div>
+            </div>
+            {speechEnabled && !s2sModel ? <div className="nola-settings-field">
+              <label htmlFor="quick-voice">{t('workbench.voice')}</label>
+              <TtsVoiceSelector usage="realtime" id="quick-voice" modelBinding={tts.binding} targetLanguage={targetLanguage}
+                value={synthesisVoiceRef(settings)} disabled={sessionActive}
+                onChange={voiceRef => patch({ synthesis: { voiceRef } })} />
+            </div> : null}
             {speechEnabled ? <div className="nola-settings-field">
               <span>{t('session.speechOutputDevice')}</span>
               <SettingSelect value={outputDevice} ariaLabel={t('session.speechOutputDevice')} isDisabled={sessionActive}
                 options={outputOptions} onChange={value => patch({ realtime: { speechOutputDeviceId: value === 'default' ? '' : value } })} />
             </div> : null}
-            {s2sModel && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(targetLanguage)
-            ? <p className="col-span-full type-muted">{t('session.speechLanguageUnavailable')}</p> : null}
           </FieldGroup>
         </CardContent>
       </Card>

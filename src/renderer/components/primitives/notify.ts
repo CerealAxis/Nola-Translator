@@ -4,7 +4,7 @@ import { getBridge } from '@/store'
 import type { MainErrorNotification } from '@/bridge'
 import type { I18nContextValue, TranslationKey } from '@/i18n'
 import { resolveUiLanguage, translate } from '@/i18n'
-import { bindingIsLocal, type GatewayCapability, type ModelGatewaySnapshot } from '../../../shared/model-gateway'
+import { gatewayStartupHint, bindingIsLocal, type GatewayCapability, type ModelGatewaySnapshot } from '../../../shared/model-gateway'
 import { appendSupportCode, SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
 import { featureConflictOwner } from '../../../shared/feature-activity'
 import { normalizeThrownError, restoreIpcError, stripIpcErrorMessage } from '../../../shared/ipc-error'
@@ -119,20 +119,20 @@ export async function notifyGatewayStartIssue(t: I18nContextValue['t'], missing?
   const service = missing ? gateway?.services?.[missing] : undefined
   const serviceFailure = service?.state === 'failed' && (!binding || service.model === binding)
     ? supportErrorCodeForCause(service.errorCode) : undefined
-  return notifyGatewayIssue(t, { state: gateway?.state, missing, binding, serviceFailure })
+  return notifyGatewayIssue(t, { state: gateway?.state, missing, binding, serviceFailure, startupFailureCode: gateway?.errorCode })
 }
 
 export function notifyGatewayIssue(t: I18nContextValue['t'], issue: {
   state?: ModelGatewaySnapshot['state']; missing?: GatewayCapability; binding?: string;
-  serviceFailure?: string; supportCode?: string;
+  serviceFailure?: string; supportCode?: string; startupFailureCode?: string;
 }): boolean {
-  const { state, missing, binding, serviceFailure, supportCode } = issue
+  const { state, missing, binding, serviceFailure, supportCode, startupFailureCode } = issue
   if ((!binding || bindingIsLocal(binding)) && state !== 'running') {
     const title: TranslationKey = state === 'stopped' ? 'gateway.notStarted'
       : state === 'failed' ? 'gateway.startupFailed'
         : state ? `gateway.${state}` : 'gateway.startupStatusUnavailable'
     const hint = state === 'stopped' ? 'gateway.notStartedHint'
-      : state === 'starting' || state === 'stopping' ? 'gateway.startupWaitHint' : 'gateway.startupRetryHint'
+      : state === 'starting' || state === 'stopping' ? 'gateway.startupWaitHint' : gatewayStartupHint(startupFailureCode)
     notifyGatewayModelUnavailable(t(title), t(hint), t('gateway.title'), supportCode ?? (state === 'stopped' ? 'GTW-001' : undefined))
     return true
   }

@@ -651,7 +651,7 @@ export function ComicTranslationPage({
         actions={
           <div className="flex flex-wrap gap-2">
             {onQuick && (
-              <Button variant="outline" onClick={onQuick}>
+              <Button variant="secondary" onClick={onQuick}>
                 <Languages data-icon="inline-start" />
                 {p('preview')}
               </Button>
@@ -662,7 +662,7 @@ export function ComicTranslationPage({
             </Button>
             {!!selected.length && (
               <Button
-                variant="destructive"
+                variant="danger"
                 disabled={busy}
                 onClick={() =>
                   void act(async () => {

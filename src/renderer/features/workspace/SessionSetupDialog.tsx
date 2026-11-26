@@ -1,5 +1,7 @@
 import { modelBindingPatch, resolveModelBinding, savedBindingOf, useAvailableModels } from '@/available-models'
 import { quickGatewayBinding } from '../../../shared/model-policy'
+import { synthesisVoiceRef } from '../../../shared/tts/settings-migration'
+import { TtsVoiceSelector } from '@/components/tts/TtsVoiceSelector'
 import { modelSupportsTranslation, useModelOptions } from '@/model-options'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -14,7 +16,7 @@ import { CircleHelp } from 'lucide-react'
 import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AudioDevice, AudioSourceOption, SessionConfig } from '@/bridge'
 import { SettingRow } from '@/components/primitives'
-import { notifyGatewayStartIssue, notifyInfo } from '@/components/primitives/notify'
+import { notifyError, notifyGatewayStartIssue, notifyInfo } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { aliyunConnectionReady } from '../../../shared/cloud-models'
 import type { UiLanguage } from '@/i18n'
@@ -78,6 +80,7 @@ export function SessionSetupDialog({
   const modelOptions = useModelOptions(inheritedAsr, inheritedMt)
   const catalog = useAvailableModels()
   const { realtime, recognition, translation, synthesis } = settings
+  const [voiceRef, setVoiceRef] = useState(synthesisVoiceRef(settings))
   const targetLanguage = translation.targetLanguage
   const translationEnabled = targetLanguage !== NO_TRANSLATION_LANGUAGE
   const outputMode = !translationEnabled ? 'source' : realtime?.outputMode === 'speech' ? 'speech' : 'translation'
@@ -106,7 +109,10 @@ export function SessionSetupDialog({
   const speechOutputDeviceId = realtime?.speechOutputDeviceId ?? ''
   const missingExplicitOutput = outputMode === 'speech' && audioSource.kind === 'virtualInput'
     && (!speechOutputDeviceId || speechOutputDeviceId === 'default')
-  const canStart = !unsupportedSource && (!s2sModel || s2sReady) && s2sTargetValid && !missingExplicitOutput && !incompatible
+  const validationIssue = unsupportedSource ? 'modelConfig.sourceUnsupported' : incompatible ? 'modelConfig.incompatibleTitle'
+    : s2sModel && !s2sReady ? 'session.s2sModelRequired'
+      : !s2sTargetValid ? outputMode === 'speech' ? 'session.speechLanguageUnavailable' : 'errors.translationUnsupportedLanguagePair'
+        : missingExplicitOutput ? 'session.explicitSpeechOutput' : undefined
 
   // Keep the title empty until edited so the session can assign its own sequence.
   const previewName = useMemo(() => {
@@ -115,7 +121,7 @@ export function SessionSetupDialog({
   }, [meetings, language])
 
   async function submit() {
-    if (!canStart) return
+    if (validationIssue) { notifyError(t(validationIssue)); return }
     const missing = !s2sModel && asr.unavailable ? 'asr'
       : needsMt && mt.unavailable ? 'mt'
         : !s2sModel && outputMode === 'speech' && tts.unavailable ? 'tts' : undefined
@@ -143,7 +149,7 @@ export function SessionSetupDialog({
       ...(outputMode === 'speech' ? { speechOutputDeviceId } : {}),
       ...(outputMode === 'speech' && !s2sModel ? {
         speechModelId: tts.binding.replace(/^resource:/, ''),
-        ...(synthesis.voice.trim() ? { speechVoice: synthesis.voice.trim() } : {}),
+        speechVoiceRef: voiceRef,
       } : {}),
     })
   }
@@ -163,15 +169,12 @@ export function SessionSetupDialog({
           <SettingRow label={t('session.keepAudio')} desc={t('session.keepAudioHint')} descriptionTooltip className="px-0 py-0">
             <SettingSwitch isSelected={draft.keepAudio} ariaLabel={t('session.keepAudio')} onChange={keepAudio => onDraftChange({ ...draft, keepAudio })} />
           </SettingRow>
-          {unsupportedSource ? <p className="type-muted text-warning-soft-foreground">{t('modelConfig.sourceUnsupported')}</p> : null}
-          {incompatible ? <p className="type-muted text-warning-soft-foreground">{t('modelConfig.incompatibleTitle')}</p> : null}
-          {s2sModel && !s2sReady ? <p className="type-muted text-warning-soft-foreground">{t('session.s2sModelRequired')}</p> : null}
-          {!s2sTargetValid ? <p className="type-muted text-warning-soft-foreground">{t(outputMode === 'speech' ? 'session.speechLanguageUnavailable' : 'errors.translationUnsupportedLanguagePair')}</p> : null}
-          {missingExplicitOutput ? <p className="type-muted text-warning-soft-foreground">{t('session.explicitSpeechOutput')}</p> : null}
+          {outputMode === 'speech' && !s2sModel && <TtsVoiceSelector usage="realtime" modelBinding={tts.binding} targetLanguage={targetLanguage}
+            value={voiceRef} onChange={setVoiceRef} />}
         </div>
         <DialogFooter>
-          <Button variant="tertiary" size="sm" onClick={() => onOpenChange(false)}>{t('session.cancel')}</Button>
-          <Button size="sm" disabled={!canStart} onClick={submit}>{t('session.start')}</Button>
+          <Button variant="secondary" size="sm" onClick={() => onOpenChange(false)}>{t('session.cancel')}</Button>
+          <Button size="sm" onClick={submit}>{t('session.start')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

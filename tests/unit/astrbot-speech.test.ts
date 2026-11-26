@@ -86,9 +86,9 @@ it.each([
   const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(response())
   vi.stubGlobal('fetch', fetch)
   const connection = presetConnection(id)
-  if (id === 'fishaudio-tts') connection.models[0].voice = 'a'.repeat(32)
+  if (id === 'fishaudio-tts') connection.models[0].tts = { defaultVoiceRef: { kind: 'preset', modelBinding: 'cloud:fishaudio-tts', voiceId: 'a'.repeat(32) } }
   if (id === 'volcengine-tts') {
-    connection.models[0].voice = 'voice-id'
+    connection.models[0].tts = { defaultVoiceRef: { kind: 'preset', modelBinding: 'cloud:volcengine-tts', voiceId: 'voice-id' } }
     connection.options = { appId: 'test-app' }
   }
   await expect(infer(id, connection)).resolves.toMatchObject({ audio: expect.stringContaining('data:' + mime + ';base64,') })

@@ -33,7 +33,7 @@ function StandardDialog() {
   return <Dialog open><DialogContent>
     <DialogCloseButton />
     <DialogHeader><DialogTitle>选择下载源</DialogTitle><DialogDescription>SenseVoiceSmall</DialogDescription></DialogHeader>
-    <div className="flex items-center gap-2 rounded-xl bg-surface-secondary p-2"><Button variant="secondary">🤗 Hugging Face</Button><Button variant="tertiary">HF-Mirror</Button><Button variant="tertiary">ModelScope</Button></div>
+    <div className="flex items-center gap-2 rounded-xl bg-surface-secondary p-2"><Button variant="secondary">🤗 Hugging Face</Button><Button variant="secondary">HF-Mirror</Button><Button variant="secondary">ModelScope</Button></div>
     <DialogFooter><Button variant="secondary">取消</Button><Button>重试</Button></DialogFooter>
   </DialogContent></Dialog>
 }
@@ -72,9 +72,9 @@ function OnboardingDialog({ complete = false }: { complete?: boolean }) {
 
 function OnboardingStep() {
   return <div className="onboarding-tour z-onboarding"><Card size="sm" className="onboarding-tour__card onboarding-tour__card--center" role="dialog" aria-modal="false" aria-labelledby="onboarding-heading" aria-describedby="onboarding-body">
-    <CardHeader><CardTitle id="onboarding-heading">选择识别模型</CardTitle><CardDescription id="onboarding-body">选择已安装的模型，随后配置字幕语言。</CardDescription><CardAction><Button variant="outline" size="icon" aria-label="退出引导"><X aria-hidden="true" /></Button></CardAction></CardHeader>
+    <CardHeader><CardTitle id="onboarding-heading">选择识别模型</CardTitle><CardDescription id="onboarding-body">选择已安装的模型，随后配置字幕语言。</CardDescription><CardAction><Button variant="secondary" size="icon" aria-label="退出引导"><X aria-hidden="true" /></Button></CardAction></CardHeader>
     <CardContent className="onboarding-tour__lesson"><p>当前步骤会介绍模型选择和安装方式。</p></CardContent>
-    <CardFooter className="onboarding-tour__footer"><div className="onboarding-tour__navigation"><span className="onboarding-tour__progress">第 2 章<span>第 3 / 6 步</span></span><div className="onboarding-tour__actions"><Button variant="secondary" size="sm">上一步</Button><Button size="sm">下一步</Button></div></div><div className="onboarding-tour__secondary"><Button variant="tertiary" size="sm">跳过本步</Button><Button variant="tertiary" size="sm">跳过本章</Button></div></CardFooter>
+    <CardFooter className="onboarding-tour__footer"><div className="onboarding-tour__navigation"><span className="onboarding-tour__progress">第 2 章<span>第 3 / 6 步</span></span><div className="onboarding-tour__actions"><Button variant="secondary" size="sm">上一步</Button><Button size="sm">下一步</Button></div></div><div className="onboarding-tour__secondary"><Button variant="secondary" size="sm">跳过本步</Button><Button variant="secondary" size="sm">跳过本章</Button></div></CardFooter>
   </Card></div>
 }
 

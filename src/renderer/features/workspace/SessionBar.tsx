@@ -77,7 +77,7 @@ export function SessionBar({ status, pausePending, elapsedMs, onPause, onResume,
       {playbackCopy ? <span className="type-muted text-muted" aria-live="polite">{t(playbackCopy)}{waitingSpeechCount ? ` · ${t('session.playbackQueueCount', { count: waitingSpeechCount })}` : ''}</span> : null}
       {playbackJob && onResolvePlayback ? <div className="flex shrink-0 items-center gap-1">
         {playbackJob.state === 'failed' ? <Button variant="secondary" size="sm" className="rounded-xl" disabled={busy} onClick={() => onResolvePlayback(playbackJob.jobId, 'retry')}>{t('session.retryPlayback')}</Button> : null}
-        <Button variant="outline" size="sm" className="rounded-xl" disabled={busy} onClick={() => onResolvePlayback(playbackJob.jobId, 'skip')}>{t('session.skipPlayback')}</Button>
+        <Button variant="secondary" size="sm" className="rounded-xl" disabled={busy} onClick={() => onResolvePlayback(playbackJob.jobId, 'skip')}>{t('session.skipPlayback')}</Button>
       </div> : null}
       <time
         dateTime={isoDuration(elapsedMs)}
@@ -101,13 +101,13 @@ export function SessionBar({ status, pausePending, elapsedMs, onPause, onResume,
 
       <div className="flex shrink-0 items-center gap-2">
         {paused ? (
-          <Button variant="outline" size="sm" className="rounded-xl" onClick={onResume} disabled={busy} tooltip={t('workspace.resume')}>
+          <Button variant="secondary" size="sm" className="rounded-xl" onClick={onResume} disabled={busy} tooltip={t('workspace.resume')}>
             {pausePending ? <Spinner /> : <Play aria-hidden="true" />}
             {t('workspace.resume')}
           </Button>
         ) : (
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             className="rounded-xl"
             onClick={onPause}

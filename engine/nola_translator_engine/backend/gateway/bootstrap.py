@@ -28,10 +28,10 @@ from ...translation.llama_server import resolve_llama_dir
 from ...translation.mymemory import DEFAULT_MYMEMORY_ENDPOINT
 from ...translation.network import DEFAULT_MICROSOFT_ENDPOINT
 from .adapters import (
-    MIMO_TTS_ENDPOINT, MIMO_TTS_MODEL, AdapterRegistry, GoogleMtAdapter, IndexPublicMtAdapter,
+    MIMO_TTS_ENDPOINT, MIMO_TTS_MODEL, MIMO_VOICE_DESCRIPTORS, AdapterRegistry, GoogleMtAdapter, IndexPublicMtAdapter,
     CloudAsrAdapter, CustomMtAdapter, LocalWorkerAdapter, MicrosoftMtAdapter, MiMoTtsAdapter, MyMemoryMtAdapter,
 )
-from .capabilities import ConcurrencyCapabilities, ContextCapabilities, LanguageCapabilities, ModelCapabilities, ModelKind, Operation, OperationProfile, TranslationPolicy
+from .capabilities import ConcurrencyCapabilities, ContextCapabilities, LanguageCapabilities, ModelCapabilities, ModelKind, Operation, OperationProfile, TranslationPolicy, VoiceCapabilities
 from .definitions import ModelDefinition, ProviderConfiguration
 from .gateway import ModelGateway, ModelRegistry, RegistryEntry
 from .languages import (
@@ -46,6 +46,7 @@ from .languages import (
 )
 from .resources import ResourceAdmission
 from .worker import LocalModelWorker
+from .tts_relay import TtsProviderRelayAdapter, TTS_PROVIDER_RELAY_MODEL
 
 #: Reserved VRAM head-room kept free for workspace/KV (doc 08 §8).
 DEFAULT_VRAM_RESERVE_MB = 1024.0
@@ -170,13 +171,30 @@ def build_default_gateway(*, model_dir: Path | None = None, worker_factory: Call
         model_id=MIMO_TTS_MODEL, adapter_id=MIMO_TTS_MODEL, kinds=[ModelKind.TTS], operations=[Operation.SYNTHESIZE],
         operation_profiles={Operation.SYNTHESIZE: OperationProfile(streaming_output="false", audio_output="utterance")},
         languages=LanguageCapabilities(input=["zh", "zh-Hant", "en"], speech_output=["zh", "zh-Hant", "en"], speech_output_available=True),
+        voices=VoiceCapabilities(preset_voices=MIMO_VOICE_DESCRIPTORS, default_voice="mimo_default"),
     )
     registry.register(
         ModelDefinition(MIMO_TTS_MODEL, [ModelKind.TTS], mimo_capabilities),
         cloud_configuration(MIMO_TTS_MODEL, ModelKind.TTS, endpoint=MIMO_TTS_ENDPOINT, credential_ref="mimo-tts"),
     )
+    for suffix, design in (("voicedesign", True), ("voiceclone", False)):
+        model_id = f"{MIMO_TTS_MODEL}-{suffix}"
+        capabilities = mimo_capabilities.model_copy(deep=True)
+        capabilities.model_id = model_id
+        capabilities.voices = VoiceCapabilities(supports_cloning=not design, supports_voice_design=design,
+            supports_voice_conversion=False)
+        registry.register(ModelDefinition(model_id, [ModelKind.TTS], capabilities),
+            cloud_configuration(model_id, ModelKind.TTS, endpoint=MIMO_TTS_ENDPOINT, credential_ref="mimo-tts"))
 
     adapters = AdapterRegistry()
+    relay_capabilities = ModelCapabilities(model_id=TTS_PROVIDER_RELAY_MODEL, adapter_id=TTS_PROVIDER_RELAY_MODEL,
+        kinds=[ModelKind.TTS], operations=[Operation.SYNTHESIZE],
+        operation_profiles={Operation.SYNTHESIZE: OperationProfile(streaming_output="false", audio_output="utterance")},
+        languages=LanguageCapabilities(speech_output_available=True),
+        voices=VoiceCapabilities(supports_cloning=True, supports_voice_design=True, supports_voice_conversion=False))
+    registry.register(ModelDefinition(TTS_PROVIDER_RELAY_MODEL, [ModelKind.TTS], relay_capabilities),
+        cloud_configuration(TTS_PROVIDER_RELAY_MODEL, ModelKind.TTS, endpoint=""))
+    adapters.register(TtsProviderRelayAdapter())
     adapters.register(
         LocalWorkerAdapter(),
         [Operation.TRANSCRIBE, Operation.TRANSLATE, Operation.SYNTHESIZE, Operation.GENERATE],
@@ -332,8 +350,6 @@ def register_local_tts(registry: ModelRegistry, root: Path) -> None:
     for spec in (*QWEN3_TTS_SPECS, *ADDITIONAL_TTS_SPECS):
         resource = RESOURCE_BY_ID[spec.model_id]
         if resource.provider == "llama.cpp":
-            continue
-        if resource.provider == "transformers-causal" and "-base-" in spec.model_id:
             continue
         installed = manager.is_installed(spec)
         existing = registry.get(spec.model_id)

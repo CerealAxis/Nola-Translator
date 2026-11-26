@@ -123,7 +123,7 @@ function ResetAll({ pending }: { pending: boolean }) {
               </AlertDialog.Description>
               <DialogFooter className="flex justify-end gap-2">
                 <Button
-                  variant="tertiary"
+                  variant="secondary"
                   size="sm"
                   className="rounded-[var(--radius-xl)]"
                   disabled={state === 'pending'} onClick={() => setOpen(false)}

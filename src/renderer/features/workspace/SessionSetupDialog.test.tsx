@@ -52,8 +52,9 @@ it.each(['zh', 'none'])('enforces custom MT source restrictions only with transl
     fireEvent.click(start)
     expect(onSubmit).toHaveBeenCalled()
   } else {
-    expect(start).toBeDisabled()
+    const showToast = vi.spyOn(toast, 'showToast')
     fireEvent.click(start)
+    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
     expect(onSubmit).not.toHaveBeenCalled()
   }
 })
@@ -119,7 +120,7 @@ it('submits speech settings only for the speech output mode', () => {
   const { onSubmit: submit } = renderDialog()
   fireEvent.click(screen.getByRole('button', { name: '开始' }))
   expect(submit).toHaveBeenCalledWith(expect.objectContaining({
-    outputMode: 'speech', speechModelId: 'tts-model', speechVoice: 'voice-a',
+    outputMode: 'speech', speechModelId: 'tts-model', speechVoiceRef: { kind: 'preset', modelBinding: 'resource:tts-model', voiceId: 'voice-a' },
     speechOutputDeviceId: 'web-audio-device', targetLanguages: ['zh'],
   }))
 })
@@ -155,15 +156,17 @@ it('blocks an inherited S2S mode when Alibaba Cloud is not configured', () => {
     realtime: { ...settings.realtime, defaultPipeline: 's2s' },
   } })
   const { onSubmit: submit } = renderDialog()
-  expect(screen.getByText('请先配置一个可用的 S2S 模型。')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '开始' })).toBeDisabled()
+  const showToast = vi.spyOn(toast, 'showToast')
+  expect(screen.queryByText('请先配置一个可用的 S2S 模型。')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '开始' }))
+  expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error', description: '请先配置一个可用的 S2S 模型。' }))
   expect(submit).not.toHaveBeenCalled()
 })
 
 it.each([
   ['stopped', '模型网关未启动', '在模型网关点「启动服务」后重试。'],
   ['starting', '正在启动', '等待网关切换状态后重试。'],
-  ['failed', '模型网关启动失败', '打开模型网关查看状态并重试。'],
+  ['failed', '启动失败', '服务启动异常，请重启软件后重试。'],
   ['running', '没有可用的 ASR 模型', '请配置可用的云端接口，或启用本地模型后在模型网关加载。'],
 ])('uses the current gateway state (%s) to report an unavailable local model', async (stateName, title, description) => {
   state.catalog.asr = []

@@ -14,6 +14,7 @@ from typing import AsyncIterator, Protocol, runtime_checkable
 
 from .capabilities import CallContext, Operation
 from .definitions import ModelInstance
+from ..tts_contracts import SynthesisRequest
 
 
 # ---------------------------------------------------------------------------
@@ -110,8 +111,13 @@ class LlmOperation(Protocol):
 @runtime_checkable
 class TtsOperation(Protocol):
     async def synthesize(
-        self, instance: ModelInstance, ctx: CallContext, *, text: str, voice: str | None
+        self, instance: ModelInstance, ctx: CallContext, *, synthesis: SynthesisRequest
     ) -> SynthesisResult: ...
+
+
+@runtime_checkable
+class VoiceInventoryOperation(Protocol):
+    async def tts_voices(self, instance: ModelInstance, ctx: CallContext) -> list: ...
 
 
 @runtime_checkable

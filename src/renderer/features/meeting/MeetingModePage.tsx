@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Captions, CircleHelp, MessagesSquare, RefreshCw, Keyboard } from 'lucide-react'
 import { ALIYUN_LANGUAGES, ALIYUN_S2S_SPEECH_LANGUAGES } from '../../../shared/cloud-config'
-import { appendSupportCode, SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
+import { SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
 import { normalizeLanguage } from '../../../shared/languages'
 import { intersectLanguages, useModelOptions } from '@/model-options'
 import { resolveModelBinding, useAvailableModels } from '@/available-models'
 import { sceneModelBinding } from '../../../shared/model-policy'
+import { TtsVoiceSelector } from '@/components/tts/TtsVoiceSelector'
+import { synthesisVoiceRef } from '../../../shared/tts/settings-migration'
+import { ttsText } from '@/i18n/tts-ui'
 import { LanguageDirectionSelect } from '@/components/primitives/LanguageDirectionSelect'
 import { DEFAULT_MEETING_MODE, type MeetingModeSettings, type MeetingModeSnapshot } from '../../../shared/meeting-mode'
 import { vbCablePair } from '../../../shared/virtual-audio'
 import { DEFAULT_SETTINGS, defaultRealtimeS2s } from '../../../shared/settings'
 import { PageHeader } from '@/components/primitives'
 import { notifyError } from '@/components/primitives/notify'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -68,8 +70,8 @@ export function MeetingModePage() {
   const refresh = useCallback(async () => {
     setDeviceState('loading')
     try { await actions.models.probeAudioDevices(); setDeviceState('loaded') }
-    catch (error) { console.error('meeting device list failed', error); setDeviceState('failed') }
-  }, [])
+    catch (cause) { setDeviceState('failed'); notifyError(t('meeting.deviceListFailed'), { cause }) }
+  }, [t])
   useEffect(() => {
     if (!api) {
       setStatusLoading(false)
@@ -81,8 +83,10 @@ export function MeetingModePage() {
     const off = api.onChanged(value => { changed = true; setStatusLoading(false); setSnapshot(value) })
     void api.snapshot().then(value => { if (alive && !changed) { setSnapshot(value) } })
       .catch(error => {
-        console.error('meeting status failed', error)
-        if (alive && !changed) setSnapshot({ state: 'unknown', passthroughActive: false, error: { key: 'meeting.statusFailed' } })
+        if (alive && !changed) {
+          notifyError(t('meeting.statusFailed'), { cause: error })
+          setSnapshot({ state: 'unknown', passthroughActive: false })
+        }
       }).finally(() => { if (alive) setStatusLoading(false) })
     void refresh()
     return () => { alive = false; off() }
@@ -164,7 +168,7 @@ export function MeetingModePage() {
   const run = async () => {
     if (!api) return
     if (!canStop && !valid) {
-      setSnapshot({ state: 'failed', passthroughActive: false, error: { key: 'meeting.invalidRoute' } })
+      notifyError(t('meeting.invalidRoute'))
       return
     }
     if (!canStop && valid) {
@@ -173,23 +177,32 @@ export function MeetingModePage() {
         await actions.settings.updateSettings({ meetingMode: mode })
         setSnapshot(await api.start(mode))
       } catch (error) {
-        console.error('meeting start failed', error)
-        setSnapshot({ state: 'failed', passthroughActive: false, error: { key: 'meeting.startFailed' } })
+        notifyError(t('meeting.startFailed'), { cause: error })
+        setSnapshot({ state: 'failed', passthroughActive: false })
       }
     } else if (canStop) {
       try { setSnapshot(await api.stop()) }
       catch (error) {
-        console.error('meeting stop failed', error)
-        setSnapshot(current => ({ ...current, error: { key: 'meeting.stopFailed' } }))
+        notifyError(t('meeting.stopFailed'), { cause: error })
       }
     }
   }
   const localizedError = errorCopy(snapshot.error)
+  const lastError = useRef('')
+  const errorIdentity = JSON.stringify(snapshot.error ?? null)
+  useEffect(() => {
+    if (localizedError && lastError.current !== errorIdentity) {
+      const direction = snapshot.error?.direction
+      notifyError(`${direction ? `${t(`meeting.${direction}`)} · ` : ''}${t(localizedError)}`,
+        { supportCode: snapshot.error?.code ? supportErrorCodeForCause(snapshot.error.code) : undefined })
+    }
+    lastError.current = errorIdentity
+  }, [errorIdentity, localizedError, t])
   const originalVolume = new Intl.NumberFormat(language, { style: 'percent' }).format(mode.duckVolume / 100)
   const preferences = <FieldGroup className="nola-settings-fields">
       <div className="col-span-full flex flex-wrap items-center justify-between gap-2">
         <h2 className="nola-settings-heading">{t('meeting.translation')}</h2>
-        <Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/audio" />}>{t('settings.audioDevicesGroup')}</Button>
+        <Button nativeButton={false} variant="secondary" size="sm" render={<a href="#/settings/audio" />}>{t('settings.audioDevicesGroup')}</Button>
       </div>
       {mode.downlinkSource === 'cable' && mode.downlinkEnabled ? <Field className="nola-settings-field">
         <div className="nola-meeting-preference-label"><FieldLabel id="meeting-duck-volume">{t('meeting.duckVolume')}</FieldLabel><Tooltip>
@@ -203,14 +216,13 @@ export function MeetingModePage() {
     </FieldGroup>
 
   return <section data-slot="meeting-page" className="flex min-w-0 flex-col gap-6">
-    <PageHeader title={t('meeting.title')} warning={t('suite.experimentalInDevelopment')} subtitle={t('meeting.singlePageHint')} actions={<>
-      <Button variant="outline" onClick={() => void actions.settings.showWorkspace().catch(error => notifyError(t('workspaceUi.windowFailed'), { cause: error }))}><MessagesSquare data-icon="inline-start" />{t('meeting.conversation')}</Button>
-      <Button variant="outline" onClick={() => void actions.settings.showOverlay('workspace').then(opened => { if (opened === false) notifyError(t('workspaceUi.overlayFailed')) }).catch(error => notifyError(t('workspaceUi.overlayFailed'), { cause: error }))}><Captions data-icon="inline-start" />{t('workspaceUi.openOverlay')}</Button>
+    <PageHeader title={t('meeting.title')} warning={t('suite.experimentalInDevelopment')} actions={<>
+      <Button variant="secondary" onClick={() => void actions.settings.showWorkspace().catch(error => notifyError(t('workspaceUi.windowFailed'), { cause: error }))}><MessagesSquare data-icon="inline-start" />{t('meeting.conversation')}</Button>
+      <Button variant="secondary" onClick={() => void actions.settings.showOverlay('workspace').then(opened => { if (opened === false) notifyError(t('workspaceUi.overlayFailed')) }).catch(error => notifyError(t('workspaceUi.overlayFailed'), { cause: error }))}><Captions data-icon="inline-start" />{t('workspaceUi.openOverlay')}</Button>
       <Button disabled={!api || pending} onClick={() => void run()}>
         {pending ? <Spinner data-icon="inline-start" /> : null}{t(snapshot.state === 'starting' ? 'gateway.starting' : snapshot.state === 'stopping' ? 'gateway.stopping' : canStop ? 'meeting.stop' : 'meeting.start')}
       </Button>
     </>} />
-    {localizedError ? <Alert variant="danger"><AlertDescription>{snapshot.error?.direction ? <strong>{t(`meeting.${snapshot.error.direction}`)} · </strong> : null}{appendSupportCode(t(localizedError), snapshot.error?.code ? supportErrorCodeForCause(snapshot.error.code) : undefined)}</AlertDescription></Alert> : null}
     <MeetingStage mode={mode} snapshot={snapshot} />
     <Card data-slot="meeting-settings" className="nola-section-card nola-settings-card nola-meeting-settings">
       <CardContent className="nola-settings-content">
@@ -218,8 +230,8 @@ export function MeetingModePage() {
           <div className="col-span-full flex flex-wrap items-center justify-between gap-2">
             <h2 className="nola-settings-heading">{t('session.processingGroup')}</h2>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" disabled={locked || deviceState === 'loading'} onClick={() => void refresh()}>{deviceState === 'loading' && api ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t('meeting.refresh')}</Button>
-              <Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/shortcuts" />}><Keyboard data-icon="inline-start" />{t('shortcuts.title')}</Button>
+              <Button variant="secondary" size="sm" disabled={locked || deviceState === 'loading'} onClick={() => void refresh()}>{deviceState === 'loading' && api ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t('meeting.refresh')}</Button>
+              <Button nativeButton={false} variant="secondary" size="sm" render={<a href="#/settings/shortcuts" />}><Keyboard data-icon="inline-start" />{t('shortcuts.title')}</Button>
             </div>
           </div>
           <RealtimeProcessingField id="meeting-pipeline" className="nola-settings-field" disabled={locked} value={mode.pipeline === 'auto' ? 'default' : mode.pipeline} onChange={value => change('pipeline', value === 'default' ? 'auto' : value)} />
@@ -231,11 +243,14 @@ export function MeetingModePage() {
               onSourceChange={value => change('localLanguage', value)} onTargetChange={value => change('remoteLanguage', value)}
               onSwap={localCodes.includes(mode.remoteLanguage) && remoteCodes.includes(mode.localLanguage) ? () => setDraft(previous => ({ ...(previous ?? mode), localLanguage: mode.remoteLanguage, remoteLanguage: mode.localLanguage })) : undefined} />
           </Field>
+          {!directSpeech && <Field className="nola-settings-field"><FieldLabel htmlFor="meeting-voice">{ttsText(language, 'voice')}</FieldLabel>
+            <TtsVoiceSelector usage="realtime" targetLanguages={[...(mode.uplinkEnabled ? [mode.remoteLanguage] : []), ...(mode.downlinkEnabled ? [mode.localLanguage] : [])]} id="meeting-voice" modelBinding={ttsBinding} targetLanguage={mode.uplinkEnabled ? mode.remoteLanguage : mode.localLanguage}
+              value={mode.voiceRef ?? synthesisVoiceRef(settings)} onChange={value => change('voiceRef', value)} disabled={locked} />
+          </Field>}
           <TextProcessingSceneField scene="meeting" disabled={locked} />
         </FieldGroup>
         <FieldGroup className="nola-settings-fields">
           <h2 className="nola-settings-heading">{t('meeting.routing')}</h2>
-          {deviceState === 'failed' ? <Alert variant="danger"><AlertDescription>{t('meeting.deviceListFailed')}</AlertDescription></Alert> : null}
           <div className="nola-meeting-routes">
             <FieldGroup>
               <Field className="nola-meeting-route-heading"><FieldLabel htmlFor="meeting-send">{t('meeting.sendDirection')}</FieldLabel><Switch id="meeting-send" checked={mode.uplinkEnabled} onCheckedChange={value => change('uplinkEnabled', value)} disabled={locked}><SwitchThumb /></Switch></Field>

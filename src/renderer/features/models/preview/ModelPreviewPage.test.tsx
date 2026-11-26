@@ -15,6 +15,25 @@ import { Routes } from '@/routes'
 import ModelPreviewPage from './ModelPreviewPage'
 import { configuredConnections, createWorkspaceConnection, saveWorkspaceConnection } from './model-workspace-settings'
 
+it('keeps MiMo connections and profiled model switches independent of the legacy default', () => {
+  const settings = structuredClone(DEFAULT_SETTINGS)
+  settings.modelWorkspace = { localSources: {}, connections: [{ id: 'mimo-account', service: 'mimo', capability: 'TTS', name: 'My MiMo',
+    endpoint: 'https://api.xiaomimimo.com/v1', protocol: '', workspace: '', region: '', models: [
+      { id: 'mimo-v2.5-tts-voiceclone', name: 'Clone', enabled: true, profileId: 'clone' },
+      { id: 'mimo-v2.5-tts-voicedesign', name: 'Design', enabled: false, profileId: 'design' },
+    ] }] }
+  const connections = configuredConnections(settings, {} as never).filter(item => item.service === 'mimo')
+  expect(connections).toHaveLength(1)
+  expect(connections[0]).toMatchObject({ id: 'mimo-account', models: [
+    expect.objectContaining({ profileId: 'clone', enabled: true }), expect.objectContaining({ profileId: 'design', enabled: false }),
+  ] })
+})
+
+vi.mock('@/components/tts/use-tts-capabilities', async () => {
+  const { ttsCatalogCapabilities } = await import('../../../../shared/tts/catalog')
+  return { useTtsCapabilities: (binding: string, modelId?: string) => ({ capabilities: ttsCatalogCapabilities(
+    binding.includes('openai') ? 'openai-tts-api' : 'mimo', modelId ?? 'mimo-v2.5-tts', binding) }) }
+})
 vi.mock('@lobehub/icons/es/features/IconAvatar', () => ({ default: () => null }))
 const initialModels = stores.models.getState()
 const initialSettings = stores.settings.getState()
@@ -235,7 +254,7 @@ it.each([
   const connection = {
     ...createWorkspaceConnection(scenario.service, scenario.category),
     workspace: 'test-workspace', region: 'ap-southeast-1', key: 'slot' in scenario ? 'test-key' : '',
-    models: [{ id: scenario.model, name: scenario.model, enabled: true, ...(scenario.service === 'mimo' ? { voice: 'Mia' } : {}) }],
+    models: [{ id: scenario.model, name: scenario.model, enabled: true, ...(scenario.service === 'mimo' ? { tts: { defaultVoiceRef: { kind: 'preset' as const, modelBinding: 'cloud:mimo-v2.5-tts', voiceId: 'Mia' } } } : {}) }],
   }
   await saveWorkspaceConnection(connection)
   let current = stores.settings.getState().settings!
@@ -244,7 +263,7 @@ it.each([
   if (scenario.binding) expect(current.modelPolicy?.enabled[scenario.binding]).toBe(true)
   else expect(current.realtime).toMatchObject({ s2sModel: scenario.model, defaultPipeline: 's2s' })
   if (scenario.service === 'aliyun') expect(current.recognition).toMatchObject({ aliyunWorkspaceId: 'test-workspace', aliyunRegion: 'ap-southeast-1' })
-  if (scenario.service === 'mimo') expect(current.synthesis.voice).toBe('Mia')
+  if (scenario.service === 'mimo') expect(current.modelWorkspace?.connections.find(item => item.service === 'mimo')?.models[0].tts?.defaultVoiceRef).toMatchObject({ kind: 'preset', voiceId: 'Mia' })
   await saveWorkspaceConnection({ ...connection, key: '', models: [] }, connection, true)
   current = stores.settings.getState().settings!
   expect(current.modelWorkspace?.connections).toEqual([])
@@ -531,22 +550,6 @@ it('adds Whisper with the AstrBot name and exposes a callable batch ASR model on
   expect(workspaceSpeechModel({ ...configured, models: configured.models.slice(1) }, 'cloud:whisper-api')).toBeUndefined()
 })
 
-it('shows a single MiMo TTS(API) source for a legacy configured MiMo connection', async () => {
-  const user = userEvent.setup()
-  const oldConnection = createWorkspaceConnection('mimo', 'TTS')
-  await saveWorkspaceConnection({ ...oldConnection, name: 'Xiaomi MiMo',
-    endpoint: 'https://api.xiaomimimo.com/v1/chat/completions',
-    models: [{ id: 'mimo-v2.5-tts', name: 'mimo-v2.5-tts', enabled: true, voice: 'Mia' }] })
-  render(<ModelPreviewPage />)
-  await chooseCategory(user, '语音合成')
-  expect(within(screen.getByRole('complementary')).getByRole('button', { name: 'MiMo TTS(API)' })).toBeVisible()
-  await user.click(screen.getByRole('button', { name: '新增' }))
-  const picker = within(screen.getByRole('dialog'))
-  expect(picker.getAllByRole('button', { name: 'MiMo TTS(API)' })).toHaveLength(1)
-  await user.click(picker.getByRole('button', { name: 'MiMo TTS(API)' }))
-  expect(screen.getByLabelText('接口地址')).toHaveValue('https://api.xiaomimimo.com/v1')
-  expect(screen.getByText('Mia')).toBeVisible()
-})
 
 it.each([
   ['MiniMax Token Plan', 'https://proxy.example/anthropic', 'Anthropic Messages', 'demo-minimax'],
@@ -576,32 +579,28 @@ it.each([
   expect(screen.getByText(model)).toBeVisible()
 })
 
-it('adds another MiMo model and lets the user choose or type a voice', async () => {
+it('saves API presets as model-bound references and keeps design models separate', async () => {
   const user = userEvent.setup()
-  const source = createWorkspaceConnection('mimo', 'TTS')
-  await saveWorkspaceConnection({ ...source,
-    models: [{ id: 'mimo-v2.5-tts', name: 'mimo-v2.5-tts', enabled: true, voice: 'mimo_default' }],
-  })
+  await saveWorkspaceConnection({ ...createWorkspaceConnection('mimo', 'TTS'),
+    models: [{ id: 'mimo-v2.5-tts', name: 'mimo-v2.5-tts', enabled: true, tts: { defaultVoiceRef: { kind: 'preset' as const, modelBinding: 'cloud:mimo-v2.5-tts', voiceId: 'mimo_default' } } }] })
   render(<ModelPreviewPage />)
   await chooseCategory(user, '语音合成')
   await user.click(screen.getByRole('button', { name: '编辑模型 mimo-v2.5-tts' }))
   const editor = within(screen.getByRole('dialog', { name: '编辑模型' }))
-  const voice = editor.getByRole('combobox', { name: '音色' })
-  await user.clear(voice)
-  await user.type(voice, 'private-voice')
-  expect(voice).toHaveValue('private-voice')
-  await user.keyboard('{Tab}')
-  await user.click(editor.getByRole('button', { name: '选择预设音色' }))
-  await user.click(await screen.findByRole('option', { name: 'Chloe' }))
-  expect(editor.getByLabelText('音色')).toHaveValue('Chloe')
+  await user.click(editor.getByRole('combobox', { name: '默认音色' }))
+  await user.click(screen.getByRole('option', { name: 'Chloe' }))
   await user.click(editor.getByRole('button', { name: '保存' }))
+  const saved = stores.settings.getState().settings?.modelWorkspace?.connections[0].models[0]
+  expect(saved?.tts?.defaultVoiceRef).toEqual({ kind: 'preset', modelBinding: 'cloud:mimo-v2.5-tts', voiceId: 'Chloe' })
+  expect(saved).not.toHaveProperty('voice')
+  expect(saved?.tts?.capabilityOverride?.presetVoices).toEqual([])
   await user.click(screen.getByRole('button', { name: '添加模型' }))
   const add = within(screen.getByRole('dialog', { name: '添加模型' }))
-  fireEvent.change(add.getByLabelText('模型 ID'), { target: { value: 'custom-tts' } })
-  fireEvent.change(add.getByLabelText('音色'), { target: { value: 'custom-voice' } })
+  fireEvent.change(add.getByLabelText('模型 ID'), { target: { value: 'mimo-v2.5-tts-voicedesign' } })
+  await waitFor(() => expect(add.getByRole('button', { name: '保存' })).toBeEnabled())
+  expect(add.queryByLabelText('Voice ID 1')).not.toBeInTheDocument()
+  expect(add.queryByText('API 音色')).not.toBeInTheDocument()
   await user.click(add.getByRole('button', { name: '保存' }))
-  expect(stores.settings.getState().settings?.modelWorkspace?.connections[0].models).toEqual([
-    expect.objectContaining({ id: 'mimo-v2.5-tts', voice: 'Chloe' }),
-    expect.objectContaining({ id: 'custom-tts', voice: 'custom-voice', profileId: expect.any(String) }),
-  ])
+  expect(stores.settings.getState().settings?.modelWorkspace?.connections[0].models.find(item => item.id === 'mimo-v2.5-tts-voicedesign')?.tts?.defaultVoiceRef)
+    .toEqual({ kind: 'engine-default' })
 })

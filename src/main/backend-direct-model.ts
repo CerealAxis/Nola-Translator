@@ -18,11 +18,15 @@ import { validEndpoint } from '../shared/cloud-models'
 import { screenBlurPatchSchema, screenCaptureResultSchema, type ScreenCaptureRequest,
   type ScreenCaptureResult, type ScreenOcrRequest, type ScreenOcrResult, type ScreenOcrStatus } from '../shared/screen-translation'
 import { resolveModelNetwork } from './network-region'
+import { ttsPresetVoiceDescriptorSchema } from '../shared/tts/capabilities'
+import { TTS_SCHEMA_VERSION } from '../shared/tts/capabilities'
 
 const catalog = z.object({ models: z.array(z.object({
   model_id: z.string(), enabled: z.boolean(), operations: z.array(z.string()),
 })) })
-const result = z.object({ text: z.string(), audio: z.string().optional(), voices: z.array(z.string()).optional() })
+const result = z.object({ text: z.string(), audio: z.string().optional(), voices: z.array(z.string()).optional(),
+  voice_inventory: z.array(ttsPresetVoiceDescriptorSchema).optional(),
+}).transform(({ voice_inventory, ...value }) => ({ ...value, ...(voice_inventory ? { voiceInventory: voice_inventory } : {}) }))
 const operations = { asr: 'transcribe', mt: 'translate', tts: 'synthesize' } as const
 type BackendConnection = Pick<BackendSupervisor, 'baseUrl' | 'authorizationHeader'>
 export async function probeBackendS2s(backend: BackendConnection, model: string, recognition: RecognitionSettings, apiKey: string, signal: AbortSignal) {
@@ -259,7 +263,10 @@ export async function inferBackendModel(
     : kind === 'mt'
       ? { text: request.text ?? '', source: request.source, target: request.target, image: request.image,
           ...(request.glossary?.length ? { glossary: request.glossary, skip_unsupported_glossary: request.skipUnsupportedGlossary } : {}) }
-      : { text: request.text, voice: request.voice, response_format: options?.mp3 ? 'mp3' : undefined }
+      : { schema_version: TTS_SCHEMA_VERSION, text: request.text, voice: request.voice, target: request.target,
+          conditioning: request.conditioning, controls: request.controls, output: request.output,
+          reference_audio: request.conditioning?.kind === 'reference-audio' ? request.audio : undefined,
+          response_format: request.output?.format === 'mp3' || options?.mp3 ? 'mp3' : 'wav' }
   const response = await fetch(new URL('/api/v2/gateway/infer', backend.baseUrl), {
     method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', ...(mimo && ttsApiKey ? { 'x-nola-tts-key': ttsApiKey } : {}),
       ...(cloudAsr ? recognition : {}),

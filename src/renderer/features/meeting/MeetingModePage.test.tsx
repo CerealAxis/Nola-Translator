@@ -5,9 +5,12 @@ import type { NolaBridge } from '@/bridge'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { DEFAULT_MEETING_MODE, type MeetingModeSnapshot } from '../../../shared/meeting-mode'
 import * as store from '@/store'
+import { notifyError } from '@/components/primitives/notify'
 import { MeetingModePage } from './MeetingModePage'
 import type { SettingSelectProps } from '../settings/SettingsPage'
 import type { AvailableModels } from '@/available-models'
+
+vi.mock('@/components/primitives/notify', () => ({ notifyError: vi.fn() }))
 
 const models = vi.hoisted(() => ({ catalog: { asr: [], mt: [], tts: [], llm: [], ocr: [] } as AvailableModels }))
 vi.mock('@/available-models', async importOriginal => ({ ...await importOriginal<typeof import('@/available-models')>(), useAvailableModels: () => models.catalog, useGatewaySnapshot: () => ({ state: 'running' }) }))
@@ -49,7 +52,7 @@ beforeEach(() => {
     stop: async () => ({ state: 'idle', passthroughActive: false }),
   } } as unknown as NolaBridge)
 })
-afterEach(() => { cleanup(); vi.restoreAllMocks(); store.stores.settings.setState(initialSettings); store.stores.models.setState(initialModels) })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks(); store.stores.settings.setState(initialSettings); store.stores.models.setState(initialModels) })
 const ready = async () => {
   await act(async () => { render(<MeetingModePage />) })
   const refresh = screen.getByText('刷新设备', { selector: 'button' })
@@ -65,7 +68,8 @@ it('keeps start disabled until the current meeting state is known and offers sto
   render(<MeetingModePage />)
   expect(screen.getByRole('button', { name: '开始会议口译' })).toBeDisabled()
   await act(async () => { reject(new Error('network unavailable')) })
-  expect(await screen.findByRole('alert')).toHaveTextContent('无法确认会议口译状态')
+  await waitFor(() => expect(notifyError).toHaveBeenCalledWith(expect.stringContaining('无法确认会议口译状态'), expect.any(Object)))
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '停止会议口译' })).toBeEnabled()
   expect(start).not.toHaveBeenCalled()
 })
@@ -156,7 +160,10 @@ it('explains invalid routing when start is clicked instead of disabling the acti
   const button = screen.getByRole('button', { name: '开始会议口译' })
   expect(button).toBeEnabled()
   fireEvent.click(button)
-  expect(await screen.findByRole('alert')).toHaveTextContent('请选择有效设备和不同语言，并至少开启一个方向。')
+  await waitFor(() => expect(notifyError).toHaveBeenCalledWith('请选择有效设备和不同语言，并至少开启一个方向。'))
+  fireEvent.click(button)
+  expect(notifyError).toHaveBeenCalledTimes(2)
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   expect(start).not.toHaveBeenCalled()
 })
 

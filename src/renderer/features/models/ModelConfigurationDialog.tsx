@@ -36,18 +36,20 @@ export interface ModelLanguageSelectProps {
   codes: readonly string[]
   onChange: (value: string[]) => void
   multiple?: boolean
+  compact?: boolean
+  hideArrow?: boolean
   genericChinese?: boolean
   /** Read-only mode disables the picker and omits tag removal. */
   readOnly?: boolean
 }
 
-export function ModelLanguageSelect({ label, value, codes, onChange, multiple = true, readOnly = false, genericChinese = false }: ModelLanguageSelectProps) {
+export function ModelLanguageSelect({ label, value, codes, onChange, multiple = true, readOnly = false, genericChinese = false, compact = false, hideArrow = false }: ModelLanguageSelectProps) {
   const fieldRef = useRef<HTMLDivElement>(null)
   const { language, t } = useI18n()
   const name = (code: string) => modelLanguageName(code, language, genericChinese)
   const ariaLabel = typeof label === 'string' ? label : undefined
   const options = <>
-    <div ref={fieldRef} className="model-language-field">
+    <div ref={fieldRef} className={`model-language-field${compact ? ' model-language-field--compact' : ''}${hideArrow ? ' model-language-field--no-arrow' : ''}`}>
       {multiple ? <Combobox.Chips className="model-language-chips">
         {value.map(code => <Combobox.Chip key={code} className="model-language-chip">
           <span>{name(code)}</span>
@@ -56,7 +58,7 @@ export function ModelLanguageSelect({ label, value, codes, onChange, multiple = 
         {!value.length ? <span className="text-muted">{t('modelConfig.selectLanguages')}</span> : null}
       </Combobox.Chips> : <span>{value.length ? name(value[0]) : t('modelConfig.selectLanguages')}</span>}
       <Combobox.Trigger className="model-language-toggle" aria-label={ariaLabel}>
-        <ChevronDown aria-hidden="true" className="size-4" />
+        {!hideArrow && <ChevronDown aria-hidden="true" className="size-4" />}
       </Combobox.Trigger>
     </div>
     <Combobox.Portal><Combobox.Positioner anchor={fieldRef} className="z-popup" sideOffset={4}>
@@ -158,14 +160,14 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false, hi
               }}>{t('modelConfig.addPair')}</Button>
             </>}
             {draft.translationPairs.map(pair => <div className="flex items-center justify-between gap-[var(--space-1)]" key={`${pair.source}:${pair.target}`}>
-              <span>{name(pair.source)} → {name(pair.target)}</span>{readOnly ? null : <Button variant="tertiary" onClick={() => patch({ translationPairs: draft.translationPairs?.filter(item => item !== pair) })} aria-label={`${t('modelConfig.removePair')}: ${name(pair.source)} → ${name(pair.target)}`}>{t('modelConfig.removePair')}</Button>}
+              <span>{name(pair.source)} → {name(pair.target)}</span>{readOnly ? null : <Button variant="secondary" onClick={() => patch({ translationPairs: draft.translationPairs?.filter(item => item !== pair) })} aria-label={`${t('modelConfig.removePair')}: ${name(pair.source)} → ${name(pair.target)}`}>{t('modelConfig.removePair')}</Button>}
             </div>)}
           </> : null}
         </> : null}
       </div>}
       <DialogFooter>
         {record.installed && !hideRemove ? <Button variant="danger" disabled={saving || removing} aria-busy={removing} onClick={() => void remove()}>{removing ? <Spinner /> : <Trash2 aria-hidden="true" />}{t('modelsSettingsUi.deleteModel')}</Button> : null}
-        <Button variant="tertiary" disabled={saving || removing} onClick={onClose}>{t('session.cancel')}</Button>
+        <Button variant="secondary" disabled={saving || removing} onClick={onClose}>{t('session.cancel')}</Button>
         {readOnly ? null : <Button disabled={!valid || saving || removing} aria-busy={saving} onClick={() => void save()}>{saving ? <Spinner /> : null}{t('modelConfig.save')}</Button>}
       </DialogFooter>
     </DialogContent>

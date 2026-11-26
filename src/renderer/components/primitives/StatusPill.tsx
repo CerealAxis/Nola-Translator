@@ -1,11 +1,3 @@
-/**
- * Status pill: pill radius plus the micro type step.
- *
- * A plain inline-flex span carries the geometry — `rounded-full`, a 20/24px
- * height and the 12px type step — while the tone supplies the fill and the
- * text colour.
- */
-
 import type { ReactNode } from 'react'
 
 /**
@@ -62,10 +54,11 @@ export function StatusPill({
 }: StatusPillProps) {
   return (
     <span
+      data-slot="status-pill"
       className={[
         'inline-flex w-fit shrink-0 items-center gap-1 rounded-full',
         SIZE_CLASS[size],
-        'type-small',
+        'type-small font-normal',
         TONE_CLASS[tone],
         className ?? '',
       ]

@@ -86,6 +86,9 @@ def main() -> None:
         if not (staging / "python.exe").exists() or not (staging / "python312.dll").exists():
             raise RuntimeError("The base Python installation is incomplete")
         shutil.copytree(base / "DLLs", staging / "DLLs", ignore=shutil.ignore_patterns("__pycache__"))
+        for pattern in ("ffi-*.dll", "libssl-*.dll", "libcrypto-*.dll", "sqlite3.dll"):
+            for source in (base / "Library" / "bin").glob(pattern):
+                shutil.copy2(source, staging / source.name)
         shutil.copytree(base / "Lib", staging / "Lib",
                         ignore=shutil.ignore_patterns("site-packages", "__pycache__", "test", "tests"))
         shutil.copytree(dependencies, staging / "Lib" / "site-packages",
@@ -117,7 +120,11 @@ def main() -> None:
         # Exercise the packaged interpreter, not the build venv: source-only imports
         # cannot catch missing native audio dependencies in the actual desktop environment.
         subprocess.run([str(staging / "python.exe"), "-I", "-c",
-            "import numpy as np, lameenc; "
+            "import io, ssl, sqlite3, numpy as np, lameenc, soundfile as sf; "
+            "assert sqlite3.connect(':memory:').execute('select 1').fetchone() == (1,); "
+            "encoder = lameenc.Encoder(); encoder.set_bit_rate(128); encoder.set_in_sample_rate(24000); encoder.set_channels(1); "
+            "encoded = encoder.encode(np.zeros(2400, dtype='<i2').tobytes()) + encoder.flush(); "
+            "decoded, rate = sf.read(io.BytesIO(encoded)); assert rate == 24000 and decoded.size > 0; "
             "from nola_translator_engine.recognition.volume_gate import SileroVadSegmenter; "
             "from nola_translator_engine.recognition.speaker import SpeakerEmbedder; "
             "from nola_translator_engine.audio.resample import AudioFrame; "

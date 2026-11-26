@@ -19,7 +19,7 @@ export const pressable =
   "transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.96] motion-reduce:transition-none";
 
 export const ghostButton =
-  "flex items-center justify-center rounded-[var(--radius-xl)] text-muted-foreground outline-hidden transition-[background-color,color,scale] duration-150 hover:bg-muted hover:text-foreground active:scale-[0.96] focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none";
+  "flex items-center justify-center rounded-[var(--radius-xl)] text-muted-foreground outline-hidden transition-[background-color,color,scale] duration-150 hover:bg-muted hover:text-foreground active:scale-[0.96]   motion-reduce:transition-none";
 
 export const inkButton =
   "bg-primary text-primary-foreground transition-[background-color,scale] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-[var(--primary-hover)] active:scale-[0.96] motion-reduce:transition-none forced-colors:border";

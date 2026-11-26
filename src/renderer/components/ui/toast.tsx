@@ -85,8 +85,8 @@ function ToastViewport({ onEmpty, container, closeLabel }: ToastProviderProps) {
             {toast.description ? <BaseToast.Description className="nola-toast-description whitespace-pre-line" /> : null}
           </div>
           {/* Base UI can hide a high-priority toast from assistive technology during pointer interaction. */}
-          {toast.actionProps ? <BaseToast.Action className="nola-toast-action" onMouseDown={event => event.preventDefault()} render={<Button variant="outline" />} /> : null}
-          <BaseToast.Close onMouseDown={event => event.preventDefault()} render={<Button size="icon" variant="tertiary" className="nola-toast-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent text-nola-ui-muted-foreground!" aria-label={closeLabel ?? t('common.close')}><X aria-hidden="true" /></Button>} />
+          {toast.actionProps ? <BaseToast.Action className="nola-toast-action" onMouseDown={event => event.preventDefault()} render={<Button variant="secondary" />} /> : null}
+          <BaseToast.Close onMouseDown={event => event.preventDefault()} render={<Button size="icon" variant="secondary" className="nola-toast-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent text-nola-ui-muted-foreground!" aria-label={closeLabel ?? t('common.close')}><X aria-hidden="true" /></Button>} />
         </BaseToast.Content>
       </BaseToast.Root>)}
     </BaseToast.Viewport>

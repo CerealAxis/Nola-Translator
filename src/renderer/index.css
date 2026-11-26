@@ -479,6 +479,19 @@ html[data-overlay-toast="true"] #splash {
   @apply type-body;
 }
 
+.nola-settings-field:has(> [data-slot="switch"]) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: center;
+}
+
+.nola-settings-field > [data-slot="switch"] {
+  justify-self: end;
+}
+
+.nola-settings-field > * {
+  min-width: 0;
+}
+
 .nola-settings-card [data-slot="field-label"] {
   min-width: 0;
   @apply type-body;
@@ -527,23 +540,6 @@ html[data-overlay-toast="true"] #splash {
 
 .nola-settings-card [data-slot="input"] {
   @apply type-body;
-}
-
-@container settings (max-width: 1100px) {
-  .nola-settings-field {
-    grid-template-columns: minmax(0, 1fr);
-    align-content: start;
-    gap: var(--space-1);
-  }
-  .nola-settings-field > .type-muted {
-    grid-column: 1;
-  }
-}
-
-@container settings (max-width: 600px) {
-  .nola-settings-fields, .nola-settings-card .nola-meeting-routes {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @layer utilities {
@@ -824,7 +820,6 @@ html[data-overlay-toast="true"] #splash {
   justify-content: space-between;
   align-items: center;
   min-height: var(--field-control-height);
-  padding-inline-end: calc(var(--space-3) / 2);
 }
 
 .nola-meeting-preference-label {
@@ -1185,7 +1180,7 @@ html[data-reduce-motion=true] .nola-meeting-wire__pulse {
   box-shadow: none;
 }
 
-:root .comic-page.comic-page--workspace .button[data-variant="outline"] {
+:root .comic-page.comic-page--workspace .button[data-variant="secondary"] {
   background: var(--card);
   border-color: var(--border);
   color: var(--foreground);
@@ -1196,7 +1191,7 @@ html[data-reduce-motion=true] .nola-meeting-wire__pulse {
   color: var(--primary-foreground);
 }
 
-:root .comic-page.comic-page--workspace .button[data-variant="outline"]:hover:not(:disabled), .comic-page--workspace .button[data-variant="bare"]:hover:not(:disabled, [aria-pressed="true"]) {
+:root .comic-page.comic-page--workspace .button[data-variant="secondary"]:hover:not(:disabled), .comic-page--workspace .button[data-variant="bare"]:hover:not(:disabled, [aria-pressed="true"]) {
   background: var(--muted);
 }
 
@@ -1258,7 +1253,7 @@ html[data-reduce-motion=true] .nola-meeting-wire__pulse {
 .comic-toolbar-edit.input { box-sizing: border-box; width: calc(var(--space-8) * .8); min-width: calc(var(--space-8) * .8); height: var(--space-4); min-height: 0; padding: 0; text-align: center; border-color: transparent; background: transparent; }
 
 .comic-page--workspace .comic-toolbar-controls input.comic-toolbar-edit.input:focus { border-color: transparent; background: transparent; outline: none; box-shadow: none; }
-.comic-page--workspace .comic-toolbar-controls input.comic-toolbar-edit.input:focus-visible { outline: 1px solid var(--ring); outline-offset: -1px; }
+.comic-page--workspace .comic-toolbar-controls input.comic-toolbar-edit.input:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .comic-toolbar-edit::selection { color: var(--accent-foreground); background: var(--accent); }
 
 .comic-canvas__toolbar .comic-layer-toggle .toggle-button:is([data-pressed], [aria-pressed="true"]) { background: var(--segment); color: var(--segment-foreground); box-shadow: var(--shadow-surface); }
@@ -2198,7 +2193,7 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  @apply type-small;
+  @apply type-small font-normal;
 }
 
 .nola-record-status i {
@@ -2428,52 +2423,6 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
 
 .nola-dual__cell[data-current="true"] {
   background: color-mix(in oklab, var(--accent) 6%, var(--surface));
-}
-
-.nola-record-audio {
-  display: flex;
-  align-items: center;
-  min-height: 68px;
-  gap: 16px;
-  padding: 12px 20px;
-  flex-wrap: wrap;
-  background: var(--surface-secondary);
-}
-
-.nola-record-audio .slider {
-  min-width: 120px;
-}
-
-@media (max-width: 680px) {
-  .nola-record-audio {
-    display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-  }
-  .nola-record-audio > button {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .nola-record-audio > span:first-of-type {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .nola-record-audio > .slider {
-    grid-column: 3;
-    grid-row: 1;
-    width: 100%;
-    min-width: 0;
-  }
-  .nola-record-audio > span:nth-of-type(2) {
-    grid-column: 4;
-    grid-row: 1;
-  }
-  .nola-record-audio > .nola-segmented {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-self: end;
-  }
 }
 
 @container (max-width: 999px) {
@@ -4165,9 +4114,6 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
   background: var(--field-background);
 }
 
-.model-configuration-dialog :is(.input, .select__trigger):focus:not([aria-invalid="true"]),
-.model-language-popup .input:focus,
-.model-language-field:focus-within,
 .model-language-field:has(.model-language-toggle[aria-expanded="true"]) {
   border-color: var(--field-border-focus);
   box-shadow: none;
@@ -5087,7 +5033,7 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
   max-width: calc(var(--space-8) * 7);
   min-height: var(--space-3);
   padding-inline: var(--space-1);
-  @apply type-small;
+  @apply type-small font-normal;
   color: var(--nola-ui-muted-foreground);
 }
 
@@ -5282,10 +5228,6 @@ html[data-screen-window] body, html[data-screen-window] #root {
 [data-slot="screen-settings"] .nola-settings-field,
 [data-slot="screen-settings"] .nola-meeting-volume-control {
   gap: var(--label-gap);
-}
-
-[data-slot="screen-settings"] .nola-settings-field > [data-slot="switch"] {
-  justify-self: start;
 }
 
 .screen-preset-dialog {
@@ -5933,10 +5875,6 @@ td .text-processing-actions {
   flex: 0 1 auto;
   flex-direction: row;
   align-items: center;
-}
-
-.text-processing-scene > [data-slot="switch"] {
-  justify-self: end;
 }
 
 @container settings-page (max-width: 36rem) {
@@ -7328,7 +7266,7 @@ html[data-reduce-motion="true"] .dev-motion-dot[data-running="true"] {
     min-width: 0;
     align-items: center;
     gap: 10px;
-    @apply type-small;
+    @apply type-small font-normal;
 }
   .nola-workspace-audio-status > span:last-child {
     max-width: 150px;
@@ -7886,4 +7824,3 @@ html[data-onboarding-card] #root {
 [data-slot="game-settings"] .nola-settings-fields + .nola-settings-fields { padding-block-start: var(--panel-gap); }
 [data-slot="game-settings"] .nola-settings-heading { margin-block-end: calc(var(--section-heading-gap) - var(--field-gap)); }
 [data-slot="game-settings"] .nola-settings-field { gap: var(--label-gap); }
-[data-slot="game-settings"] .text-processing-scene > [data-slot="switch"] { justify-self: start; }

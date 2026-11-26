@@ -12,8 +12,10 @@ capability stays unknown rather than defaulting to true.
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 import wave
+from pathlib import Path
 from contextlib import aclosing
 from typing import Any
 
@@ -31,6 +33,7 @@ from .capabilities import (
     ModelKind,
     Operation,
     sanitize_details,
+    VoiceDescriptor,
 )
 from .definitions import ModelInstance
 from .operations import (
@@ -40,6 +43,7 @@ from .operations import (
     TranslationResult,
 )
 from .worker import LocalModelWorker, WorkerRequest
+from ..tts_contracts import SynthesisRequest, DesignVoice, ReferenceVoice
 
 
 def _decode_wav_data_url(data_url: str) -> tuple[bytes, int, int]:
@@ -152,7 +156,9 @@ class CloudAsrAdapter(Adapter):
 
 MIMO_TTS_MODEL = "mimo-v2.5-tts"
 MIMO_TTS_ENDPOINT = "https://api.xiaomimimo.com/v1/chat/completions"
-MIMO_TTS_VOICES = ("mimo_default", "冰糖", "茉莉", "苏打", "白桦", "Mia", "Chloe", "Milo", "Dean")
+MIMO_VOICE_DESCRIPTORS = [VoiceDescriptor.model_validate(voice) for voice in
+    json.loads(Path(__file__).with_name("preset-voices.json").read_text(encoding="utf-8"))["mimo"]]
+MIMO_TTS_VOICES = tuple(voice.id for voice in MIMO_VOICE_DESCRIPTORS)
 
 
 class MiMoTtsAdapter(Adapter):
@@ -160,10 +166,10 @@ class MiMoTtsAdapter(Adapter):
     operations = frozenset({Operation.SYNTHESIZE})
     kinds = frozenset({ModelKind.TTS})
 
-    async def tts_voices(self, instance: ModelInstance, ctx: CallContext) -> list[str]:
-        return list(MIMO_TTS_VOICES)
+    async def tts_voices(self, instance: ModelInstance, ctx: CallContext) -> list[VoiceDescriptor]:
+        return [voice.model_copy(deep=True) for voice in MIMO_VOICE_DESCRIPTORS] if instance.definition.model_id == MIMO_TTS_MODEL else []
 
-    async def synthesize(self, instance: ModelInstance, ctx: CallContext, *, text: str, voice: str | None) -> SynthesisResult:
+    async def synthesize(self, instance: ModelInstance, ctx: CallContext, *, synthesis: SynthesisRequest) -> SynthesisResult:
         ctx.cancel_token.raise_if_cancelled()
         key = ctx.provider_options.get("api_key", "").strip()
         if not key:
@@ -176,12 +182,29 @@ class MiMoTtsAdapter(Adapter):
                 endpoint = (ctx.provider_options.get("endpoint") or MIMO_TTS_ENDPOINT).rstrip("/")
                 if not endpoint.endswith("/chat/completions"):
                     endpoint += "/chat/completions"
-                response = await client.post(endpoint, headers={"Authorization": f"Bearer {key}"}, json={
-                    "model": ctx.provider_options.get("model") or MIMO_TTS_MODEL,
-                    "messages": [{"role": "assistant", "content": text}],
-                    "audio": {"format": "wav", "voice": voice or "mimo_default"},
-                    "stream": False,
-                })
+                model = ctx.provider_options.get("model") or instance.definition.model_id
+                messages = []
+                audio = {"format": "wav"}
+                if model == "mimo-v2.5-tts-voicedesign":
+                    if not isinstance(synthesis.conditioning, DesignVoice):
+                        raise ValueError("MiMo design conditioning required")
+                    messages.append({"role": "user", "content": synthesis.conditioning.description})
+                elif model == "mimo-v2.5-tts-voiceclone":
+                    if not isinstance(synthesis.conditioning, ReferenceVoice) or not synthesis.reference_audio:
+                        raise ValueError("MiMo reference conditioning required")
+                    if len(synthesis.reference_audio.split(",", 1)[1]) > 10_000_000:
+                        raise ValueError("MiMo encoded reference exceeds 10 MB")
+                    audio["voice"] = synthesis.reference_audio
+                elif model == MIMO_TTS_MODEL:
+                    audio["voice"] = synthesis.legacy_voice() or "mimo_default"
+                else:
+                    raise ValueError("Unsupported MiMo TTS model")
+                if synthesis.controls.instruct:
+                    messages.append({"role": "user", "content": synthesis.controls.instruct})
+                style = f"<style>{synthesis.controls.emotion}</style>" if synthesis.controls.emotion else ""
+                messages.append({"role": "assistant", "content": style + synthesis.text})
+                response = await client.post(endpoint, headers={"Authorization": f"Bearer {key}"},
+                    json={"model": model, "messages": messages, "audio": audio, "stream": False})
                 response.raise_for_status()
                 data = response.json()["choices"][0]["message"]["audio"]["data"]
                 if not isinstance(data, str):
@@ -330,11 +353,10 @@ class LocalWorkerAdapter(Adapter):
         return list(response.get("voices") or [])
 
     async def synthesize(
-        self, instance: ModelInstance, ctx: CallContext, *, text: str, voice: str | None
+        self, instance: ModelInstance, ctx: CallContext, *, synthesis: SynthesisRequest
     ) -> SynthesisResult:
-        payload: dict[str, Any] = {"text": text}
-        if voice:
-            payload["voice"] = voice
+        payload: dict[str, Any] = synthesis.worker_payload()
+        payload["target"] = synthesis.language
         request = WorkerRequest(
             kind="tts",
             config=instance.configuration.compute_options.get("prewarm") or _prewarm(instance),

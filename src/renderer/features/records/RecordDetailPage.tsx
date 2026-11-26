@@ -1,3 +1,4 @@
+import { AudioPlayer } from '@/components/assistant-ui/native/media-player'
 /**
  * Record detail: the two languages side by side, with a transport bar underneath.
  *
@@ -16,7 +17,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 
-import { AudioPlayerBar, DualColumnView } from '@/components/reading'
+import { DualColumnView } from '@/components/reading'
 import type { DualColumnSegment } from '@/components/reading'
 import { ErrorBoundary, PageHeader, StatusPill } from '@/components/primitives'
 import { Input } from '@/components/ui/input'
@@ -167,7 +168,7 @@ export function RecordDetailPage(): ReactNode {
                 <Plus aria-hidden="true" />
               </Button>
               <Button
-                variant="tertiary"
+                variant="secondary"
                 size="sm"
                 className={HEADER_ACTION_CLASS}
                 onClick={() => setRenameOpen(true)}
@@ -230,11 +231,11 @@ export function RecordDetailPage(): ReactNode {
 
           </CardContent>
           {(!gameRecord || detail?.audioUrl) && <CardFooter className="p-0">
-            <AudioPlayerBar
-              audioUrl={detail?.audioUrl ?? null}
-              durationMs={detail?.meta.audioDurationMs ?? null}
-              isPending={detailLoading && !detail}
-              unavailableLabel={t('records.audioUnavailable')}
+            {detail?.audioUrl ? <AudioPlayer
+              src={detail.audioUrl}
+              title={detail.meta.title}
+              durationMs={detail.meta.audioDurationMs ?? undefined}
+              className="max-w-none"
               onTimeChange={(ms) => {
                 if (!detail) return
                 // Which sentence the playhead is on: the last one starting at or before now.
@@ -245,7 +246,7 @@ export function RecordDetailPage(): ReactNode {
                 }
                 setCurrentIndex(index)
               }}
-            />
+            /> : <p className="p-[var(--panel-padding)] type-muted">{t('records.audioUnavailable')}</p>}
           </CardFooter>}
         </Card>
 

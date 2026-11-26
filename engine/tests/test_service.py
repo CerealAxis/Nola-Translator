@@ -86,7 +86,7 @@ def test_service_does_not_replace_missing_selected_device_with_default() -> None
         )
     )
     assert events[0].type == "error"
-    assert events[0].code == "audioDeviceEnumerationFailed"
+    assert events[0].code == "audioDeviceUnavailable"
 
 
 def _output_device() -> AudioDeviceRecord:

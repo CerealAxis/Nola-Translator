@@ -366,7 +366,7 @@ function MermaidZoom({ svg, children, labels }: MermaidZoomProps) {
             >
               <Button
                 size="icon"
-                variant="outline"
+                variant="secondary"
                 type="button"
                 aria-label={labels.zoomIn}
                 onClick={() => zoomBy(1.25)}
@@ -375,7 +375,7 @@ function MermaidZoom({ svg, children, labels }: MermaidZoomProps) {
               </Button>
               <Button
                 size="icon"
-                variant="outline"
+                variant="secondary"
                 type="button"
                 aria-label={labels.zoomOut}
                 onClick={() => zoomBy(0.8)}
@@ -384,7 +384,7 @@ function MermaidZoom({ svg, children, labels }: MermaidZoomProps) {
               </Button>
               <Button
                 size="icon"
-                variant="outline"
+                variant="secondary"
                 type="button"
                 aria-label={labels.reset}
                 onClick={() => setTransform({ x: 0, y: 0, scale: 1 })}
@@ -393,7 +393,7 @@ function MermaidZoom({ svg, children, labels }: MermaidZoomProps) {
               </Button>
               <Button
                 size="icon"
-                variant="tertiary"
+                variant="secondary"
                 ref={closeRef}
                 type="button"
                 aria-label={labels.close}

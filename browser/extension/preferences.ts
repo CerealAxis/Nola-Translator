@@ -61,7 +61,6 @@ export interface Preferences {
   ttsRate: number
   ttsPitch: number
   ttsVolume: number
-  glossary: Array<{ source: string; target: string; sites: string }>
   siteRules: Array<{ host: string; excludeSelectors: string; includeSelectors: string }>
 
   uiLanguage: UiLanguagePreference
@@ -101,7 +100,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   floatingSide: 'right', floatingPosition: 0.65, floatingLocked: false, floatingClickAction: 'translate', floatingDisabledSites: [], selectionOpacity: 0.95, selectionTranslate: true, selectionCopy: true, selectionSpeak: true, selectionDisabledSites: [], inputTrigger: 'tripleSpace',
   siteBlacklist: [], neverAutoSites: [], pageStyle: 'plain', pageCustomCss: '', subtitleCustomCss: '', pagePrompt: '', subtitlePrompt: '',
   requestRate: 5, webConcurrency: 8, batchSize: 8, shortcutPage: 'Alt+T', shortcutSelection: 'Alt+S', shortcutHover: 'Alt', shortcutSubtitles: 'Alt+V',
-  ttsVoice: '', ttsRate: 1, ttsPitch: 1, ttsVolume: 1, glossary: [], siteRules: [],
+  ttsVoice: '', ttsRate: 1, ttsPitch: 1, ttsVolume: 1, siteRules: [],
 
   uiLanguage: 'auto', theme: 'auto', pageLanguage: 'zh', pageDisplay: 'bilingual', autoSites: [],
   subtitleSourceSize: 16, subtitleSourceColor: '#ffffff', subtitleSourceFont: 'system-ui', subtitleTranslationSize: 16, subtitleTranslationColor: '#ffffff', subtitleTranslationFont: 'system-ui', subtitleTranslationFirst: false, subtitleBold: false, subtitlePauseOnHover: false,
@@ -114,7 +113,7 @@ export function liveTranslationEnabled(settings: Preferences): boolean {
     ? settings.s2sProvider !== DISABLED_PROVIDER
     : settings.asrProvider !== DISABLED_PROVIDER && settings.subtitleProvider !== DISABLED_PROVIDER
 }
-const keys = (Object.keys(DEFAULT_PREFERENCES) as (keyof Preferences)[]).filter(key => key !== 'glossary')
+const keys = Object.keys(DEFAULT_PREFERENCES) as (keyof Preferences)[]
 const numberIn = (value: unknown, min: number, max: number, fallback: number) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.round(Math.min(max, Math.max(min, value))) : fallback
 const subtitleColor = (value: unknown, fallback: string) => typeof value === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value) ? value : fallback
@@ -143,7 +142,6 @@ export function readPreferences(values: Record<string, unknown>): Preferences {
     settings[key] = readSitePatterns(values[key])
   }
   settings.skipLanguages = Array.isArray(values.skipLanguages) ? values.skipLanguages.filter((code): code is string => typeof code === 'string' && LANGUAGE_CODES.includes(code)) : []
-  settings.glossary = Array.isArray(values.glossary) ? values.glossary.filter((row): row is Preferences['glossary'][number] => Boolean(row) && typeof row.source === 'string' && typeof row.target === 'string' && typeof row.sites === 'string').slice(0, 20000) : []
   settings.siteRules = Array.isArray(values.siteRules) ? values.siteRules.filter((row): row is Preferences['siteRules'][number] => Boolean(row) && typeof row.host === 'string' && typeof row.excludeSelectors === 'string' && typeof row.includeSelectors === 'string').slice(0, 200) : []
   return {
     ...settings,

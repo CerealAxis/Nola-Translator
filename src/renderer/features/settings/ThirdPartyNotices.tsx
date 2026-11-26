@@ -22,7 +22,7 @@ export function ThirdPartyNotices() {
 
   return (
     <>
-      <Button variant="tertiary" size="sm" onClick={() => setOpen(true)}>
+      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
         <Scale className="size-4" aria-hidden="true" />
         {t('settings.viewNotices')}
       </Button>

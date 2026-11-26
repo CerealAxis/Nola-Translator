@@ -13,10 +13,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from .gateway.adapters import _decode_wav_data_url
-from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
+from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation, VoiceDescriptor
 from .gateway.gateway import MatchRequest, ModelGateway
 from .gateway.operations import SynthesisResult
 from .glossary import GlossaryTerm, glossary_prompt
+from .tts_contracts import SynthesisRequest, ResolvedVoiceConditioning, TtsControls, TtsOutput
 
 Language = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64_000)]
@@ -59,11 +60,16 @@ class DirectMtRequest(_DirectRequest):
 
 
 class DirectTtsRequest(_DirectRequest):
+    schema_version: Literal[1] = 1
     kind: Literal["tts"]
     text: Text
     voice: str | None = Field(default=None, max_length=256)
     target: Language | None = None
     response_format: Literal["wav", "mp3"] = "wav"
+    conditioning: ResolvedVoiceConditioning | None = None
+    controls: TtsControls | None = None
+    output: TtsOutput | None = None
+    reference_audio: str | None = Field(default=None, max_length=32 * 1024 * 1024 + 64, repr=False)
 
 
 class DirectTtsVoicesRequest(_DirectRequest):
@@ -79,6 +85,7 @@ class DirectInferenceResult(BaseModel):
     text: str
     audio: str | None = None
     voices: list[str] | None = None
+    voice_inventory: list[VoiceDescriptor] | None = None
 
 
 def _asr_pcm(audio: str) -> bytes:
@@ -205,9 +212,14 @@ async def run_direct_inference(
                 return DirectInferenceResult(text=translation.text)
             match.required_outputs = ["speech"]
             if isinstance(request, DirectTtsVoicesRequest):
-                return DirectInferenceResult(text="", voices=await gateway.tts_voices(ctx, match))
+                inventory = await gateway.tts_voices(ctx, match)
+                return DirectInferenceResult(text="", voices=[voice.id for voice in inventory], voice_inventory=inventory)
             match.target_language = request.target
-            result = await gateway.synthesize(ctx, text=request.text, voice=request.voice or None, request=match)
+            synthesis = SynthesisRequest(text=request.text, language=request.target or "auto",
+                conditioning=request.conditioning or ({"kind": "preset", "voiceId": request.voice} if request.voice else {"kind": "engine-default"}),
+                controls=request.controls or TtsControls(), output=request.output or TtsOutput(format=request.response_format),
+                reference_audio=request.reference_audio)
+            result = await gateway.synthesize(ctx, synthesis=synthesis, request=match)
             audio = _tts_wav(result)
             if request.response_format == "mp3":
                 from ..gateway_worker import speech_format

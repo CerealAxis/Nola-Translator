@@ -48,9 +48,10 @@ export type { HubCompatibility, HubInspectResult, HubModelSummary, HubSearchResu
 export type { PrewarmErrorCode, PrewarmResult } from '../../shared/contracts'
 
 /** Route id for this app's multi-window UI; `routes.tsx` holds the hash mapping. */
-export type RouteId = 'workbench' | 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'game-translation' | 'game-translation-demo' | 'comic-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
+export type RouteId = 'voices' | 'workbench' | 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'game-translation' | 'game-translation-demo' | 'comic-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
 
 export interface NolaBridge {
+  voices?: import('../../shared/tts/voice-library-api').VoiceLibraryApi
   desktopData?: import('../../shared/desktop-data').DesktopDataApi
   wordRules?: import('../../shared/word-rules').WordRulesBridge
   textProcessing?: import('../../shared/text-processing').TextProcessingBridge

@@ -149,7 +149,7 @@ describe('desktop backend session', () => {
     expect(mapSessionConfig(session, settings, ids, { output: 'speech' })).toBeUndefined()
     const mapped = mapSessionConfig(session, settings, ids, { output: 'speech', ttsApiKey: 'test-mimo-key' })
     expect(mapped?.config.pipeline).toEqual({ kind: 'cascade', asr_model: asr, translation_model: 'index-translate', tts_model: MIMO_TTS_MODEL })
-    expect(mapped?.headers).toEqual({ 'x-nola-tts-key': 'test-mimo-key' })
+    expect(mapped?.headers).toEqual({ 'x-nola-tts-key': 'test-mimo-key', 'x-nola-tts-model': MIMO_TTS_MODEL })
     expect(JSON.stringify(mapped?.config)).not.toContain('test-mimo-key')
   })
   it('preserves supported model IDs, private headers, and explicit capture routes', () => {

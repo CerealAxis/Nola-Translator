@@ -158,7 +158,7 @@ async def test_translation_failure_waits_for_native_loader_before_cleanup(models
     finally:
         release.set()
     result = await work
-    assert result[0].code == 'modelUnavailable'
+    assert result[0].code == 'modelLoadFailed'
     assert not recognition.loaded and not translation.ready
     assert not [event for event in events if event.state == 'ready']
     await runtime.close()

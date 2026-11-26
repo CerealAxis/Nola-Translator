@@ -33,7 +33,11 @@ class TtsWorker(LocalModelWorker):
         payload = {key: value for key, value in request.payload.items() if key not in ('correlationId', 'taskId')}
         if payload == {"inspect": True, "max_concurrency": 1}:
             return {"voices": ["cori"]}
-        assert payload == {"text": "Hello", "voice": "cori", "max_concurrency": 1}
+        assert payload["text"] == "Hello"
+        assert payload["language"] == "en"
+        assert payload["conditioning"] == {"kind": "preset", "voiceId": "cori"}
+        assert payload["schema_version"] == 1
+        assert payload["max_concurrency"] == 1
         return self.response
 
 
@@ -45,11 +49,13 @@ def test_registry_registers_only_installed_callable_tts(tmp_path, monkeypatch):
                                          "tts-qwen3-tts-pytorch-0.6b-base-bf16"},
     )
     gateway = bootstrap.build_default_gateway(model_dir=tmp_path)
-    assert {entry.definition.model_id for entry in gateway.registry.candidates(Operation.SYNTHESIZE)} == {MODEL, MIMO_TTS_MODEL}
+    assert {entry.definition.model_id for entry in gateway.registry.candidates(Operation.SYNTHESIZE)} == {
+        MODEL, MIMO_TTS_MODEL, f"{MIMO_TTS_MODEL}-voicedesign", f"{MIMO_TTS_MODEL}-voiceclone",
+        "tts-qwen3-tts-pytorch-0.6b-base-bf16", "nola-provider-tts"}
     match = gateway.match(MatchRequest(Operation.SYNTHESIZE, model_id=MODEL, target_language="en", required_outputs=["speech"]))
     assert match.profile.audio_output == "utterance"
     with pytest.raises(GatewayError, match="speech output required but unavailable"):
-        gateway.match(MatchRequest(Operation.SYNTHESIZE, target_language="ja", required_outputs=["speech"]))
+        gateway.match(MatchRequest(Operation.SYNTHESIZE, model_id=MODEL, target_language="ja", required_outputs=["speech"]))
 
 
 async def test_gateway_synthesizes_pcm_and_rejects_missing_or_invalid_audio(tmp_path, monkeypatch):
@@ -110,5 +116,22 @@ async def test_mimo_synthesizes_pcm_through_the_gateway_without_a_local_worker(t
         assert (chunk.pcm, chunk.sample_rate, chunk.channels, chunk.terminal) == (pcm, 24000, 1, True)
         with pytest.raises(GatewayError, match="API key is missing"):
             await gateway.synthesize(CallContext(Operation.SYNTHESIZE, "missing"), text="你好", voice=None, request=request)
+    finally:
+        await gateway.shutdown()
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("voice", ["Mia", "Chloe", "Milo", "Dean"])
+async def test_mimo_voice_language_is_checked_before_network_or_worker(tmp_path, monkeypatch, voice):
+    monkeypatch.setattr(bootstrap, "register_device_budgets", lambda _: [])
+    monkeypatch.setattr(ModelManager, "is_installed", lambda *_: False)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: pytest.fail("provider was called"))
+    gateway = bootstrap.build_default_gateway(model_dir=tmp_path, worker_factory=lambda: pytest.fail("worker was loaded"))
+    try:
+        request = MatchRequest(Operation.SYNTHESIZE, model_id=MIMO_TTS_MODEL, target_language="zh", required_outputs=["speech"])
+        with pytest.raises(GatewayError, match="does not support zh") as error:
+            await gateway.synthesize(CallContext(Operation.SYNTHESIZE, "test"), text="你好", voice=voice, request=request)
+        assert error.value.provider_code == "VOICE_LANGUAGE_UNSUPPORTED"
+        inventory = await gateway.tts_voices(CallContext(Operation.SYNTHESIZE, "inventory"), request)
+        assert next(item for item in inventory if item.id == voice).languages == ["en"]
     finally:
         await gateway.shutdown()

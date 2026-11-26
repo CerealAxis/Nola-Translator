@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
 import { DEFAULT_SETTINGS, isCredentialProvider } from './settings'
 import { customModelsOf, customModelPatch, customCredentialSlot, customModelSchema, synchronizeCustomModel } from './custom-models'
+import { LANGUAGE_CODES } from './languages'
 
 const first = { id: 'first', name: 'Fast translator', endpoint: 'https://example.com/v1', model: 'fast-model', apiFormat: 'chat-completions' as const, contextWindow: 32768, maxOutputTokens: 1024, languages: ['zh', 'en'] }
 const second = { ...first, id: 'second', name: 'Second translator', endpoint: 'https://second.example/v1', languages: ['ja', 'en'] }
@@ -9,7 +10,7 @@ it('keeps independent configurations and selects the matching connection and lan
   const translation = { ...DEFAULT_SETTINGS.translation, customModels: [first, second] }
   expect(customModelsOf(translation)).toEqual([first, second])
   expect(customCredentialSlot(first.id)).not.toEqual(customCredentialSlot(second.id))
-  expect(customModelPatch(translation, second)).toMatchObject({ provider: 'cloud', customModelId: 'second', cloudName: second.name, cloudEndpoint: second.endpoint, cloudLanguages: ['ja', 'en'], targetLanguage: 'ja' })
+  expect(customModelPatch(translation, second)).toMatchObject({ provider: 'cloud', customModelId: 'second', cloudName: second.name, cloudEndpoint: second.endpoint, cloudLanguages: [...LANGUAGE_CODES], targetLanguage: translation.targetLanguage })
 })
 
 it('retains a legacy endpoint without treating shipped defaults as an installed custom model', () => {

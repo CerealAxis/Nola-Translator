@@ -50,8 +50,8 @@ export function HomePage(): ReactNode {
                 target="_blank"
                 rel="noreferrer"
                 data-slot="button"
-                data-variant="outline"
-                className={buttonVariants({ variant: 'outline', size: 'sm', className: 'button no-underline' })}
+                data-variant="secondary"
+                className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'button no-underline' })}
               >
                 {copy.website}
               </a>

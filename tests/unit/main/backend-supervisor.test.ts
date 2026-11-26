@@ -138,3 +138,15 @@ describe('BackendSupervisor', () => {
     expect(await supervisor.health()).toBe(false)
   })
 })
+
+
+it('preserves a missing DLL failure when the Python backend exits', async () => {
+  const child = fakeChild([])
+  spawnMock.mockReturnValue(child as never)
+  const supervisor = new BackendSupervisor({ spec })
+  const start = supervisor.start()
+  const result = expect(start).rejects.toMatchObject({ code: 'BACKEND_DEPENDENCY_MISSING', message: expect.stringContaining('_sqlite3') })
+  child.stderr.write('Traceback (most recent call last):\nImportError: DLL load failed while importing _sqlite3: module not found\n')
+  child.emit('exit', 1, null)
+  await result
+})

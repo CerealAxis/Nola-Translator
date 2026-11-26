@@ -122,25 +122,22 @@ function ButtonGroup() {
 
   return (
     <SettingGroup legend={t('dev.sectionButtons')}>
-      <SettingsRow label={t('dev.buttonVariants')} desc={t('dev.buttonVariantsDesc')}>
+      <SettingsRow label={t('dev.buttonVariants')} desc={t('dev.buttonVariantsDesc')} descriptionTooltip>
         <div className="dev-strip">
           <Button variant="default">{t('dev.buttonPrimary')}</Button>
           <Button variant="secondary">{t('dev.buttonSecondary')}</Button>
-          <Button variant="tertiary">{t('dev.buttonTertiary')}</Button>
-          <Button variant="outline">{t('dev.buttonOutline')}</Button>
           <Button variant="danger">{t('dev.buttonDanger')}</Button>
-          <Button variant="destructive">{t('dev.buttonDangerSoft')}</Button>
         </div>
       </SettingsRow>
 
-      <SettingsRow label={t('dev.buttonSizes')} desc={t('dev.buttonSizesDesc')}>
+      <SettingsRow label={t('dev.buttonSizes')} desc={t('dev.buttonSizesDesc')} descriptionTooltip>
         <div className="dev-strip">
           <Button variant="default" size="sm">{t('dev.buttonSmall')}</Button>
           <Button variant="default">{t('dev.buttonDefault')}</Button>
         </div>
       </SettingsRow>
 
-      <SettingsRow label={t('dev.buttonStates')} desc={t('dev.buttonStatesDesc')}>
+      <SettingsRow label={t('dev.buttonStates')} desc={t('dev.buttonStatesDesc')} descriptionTooltip>
         <div className="dev-strip">
           <Button variant="secondary" disabled>{t('dev.buttonDisabled')}</Button>
           <Button variant="default" disabled>
@@ -151,14 +148,14 @@ function ButtonGroup() {
         </div>
       </SettingsRow>
 
-      <SettingsRow label={t('dev.buttonIconOnly')} desc={t('dev.buttonIconOnlyDesc')}>
+      <SettingsRow label={t('dev.buttonIconOnly')} desc={t('dev.buttonIconOnlyDesc')} descriptionTooltip>
         <div className="dev-strip">
           <Button variant="secondary" size="icon" aria-label={t('dev.buttonIconOnly')}><ArrowRight aria-hidden="true" /></Button>
-          <Button variant="destructive" size="icon" aria-label={t('dev.buttonDelete')}><Trash2 aria-hidden="true" /></Button>
+          <Button variant="danger" size="icon" aria-label={t('dev.buttonDelete')}><Trash2 aria-hidden="true" /></Button>
         </div>
       </SettingsRow>
 
-      <SettingsRow label={t('dev.buttonSegmented')} desc={t('dev.buttonSegmentedDesc')}>
+      <SettingsRow label={t('dev.buttonSegmented')} desc={t('dev.buttonSegmentedDesc')} descriptionTooltip>
         <TabsRoot value="selected">
           <TabsList className="nola-segmented" aria-label={t('dev.buttonSegmented')}>
             <TabsTrigger value="selected">{t('dev.buttonSelected')}</TabsTrigger>
@@ -176,7 +173,7 @@ function ToastTrigger({ label, desc, run }: { label: string; desc: string; run: 
   const { t } = useI18n()
   return (
     <SettingsRow label={label} desc={desc} descriptionTooltip>
-      <Button variant="tertiary" size="sm" onClick={run}>
+      <Button variant="secondary" size="sm" onClick={run}>
         {t('dev.run')}
       </Button>
     </SettingsRow>
@@ -326,7 +323,7 @@ function OverlayToastPreviewGroup() {
     <SettingGroup legend={t('dev.sectionOverlayToast')}>
       <SettingsRow label={t('dev.toastWindowSimple')} desc={t('dev.toastWindowSimpleDesc')} descriptionTooltip>
         <div className="dev-strip">
-          {simpleTypes.map(({ type, label }) => <Button key={type} variant="tertiary" size="sm" onClick={() => {
+          {simpleTypes.map(({ type, label }) => <Button key={type} variant="secondary" size="sm" onClick={() => {
             preview({ type, message: t('dev.toastWindowSample') })
           }}>{label}</Button>)}
         </div>
@@ -369,7 +366,7 @@ function DialogTrigger({ label, desc, tone, pending, open, onOpenChange, title, 
   return (
     <>
       <SettingsRow label={label} desc={desc} descriptionTooltip>
-        <Button variant="tertiary" size="sm" onClick={() => onOpenChange(true)}>
+        <Button variant="secondary" size="sm" onClick={() => onOpenChange(true)}>
           {t('dev.run')}
         </Button>
       </SettingsRow>
@@ -385,7 +382,7 @@ function DialogTrigger({ label, desc, tone, pending, open, onOpenChange, title, 
               <p className="type-body text-muted">{body}</p>
             </div>
             <DialogFooter>
-              <AlertDialog.Close render={<Button variant="tertiary" size="sm" />}>
+              <AlertDialog.Close render={<Button variant="secondary" size="sm" />}>
                 {t('common.cancel')}
               </AlertDialog.Close>
               {footer}
@@ -487,7 +484,7 @@ function DialogGroup() {
           )}
         />
         <SettingsRow label={t('dev.dialogModal')} desc={t('dev.dialogModalDesc')} descriptionTooltip>
-          <Button variant="tertiary" size="sm" onClick={() => setModalOpen(true)}>
+          <Button variant="secondary" size="sm" onClick={() => setModalOpen(true)}>
             {t('dev.run')}
           </Button>
         </SettingsRow>
@@ -502,7 +499,7 @@ function DialogGroup() {
             <p className="type-body text-muted">{t('dev.dialogModalBody')}</p>
           </div>
           <DialogFooter>
-            <Button variant="tertiary" size="sm" onClick={() => setModalOpen(false)}>
+            <Button variant="secondary" size="sm" onClick={() => setModalOpen(false)}>
               {t('dev.dialogModalClose')}
             </Button>
           </DialogFooter>
@@ -556,7 +553,7 @@ function GalleryRow({ label, desc, children }: { label: string; desc: string; ch
 function RunButton({ onClick, isPending = false }: { onClick: () => void; isPending?: boolean }) {
   const { t } = useI18n()
   return (
-    <Button variant="tertiary" size="sm" onClick={onClick} disabled={isPending}>
+    <Button variant="secondary" size="sm" onClick={onClick} disabled={isPending}>
       {isPending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
       {t('dev.run')}
     </Button>

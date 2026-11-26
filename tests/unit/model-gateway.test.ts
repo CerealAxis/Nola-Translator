@@ -1,3 +1,5 @@
+import { customCredentialSlot } from '../../src/shared/custom-models'
+import { StaleCredentialError } from '../../src/main/secure-store'
 import { createServer } from 'node:net'
 import { randomUUID } from 'node:crypto'
 import { File as NodeFile } from 'node:buffer'
@@ -1089,8 +1091,8 @@ it('sends the chosen MiMo model ID and voice from its own saved row', async () =
     id: 'TTS-mimo', service: 'mimo', capability: 'TTS', name: 'MiMo TTS(API)',
     endpoint: 'https://api.xiaomimimo.com/v1', protocol: '', workspace: '', region: '',
     models: [
-      { id: 'mimo-v2.5-tts', name: 'mimo-v2.5-tts', enabled: false, voice: 'Chloe' },
-      { id: 'custom-tts', name: 'Custom TTS', enabled: true, voice: 'custom-voice', profileId: 'second' },
+      { id: 'mimo-v2.5-tts', name: 'mimo-v2.5-tts', enabled: false, tts: { defaultVoiceRef: { kind: 'preset' as const, modelBinding: 'cloud:mimo-v2.5-tts', voiceId: 'Chloe' } } },
+      { id: 'mimo-v2.5-tts', name: 'Custom TTS', enabled: true, tts: { defaultVoiceRef: { kind: 'preset' as const, modelBinding: 'cloud:mimo-v2.5-tts', voiceId: 'custom-voice' } }, profileId: 'second' },
     ],
   }] }
   const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(Response.json({
@@ -1101,5 +1103,32 @@ it('sends the chosen MiMo model ID and voice from its own saved row', async () =
   await expect(test.gateway.batchSpeechModels()).resolves.toEqual([expect.objectContaining({ binding: model })])
   await expect(test.gateway.infer({ id: randomUUID(), kind: 'tts', text: 'Hello', model },
     new AbortController().signal)).resolves.toMatchObject({ audio: 'data:audio/wav;base64,AAAA' })
-  expect(JSON.parse(fetch.mock.calls[0][1]!.body as string)).toMatchObject({ model: 'custom-tts', audio: { voice: 'custom-voice' } })
+  expect(JSON.parse(fetch.mock.calls[0][1]!.body as string)).toMatchObject({ model: 'mimo-v2.5-tts', audio: { voice: 'custom-voice' } })
+})
+
+it('lists other speech models when one credential cannot be decrypted', async () => {
+  const test = await fixture()
+  test.settings.modelWorkspace = { connections: [
+    { id: 'bad-account', service: 'mimo', capability: 'TTS', name: 'MiMo', endpoint: '', protocol: '', region: '', workspace: '', models: [{ id: 'mimo-v2.5-tts', name: 'MiMo', enabled: true }] },
+    { id: 'good-account', service: 'openai-tts-api', capability: 'TTS', name: 'Speech', endpoint: '', protocol: '', region: '', workspace: '', models: [{ id: 'tts-1', name: 'Speech', profileId: 'good', enabled: true }] },
+  ], localSources: {} }
+  const get = vi.fn(async () => { throw new StaleCredentialError('mimo-tts') })
+  test.options.getCredential = get
+  test.options.hasCredential = async provider => provider === customCredentialSlot('good-account')
+  const models = await test.gateway.batchSpeechModels()
+  expect(models).toHaveLength(1)
+  expect(models[0].binding).toBe('cloud:openai-tts-api:good')
+  expect(get).not.toHaveBeenCalled()
+})
+
+
+it('retains the backend startup reason in the failed gateway snapshot and clears it after recovery', async () => {
+  const test = await fixture()
+  const changed = vi.fn()
+  test.options.onChanged = changed
+  test.options.configureBackendLoading = vi.fn().mockRejectedValueOnce(Object.assign(new Error('ImportError: _sqlite3 DLL missing'), { code: 'BACKEND_DEPENDENCY_MISSING' })).mockResolvedValue(undefined)
+  expect(await test.gateway.start()).toMatchObject({ state: 'failed', errorCode: 'BACKEND_DEPENDENCY_MISSING', error: 'ImportError: _sqlite3 DLL missing' })
+  expect(changed.mock.calls.some(([snapshot]) => snapshot.state === 'stopped')).toBe(false)
+  expect(await test.gateway.start()).toMatchObject({ state: 'running' })
+  expect(test.gateway.snapshot().errorCode).toBeUndefined()
 })

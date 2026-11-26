@@ -586,7 +586,8 @@
     max-width: var(--available-width, calc(100vi - var(--space-4)));
     max-height: min(var(--available-height, 320px), calc(var(--space-5) * 8));
     overflow-x: hidden;
-    padding: calc(var(--space-1) / 2);
+    padding: var(--space-1);
+    scroll-padding: var(--space-1);
     border: 1px solid var(--border);
     background: var(--overlay);
     color: var(--overlay-foreground);
@@ -617,6 +618,7 @@
     outline: none;
     cursor: default;
     user-select: none;
+    scroll-margin: var(--space-1);
   }
   .select__item-text {
     display: flex;
@@ -639,6 +641,13 @@
     opacity: 0.5;
     pointer-events: none;
   }
+  .tts-voice-option .select__item-text {
+      gap: var(--label-gap);
+    }
+  .tts-voice-option[data-disabled] {
+      opacity: 1;
+      pointer-events: auto;
+    }
   .select__item-indicator {
     position: absolute;
     inset-inline-end: var(--space-2);
@@ -794,10 +803,6 @@
     background: transparent;
     color: var(--nola-ui-foreground);
     @apply type-body;
-  }
-  .number-field__group:focus-within {
-    border-color: var(--nola-ui-ring);
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--nola-ui-ring) 50%, transparent);
   }
   .nola-segmented {
     display: inline-flex;
@@ -958,11 +963,6 @@
   }
   .table__column:has([role="checkbox"]), .table__cell:has([role="checkbox"]) {
     padding-inline-end: 0;
-  }
-  .select__trigger:focus-visible, .switch:focus-visible, .toggle-button:focus-visible, .tabs__tab:focus-visible {
-    border-color: var(--nola-ui-ring);
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--nola-ui-ring) 50%, transparent);
-    outline: none;
   }
   :is(.select__trigger, .switch, .slider, .number-field, .toggle-button, .tabs__tab):is(:disabled, [data-disabled], [aria-disabled="true"]) {
     pointer-events: none;
@@ -2813,8 +2813,7 @@ body {
   background: var(--primary);
 }
 
-[data-slot="button"][data-variant="secondary"]:not([data-size^="icon"]),
-[data-slot="button"][data-variant="outline"] {
+[data-slot="button"][data-variant="secondary"]:not([data-size^="icon"]) {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--surface);
@@ -2824,7 +2823,7 @@ body {
   filter: brightness(0.97);
 }
 
-[data-slot="button"][data-variant="destructive"]:hover:not(:disabled, [aria-disabled="true"]),
+[data-slot="button"][data-variant="danger"]:hover:not(:disabled, [aria-disabled="true"]),
 [data-slot="button"][class~="text-danger-soft-foreground"]:hover:not(:disabled, [aria-disabled="true"]) {
   filter: none;
 }
@@ -2835,10 +2834,21 @@ svg[class~="text-danger-soft-foreground"],
   color: var(--destructive);
 }
 
-[data-slot="button"]:focus-visible {
+:where(button, a[href], input, textarea, select, summary, [tabindex], [role="slider"]):focus-visible,
+[data-slot="input-group"]:has(:is(input, textarea):focus-visible),
+[data-slot="code-block"]:has(> [data-slot="code-block-content"]:focus-visible),
+[data-slot="composer-bar"]:has([data-slot="composer-input"]:focus-visible),
+.number-field__group:has(input:focus-visible) {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   box-shadow: none;
+}
+
+[data-slot="input-group"] :is(input, textarea):focus-visible,
+[data-slot="code-block-content"]:focus-visible,
+[data-slot="composer-bar"] [data-slot="composer-input"]:focus-visible,
+.number-field__group input:focus-visible {
+  outline: none;
 }
 
 [data-slot="alert"][data-variant="default"] {
@@ -2912,14 +2922,14 @@ svg[class~="text-danger-soft-foreground"],
 
 /* Dismiss icons stay unfilled in every state, including independent renderer themes. */
 
-:is(button, [role="button"]):not([data-variant="destructive"]):has(> svg.lucide-x) {
+:is(button, [role="button"]):not([data-variant="danger"], [data-variant="destructive"]):has(> svg.lucide-x) {
   background: none !important;
   border-color: transparent !important;
 }
 
 /* Caption recording controls keep their state fill so the pause icon stays visible. */
 
-[data-slot="button"][data-size^="icon"]:not([data-variant="nav"], [data-variant="destructive"]):not(.nola-color-picker__preset):not(.nola-caption-mic) {
+[data-slot="button"][data-size^="icon"]:not([data-variant="nav"], [data-variant="danger"]):not(.nola-color-picker__preset):not(.nola-caption-mic) {
   background: none !important;
   border-color: transparent !important;
 }
@@ -4244,7 +4254,7 @@ svg[class~="text-danger-soft-foreground"],
     color: var(--text-secondary);
     flex-shrink: 0;
     white-space: nowrap;
-    @apply type-small;
+    @apply type-small font-normal;
   }
   [data-aui="row"][data-aui-align="start"] > [data-aui="badge"], [data-aui="col"][data-aui-align="start"] > [data-aui="badge"] {
     align-self: flex-start;

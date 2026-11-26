@@ -10,9 +10,8 @@ import { initTextProcessing } from './text-processing-preview'
 it('runs the preview through the desktop bridge and reports backend failures with a Toast', async () => {
   const preview = vi.fn(async () => ({ text: '后端结果', skip: false, issues: [] }))
   let receiveError: Parameters<TextProcessingBridge['onError']>[0] | undefined
-  const config = { revision: 1, migrated: true, values: { enabled: { normalize: true } } }
+  const config = { revision: 1, values: { enabled: { normalize: true } } }
   const textProcessing: TextProcessingBridge = {
-    load: vi.fn(async () => config),
     snapshot: vi.fn(async () => config),
     save: vi.fn(),
     preview,
@@ -25,7 +24,7 @@ it('runs the preview through the desktop bridge and reports backend failures wit
   vi.spyOn(store, 'getBridge').mockReturnValue({ textProcessing } as NonNullable<ReturnType<typeof store.getBridge>>)
   const errorToast = vi.spyOn(notifications, 'notifyError').mockReturnValue('test-toast')
   document.documentElement.lang = 'zh-CN'
-  initTextProcessing(true)
+  initTextProcessing()
   render(<TextProcessingTab route={parseRoute('#/settings/text-processing')} />)
   fireEvent.change(await screen.findByRole('textbox', { name: '测试原文' }), { target: { value: 'ＡＢＣ' } })
   await waitFor(() => expect(screen.getByRole('textbox', { name: '处理结果' })).toHaveValue('后端结果'))

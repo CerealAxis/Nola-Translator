@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import ctypes
 import math
+import sys
 from dataclasses import dataclass, replace
 from collections import deque
 from queue import Empty, Full, Queue
@@ -228,6 +230,20 @@ class PortAudioCapture:
         return (None, pyaudio.paContinue)
 
     def start(self) -> None:
+        if sys.platform != "win32":
+            return self._start()
+        # PortAudio may already be initialized by playback on another thread.
+        ole32 = ctypes.WinDLL("ole32")
+        result = ole32.CoInitializeEx(None, 0)
+        if result < 0 and result != -2147417850:  # RPC_E_CHANGED_MODE means COM is already initialized.
+            raise OSError(result, "WASAPI COM initialization failed")
+        try:
+            self._start()
+        finally:
+            if result >= 0:
+                ole32.CoUninitialize()
+
+    def _start(self) -> None:
         if self.running:
             return
         context = {"requestId": self.request_id, "kind": self.device.kind,

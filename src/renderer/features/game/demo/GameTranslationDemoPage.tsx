@@ -116,7 +116,7 @@ export default function GameTranslationDemoPage({ capability = 'ready' }: { capa
   }
   const dialogue = sampleLine(step, from, to)
   return <div className="screen-page game-translation-page" data-slot="game-page">
-    <PageHeader title={t('suite.gameTitle')} actions={<Button variant={running ? 'destructive' : 'default'} onClick={start}>
+    <PageHeader title={t('suite.gameTitle')} actions={<Button variant={running ? 'danger' : 'default'} onClick={start}>
       {running ? <Square data-icon="inline-start" /> : <Play data-icon="inline-start" />}{t(running ? 'screen.stop' : 'screen.start')}
     </Button>} />
     <DemoScene source={source === 'hook' ? 'hook' : 'ocr'} gameName={selected?.name} active={false} paused={!running}
@@ -177,9 +177,9 @@ export default function GameTranslationDemoPage({ capability = 'ready' }: { capa
         {presetDialog === 'delete' ? <p>{selectedPreset?.name}</p> : <Field><FieldLabel htmlFor="game-preset-name">{t('screen.presetName')}</FieldLabel>
           <Input id="game-preset-name" value={presetName} maxLength={80} onChange={event => setPresetName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && presetName.trim()) commitPreset() }} /></Field>}
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setPresetDialog(undefined)}>{t('screen.cancel')}</Button>
-          {presetDialog === 'save' && selectedPreset && <Button variant="outline" disabled={!presetName.trim()} onClick={() => commitPreset(true)}>{t('screen.presetSaveAs')}</Button>}
-          <Button variant={presetDialog === 'delete' ? 'destructive' : 'default'} disabled={presetDialog !== 'delete' && !presetName.trim()} onClick={() => commitPreset()}>{t(presetDialog === 'delete' ? 'screen.presetDelete' : presetDialog === 'rename' ? 'screen.presetRename' : selectedPreset ? 'screen.presetUpdate' : 'screen.presetSave')}</Button>
+          <Button variant="secondary" onClick={() => setPresetDialog(undefined)}>{t('screen.cancel')}</Button>
+          {presetDialog === 'save' && selectedPreset && <Button variant="secondary" disabled={!presetName.trim()} onClick={() => commitPreset(true)}>{t('screen.presetSaveAs')}</Button>}
+          <Button variant={presetDialog === 'delete' ? 'danger' : 'default'} disabled={presetDialog !== 'delete' && !presetName.trim()} onClick={() => commitPreset()}>{t(presetDialog === 'delete' ? 'screen.presetDelete' : presetDialog === 'rename' ? 'screen.presetRename' : selectedPreset ? 'screen.presetUpdate' : 'screen.presetSave')}</Button>
         </div>
       </DialogContent>
     </Dialog>

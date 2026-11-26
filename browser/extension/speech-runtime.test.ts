@@ -3,13 +3,24 @@ import { setupSpeechRuntime } from './speech-runtime'
 import { loadPreferences, DEFAULT_PREFERENCES } from './preferences'
 import { getProvider, createProvider } from './providers'
 import { translateWith, generateWith } from './provider-execution'
-import { migrateLegacyGlossary } from './glossary-store'
+import { emptyGlossary } from '../../src/shared/glossary'
 
 vi.mock('./preferences', async importOriginal => ({ ...await importOriginal<typeof import('./preferences')>(), loadPreferences: vi.fn() }))
 vi.mock('./providers', async importOriginal => ({ ...await importOriginal<typeof import('./providers')>(), getProvider: vi.fn() }))
 vi.mock('./provider-execution', async importOriginal => ({ ...await importOriginal<typeof import('./provider-execution')>(), translateWith: vi.fn(), generateWith: vi.fn() }))
 vi.mock('./native-provider', async importOriginal => ({ ...await importOriginal<typeof import('./native-provider')>(), nativeTranslationSummary: vi.fn(async () => ({ textTranslationConcurrency: 1 })) }))
-vi.mock('./glossary-store', async importOriginal => ({ ...await importOriginal<typeof import('./glossary-store')>(), recoverExtensionConfiguration: vi.fn(), extensionGlossary: { snapshot: vi.fn(async () => migrateLegacyGlossary([{ source: 'Nola', target: '诺拉', sites: 'video.test' }, { source: 'Recognized', target: 'ignore', sites: 'other.test' }], 'Terms')), onChanged: vi.fn(() => () => {}) } }))
+vi.mock('./glossary-store', async importOriginal => ({
+  ...await importOriginal<typeof import('./glossary-store')>(), recoverExtensionConfiguration: vi.fn(),
+  extensionGlossary: {
+    snapshot: vi.fn(async () => ({ ...emptyGlossary(), libraries: [
+      ['Nola', '诺拉', 'video.test'], ['Recognized', 'ignore', 'other.test'],
+    ].map(([source, target, host]) => ({
+      id: crypto.randomUUID(), name: 'Terms', description: '', enabled: true,
+      scope: { mode: 'selected' as const, targets: [{ kind: 'website' as const, patterns: ['*.' + host] }] },
+      entries: [{ id: crypto.randomUUID(), source, target, targetLanguage: '*', caseSensitive: true, enabled: true }],
+    })) })), onChanged: vi.fn(() => () => {}),
+  },
+}))
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
 
 it('rejects a blacklisted page even when its browser host permission is granted', async () => {

@@ -30,7 +30,7 @@ export function SettingsPreview({ kind, settings, t }: { kind: PreviewKind; sett
               <div className="nola-illustration-heading" aria-hidden="true" />
               {kind === 'inputTranslation' ? <div className="nola-illustration-input" data-translated={translated}>
                 <div className="nola-illustration-lines" aria-hidden="true"><i /><i /></div>
-                {settings.inputTranslation && <Button size="icon-sm" variant="outline" aria-label={translationLabel} tooltip={translationLabel} onClick={() => setTranslated(!translated)}><Languages /></Button>}
+                {settings.inputTranslation && <Button size="icon-sm" variant="secondary" aria-label={translationLabel} tooltip={translationLabel} onClick={() => setTranslated(!translated)}><Languages /></Button>}
               </div> : <>
                 {(kind !== 'web' || settings.pageDisplay === 'bilingual') && <div className="nola-illustration-lines" role="img" aria-label={t('sourceCaption')} data-selected={kind === 'selection' && settings.selectionTranslation}><i /><i /><i /></div>}
                 {(kind === 'web' || translated) && <div className="nola-illustration-lines nola-illustration-translation" role="img" aria-label={t('translatedCaption')} data-style={settings.pageStyle}><i /><i /></div>}
@@ -47,8 +47,8 @@ export function SettingsPreview({ kind, settings, t }: { kind: PreviewKind; sett
               </div>}
             </div>}
             {kind === 'floatingButton' && settings.floatingButton && <div className="nola-demo-floating" data-pinned={settings.floatingLocked} data-side={settings.floatingSide} style={{ top: `${Math.max(20, Math.min(75, settings.floatingPosition * 100))}%` }}>
-              <Button className="nola-demo-floating-action" variant={translated ? "default" : "outline"} size="sm" aria-label={t(translated ? 'restorePage' : 'translatePage')} onClick={() => setTranslated(!translated)}><Languages /></Button>
-              <Button className="nola-demo-dock" variant="outline" size="lg" aria-label={t('floatingButton')} onClick={() => settings.floatingClickAction === 'translate' ? setTranslated(!translated) : setOpen(!open)}><NolaLogo /></Button>
+              <Button className="nola-demo-floating-action" variant={translated ? "default" : "secondary"} size="sm" aria-label={t(translated ? 'restorePage' : 'translatePage')} onClick={() => setTranslated(!translated)}><Languages /></Button>
+              <Button className="nola-demo-dock" variant="secondary" size="lg" aria-label={t('floatingButton')} onClick={() => settings.floatingClickAction === 'translate' ? setTranslated(!translated) : setOpen(!open)}><NolaLogo /></Button>
             </div>}
             {kind === 'floatingButton' && settings.floatingButton && open && settings.floatingClickAction === 'panel' && <div className="nola-illustration-sidebar nola-popup-surface">
               <header><NolaLogo /><Button size="icon-sm" variant="bare" aria-label={t('close')} onClick={() => setOpen(false)}><X /></Button></header>

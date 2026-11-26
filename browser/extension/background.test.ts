@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest'
-import { migrateLegacyGlossary } from './glossary-store'
+import { emptyGlossary } from '../../src/shared/glossary'
 import { DEFAULT_PREFERENCES, loadPreferences } from './preferences'
 
 vi.mock('./provider-runtime', () => ({ setupProviderRuntime: vi.fn() }))
@@ -128,7 +128,7 @@ it('broadcasts permission changes without relying on revoked URL metadata and ch
 it('keeps private extension terms out of a direct desktop audio session and provides an actionable mode error', async () => {
   vi.resetModules()
   const glossary = await import('./glossary-store')
-  vi.mocked(glossary.extensionGlossary.snapshot).mockResolvedValue(migrateLegacyGlossary([{ source: 'Nola', target: '诺拉', sites: 'video.test' }], 'Terms'))
+  vi.mocked(glossary.extensionGlossary.snapshot).mockResolvedValue({ ...emptyGlossary(), libraries: [{ id: crypto.randomUUID(), name: 'Terms', description: '', enabled: true, scope: { mode: 'selected' as const, targets: [{ kind: 'website' as const, patterns: ['*.video.test'] }] }, entries: [{ id: crypto.randomUUID(), source: 'Nola', target: '诺拉', targetLanguage: '*', caseSensitive: true, enabled: true }] }] })
   const event = () => ({ addListener: vi.fn() })
   const runtime = { onInstalled: event(), onStartup: event(), onMessage: event(), onConnect: event(), getURL: (path: string) => `chrome-extension://nola/${path}`, connectNative: vi.fn() }
   vi.stubGlobal('chrome', { runtime, permissions: { onRemoved: event(), contains: vi.fn(async () => true) } })

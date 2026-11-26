@@ -8,6 +8,9 @@ import { runDirectModel } from './direct-model'
 import type { AgentProject } from '../shared/agent-workspace'
 import { defaultModelBinding, isModelEnabled } from '../shared/model-policy'
 import { comicReadTools } from './comic-reader'
+import { synthesisVoiceRef } from '../shared/tts/settings-migration'
+import { ttsVoiceRefSchema } from '../shared/tts/voice-ref'
+import { migrateLegacyVoice } from '../shared/tts/migration'
 
 export interface AgentToolContext {
   services: LanguageModelServices
@@ -87,10 +90,12 @@ export async function nativeAgentTools(context: AgentToolContext): Promise<ToolS
         const model = defaultAgentModel(services, 'mt')
         return { ...await runDirectModel(services, { id: randomUUID(), model, kind: 'mt', source: args.source, target: args.target || services.getSettings().translation.targetLanguage, image: part.url }, context.signal), model }
       } }),
-    synthesize_speech: tool({ description: 'Synthesize text using the current default synthesis model and voice from Model Management. Use an empty voice for the default voice. The resulting audio is attached automatically.',
-      inputSchema: z.object({ text: z.string(), voice: z.string() }), execute: async args => {
+    synthesize_speech: tool({ description: 'Synthesize text with the selected voice and output language. The resulting audio is attached automatically.',
+      inputSchema: z.object({ text: z.string(), voiceRef: ttsVoiceRefSchema.optional(), language: z.string().optional(), voice: z.string().optional() }), execute: async args => {
         const model = defaultAgentModel(services, 'tts')
-        const result = await runDirectModel(services, { ...args, model, voice: args.voice || services.getSettings().synthesis.voice, id: randomUUID(), kind: 'tts' }, context.signal)
+        const settings = services.getSettings()
+        const voiceRef = args.voiceRef ?? (args.voice ? migrateLegacyVoice(args.voice, model).voiceRef : synthesisVoiceRef(settings))
+        const result = await runDirectModel(services, { text: args.text, model, voiceRef, target: args.language || settings.translation.targetLanguage, id: randomUUID(), kind: 'tts' }, context.signal)
         if (!result.audio) throw new Error('The default synthesis model returned no audio')
         if (result.audio) context.artifact(result.audio)
         return { text: result.text, voices: result.voices, audioAttached: !!result.audio, model }

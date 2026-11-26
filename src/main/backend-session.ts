@@ -13,6 +13,8 @@ import { translationOptionsFor } from '../shared/cloud-config'
 import { backendAsrHeaders, backendMtHeaders } from './backend-direct-model'
 import { backendError, backendErrorCode, backendFailure, readBackendFailure } from './backend-error'
 import { logDiagnostic } from './session-log'
+import { workspaceSpeechConnection } from '../shared/model-workspace'
+import { TTS_PROVIDER_RELAY_MODEL } from './tts/tts-provider-relay'
 
 export interface BackendSessionOptions {
   output?: 'source' | 'translation' | 'speech'
@@ -22,11 +24,13 @@ export interface BackendSessionOptions {
   ttsApiKey?: string
 }
 
-export type BackendSessionConfig = SessionConfig & { fallbackTranslationModelId?: string }
+export type BackendSessionConfig = SessionConfig & { fallbackTranslationModelId?: string;
+  speechRelay?: { url: string; token: string };
+  speechSnapshot?: import('../shared/tts/synthesis').ResolvedTtsRequest }
 
 export interface MappedBackendSession {
   config: {
-    pipeline: { kind: 'cascade'; asr_model: string; translation_model?: string; fallback_translation_model?: string; tts_model?: string; tts_voice?: string }
+    pipeline: { kind: 'cascade'; asr_model: string; translation_model?: string; fallback_translation_model?: string; tts_model?: string; tts_voice?: string; tts_snapshot?: Record<string, unknown> }
       | { kind: 's2s'; s2s_model: string }
     input: {
       kind: 'microphone' | 'system_audio' | 'process_audio' | 'virtual_input' | 'browser_tab'
@@ -125,17 +129,28 @@ export function mapSessionConfig(
     }
     if (speech) {
       const { modelId: binding, voice } = settings.synthesis
-      const modelId = binding === MIMO_TTS_BINDING ? MIMO_TTS_MODEL : binding
+      const modelId = config.speechRelay ? TTS_PROVIDER_RELAY_MODEL : config.speechSnapshot?.modelId ?? (binding.startsWith(MIMO_TTS_BINDING) ? MIMO_TTS_MODEL : binding)
       if (!modelId || !enabledModelIds.has(modelId)) return
-      if (modelId === MIMO_TTS_MODEL) {
+      if (config.speechRelay) {
+        headers['x-nola-tts-relay-url'] = config.speechRelay.url
+        headers['x-nola-tts-relay-token'] = config.speechRelay.token
+      }
+      if (modelId.startsWith(MIMO_TTS_MODEL)) {
         if (!options.ttsApiKey) return
         headers['x-nola-tts-key'] = options.ttsApiKey
-        const source = settings.modelWorkspace?.connections.find(item => item.service === 'mimo' && item.capability === 'TTS')
+        const source = workspaceSpeechConnection(settings.modelWorkspace, 'tts', config.speechSnapshot?.modelBinding ?? binding)
         if (source?.endpoint) headers['x-nola-tts-endpoint'] = source.endpoint
-        if (source?.models[0]?.id) headers['x-nola-tts-model'] = source.models[0].id
+        headers['x-nola-tts-model'] = modelId
       }
       pipeline.tts_model = modelId
-      if (voice) pipeline.tts_voice = voice
+      if (config.speechSnapshot) {
+        const snapshot = config.speechSnapshot
+        pipeline.tts_snapshot = { schema_version: 1, conditioning: snapshot.conditioning,
+          resolved_request: snapshot,
+          controls: snapshot.controls ?? {}, output: snapshot.output ?? {},
+          profile_id: snapshot.profileId, profile_revision: snapshot.profileRevision,
+          voice_epoch: snapshot.voiceEpoch ?? 0 }
+      } else if (voice) pipeline.tts_voice = voice
     }
   }
 

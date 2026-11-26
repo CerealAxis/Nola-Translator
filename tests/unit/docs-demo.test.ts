@@ -19,7 +19,7 @@ describe('documentation site demo', () => {
     const resources = stores.models.getState().resources
     const settings = stores.settings.getState().settings!
     expect(resources.length).toBeGreaterThan(0)
-    expect(resources.every(item => item.resourceId in RECOMMENDED_CONFIGURATIONS)).toBe(true)
+    expect(resources.filter(item => item.installed && ['recognitionModel', 'translationModel'].includes(item.kind)).every(item => item.resourceId in RECOMMENDED_CONFIGURATIONS)).toBe(true)
     expect(resources.some(item => item.resourceId === settings.recognition.modelId)).toBe(true)
     expect(resources.some(item => item.resourceId === settings.translation.localModelId)).toBe(true)
     expect(stores.meetings.getState().meetings[0].segmentCount).toBe(stores.session.getState().segments.length)

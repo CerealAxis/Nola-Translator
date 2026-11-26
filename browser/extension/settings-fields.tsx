@@ -80,7 +80,7 @@ export function ConnectionStatus({ t, compact = false, onReconnect }: { t: Retur
   const variant = status === 'connected' && !checking ? 'success' : 'secondary'
   if (compact) return <div className="nola-provider-status" aria-busy={checking}>
     <Badge role="status" variant={variant}>{label}</Badge>
-    {status === 'disconnected' && <Button variant="outline" size="icon-xs" disabled={checking} aria-label={t('reconnect')} tooltip={t('reconnect')} onClick={() => void check(true)}><RefreshCw aria-hidden="true" /></Button>}
+    {status === 'disconnected' && <Button variant="secondary" size="icon-xs" disabled={checking} aria-label={t('reconnect')} tooltip={t('reconnect')} onClick={() => void check(true)}><RefreshCw aria-hidden="true" /></Button>}
   </div>
   return <span className="flex" role="status" aria-busy={checking}>
     <TooltipHint content={t('testConnection')} disabledTrigger={checking}>

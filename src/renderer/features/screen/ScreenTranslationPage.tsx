@@ -209,8 +209,8 @@ export function ScreenTranslationPage() {
   </Tooltip>
   return <div className="screen-page" data-slot="screen-page">
     <PageHeader title={t('screen.title')} warning={t('suite.experimentalInDevelopment')} subtitle={t('screen.description')} actions={<div className="screen-page__actions">
-      {canStop && <Button variant="outline" disabled={busy || !api} onClick={() => void run({ action: 'showToolbar' })}>{t('suite.showToolbar')}</Button>}
-      <Button variant={canStop ? 'destructive' : 'default'}
+      {canStop && <Button variant="secondary" disabled={busy || !api} onClick={() => void run({ action: 'showToolbar' })}>{t('suite.showToolbar')}</Button>}
+      <Button variant={canStop ? 'danger' : 'default'}
         disabled={!snapshot || busy || !api || !canStop && (incompatible || ocrSaving)}
         onClick={() => void run({ action: canStop ? 'stop' : 'start' }, !canStop)}>
         {busy ? <Spinner data-icon="inline-start" /> : canStop ? <Square data-icon="inline-start" /> : <Play data-icon="inline-start" />}
@@ -334,8 +334,8 @@ export function ScreenTranslationPage() {
         <CardContent className="screen-preset-dialog">
           {presetDialog === 'delete' ? <p>{selectedPreset?.name}</p> : <Field><FieldLabel htmlFor="screen-preset-name">{t('screen.presetName')}</FieldLabel><Input id="screen-preset-name" value={presetName} maxLength={80} disabled={busy} onChange={event => setPresetName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && presetName.trim()) { event.preventDefault(); void confirmPreset() } }} /></Field>}
           <div className="screen-page__actions">
-            {presetDialog === 'save' && selectedPreset && <Button variant="outline" disabled={busy || !presetName.trim()} onClick={() => void confirmPreset(true)}>{t('screen.presetSaveAs')}</Button>}
-            <Button variant={presetDialog === 'delete' ? 'destructive' : 'default'} disabled={busy || (presetDialog !== 'delete' && !presetName.trim())} onClick={() => void confirmPreset()}>{busy && <Spinner data-icon="inline-start" />}{t(presetDialog === 'delete' ? 'screen.presetDelete' : presetDialog === 'rename' ? 'screen.presetRename' : presetDialog === 'save' && selectedPreset ? 'screen.presetUpdate' : 'screen.presetSave')}</Button>
+            {presetDialog === 'save' && selectedPreset && <Button variant="secondary" disabled={busy || !presetName.trim()} onClick={() => void confirmPreset(true)}>{t('screen.presetSaveAs')}</Button>}
+            <Button variant={presetDialog === 'delete' ? 'danger' : 'default'} disabled={busy || (presetDialog !== 'delete' && !presetName.trim())} onClick={() => void confirmPreset()}>{busy && <Spinner data-icon="inline-start" />}{t(presetDialog === 'delete' ? 'screen.presetDelete' : presetDialog === 'rename' ? 'screen.presetRename' : presetDialog === 'save' && selectedPreset ? 'screen.presetUpdate' : 'screen.presetSave')}</Button>
           </div>
         </CardContent>
       </DialogContent>

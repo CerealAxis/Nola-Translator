@@ -1,4 +1,4 @@
-import { astrBotSpeechPreset } from '../../../../shared/astrbot-speech-presets'
+import { astrBotSpeechPreset, astrBotSpeechBinding } from '../../../../shared/astrbot-speech-presets'
 import { actions, stores, updateSettings } from '@/store'
 import { TRANSLATION_PRESETS } from '../../../../shared/provider-presets'
 import { customCredentialSlot, customModelPatch, customModelsOf, customModelSchema, providerGroupOf } from '../../../../shared/custom-models'
@@ -8,6 +8,7 @@ import { modelWorkspaceSchema, type ModelWorkspace, type WorkspaceConnection } f
 import { ALIYUN_ASR_MODELS, DEFAULT_SETTINGS, MINIMAX_RECOGNITION_MODELS, MIMO_TTS_BINDING, REALTIME_S2S_MODELS, SOURCE_LANGUAGE_OPTIONS, defaultRealtimeS2s, type AppSettings, type AppSettingsPatch, type CredentialProvider } from '../../../../shared/settings'
 import { newConnection, templates, type CloudModel, type Connection, type Service } from './cloud-preview-data'
 import { CHATGPT_PLAN_SERVICE } from '../../../../shared/chatgpt-plan'
+import { synthesisVoiceRef } from '../../../../shared/tts/settings-migration'
 
 export const emptyWorkspace: ModelWorkspace = { connections: [], localSources: {} }
 
@@ -76,7 +77,7 @@ export function configuredConnections(settings: AppSettings, credentials: Readon
   const connections = new Map<string, Connection>()
   for (const entry of saved) {
     if (entry.capability === 'LLM') connections.set(entry.id, { ...entry, key: '', models: [] })
-    else if (entry.service !== 'mimo' && astrBotSpeechPreset(entry.service)) connections.set(entry.id, { ...entry, key: '' })
+    else if (astrBotSpeechPreset(entry.service)) connections.set(entry.id, { ...entry, key: '' })
   }
   const legacyNames: Partial<Record<Service, string>> = { openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Google Gemini' }
   for (const profile of profiles) {
@@ -90,7 +91,7 @@ export function configuredConnections(settings: AppSettings, credentials: Readon
     const connection = connections.get(group) ?? newConnection(known ? known.id as Service : 'compatible', 'LLM', group)
     if (!connection.models.length) {
       const storedName = metadata?.name ?? profile.name
-      connection.name = storedName === legacyNames[connection.service] ? templates[connection.service].name : storedName
+      connection.name = !metadata && storedName === legacyNames[connection.service] ? templates[connection.service].name : storedName
       connection.endpoint = profile.endpoint
       connection.protocol = metadata?.protocol ?? profile.apiFormat
     }
@@ -105,6 +106,7 @@ export function configuredConnections(settings: AppSettings, credentials: Readon
   for (const [service, capability] of fixedSources) {
     const template = createWorkspaceConnection(service, capability)
     const metadata = saved.find(entry => entry.id === template.id)
+    if (service === 'mimo' && !metadata && saved.some(entry => entry.service === 'mimo')) continue
     const slot = credentialSlot(template)
     const enabled = fixedEnabled(settings, template)
     const binding = fixedBinding(template)
@@ -123,10 +125,8 @@ export function configuredConnections(settings: AppSettings, credentials: Readon
       connection.endpoint = settings.translation.mymemoryEndpoint ?? template.endpoint
     }
     if (service === 'mimo') {
-      if (connection.name === 'Xiaomi MiMo') connection.name = template.name
-      if (connection.endpoint === template.endpoint + '/chat/completions') connection.endpoint = template.endpoint
       if (metadata?.models.length) {
-        connection.models = metadata.models.map((model, index) => index === 0 ? { ...model, enabled, voice: settings.synthesis.voice || model.voice } : model)
+        connection.models = metadata.models.map(model => model.profileId ? model : { ...model, enabled })
         connections.set(connection.id, connection)
         continue
       }
@@ -134,7 +134,7 @@ export function configuredConnections(settings: AppSettings, credentials: Readon
     const id = fixedModel(settings, connection, metadata)
     connection.models = metadata ? metadata.models.map(model => ({
       ...model, enabled, ...(capability === 'ASR' || capability === 'S2S' || service === 'index' ? { id: id ?? model.id, name: id ?? model.name } : {}),
-    })) : id ? [{ id, name: id, enabled, ...(capability === 'TTS' ? { voice: settings.synthesis.voice || 'mimo_default' } : {}) }] : []
+    })) : id ? [{ id, name: id, enabled, ...(capability === 'TTS' ? { tts: { defaultVoiceRef: synthesisVoiceRef(settings) } } : {}) }] : []
     connections.set(connection.id, connection)
   }
   return [...connections.values()]
@@ -211,18 +211,24 @@ function fixedPatch(settings: AppSettings, connection: Connection): AppSettingsP
     } }
   }
   if (connection.service === 'mymemory') patch.translation = { mymemoryEndpoint: connection.endpoint }
-  if (connection.service === 'mimo' && model?.voice && model.voice !== settings.synthesis.voice) patch.synthesis = { voice: model.voice }
   return patch
 }
 
 export async function saveWorkspaceConnection(connection: Connection, previous?: Connection, removing = false, keepCredential = false): Promise<void> {
   const settings = stores.settings.getState().settings
   if (!settings) throw new Error('Model settings are unavailable')
-  const models = connection.capability === 'LLM' ? connection.models.map(model => ({
+  let models = connection.capability === 'LLM' ? connection.models.map(model => ({
     ...model, profileId: model.profileId ?? (connection.id.startsWith('provider_') ? `${connection.id}_${randomId()}` : randomId()),
   })) : astrBotSpeechPreset(connection.service)
     ? connection.models.map((model, index) => index > 0 && !model.profileId ? { ...model, profileId: randomId() } : model)
     : connection.models
+  const speech = astrBotSpeechPreset(connection.service)
+  if (connection.capability === 'TTS' && speech) models = models.map(model => {
+    const binding = astrBotSpeechBinding(speech.id, model.profileId)
+    const selected = model.tts?.defaultVoiceRef
+    return { ...model, tts: { ...model.tts,
+      defaultVoiceRef: selected?.kind === 'preset' ? { ...selected, modelBinding: binding } : selected ?? { kind: 'engine-default' } } }
+  })
   const { key, ...saved } = { ...connection, models }
   const slot = credentialSlot(previous ?? connection)
   const patch = connection.capability === 'LLM' ? llmPatch(settings, connection, previous ?? connection, models) : connection.service !== 'mimo' && astrBotSpeechPreset(connection.service) ? {} : fixedPatch(settings, { ...saved, key })

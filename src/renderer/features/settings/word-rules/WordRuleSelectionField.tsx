@@ -74,7 +74,7 @@ export function WordRuleSelectionField({
         </Select>
         {value.mode === 'selected' && (
           <Popover>
-            <PopoverTrigger render={<Button variant="outline" size={compact ? 'icon-sm' : 'sm'} disabled={disabled} aria-label={compact ? t('suite.selectedLibraries', { count: value.libraryIds.length }) : undefined} />}>
+            <PopoverTrigger render={<Button variant="secondary" size={compact ? 'icon-sm' : 'sm'} disabled={disabled} aria-label={compact ? t('suite.selectedLibraries', { count: value.libraryIds.length }) : undefined} />}>
               {value.libraryIds.length}
             </PopoverTrigger>
             <PopoverContent>
@@ -104,7 +104,7 @@ export function WordRuleSelectionField({
         {showSettings && (compact
           ? <Tooltip><TooltipTrigger render={<Button variant="bare" size="icon-sm" nativeButton={false} aria-label={p('settings')} render={<a role="link" href={settingsHref} />}><Settings2 /></Button>} /><TooltipContent>{p('settings')}</TooltipContent></Tooltip>
           : <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           nativeButton={false}
           render={

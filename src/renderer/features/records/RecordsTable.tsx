@@ -86,7 +86,7 @@ export function RecordsTable({ meetings, onOpen, onRename, onExport, onDelete, p
               </th> : null}
               <th scope="col" className="nola-records-table__name table__column">{t('records.columnName')}</th>
               <th scope="col" className="nola-records-table__time table__column" aria-sort={onSortChange ? (sortAscending ? 'ascending' : 'descending') : undefined}>
-                {onSortChange ? <Button variant="tertiary" className="h-auto min-h-0 w-full justify-between border-0 bg-transparent p-0 type-body font-medium text-inherit" onClick={() => onSortChange(!sortAscending)}>
+                {onSortChange ? <Button variant="secondary" className="h-auto min-h-0 w-full justify-between border-0 bg-transparent p-0 type-body font-medium text-inherit" onClick={() => onSortChange(!sortAscending)}>
                   {t('homeRecordsUi.time')}
                   <span className="table__sortable-column-indicator" data-direction={sortAscending ? 'ascending' : 'descending'}><ChevronUp aria-hidden="true" size={12} /></span>
                 </Button> : t('homeRecordsUi.time')}

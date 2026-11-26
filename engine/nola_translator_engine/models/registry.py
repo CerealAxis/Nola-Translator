@@ -163,7 +163,7 @@ class CustomModelEntry:
         )
 
     @classmethod
-    def from_json(cls, raw: object, *, migrate_auto_detection: bool = False) -> CustomModelEntry:
+    def from_json(cls, raw: object) -> CustomModelEntry:
         if not isinstance(raw, dict):
             raise RegistryError("自定义模型注册表的条目不是对象")
         repo = raw.get("repo")
@@ -189,14 +189,6 @@ class CustomModelEntry:
         if raw.get("configuration"):
             try:
                 candidate = ModelConfiguration.model_validate(raw["configuration"])
-                if migrate_auto_detection and candidate.slot == "translation":
-                    source_languages = candidate.sourceLanguages
-                    candidate = candidate.model_copy(update={
-                        "supportsAutoDetection": True,
-                        "sourceLanguages": source_languages if "auto" in source_languages else ["auto", *source_languages],
-                    })
-                elif migrate_auto_detection and candidate.slot == "recognition" and not candidate.supportsAutoDetection:
-                    candidate = candidate.model_copy(update={"supportsAutoDetection": True})
                 required = [candidate.languages] if slot == "recognition" else [candidate.sourceLanguages, candidate.targetLanguages]
                 codes = candidate.languages + [code for code in candidate.sourceLanguages if code != "auto"] + candidate.targetLanguages
                 valid_pairs = candidate.translationPairs is None or bool(candidate.translationPairs) and all(supports_translation(candidate, pair.source, pair.target) for pair in candidate.translationPairs)
@@ -310,13 +302,9 @@ class CustomModelRegistry:
         if not isinstance(models, list):
             raise RegistryError(f"自定义模型注册表 {self.path} 的 models 不是数组")
         entries: dict[str, CustomModelEntry] = {}
-        version = raw.get("version", 0)
-        migrate_auto_detection = not isinstance(version, int) or version < REGISTRY_VERSION
         for item in models:
-            entry = CustomModelEntry.from_json(item, migrate_auto_detection=migrate_auto_detection)
+            entry = CustomModelEntry.from_json(item)
             entries[entry.resource_id] = entry
-        if migrate_auto_detection:
-            self._write(entries)
         return entries
 
     def _write(self, entries: dict[str, CustomModelEntry] | None = None) -> None:

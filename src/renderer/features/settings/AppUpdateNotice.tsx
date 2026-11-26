@@ -123,7 +123,7 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
             : <div className="type-muted text-muted">{displayReleaseName(result.releaseName)}<p>{t('appUpdate.notesUnavailable')}</p></div>}
         </div>
         <DialogFooter className="app-update-dialog-footer">
-          <Button variant="tertiary" size="sm" onClick={() => onOpenChange(false)}>{t(isCurrentVersion ? 'common.close' : 'appUpdate.later')}</Button>
+          <Button variant="secondary" size="sm" onClick={() => onOpenChange(false)}>{t(isCurrentVersion ? 'common.close' : 'appUpdate.later')}</Button>
           <Button size="sm" disabled={isOpening} onClick={() => void onOpenRelease(releaseUrl)}>
             <ArrowUpRight aria-hidden="true" />{t(isCurrentVersion ? 'appUpdate.viewAnnouncement' : 'appUpdate.openRelease')}
           </Button>

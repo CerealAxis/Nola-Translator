@@ -925,7 +925,7 @@ export const en: Dictionary = {
 
     sectionButtons: 'Button styles',
     buttonVariants: 'Base variants', buttonVariantsDesc: 'Visible-fill button variants used in the app, shown here for appearance only.',
-    buttonPrimary: 'Primary', buttonSecondary: 'Secondary', buttonTertiary: 'Tertiary', buttonOutline: 'Outline', buttonDanger: 'Danger', buttonDangerSoft: 'Soft danger',
+    buttonPrimary: 'Primary', buttonSecondary: 'Secondary', buttonDanger: 'Danger',
     buttonSizes: 'Sizes', buttonSizesDesc: 'Default and small button sizes.', buttonSmall: 'Small', buttonDefault: 'Default',
     buttonStates: 'Common states', buttonStatesDesc: 'Static examples of disabled, pending, and selected/current states.', buttonDisabled: 'Disabled', buttonPending: 'Pending', buttonCurrent: 'In use',
     buttonIconOnly: 'Icon buttons', buttonIconOnlyDesc: 'Icon buttons have a visible fill that differs from their background and an accessible name.', buttonDelete: 'Delete sample',

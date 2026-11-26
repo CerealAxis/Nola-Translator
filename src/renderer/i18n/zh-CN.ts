@@ -946,7 +946,7 @@ export const zhCN = {
 
     sectionButtons: '按钮样式',
     buttonVariants: '基础变体', buttonVariantsDesc: '项目中使用的可见底色按钮变体；这里只展示外观。',
-    buttonPrimary: '主要', buttonSecondary: '次要', buttonTertiary: '轻量', buttonOutline: '描边', buttonDanger: '危险', buttonDangerSoft: '柔和危险',
+    buttonPrimary: '主要', buttonSecondary: '次要', buttonDanger: '危险',
     buttonSizes: '尺寸', buttonSizesDesc: '默认尺寸与小尺寸。', buttonSmall: '小尺寸', buttonDefault: '默认尺寸',
     buttonStates: '常见状态', buttonStatesDesc: '禁用、处理中和已选中/当前项的静态展示。', buttonDisabled: '已禁用', buttonPending: '处理中', buttonCurrent: '当前使用',
     buttonIconOnly: '图标按钮', buttonIconOnlyDesc: '图标按钮使用与底层不同的可见底色，并通过无障碍名称说明操作。', buttonDelete: '删除样例',

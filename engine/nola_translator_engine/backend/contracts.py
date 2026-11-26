@@ -136,6 +136,7 @@ class CascadePipelineConfig(ContractModel):
     fallback_translation_model: str | None = Field(default=None, max_length=256)
     tts_model: str | None = Field(default=None, max_length=256)
     tts_voice: str | None = Field(default=None, max_length=256)
+    tts_snapshot: dict | None = None
 
 
 class S2SPipelineConfig(ContractModel):

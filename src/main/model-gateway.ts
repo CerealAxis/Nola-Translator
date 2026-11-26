@@ -1,4 +1,5 @@
 import { inferAstrBotSpeech } from './astrbot-speech'
+import { normalizeThrownError } from '../shared/ipc-error'
 import { measureCloudCall } from './gateway-performance'
 import { workspaceChatConnection, workspaceSpeechConnection, workspaceSpeechModel } from '../shared/model-workspace'
 import { astrBotSpeechPreset, astrBotSpeechPresetForBinding } from '../shared/astrbot-speech-presets'
@@ -26,6 +27,9 @@ import { BackendModelError, backendCloudAsr, backendCloudMt, type BackendInferen
 import type { DirectModelServices } from './direct-model'
 import type { ScreenOcrRequest, ScreenOcrResult } from '../shared/screen-translation'
 import type { GatewayServiceSnapshot } from '../shared/model-gateway'
+import type { TtsOrchestrator } from './tts/tts-orchestrator'
+import { synthesisVoiceRef } from '../shared/tts/settings-migration'
+import { migrateLegacyVoice, selectTtsVoiceRef } from '../shared/tts/migration'
 
 const WORKER_KINDS = ['asr', 'mt', 'tts'] as const
 type WorkerKind = typeof WORKER_KINDS[number]
@@ -59,6 +63,7 @@ interface WorkerPlan {
   signature: string
 }
 export interface ModelGatewayOptions {
+  tts?: TtsOrchestrator
   configureBackendLoading?(mode: 'on-demand' | 'direct', models: string[], signal: AbortSignal): Promise<void>
   loadBackend?(kind: WorkerKind, binding: string, signal: AbortSignal): Promise<void>
   backendInstances?(): Promise<{ model_id: string; state: string }[]>
@@ -68,6 +73,7 @@ export interface ModelGatewayOptions {
   directLaunch(model: string): Promise<EngineLaunchSpec>
   listResources(): Promise<ResourceRecord[]>
   getCredential?(provider: CredentialProvider): Promise<string>
+  hasCredential?(provider: CredentialProvider): Promise<boolean>
   getKey(): Promise<string>
   setKey(value: string): Promise<void>
   onChanged?(snapshot: ModelGatewaySnapshot): void
@@ -102,6 +108,7 @@ const cloudTranslationProvider = (binding: string): TranslationProvider | undefi
 export class ModelGateway {
   private state: ModelGatewaySnapshot['state'] = 'stopped'
   private error?: string
+  private errorCode?: string
   private server?: Server
   private webSockets?: WebSocketServer
   private readonly sockets = new Set<Socket>()
@@ -288,8 +295,31 @@ export class ModelGateway {
   }
 
   async infer(request: DirectModelRequest, signal: AbortSignal, inspect = false, probe = false): Promise<DirectModelResult> {
+    if (request.kind === 'tts' && inspect && this.options.tts) {
+      const binding = normalizeModelBinding('tts', request.model) || this.bindingFor('tts', this.options.getSettings().modelGateway, this.options.getSettings())
+      const voiceInventory = await this.options.tts.inventory(binding)
+      return { text: '', voiceInventory, voices: voiceInventory.map(voice => voice.id) }
+    }
+    if (request.kind === 'tts' && !inspect && this.options.tts) {
+      const settings = structuredClone(this.options.getSettings())
+      const binding = normalizeModelBinding('tts', request.model) || this.bindingFor('tts', settings.modelGateway, settings)
+      const connection = workspaceSpeechConnection(settings.modelWorkspace, 'tts', binding)
+      const model = connection && workspaceSpeechModel(connection, binding)
+      const voiceRef = selectTtsVoiceRef(request.voiceRef,
+        request.voice ? migrateLegacyVoice(request.voice, binding).voiceRef : undefined,
+        settings.synthesis.voiceRef ?? (settings.synthesis.voice ? synthesisVoiceRef(settings) : undefined),
+        model?.tts?.defaultVoiceRef ?? (binding.startsWith('resource:') ? settings.modelWorkspace?.localTts?.[binding.slice('resource:'.length)]?.defaultVoiceRef : undefined))
+      return this.options.tts.synthesize({ schemaVersion: 1, requestId: request.id, modelBinding: binding,
+        voiceRef, text: request.text ?? '', targetLanguage: request.target ?? settings.translation.targetLanguage,
+        controls: request.controls, output: request.output }, signal,
+      this.options.tts.adapter((resolved, cancellation) => this.inferResolved(resolved, cancellation, false, probe, settings)))
+    }
+    return this.inferResolved(request, signal, inspect, probe)
+  }
+
+  private async inferResolved(request: DirectModelRequest, signal: AbortSignal, inspect = false, probe = false, settingsSnapshot?: AppSettings): Promise<DirectModelResult> {
     const kind = request.kind as WorkerKind
-    const settings = this.options.getSettings()
+    const settings = settingsSnapshot ?? this.options.getSettings()
     const binding = normalizeModelBinding(kind, request.model) || this.bindingFor(kind, settings.modelGateway, settings)
     let entry: GatewayRequestSnapshot | undefined
     let held: WorkerSlot | undefined
@@ -300,7 +330,7 @@ export class ModelGateway {
       if (preset?.capability.toLowerCase() === kind && (preset.id !== 'mimo' || speech)) {
         const model = speech && workspaceSpeechModel(speech, binding)
         if (!speech || !model || (!probe && (!model.enabled || (binding === MIMO_TTS_BINDING && !isModelEnabled(settings, kind, binding))))) throw new GatewayError(503, 'The requested model is not enabled.', 'model_disabled')
-        if (inspect) return { text: '', voices: model.voice ? [model.voice] : [] }
+        if (inspect) return { text: '', voices: model.tts?.defaultVoiceRef?.kind === 'preset' ? [model.tts.defaultVoiceRef.voiceId] : [] }
         entry = this.begin(kind, binding)
         const key = preset.keyless ? '' : await this.options.getCredential?.(preset.id === 'mimo' ? 'mimo-tts' : customCredentialSlot(speech.id)) ?? ''
         return await measureCloudCall(model.id, () =>
@@ -358,7 +388,7 @@ export class ModelGateway {
   snapshot(): ModelGatewaySnapshot {
     return { state: this.state, address: `http://${this.host}:${this.port}/v2`, port: this.port, connections: this.clients.size,
       activeRequests: this.requests.filter(request => request.status === 'running').length,
-      services: structuredClone(this.services), availableModels: this.availableModels(), requests: this.requests.map(request => ({ ...request })), ...(this.error ? { error: this.error } : {}) }
+      services: structuredClone(this.services), availableModels: this.availableModels(), requests: this.requests.map(request => ({ ...request })), ...(this.error ? { error: this.error, errorCode: this.errorCode } : {}) }
   }
   private availableModels(): Record<GatewayCapability, AvailableGatewayModel[]> {
     const settings = this.options.getSettings()
@@ -424,7 +454,7 @@ export class ModelGateway {
         return speech && !speech.keyless && speech.id !== 'mimo' ? [customCredentialSlot(connection.id)] : []
       }) ?? [])]
     return Object.fromEntries(await Promise.all([...new Set(slots)].map(async slot =>
-      [slot, await this.options.chatGptPlanPresence?.(slot) ?? !!await this.options.getCredential?.(slot)]))) as Record<CredentialProvider, boolean>
+      [slot, await this.options.chatGptPlanPresence?.(slot) ?? await this.options.hasCredential?.(slot) ?? !!await this.options.getCredential?.(slot)]))) as Record<CredentialProvider, boolean>
   }
   private changed(): void { this.options.onChanged?.(this.snapshot()) }
   revealKey(): Promise<string> {
@@ -523,7 +553,7 @@ export class ModelGateway {
   private async startInternal(version = this.stopVersion): Promise<ModelGatewaySnapshot> {
     if (version !== this.stopVersion) return this.snapshot()
     if (this.state === 'running') return this.snapshot()
-    this.stopping = false; this.state = 'starting'; this.error = undefined; this.changed()
+    this.stopping = false; this.state = 'starting'; this.error = undefined; this.errorCode = undefined; this.changed()
     this.loadingController = new AbortController()
     try {
       await this.revealKey()
@@ -541,7 +571,7 @@ export class ModelGateway {
     } catch (error) {
       console.error('[gateway.start]', error)
       if (this.stopping || version !== this.stopVersion) return this.snapshot()
-      await this.stopInternal(); this.state = 'failed'; this.error = 'Gateway could not start. Check the address, port and installed runtime.'; this.changed()
+      await this.stopInternal({ message: error instanceof Error ? error.message : String(error), code: normalizeThrownError(error).code })
     }
     return this.snapshot()
   }
@@ -973,7 +1003,7 @@ export class ModelGateway {
     slot.retired = true; this.clearIdle(slot); this.retiring.add(slot)
     if (!slot.refs) { this.retiring.delete(slot); void this.closeSlot(slot) }
   }
-  private async stopInternal(): Promise<ModelGatewaySnapshot> {
+  private async stopInternal(failure?: { message: string; code: string }): Promise<ModelGatewaySnapshot> {
     this.stopping = true; this.state = 'stopping'; this.changed()
     if (this.backendPolling) clearInterval(this.backendPolling)
     this.backendPolling = undefined
@@ -999,7 +1029,7 @@ export class ModelGateway {
     await this.options.configureBackendLoading?.('on-demand', [], AbortSignal.timeout(10000))
     this.tickets.clear()
     for (const kind of KINDS) this.services[kind] = { ...this.services[kind], state: 'stopped', error: undefined }
-    this.state = 'stopped'; this.error = undefined; this.changed(); return this.snapshot()
+    this.state = failure ? 'failed' : 'stopped'; this.error = failure?.message; this.errorCode = failure?.code; this.changed(); return this.snapshot()
   }
 
   private async configureLanguageModel(force = false): Promise<void> {
@@ -1190,7 +1220,8 @@ export class ModelGateway {
             if (inspected?.voices && this.services.tts === service) service.voices = inspected.voices
             voices = inspected?.voices
           }
-          return { ...model, voices: voices ?? [] }
+          const voiceInventory = this.options.tts ? await this.options.tts.inventory(binding) : (voices ?? []).map(id => ({ id, name: id }))
+          return { ...model, voice_inventory: voiceInventory, voices: voiceInventory.map(voice => voice.id) }
         }))
         this.json(response, 200, { object: 'list', data: models }); return
       }
@@ -1211,8 +1242,8 @@ export class ModelGateway {
       if (kind === 'mt') payload = translationRequest(data, this.options.getSettings().modelGateway.targetLanguage)
       else if (kind === 'tts') {
         if (data.response_format && !['mp3', 'wav', 'pcm'].includes(String(data.response_format))) throw new GatewayError(400, 'Supported speech formats are mp3, wav and pcm')
-        if (data.speed !== undefined && data.speed !== 1) throw new GatewayError(400, 'Only speech speed 1 is supported')
-        payload = { op: 'infer', text: text(data.input, 'input'), voice: data.voice === undefined ? this.options.getSettings().synthesis.voice : text(data.voice, 'voice', 256), response_format: data.response_format ?? 'mp3' }
+        if (!this.options.tts && data.speed !== undefined && data.speed !== 1) throw new GatewayError(400, 'Only speech speed 1 is supported')
+        payload = { op: 'infer', text: text(data.input, 'input'), voice: data.voice === undefined ? this.options.tts ? undefined : this.options.getSettings().synthesis.voice : text(data.voice, 'voice', 256), response_format: data.response_format ?? 'mp3' }
       } else {
         if (!['json', 'text', undefined].includes(data.response_format as string | undefined)) throw new GatewayError(400, 'Supported transcription formats are json and text')
         payload = { op: 'infer', audio: data.audio, source: data.language === undefined ? 'auto' : text(data.language, 'language', 32) }
@@ -1220,7 +1251,15 @@ export class ModelGateway {
       const settings = this.options.getSettings()
       let result: GatewayWorkerResult | DirectModelResult | undefined
       entry = this.begin(kind, publicBinding, !this.usesBackend(kind, publicBinding))
-      if (this.options.inferBackend && this.usesBackend(kind, publicBinding)) {
+      if (kind === 'tts' && this.options.tts) {
+        const direct = directModelRequestSchema.parse({ kind, id: randomUUID(), model: publicBinding,
+          text: payload.text, target: data.language ?? settings.modelGateway.targetLanguage,
+          voice: payload.voice, voiceRef: data.voice_ref,
+          controls: { ...data.controls as object, ...(data.speed === undefined ? {} : { speed: data.speed }) },
+          output: { format: payload.response_format },
+        })
+        result = await this.infer(direct, controller.signal)
+      } else if (this.options.inferBackend && this.usesBackend(kind, publicBinding)) {
         if (bindingIsLocal(publicBinding)) this.requireLocalBinding(kind, publicBinding, settings)
         else await this.plan(kind, publicBinding, [], settings, settings.modelGateway)
         const direct = directModelRequestSchema.safeParse({ ...payload, kind, model: publicBinding, id: randomUUID() })

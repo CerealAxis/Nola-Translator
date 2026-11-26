@@ -183,6 +183,20 @@ const api: NolaTranslatorApi = {
     },
   },
 
+  voices: {
+    list: () => invoke('voices:list'),
+    save: (profile, expectedRevision) => invoke('voices:save', profile, expectedRevision),
+    delete: (id, expectedRevision) => invoke('voices:delete', id, expectedRevision),
+    importAudio: (id, role) => invoke('voices:import-audio', id, role),
+    audio: id => invoke('voices:audio', id),
+    capabilities: (binding, refresh, modelId, catalog) => invoke('voices:capabilities', binding, refresh, modelId, catalog),
+    compatibility: (binding, language, refs, usage) => invoke('voices:compatibility', binding, language, refs, usage),
+    addProviderVoice: (binding, voiceId, name) => invoke('voices:add-provider-voice', binding, voiceId, name),
+    bindings: (id, revision) => invoke('voices:bindings', id, revision),
+    refreshBinding: (id, revision, bindingId, remove) => invoke('voices:refresh-binding', id, revision, bindingId, remove),
+    prepare: (id, revision, binding, text, language) => invoke('voices:prepare', id, revision, binding, text, language),
+    preview: (binding, ref, text, language) => invoke('voices:preview', binding, ref, text, language),
+  },
   desktopData: {
     snapshot: () => invoke('desktop-data:snapshot'),
     backup: options => invoke('desktop-data:backup', options),
@@ -215,7 +229,6 @@ const api: NolaTranslatorApi = {
     onChanged: callback => { const listener = (_: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value); ipcRenderer.on('word-rules:changed', listener); return () => ipcRenderer.off('word-rules:changed', listener) },
   },
   textProcessing: {
-    load: legacy => invoke('text-processing:load', legacy),
     snapshot: () => invoke('text-processing:snapshot'),
     save: (key, value) => invoke('text-processing:save', { key, value }),
     preview: (text, overrides) => invoke('text-processing:preview', { text, overrides }),

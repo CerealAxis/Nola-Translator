@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ttsVoiceRefSchema } from './tts/voice-ref'
 
 const sourceId = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/)
 export const cloudModelListRequestSchema = z.object({
@@ -23,5 +24,6 @@ export const cloudModelProbeRequestSchema = z.object({
   audio: z.string().startsWith('data:audio/wav;base64,').max(1024 * 1024).optional(),
   text: z.string().trim().min(1).max(1000).optional(),
   voice: z.string().trim().max(256).optional(),
+  voiceRef: ttsVoiceRefSchema.optional(), targetLanguage: z.string().min(1).max(32).optional(),
 }).strict()
 export type CloudModelProbeRequest = z.input<typeof cloudModelProbeRequestSchema>

@@ -22,7 +22,7 @@ it('reopens a completed game transcript through the records store after restarti
   const records = new MeetingStore(recordsRoot)
   let service: GameTranslation | undefined
   try {
-    await records.initialize(join(root, 'history.jsonl'))
+    await records.initialize()
     await writeFile(configPath, JSON.stringify({ version: 1, revision: 0, profiles: [profile] }))
     service = new GameTranslation({ mainDir: root, configPath, records, settings: () => DEFAULT_SETTINGS,
       screen: { subscribe: () => () => {}, stop: async () => {} } as unknown as ScreenTranslation,
@@ -32,7 +32,7 @@ it('reopens a completed game transcript through the records store after restarti
     await vi.waitFor(async () => expect((await service!.snapshot()).lines[0]?.status).toBe('ready'))
     await service.dispose(); service = undefined
     const reopened = new MeetingStore(recordsRoot)
-    await reopened.initialize(join(root, 'history.jsonl'))
+    await reopened.initialize()
     expect(reopened.list()).toMatchObject([{ sourceKind: 'game', gameId: profile.id, title: profile.name, segmentCount: 1, state: 'completed' }])
     expect(await reopened.segments(reopened.list()[0].meetingId)).toMatchObject([{ sourceText: 'Game dialogue', translations: [{ text: '游戏对白' }] }])
   } finally {

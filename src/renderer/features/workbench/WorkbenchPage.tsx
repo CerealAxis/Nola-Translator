@@ -20,6 +20,8 @@ import { settingsPath, pathOf } from '@/routes'
 import type { AgentWorkspaceSnapshot, WorkspaceAction } from '../../../shared/agent-workspace'
 import { NativeAgentSurface, type WorkbenchPageProps } from './NativeAgentSurface'
 import { createGenerativePresentationTools, nativePresentationTools } from './native-agent-tools'
+import { synthesisVoiceRef } from '../../../shared/tts/settings-migration'
+import type { TtsVoiceRef } from '../../../shared/tts/voice-ref'
 
 const workbenchStorage = {
   getItem: async (key: string) => {
@@ -74,7 +76,7 @@ const agentTools = defineToolkit({
 })
 
 class WorkbenchSpeechSynthesisAdapter {
-  constructor(private readonly getSelection: () => { modelId: string; voice: string }, private readonly t: (key: TranslationKey) => string,
+  constructor(private readonly getSelection: () => { modelId: string; voiceRef: TtsVoiceRef; target: string }, private readonly t: (key: TranslationKey) => string,
     private readonly reportError: (error: unknown) => void) {}
 
   speak(text: string) {
@@ -105,13 +107,13 @@ class WorkbenchSpeechSynthesisAdapter {
       },
     }
     void (async () => {
-      const { modelId, voice } = this.getSelection()
+      const { modelId, voiceRef, target } = this.getSelection()
       if (!modelId) throw new Error(this.t('workbench.ttsDefaultModelMissing'))
       audioContext = new AudioContext()
       await audioContext.resume()
       const app = getBridge()?.app
       if (!app?.directModel) throw new Error(this.t('workbench.runtimeUnavailable'))
-      const result = await app.directModel({ id: requestId, model: modelId, kind: 'tts', text, voice })
+      const result = await app.directModel({ id: requestId, model: modelId, kind: 'tts', text, voiceRef, target })
       if (isEnded()) return
       if (!result.audio) throw new Error(this.t('workbench.noAudioResult'))
       const samples = await audioContext.decodeAudioData(await (await fetch(result.audio)).arrayBuffer())
@@ -179,9 +181,8 @@ function WorkbenchChat({ snapshot, onAction, busy, ...page }: WorkbenchChatProps
   const modelCatalog = useMemo(() => [...models, ...playground.filter(model => model.id.startsWith('resource:') && resources.some(resource => `resource:${resource.resourceId}` === model.id && ['recognitionModel', 'translationModel', 'ttsModel'].includes(resource.kind)) && !models.some(item => item.id === model.id && item.kind === model.kind))], [models, playground, resources])
   const modelsRef = useRef(models)
   modelsRef.current = models
-  const [config, setConfig] = useState<PlaygroundConfig>({ model: '', kind: 'llm', effort: 'auto', source: 'auto', target: 'zh', voice: '', projectId: snapshot?.selectedProject ?? null })
+  const [config, setConfig] = useState<PlaygroundConfig>({ model: '', kind: 'llm', effort: 'auto', source: 'auto', target: 'zh', projectId: snapshot?.selectedProject ?? null })
   const [requestRunning, setRequestRunning] = useState(false)
-  const [ttsVoices, setTtsVoices] = useState<{ model: string; names: string[] }>({ model: '', names: [] })
 
   const [memories, setMemories] = useState<string[]>(() => { try { const saved: unknown = JSON.parse(localStorage.getItem('nola.playground.memories') || '[]'); return Array.isArray(saved) ? saved.filter((item): item is string => typeof item === 'string') : [] } catch { return [] } })
   const memoriesRef = useRef(memories)
@@ -226,7 +227,10 @@ function WorkbenchChat({ snapshot, onAction, busy, ...page }: WorkbenchChatProps
   const speech = useMemo(() => new WorkbenchSpeechSynthesisAdapter(() => {
     const selected = configRef.current
     const ready = modelsRef.current.find(model => model.kind === 'tts' && (selected.kind === 'tts' ? model.id === selected.model : model.id.startsWith('resource:')))
-    return { modelId: ready?.id ?? '', voice: selected.kind === 'tts' ? selected.voice : settingsRef.current?.synthesis.voice ?? '' }
+    const current = settingsRef.current
+    return { modelId: ready?.id ?? '', voiceRef: selected.kind === 'tts' && selected.voiceRef
+      ? selected.voiceRef : current ? synthesisVoiceRef(current) : { kind: 'engine-default' },
+      target: selected.kind === 'tts' ? selected.target : current?.translation.targetLanguage ?? 'zh' }
   }, t,
   error => notifyError(t('workbench.readAloudErrorTitle'), {
     cause: error,
@@ -281,12 +285,10 @@ function WorkbenchChat({ snapshot, onAction, busy, ...page }: WorkbenchChatProps
         if (requestRunning) return
         setConfig(next)
         if (next.model !== config.model) {
-          setTtsVoices({ model: '', names: [] })
           const batch = models.some(model => model.id === next.model && model.kind === next.kind && model.batchSpeech)
           if (settings && next.model && !batch) void selectModelBinding(next.kind, next.model, settings).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
         }
       }}
-      voices={ttsVoices.model === config.model ? ttsVoices.names : []} onVoices={names => setTtsVoices({ model: config.model, names })}
       snapshot={snapshot} onAction={onAction} busy={busy} placeholder={config.model ? placeholder : t('workbench.noModels')}
       memories={memories} onMemories={next => { try { localStorage.setItem('nola.playground.memories', JSON.stringify(next)); setMemories(next) } catch (error) { notifyError(t('workbench.actionFailed'), { cause: error }) } }} />
     </div>

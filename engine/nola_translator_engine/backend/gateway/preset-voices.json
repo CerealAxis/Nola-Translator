@@ -1,0 +1,65 @@
+{
+  "mimo": [
+    {
+      "id": "mimo_default",
+      "name": "mimo_default",
+      "languages": []
+    },
+    {
+      "id": "冰糖",
+      "name": "冰糖",
+      "languages": [
+        "zh"
+      ]
+    },
+    {
+      "id": "茉莉",
+      "name": "茉莉",
+      "languages": [
+        "zh"
+      ]
+    },
+    {
+      "id": "苏打",
+      "name": "苏打",
+      "languages": [
+        "zh"
+      ]
+    },
+    {
+      "id": "白桦",
+      "name": "白桦",
+      "languages": [
+        "zh"
+      ]
+    },
+    {
+      "id": "Mia",
+      "name": "Mia",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "Chloe",
+      "name": "Chloe",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "Milo",
+      "name": "Milo",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "Dean",
+      "name": "Dean",
+      "languages": [
+        "en"
+      ]
+    }
+  ]
+}

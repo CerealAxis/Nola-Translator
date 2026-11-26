@@ -3,6 +3,8 @@ import { astrBotSpeechBinding, astrBotSpeechPreset, astrBotSpeechPresetForBindin
 import { astrBotChatPresets } from './astrbot-chat-presets'
 import { localChatSettingsSchema } from './language-model'
 import { CHATGPT_PLAN_ENDPOINT, CHATGPT_PLAN_SERVICE } from './chatgpt-plan'
+import { ttsVoiceRefSchema } from './tts/voice-ref'
+import { ttsModelCapabilitiesSchema } from './tts/capabilities'
 
 export const workspaceCapabilities = ['LLM', 'ASR', 'MT', 'TTS', 'S2S'] as const
 const workspaceServices = [
@@ -18,7 +20,10 @@ const model = z.object({
   id: modelId,
   name: modelId,
   enabled: z.boolean(),
-  voice: z.string().max(256).optional(),
+  tts: z.object({ defaultVoiceRef: ttsVoiceRefSchema.optional(),
+    presetVoiceIds: z.array(z.string().min(1).max(512)).max(10000).optional(),
+    capabilityOverride: ttsModelCapabilitiesSchema.partial().optional(),
+  }).strict().optional(),
   profileId: profileId.optional(),
   llm: z.object({
     id: modelId,
@@ -26,13 +31,11 @@ const model = z.object({
     contextWindow: z.number().int().min(256).max(10_000_000),
     maxOutputTokens: z.number().int().min(1).max(10_000_000),
     images: z.boolean(),
-    sourceLanguages: z.array(z.string().max(32)).max(256).optional(),
-    targetLanguages: z.array(z.string().max(32)).max(256).optional(),
     video: z.boolean().optional(),
     pdf: z.boolean().optional(),
     reasoningLevels: z.array(z.string().max(64)).optional(),
     reasoningLevelsDefault: z.boolean().optional(),
-  }).strict().transform(({ sourceLanguages: _source, targetLanguages: _target, ...configuration }) => configuration).optional(),
+  }).strict().optional(),
 }).strict()
 
 const connection = z.object({
@@ -60,6 +63,7 @@ export const modelWorkspaceSchema = z.object({
   })).max(100),
   localSources: z.record(z.string().min(1).max(512), z.boolean()),
   localChat: z.record(modelId, localChatSettingsSchema).optional(),
+  localTts: z.record(modelId, model.shape.tts.unwrap()).optional(),
   managedBindings: z.array(z.string().max(520)).optional(),
 }).strict()
 
@@ -80,7 +84,7 @@ export function workspaceSpeechConnection(workspace: ModelWorkspace | undefined,
   const service = astrBotSpeechPresetForBinding(binding)
   if (!service || service.capability.toLowerCase() !== kind) return undefined
   return workspace?.connections.find(connection => connection.service === service.id
-    && connection.capability === service.capability)
+    && connection.capability === service.capability && !!workspaceSpeechModel(connection, binding))
 }
 
 export function workspaceSpeechModel(connection: WorkspaceConnection, binding: string) {

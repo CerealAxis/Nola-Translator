@@ -157,7 +157,7 @@ export function GlossaryTab({ libraryId }: { libraryId?: string }) {
           {loadFailed ? (
             <div className="flex flex-col items-start gap-3" role="alert">
               <p>{t('suite.actionFailed')}</p>
-              <Button variant="outline" size="sm" onClick={() => void load()}>{t('suite.retry')}</Button>
+              <Button variant="secondary" size="sm" onClick={() => void load()}>{t('suite.retry')}</Button>
             </div>
           ) : <div className="flex items-center gap-2"><Spinner /><span>{t('common.loading')}</span></div>}
         </CardContent>
@@ -476,15 +476,15 @@ export function GlossaryTab({ libraryId }: { libraryId?: string }) {
                     <EmptyTitle>{t('suite.noMatches')}</EmptyTitle>
                   </EmptyHeader>
                   {query && (
-                    <Button size="sm" variant="outline" onClick={() => setQuery('')}>{t('suite.textClearSearch')}</Button>
+                    <Button size="sm" variant="secondary" onClick={() => setQuery('')}>{t('suite.textClearSearch')}</Button>
                   )}
                 </Empty>
               )}
               {entries.length > 50 && (
                 <div className="flex items-center justify-end gap-2">
-                  <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(value => value - 1)}>{t('suite.previous')}</Button>
+                  <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage(value => value - 1)}>{t('suite.previous')}</Button>
                   <span className="type-muted tabular-nums">{page + 1} / {Math.ceil(entries.length / 50)}</span>
-                  <Button variant="outline" size="sm" disabled={(page + 1) * 50 >= entries.length} onClick={() => setPage(value => value + 1)}>{t('suite.next')}</Button>
+                  <Button variant="secondary" size="sm" disabled={(page + 1) * 50 >= entries.length} onClick={() => setPage(value => value + 1)}>{t('suite.next')}</Button>
                 </div>
               )}
             </CardContent>
@@ -541,7 +541,7 @@ export function GlossaryTab({ libraryId }: { libraryId?: string }) {
                 </FieldGroup>
               </CardContent>
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" disabled={busy} onClick={() => setLibraryDraft(undefined)}>{t('common.cancel')}</Button>
+                <Button type="button" variant="secondary" disabled={busy} onClick={() => setLibraryDraft(undefined)}>{t('common.cancel')}</Button>
                 <Button type="submit" disabled={busy || !libraryDraft.name.trim()}>{t('suite.save')}</Button>
               </div>
             </form>
@@ -557,7 +557,7 @@ export function GlossaryTab({ libraryId }: { libraryId?: string }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={busy} onClick={() => {
+            <AlertDialogAction variant="danger" disabled={busy} onClick={() => {
               if (!deleting) return
               void mutate(deleting.command).then(ok => {
                 if (!ok) return
@@ -624,7 +624,7 @@ export function GlossaryTab({ libraryId }: { libraryId?: string }) {
                 )}
               </CardContent>
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" disabled={busy} onClick={() => setCsv(undefined)}>{t('common.cancel')}</Button>
+                <Button type="button" variant="secondary" disabled={busy} onClick={() => setCsv(undefined)}>{t('common.cancel')}</Button>
                 <Button disabled={busy || !csv.entries.length || !!csv.errors.length || !library} onClick={() => {
                   if (library) void mutate({ action: 'importTerms', libraryId: library.id, entries: csvPlan!.entries, mode: 'replace' }, formRevision).then(ok => {
                     if (ok) { setCsv(undefined); notifySuccess(t('suite.saved')) }
@@ -691,7 +691,7 @@ export function GlossaryTab({ libraryId }: { libraryId?: string }) {
                 </FieldGroup>
               </CardContent>
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setTesting(false)}>{t('common.close')}</Button>
+                <Button type="button" variant="secondary" onClick={() => setTesting(false)}>{t('common.close')}</Button>
                 <Button disabled={!testText.trim() || busy || restrictedProjects && !testProjectId || testScenario === 'website' && !testPageUrl.trim()}
                   onClick={() => {
                     if (api) void api.testMatch({

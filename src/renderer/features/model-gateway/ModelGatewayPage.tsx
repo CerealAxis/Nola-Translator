@@ -1,3 +1,4 @@
+import { synthesisVoiceRef } from '../../../shared/tts/settings-migration'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { Activity, CircleHelp, Copy, Eye, EyeOff, Mic, Languages, RotateCcw, Volume2, Bot, ScanText } from 'lucide-react'
@@ -107,7 +108,7 @@ export function ModelGatewayPage() {
     }).catch(error => { console.error('[gateway.snapshot]', error); if (alive) setLoadFailed(true) })
     return () => { alive = false; unsubscribe() }
   }, [api])
-  const performanceMonitorButton = api?.openPerformanceMonitor && <Button variant="outline" onClick={() => {
+  const performanceMonitorButton = api?.openPerformanceMonitor && <Button variant="secondary" onClick={() => {
     const state = snapshot?.state
     if (runtimeBusy || state === 'starting' || state === 'stopping') {
       notifyWarning(t('gateway.startupWaitHint'))
@@ -278,7 +279,7 @@ export function ModelGatewayPage() {
   const example = (kind: typeof PUBLIC_CAPABILITIES[number]) => {
     const base = address.replace(/\/v2\/?$/, '').replace(/\/$/, '')
     if (kind === 'asr') return `curl ${base}/v2/audio/transcriptions \\\n  -H "Authorization: Bearer YOUR_API_KEY" \\\n  -F "model=nola-asr" -F "file=@audio.wav"`
-    if (kind === 'tts') return `curl ${base}/v2/audio/speech \\\n  -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" \\\n  -d '${JSON.stringify({ model: 'nola-tts', input: 'Hello', voice: settings.synthesis.voice, response_format: 'wav' })}' --output speech.wav`
+    if (kind === 'tts') return `curl ${base}/v2/audio/speech \\\n  -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" \\\n  -d '${JSON.stringify({ model: 'nola-tts', input: 'Hello', language: config.targetLanguage, voice_ref: synthesisVoiceRef(settings), response_format: 'wav' })}' --output speech.wav`
     return `curl ${base}/v2/chat/completions \\\n  -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" \\\n  -d '${JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'Hello' }], translation_options: { source_lang: 'auto', target_lang: config.targetLanguage } })}'`
   }
   const realtimeExample = `import WebSocket from 'ws';
@@ -324,7 +325,7 @@ socket.on('open', async () => {
         }} />
       </CardContent>
     </Card>
-    <Card data-onboarding="gateway-capabilities"><CardHeader><CardTitle className="flex items-center gap-1">{t('gateway.capabilities')}<Tooltip><TooltipTrigger delay={300} render={<Button variant="tertiary" size="icon-xs" className="-ms-[5px] border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('common.info')}><CircleHelp aria-hidden="true" className="size-3.5" /></Button>} /><TooltipContent className="z-popup max-w-96 whitespace-normal">{t('gateway.gatewayBindingHint')}</TooltipContent></Tooltip></CardTitle></CardHeader><CardContent><FieldGroup>
+    <Card data-onboarding="gateway-capabilities"><CardHeader><CardTitle className="flex items-center gap-1">{t('gateway.capabilities')}<Tooltip><TooltipTrigger delay={300} render={<Button variant="secondary" size="icon-xs" className="-ms-[5px] border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('common.info')}><CircleHelp aria-hidden="true" className="size-3.5" /></Button>} /><TooltipContent className="z-popup max-w-96 whitespace-normal">{t('gateway.gatewayBindingHint')}</TooltipContent></Tooltip></CardTitle></CardHeader><CardContent><FieldGroup>
       <Field>
         <ModelAvailabilityLabel label={t('gateway.loadMode')} hint={<div className="flex max-w-80 flex-col gap-2 whitespace-normal">
           <p><strong>{t('gateway.onDemand')}</strong><br />{t('gateway.onDemandHint')}</p>
@@ -369,7 +370,7 @@ socket.on('open', async () => {
           <div className="flex items-center gap-1">
             <FieldLabel htmlFor="gateway-external">{t('gateway.externalApi')}</FieldLabel>
             <Tooltip>
-              <TooltipTrigger delay={300} render={<Button variant="tertiary" size="icon-xs" className="-ms-[5px] border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('common.info')}><CircleHelp aria-hidden="true" className="size-3.5" /></Button>} />
+              <TooltipTrigger delay={300} render={<Button variant="secondary" size="icon-xs" className="-ms-[5px] border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('common.info')}><CircleHelp aria-hidden="true" className="size-3.5" /></Button>} />
               <TooltipContent className="z-popup max-w-96 whitespace-normal">{t('gateway.externalHint')}</TooltipContent>
             </Tooltip>
           </div>

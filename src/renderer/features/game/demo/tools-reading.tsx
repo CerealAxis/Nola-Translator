@@ -97,11 +97,11 @@ export function HistoryTools({
                 ['SRT', 'SRT'],
               ]}
             />
-            <Button variant="outline" aria-expanded={preview} onClick={() => setPreview(!preview)}>
+            <Button variant="secondary" aria-expanded={preview} onClick={() => setPreview(!preview)}>
               <BookOpen />
               {label('export')}
             </Button>
-            <Button variant="outline" onClick={() => downloadText(fileName, content)}>
+            <Button variant="secondary" onClick={() => downloadText(fileName, content)}>
               <Download />
               {fileName}
             </Button>
@@ -199,7 +199,7 @@ export function NoteTools({
             i + 1 + ' · ' + (p.text.split('\n')[0].slice(0, 32) || label('page')),
           ])}
         />
-        <Button size="sm" variant="outline" onClick={addPage}>
+        <Button size="sm" variant="secondary" onClick={addPage}>
           <Plus />
           {label('addPage')}
         </Button>
@@ -216,7 +216,7 @@ export function NoteTools({
           <figcaption>{attachment.title}</figcaption>
         </figure>
       )}
-      <Button className="gt-tool-fit" size="sm" variant="outline" disabled={capturing}
+      <Button className="gt-tool-fit" size="sm" variant="secondary" disabled={capturing}
         onClick={() => attachment ? update({ media: undefined }) : void attachImage()}>
         <ImagePlus />
         {label(attachment ? 'clear' : 'media')}
@@ -351,14 +351,14 @@ export function StudyTools({
       <div className="gt-tool-actions">
         <Button
           disabled={!!skip[role] || !current}
-          variant="outline"
+          variant="secondary"
           onClick={() => (reading ? setReading(false) : startVoice(() => setReading(true)))}
         >
           {reading ? <Square /> : <Play />}
           {label(reading ? 'stop' : 'speak')}
         </Button>
         <Button
-          variant="outline"
+          variant="secondary"
           onClick={() => (recognizing ? setRecognizing(false) : startVoice(() => setRecognizing(true)))}
         >
           {label(recognizing ? 'stop' : 'recognize')}
@@ -395,7 +395,7 @@ export function StudyTools({
           />
         </label>
       </div>
-      <Button className="gt-tool-fit" variant="outline" onClick={lookup}>
+      <Button className="gt-tool-fit" variant="secondary" onClick={lookup}>
         <BookOpen />
         {label('lookup')}
       </Button>
@@ -406,7 +406,7 @@ export function StudyTools({
             <rt>{result.reading}</rt>
           </ruby>
           <p>{label(result.meaning)}</p>
-          <Button size="sm" variant="outline" onClick={addCard}>
+          <Button size="sm" variant="secondary" onClick={addCard}>
             <Plus />
             {label('card')}
           </Button>
@@ -414,7 +414,7 @@ export function StudyTools({
       )}
       <div className="gt-tool-actions">
         <span>AnkiConnect</span>
-        <Button size="sm" variant="outline" onClick={() => setAnki(!anki)}>
+        <Button size="sm" variant="secondary" onClick={() => setAnki(!anki)}>
           {label(anki ? 'disconnect' : 'connect')}
         </Button>
         {anki && <span className="type-muted">{label('connected')}</span>}

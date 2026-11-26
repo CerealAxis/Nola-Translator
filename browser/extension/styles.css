@@ -247,7 +247,7 @@
     white-space: nowrap;
   }
   .nola-status {
-    @apply type-small;
+    @apply type-small font-normal;
     margin: 0;
     color: var(--muted-foreground);
   }
@@ -1536,7 +1536,7 @@
     bottom: calc(var(--space-1) / 2);
     height: auto;
     padding: 0 calc(var(--space-1) / 2);
-    @apply type-small;
+    @apply type-small font-normal;
   }
   .nola-trigger-state[data-variant="secondary"] {
     @apply bg-black text-white;

@@ -20,6 +20,7 @@ from .capabilities import (
     OperationInput,
     OperationOutput,
     OperationProfile,
+    VoiceCapabilities,
     TranslationPolicy,
 )
 from .definitions import ModelDefinition, ProviderConfiguration
@@ -139,6 +140,9 @@ def local_tts_definition(
             )
         },
         languages=LanguageCapabilities(input=list(languages), speech_output=list(languages), speech_output_available=True),
+        voices=VoiceCapabilities(supports_cloning="qwen3" in model_id and "-base-" in model_id,
+            supports_voice_design="qwen3" in model_id and "voicedesign" in model_id,
+            supports_voice_conversion=False),
         translation_policy=TranslationPolicy(min_source_state="committed", allow_preview=False),
     )
     return ModelDefinition(model_id, [ModelKind.TTS], capabilities, estimated_memory_mb=estimated_memory_mb)

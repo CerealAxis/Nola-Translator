@@ -88,7 +88,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
             <SettingSelect className="max-w-full grow basis-48" value={selectedOutput} ariaLabel={t('session.speechOutputDevice')} isDisabled={!!preview.active}
               options={speechOutputOptions(speechOutputs, selectedOutput, t)}
               onChange={value => { preview.cancel(); void updateSettings({ realtime: { speechOutputDeviceId: value === 'default' ? '' : value } }).catch(() => undefined) }} />
-            <Button variant={preview.active === 'output' ? 'destructive' : 'secondary'} size="sm" disabled={realtimeActive || preview.active === 'input' ||
+            <Button variant={preview.active === 'output' ? 'danger' : 'secondary'} size="sm" disabled={realtimeActive || preview.active === 'input' ||
               (selectedOutput !== 'default' && !speechOutputs.some(device => device.deviceId === selectedOutput))}
               aria-label={t(preview.active === 'output' ? 'settings.stopAudioTest' : 'settings.testSpeaker')}
               onClick={preview.testOutput}>{t(preview.active === 'output' ? 'settings.stopAudioTest' : 'settings.test')}</Button>
@@ -102,7 +102,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
               ariaLabel={t('settings.inputDevice')}
               onChange={value => { preview.cancel(); void updateSettings({ recognition: { audioSource: value }, realtime: { virtualInputDeviceId: '' } }).catch(() => undefined) }} />
             {source.kind !== 'browserTab' && (source.kind !== 'defaultOutput' || selectedSource === DEFAULT_OUTPUT)
-              ? <Button variant={preview.active === 'input' ? 'destructive' : 'secondary'} size="sm" disabled={realtimeActive || preview.active === 'output'}
+              ? <Button variant={preview.active === 'input' ? 'danger' : 'secondary'} size="sm" disabled={realtimeActive || preview.active === 'output'}
                   aria-label={t(preview.active === 'input' ? 'settings.stopAudioTest' : 'settings.testInput')}
                   onClick={() => preview.testInput(source)}>{t(preview.active === 'input' ? 'settings.stopAudioTest' : 'settings.test')}</Button> : null}
           </div>

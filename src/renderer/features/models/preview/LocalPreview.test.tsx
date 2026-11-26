@@ -123,3 +123,20 @@ it('groups PP-OCR versions and installs the selected variant from the selected s
   await user.click(screen.getByRole('button', { name: '安装' }))
   expect(onInstall).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ resourceId: 'pp-ocrv5-mobile-korean-onnx' }), 'hf-mirror')
 })
+
+it('prefills local Qwen CustomVoice voices and opens the shared language and default switch editor', async () => {
+  const user = userEvent.setup()
+  const record: ResourceRecord = { resourceId: 'qwen3-tts-1.7b-customvoice', kind: 'ttsModel', provider: 'transformers-tts', name: 'Qwen3 TTS CustomVoice', description: '', languages: ['zh', 'en'], installed: true, installedBytes: 0, state: 'idle', cancellable: false }
+  const [family] = localModelFamilies([record])
+  render(<LocalDetails family={family} installed={new Set([record.resourceId])} onAdd={vi.fn()} onRemove={vi.fn()} />)
+  await user.click(screen.getByRole('button', { name: /编辑模型/ }))
+  const editor = within(screen.getByRole('dialog', { name: '编辑模型' }))
+  expect(editor.getByDisplayValue('vivian')).toBeVisible()
+  expect(editor.getByDisplayValue('sohee')).toBeVisible()
+  expect(editor.getByRole('combobox', { name: '默认音色' })).toHaveTextContent('vivian')
+  await user.click(editor.getByRole('button', { name: '详细设置 vivian' }))
+  const detail = within(screen.getByRole('dialog', { name: '音色配置' }))
+  expect(detail.getByText('中文', { exact: true })).toBeVisible()
+  expect(detail.queryByText('中文（简体）')).not.toBeInTheDocument()
+  expect(detail.queryByRole('switch', { name: '默认音色' })).not.toBeInTheDocument()
+})

@@ -17,6 +17,17 @@ import { build } from 'esbuild'
 
 const defaultsBundle = await build({ entryPoints: ['src/shared/settings.ts'], bundle: true, platform: 'node', format: 'esm', write: false })
 const { DEFAULT_SETTINGS } = await import('data:text/javascript;base64,' + Buffer.from(defaultsBundle.outputFiles[0].text).toString('base64'))
+
+const voiceBundle = await build({ entryPoints: ['src/shared/tts/catalog.ts'], bundle: true, platform: 'node', format: 'esm', write: false })
+const { ttsCatalogCapabilities } = await import('data:text/javascript;base64,' + Buffer.from(voiceBundle.outputFiles[0].text).toString('base64'))
+const voiceCapability = ttsCatalogCapabilities('mimo', 'mimo-v2.5-tts', 'cloud:mimo-v2.5-tts')
+const compatibilityBundle = await build({ entryPoints: ['src/shared/tts/compatibility.ts'], bundle: true, platform: 'browser', format: 'iife', globalName: 'voiceCompatibility', write: false })
+const voiceSettings = { modelWorkspace: { connections: [{ id: 'mimo-fixture', service: 'mimo', capability: 'TTS', name: 'MiMo',
+  endpoint: 'https://api.xiaomimimo.com/v1', protocol: '', workspace: '', region: '',
+  models: [{ id: 'mimo-v2.5-tts', name: 'MiMo', enabled: true, tts: { defaultVoiceRef: { kind: 'engine-default' } } }] }], localSources: {} },
+  synthesis: { ...DEFAULT_SETTINGS.synthesis, modelId: 'cloud:mimo-v2.5-tts', voiceRef: { kind: 'engine-default' } },
+  modelPolicy: { ...DEFAULT_SETTINGS.modelPolicy, enabled: { 'tts:cloud:mimo-v2.5-tts': true } } }
+
 const screenBundle = await build({ entryPoints: ['src/shared/screen-translation.ts'], bundle: true, platform: 'node', format: 'esm', write: false })
 const { screenConfigSchema } = await import('data:text/javascript;base64,' + Buffer.from(screenBundle.outputFiles[0].text).toString('base64'))
 const SCREEN_CONFIG = screenConfigSchema.parse({})
@@ -122,7 +133,7 @@ const PAGE_GROUPS = {
     { name: 'dual-scroll', selector: '.nola-dual__scroll', min: 1 },
     // One pair per segment; the fixture's meeting has two.
     { name: 'dual-pair', selector: '.nola-dual__scroll .nola-dual__pair', min: 2 },
-    { name: 'audio-player', selector: '.nola-record-audio', min: 1 },
+    { name: 'audio-player', selector: '[data-slot="audio-player"]', min: 1 },
   ],
   models: [
     { name: 'models-page', selector: '.model-workspace', min: 1 },
@@ -196,6 +207,7 @@ const suiteImage = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http:
 
 const preloadSource = `
 const {contextBridge} = require('electron');
+${compatibilityBundle.outputFiles[0].text}
 const defaults = ${JSON.stringify(DEFAULT_SETTINGS)};
 let settings = {
   ...defaults,
@@ -225,8 +237,19 @@ const update = async (patch) => {
   settingsListeners.forEach(fn => fn(settings));
   return settings;
 };
+if (${(process.argv.includes('--voices') || process.argv.includes('--tts-models') || process.argv.includes('--tts-selectors'))}) settings = { ...settings, ...${JSON.stringify(voiceSettings)} };
+if (${process.argv.includes('--tts-selectors')}) settings.modelPolicy = { ...settings.modelPolicy, selections: { ...settings.modelPolicy.selections, tts: 'cloud:mimo-v2.5-tts' } };
 const emit = (event) => eventListeners.forEach(fn => fn(event));
 contextBridge.exposeInMainWorld('nolaTranslator', {
+  voices: {
+    list: async () => [], capabilities: async binding => ({ ...${JSON.stringify(voiceCapability)}, modelBinding: binding }),
+    compatibility: async (_binding, language, refs) => refs.map(ref => {
+      const capabilities = ${JSON.stringify(voiceCapability)};
+      const voice = ref.kind === 'preset' ? capabilities.presetVoices.find(voice => voice.id === ref.voiceId) : undefined;
+      return { ref, compatible: voiceCompatibility.ttsLanguageCompatibility(capabilities, language, voice) === 'compatible', code: 'VOICE_LANGUAGE_UNSUPPORTED', details: { targetLanguage: language } };
+    }),
+  },
+  openMainPage: async hash => { location.hash = hash; },
   desktopData: { snapshot: async () => ({ root: 'D:/Data', usage: { configuration: 10240, content: 10485760, audio: 204800, models: 1073741824, credentials: 512, logs: 1048576 } }), backup: async () => false, restore: async () => false },
   getSettings: async () => settings,
   updateSettings: update,
@@ -282,7 +305,7 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
   getDiagnostics: async () => ({ '引擎状态': 'ready', '语音识别': 'Qwen3-ASR 1.7B（nf4）', '本地翻译': 'Hy-MT2 · llama.cpp（cuda）' }),
   copyDiagnostics: async () => {},
   checkLatestRelease: async () => ({ currentVersion: '1.0.7', latestVersion: null, updateAvailable: false, releaseName: null, releaseNotes: '', releaseUrl: null }),
-  hasTranslationCredential: async () => false,
+  hasTranslationCredential: async () => ${(process.argv.includes('--voices') || process.argv.includes('--tts-models') || process.argv.includes('--tts-selectors'))},
   setTranslationCredential: async () => {},
   showOverlay: async () => {},
   hideOverlay: async () => {},
@@ -388,6 +411,274 @@ async function main() {
   })
   await window.loadFile(resolve('out/renderer/index.html'))
 
+  if (process.argv.includes('--status-tags')) {
+    const typography = []
+    const pages = [['#/', 'home'], ['#/models', 'models'], ['#/model-gateway', 'model-gateway'], ['#/records', 'records'], ['#/records/m-finished', 'record'], ['#/settings/engine', 'settings']]
+    for (const theme of ['light', 'dark']) for (const [width, zoom] of [[1180, 1], [760, 1], [1240, 2]]) {
+      window.setContentSize(width, 900); window.webContents.setZoomFactor(zoom)
+      await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({ theme: '${theme}' })`)
+      for (const [hash, page] of pages) {
+        await goto(window, hash, page); await settle(window)
+        const tags = await window.webContents.executeJavaScript(`(() => {
+          const sample = document.createElement('span'); sample.dataset.aui = 'badge'; sample.textContent = 'Ready'; document.body.append(sample);
+          const tags = [...document.querySelectorAll('.nola-badge, [data-slot="status-pill"], .nola-record-status, [data-aui="badge"]')].filter(el => el.getClientRects().length).map(el => {
+            const s = getComputedStyle(el);
+            return { text: el.textContent.trim(), size: parseFloat(s.fontSize), line: parseFloat(s.lineHeight), weight: Number(s.fontWeight) };
+          }); sample.remove(); return tags;
+        })()`)
+        const context = { theme, width, zoom, page }
+        typography.push({ ...context, tags }); scenarios++
+        if (!tags.length || tags.some(tag => tag.size > 14 || tag.line > 20 || tag.weight !== 400)) fail(context, 'secondary-status-typography', { tags })
+      }
+    }
+    await writeFile(resolve(output, 'status-tags-results.json'), JSON.stringify({ scenarios, failures, typography }, null, 2))
+    console.log(JSON.stringify({ scenarios, failures }, null, 2))
+    await closeWindow(window); app.exit(failures.length ? 1 : 0); return
+  }
+
+  if (process.argv.includes('--tts-selectors')) {
+    window.webContents.debugger.attach('1.3')
+    await window.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true })
+    for (const theme of ['light', 'dark']) for (const [width, zoom] of [[1180, 1], [760, 1], [1240, 2]]) {
+      window.setContentSize(width, 900); window.webContents.setZoomFactor(zoom)
+      await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({ uiLanguage: 'zh-CN', theme: '${theme}', realtime: { quickS2sModel: null, outputMode: 'speech' }, translation: { targetLanguage: 'zh' } })`)
+      await goto(window, '#/overlay', 'overlay')
+      await settle(window)
+      const state = await window.webContents.executeJavaScript(`(() => {
+        const voice = document.querySelector('#quick-voice'); voice?.scrollIntoView({ block: 'center' });
+        const field = voice?.closest('.nola-settings-field'); const next = field?.nextElementSibling;
+        const latency = document.querySelector('[data-slot="quick-latency"]'); const speech = document.querySelector('[data-slot="quick-speech"]');
+        const a = latency?.getBoundingClientRect(), b = speech?.getBoundingClientRect();
+        const cols = getComputedStyle(document.querySelector('[data-slot="quick-toggles"]')).gridTemplateColumns.split(' ').length;
+        const v = voice?.getBoundingClientRect(), o = next?.querySelector('[role="combobox"]')?.getBoundingClientRect();
+        return { found: !!voice, overflow: document.documentElement.scrollWidth > innerWidth + 1,
+          toggleOrder: !!a && !!b && (cols === 2 ? Math.abs(a.top-b.top)<2 && a.left<b.left : a.top<b.top),
+          sameHeight: !!v && !!o && Math.abs(v.height-o.height)<2, fullWidth: field?.classList.contains('col-span-full') };
+      })()`)
+      if (!state.found || state.overflow || !state.toggleOrder || !state.sameHeight || state.fullWidth) fail({ theme, width, zoom }, 'tts-selector-layout', state)
+      await window.webContents.executeJavaScript(`document.querySelector('#quick-voice')?.focus()`)
+      await window.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 })
+      await window.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 })
+      await settle(window)
+      const options = await window.webContents.executeJavaScript(`(() => {
+        const items = Array.from(document.querySelectorAll('[role="option"]'));
+        const dean = items.find(item => item.textContent.includes('Dean'));
+        const english = items.filter(item => ['Mia', 'Chloe', 'Milo', 'Dean'].some(name => item.textContent.includes(name)));
+        return { disabled: dean?.getAttribute('aria-disabled'), description: dean?.getAttribute('aria-description'),
+          secondaryTypography: items.every(item => {
+            const badge = item.querySelector('.nola-badge'), label = item.querySelector('.select__item-text > span');
+            if (!badge || !label) return false;
+            const status = getComputedStyle(badge), name = getComputedStyle(label);
+            return parseFloat(status.fontSize) <= parseFloat(name.fontSize) && Number(status.fontWeight) <= Number(name.fontWeight);
+          }),
+          englishDisabled: english.length === 4 && english.every(item => item.getAttribute('aria-disabled') === 'true'),
+          red: dean?.querySelector('[data-variant="danger"]')?.textContent, green: items.some(item => item.querySelector('[data-variant="success"]')) };
+      })()`)
+      if (!options.secondaryTypography || !options.englishDisabled || options.disabled !== 'true' || !options.description?.includes('中文') || options.red !== '不可用' || !options.green) fail({ theme, width, zoom }, 'tts-selector-language-state', options)
+      await writeFile(resolve(output, `tts-selector-${theme}-${width}-${zoom}.png`), (await window.webContents.capturePage()).toPNG())
+      await window.webContents.executeJavaScript(`(() => {
+        const item = Array.from(document.querySelectorAll('[role="option"]')).find(item => item.textContent.includes('Dean'));
+        item?.scrollIntoView({ block: 'nearest' }); item?.focus();
+      })()`)
+      await settle(window)
+      const tooltip = await window.webContents.executeJavaScript(`document.querySelector('[role="tooltip"]')?.textContent`)
+      if (!tooltip?.includes('音色不支持 中文')) fail({ theme, width, zoom }, 'tts-disabled-keyboard-tooltip', { tooltip })
+      const focus = await window.webContents.executeJavaScript(`(() => {
+        const item = document.activeElement, popup = item.closest('[data-slot="select-content"]');
+        if (!popup) return { fits: false };
+        const r = item.getBoundingClientRect(), p = popup.getBoundingClientRect(), style = getComputedStyle(item);
+        const ring = Math.max(0, parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset));
+        return { fits: r.top-ring >= p.top && r.bottom+ring <= p.bottom && r.left-ring >= p.left && r.right+ring <= p.right, ring };
+      })()`)
+      if (!focus.fits) fail({ theme, width, zoom }, 'tts-disabled-focus-ring-clipped', focus)
+
+      await writeFile(resolve(output, `tts-selector-disabled-${theme}-${width}-${zoom}.png`), (await window.webContents.capturePage()).toPNG())
+
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
+      window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
+      await settle(window)
+      for (const [hash, page] of [['#/overlay', 'overlay'], ['#/meeting', 'meeting'], ['#/screen-translation', 'screen-translation'], ['#/game', 'game-translation-demo']]) {
+        await goto(window, hash, page)
+        await settle(window)
+        const rows = await window.webContents.executeJavaScript(`Array.from(document.querySelectorAll('.nola-settings-field:has(> [data-slot="switch"]), .nola-meeting-route-heading:has(> [data-slot="switch"])')).filter(row => row.getBoundingClientRect().width > 0).map(row => {
+          const label = row.firstElementChild.getBoundingClientRect(), control = row.querySelector(':scope > [data-slot="switch"]').getBoundingClientRect();
+          return { label: row.firstElementChild.textContent, aligned: Math.abs(label.top+label.height/2-control.top-control.height/2)<2 && label.right <= control.left+1, rightAligned: Math.abs(control.right-row.getBoundingClientRect().right)<1 };
+        })`)
+        if (!rows.length || rows.some(row => !row.aligned || !row.rightAligned)) fail({ theme, width, zoom, page }, 'switch-label-must-stay-inline', { rows })
+        const fields = await window.webContents.executeJavaScript(`(() => {
+          const visible = element => element.getBoundingClientRect().width > 0;
+          return {
+            groups: Array.from(document.querySelectorAll('.nola-settings-fields, .nola-meeting-routes')).filter(visible).map(group => getComputedStyle(group).gridTemplateColumns.split(' ').length),
+            fields: Array.from(document.querySelectorAll('.nola-settings-field')).filter(visible).map(field => {
+              const label = field.firstElementChild?.getBoundingClientRect(), control = field.children[1]?.getBoundingClientRect(), bounds = field.getBoundingClientRect();
+              const switchField = !!field.querySelector(':scope > [data-slot="switch"]');
+              const tokens = getComputedStyle(field), labelWidth = parseFloat(tokens.getPropertyValue('--space-8')) + parseFloat(tokens.getPropertyValue('--space-4'));
+              return { label: field.firstElementChild?.textContent, inline: !!label && !!control && label.right <= control.left+1 && Math.abs(label.top+label.height/2-control.top-control.height/2)<2,
+                fixedLabel: switchField || !!label && Math.abs(label.width-labelWidth)<1,
+                fits: !!control && control.right <= bounds.right+1 && (switchField || field.scrollWidth <= field.clientWidth+1) };
+            }),
+            overflow: document.documentElement.scrollWidth > innerWidth+1,
+          };
+        })()`)
+        if (fields.groups.some(count => count !== 2) || fields.fields.some(field => !field.inline || !field.fits || !field.fixedLabel) || fields.overflow)
+          fail({ theme, width, zoom, page }, 'two-column-inline-fields', fields)
+        await writeFile(resolve(output, `switch-rows-${page}-${theme}-${width}-${zoom}.png`), (await window.webContents.capturePage()).toPNG())
+      }
+      scenarios++
+    }
+    await writeFile(resolve(output, 'tts-selectors-results.json'), JSON.stringify({ scenarios, failures }, null, 2))
+    console.log(JSON.stringify({ scenarios, failures }, null, 2))
+    await closeWindow(window); app.exit(failures.length ? 1 : 0); return
+  }
+
+  if (process.argv.includes('--tts-models')) {
+    window.webContents.debugger.attach('1.3')
+    await window.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true })
+    window.webContents.focus()
+    const verifyReachable = async (context, name) => {
+      await window.webContents.executeJavaScript(`(() => {
+        const dialog = Array.from(document.querySelectorAll('[data-slot="dialog-content"][role="dialog"]')).at(-1);
+        const form = dialog?.querySelector('.model-editor__body');
+        const controls = Array.from(form?.querySelectorAll('input:not([type=hidden]):not([type=checkbox]), button:not([disabled]), [role=switch]') ?? []).filter(control => control.tabIndex >= 0 && control.getBoundingClientRect().width > 0);
+        controls.at(-1)?.setAttribute('data-layout-last', '');
+        controls.at(-2)?.focus();
+      })()`)
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' })
+      window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' })
+      await settle(window)
+      const state = await window.webContents.executeJavaScript(`(() => {
+        const dialog = Array.from(document.querySelectorAll('[data-slot="dialog-content"][role="dialog"]')).at(-1);
+        const form = dialog?.querySelector('.model-editor__body'); const last = form?.querySelector('[data-layout-last]');
+        const outer = form?.getBoundingClientRect(); const rect = last?.getBoundingClientRect();
+        const style = last && getComputedStyle(last); const ring = style ? Math.max(0, parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset)) : 0;
+        return { ringFits: !!rect && rect.top - ring >= outer.top - 1 && rect.bottom + ring <= outer.bottom + 1, focused: document.activeElement === last, visible: !!rect && rect.top >= outer.top - 1 && rect.bottom <= outer.bottom + 1, scrollable: getComputedStyle(form).overflowY === 'auto', scrollTop: form?.scrollTop };
+      })()`)
+      if (!state.focused || !state.visible || !state.ringFits || !state.scrollable) fail(context, name + '-keyboard-scroll', state)
+      await writeFile(resolve(output, name + '-scrolled-' + context.language + '-' + context.theme + '-' + context.width + '-' + context.zoom + '.png'), (await window.webContents.capturePage()).toPNG())
+    }
+    for (const language of ['zh-CN', 'en']) for (const theme of ['light', 'dark']) for (const [width, zoom] of [[1180, 1], [760, 1], [1240, 2]]) {
+      const context = { language, theme, width, zoom }
+      window.setContentSize(width, 900); window.webContents.setZoomFactor(zoom)
+      await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings(${JSON.stringify({ uiLanguage: language, theme })})`)
+      await goto(window, '#/models', 'models')
+      await clickAt(window, '[data-onboarding="models-category"]')
+      await clickAt(window, '[data-onboarding="models-category-TTS"]')
+      await window.webContents.executeJavaScript(`Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label')?.endsWith(' mimo-v2.5-tts') && button.querySelector('.lucide-pencil'))?.click()`)
+      await settle(window)
+      const writeModelId = async value => {
+        await window.webContents.executeJavaScript(`(() => { const input = document.querySelector('[role="dialog"] input[role="combobox"]'); input.focus(); input.select(); })()`)
+        if (value) await window.webContents.debugger.sendCommand('Input.insertText', { text: value })
+        else {
+          window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Backspace' })
+          window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Backspace' })
+        }
+        await settle(window)
+      }
+      await writeModelId('')
+      const editing = await window.webContents.executeJavaScript(`({ blank: document.querySelectorAll('[role="dialog"] input[aria-label^="Voice ID "]').length, add: !!document.querySelector('[role="dialog"] button:has(.lucide-plus)') })`)
+      await writeModelId('mimo-v2.5-tts')
+      await delay(600); await settle(window)
+      editing.matched = await window.webContents.executeJavaScript(`document.querySelectorAll('[role="dialog"] input[aria-label^="Voice ID "]').length`)
+      await window.webContents.executeJavaScript(`document.querySelector('[role="dialog"] .llm-editor__level-tags button:has(.lucide-x)')?.click()`)
+      await settle(window)
+      editing.removed = await window.webContents.executeJavaScript(`document.querySelectorAll('[role="dialog"] input[aria-label^="Voice ID "]').length`)
+      await writeModelId(''); await writeModelId('mimo-v2.5-tts'); await delay(600); await settle(window)
+      editing.restored = await window.webContents.executeJavaScript(`document.querySelectorAll('[role="dialog"] input[aria-label^="Voice ID "]').length`)
+      if (editing.blank !== 0 || !editing.add || editing.matched !== 9 || editing.removed !== 8 || editing.restored !== 9) fail(context, 'tts-smart-configuration', editing)
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' })
+      window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' })
+      await settle(window)
+      const parent = await window.webContents.executeJavaScript(`(() => {
+        const dialog = document.querySelector('.model-editor[role="dialog"]'); const rect = dialog?.getBoundingClientRect();
+        return { found: !!dialog, voices: dialog?.querySelectorAll('input[aria-label^="Voice ID "]').length, overflow: dialog?.scrollWidth > dialog?.clientWidth + 1,
+          fits: !!rect && rect.left >= 0 && rect.right <= innerWidth + 1 && rect.top >= 0 && rect.bottom <= innerHeight + 1 };
+      })()`)
+      if (!parent.found || parent.voices !== 9 || parent.overflow || !parent.fits) fail(context, 'tts-model-editor', parent)
+      await writeFile(resolve(output, `tts-model-${language}-${theme}-${width}-${zoom}.png`), (await window.webContents.capturePage()).toPNG())
+      if (zoom === 2) await verifyReachable(context, 'tts-model')
+      await window.webContents.executeJavaScript(`Array.from(document.querySelectorAll('[role="dialog"] button:has(.lucide-ellipsis)')).find(button => button.getAttribute('aria-label')?.endsWith(' Mia'))?.click()`)
+      await settle(window)
+      const detail = await window.webContents.executeJavaScript(`(() => {
+        const dialog = Array.from(document.querySelectorAll('[data-slot="dialog-content"][role="dialog"]')).at(-1); const rect = dialog?.getBoundingClientRect();
+        const input = dialog?.querySelector('input'); const field = dialog?.querySelector('.model-language-field');
+        return { found: !!field, visibleDialogs: Array.from(document.querySelectorAll('[data-slot="dialog-content"][role="dialog"]')).filter(item => item.getBoundingClientRect().width > 0).length,
+          backdrops: Array.from(document.querySelectorAll('[data-slot="dialog-backdrop"]')).filter(item => item.getBoundingClientRect().width > 0).length,
+          inputHeight: input?.getBoundingClientRect().height, languageHeight: field?.getBoundingClientRect().height,
+          arrows: field?.querySelectorAll('.model-language-toggle svg').length, switches: dialog?.querySelectorAll('[role="switch"]').length,
+          overflow: dialog?.scrollWidth > dialog?.clientWidth + 1, fits: !!rect && rect.left >= 0 && rect.right <= innerWidth + 1 && rect.top >= 0 && rect.bottom <= innerHeight + 1,
+          text: dialog?.textContent };
+      })()`)
+      if (!detail.found || detail.visibleDialogs !== 1 || detail.backdrops !== 1 || Math.abs(detail.inputHeight - detail.languageHeight) > 1 || detail.arrows || detail.switches !== 0 || detail.overflow || !detail.fits || language === 'zh-CN' && (!detail.text.includes('英语') || detail.text.includes('中文'))) fail(context, 'tts-voice-editor', detail)
+      await writeFile(resolve(output, `tts-detail-${language}-${theme}-${width}-${zoom}.png`), (await window.webContents.capturePage()).toPNG())
+      if (zoom === 2) await verifyReachable(context, 'tts-detail')
+      await window.webContents.executeJavaScript(`Array.from(document.querySelectorAll('[role="dialog"] .nola-dialog-close')).at(-1)?.click()`)
+      await settle(window)
+      const restored = await window.webContents.executeJavaScript(`(() => {
+        const dialogs = Array.from(document.querySelectorAll('[data-slot="dialog-content"][role="dialog"]')).filter(item => item.getBoundingClientRect().width > 0);
+        return dialogs.length === 1 && dialogs[0].querySelectorAll('input[aria-label^="Voice ID "]').length === 9;
+      })()`)
+      if (!restored) fail(context, 'tts-parent-draft-restored', { restored })
+      await window.webContents.executeJavaScript(`document.querySelector('[role="dialog"] .nola-dialog-close')?.click()`)
+      await settle(window)
+      scenarios++
+    }
+    await writeFile(resolve(output, 'tts-models-results.json'), JSON.stringify({ scenarios, failures }, null, 2))
+    console.log(JSON.stringify({ scenarios, failures }, null, 2))
+    await closeWindow(window); app.exit(failures.length ? 1 : 0); return
+  }
+
+  if (process.argv.includes('--voices')) {
+    window.webContents.debugger.attach('1.3')
+    await window.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true })
+    window.webContents.focus()
+    for (const language of ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko']) for (const theme of ['light', 'dark']) for (const [width, zoom] of [[1180, 1], [760, 1], [1240, 2]]) {
+      window.setContentSize(width, 900); window.webContents.setZoomFactor(zoom)
+      await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings(${JSON.stringify({ uiLanguage: language, theme })})`)
+      await goto(window, '#/voices', 'voices')
+      await settle(window)
+      const state = await window.webContents.executeJavaScript(`(() => {
+        const root = document.querySelector('[data-page="voices"] section');
+        return { cards: root?.querySelectorAll('[data-testid="voice-tile"]').length, tileWidth: root?.querySelector('[data-testid="voice-tile"]')?.getBoundingClientRect().width,
+          overflow: root ? root.scrollWidth > root.clientWidth + 1 : true,
+          documentOverflow: document.documentElement.scrollWidth > innerWidth + 1,
+          errors: !!root?.querySelector('pre') };
+      })()`)
+      if (state.cards !== 9 || state.overflow || state.documentOverflow || state.errors) fail({ language, theme, width, zoom }, 'voice-wall', state)
+      await writeFile(resolve(output, `voices-wall-${language}-${theme}-${width}-${zoom}.png`), (await window.webContents.capturePage()).toPNG())
+      await window.webContents.executeJavaScript(`Array.from(document.querySelectorAll('[data-testid="voice-tile"] button')).find(button => button.getAttribute('aria-label')?.endsWith('茉莉'))?.click()`)
+      await settle(window)
+      window.webContents.focus()
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' })
+      window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' })
+      const panel = await window.webContents.executeJavaScript(`(() => {
+        const region = document.querySelector('[role="dialog"]');
+        const focus = ['textarea', '[role="combobox"]', '.nola-dialog-close'].map(selector => {
+          const control = region?.querySelector(selector);
+          control?.focus();
+          const style = control && getComputedStyle(control);
+          return { selector, active: control === document.activeElement, documentFocused: document.hasFocus(), visible: control?.matches(':focus-visible'), width: style?.outlineWidth, shadow: style?.boxShadow };
+        });
+        const box = region?.getBoundingClientRect();
+        return { focus, found: !!region, text: !!region?.querySelector('textarea'), overflow: region ? region.scrollWidth > region.clientWidth + 1 : true,
+          fits: !!box && box.left >= -1 && box.right <= innerWidth + 1 && box.top >= -1 && box.bottom <= innerHeight + 1,
+          tileWidth: document.querySelector('[data-testid="voice-tile"]')?.getBoundingClientRect().width,
+          cards: document.querySelectorAll('[data-testid="voice-tile"]').length };
+      })()`)
+      if (!panel.found || !panel.text || panel.overflow || !panel.fits || panel.cards !== 9 || Math.abs(panel.tileWidth - state.tileWidth) > 1) fail({ language, theme, width, zoom }, 'voice-preview-dialog', panel)
+      if (panel.focus.some(control => !control.visible || control.width !== '2px' || control.shadow !== 'none')) fail({ language, theme, width, zoom }, 'consistent-control-focus', panel.focus)
+      await writeFile(resolve(output, `voices-preview-${language}-${theme}-${width}-${zoom}.png`), (await window.webContents.capturePage()).toPNG())
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
+      window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
+      await settle(window)
+      const closed = await window.webContents.executeJavaScript(`!document.querySelector('[role="dialog"]')`)
+      if (!closed) fail({ language, theme, width, zoom }, 'voice-dialog-close')
+      scenarios++
+    }
+    await writeFile(resolve(output, 'voices-results.json'), JSON.stringify({ scenarios, failures }, null, 2))
+    console.log(JSON.stringify({ scenarios, failures }, null, 2))
+    await closeWindow(window); app.exit(failures.length ? 1 : 0); return
+  }
+
   if (process.argv.includes('--design-browser')) {
     const assets = await readdir('browser/extension/dist/assets')
     const css = await readFile(resolve('browser/extension/dist/assets', assets.find(file => /^styles-.*\.css$/.test(file))), 'utf8')
@@ -407,15 +698,20 @@ async function main() {
       documentPreview.style.setProperty('--doc-zoom','1.5');
       root.insertAdjacentHTML('beforeend', '<header class="nola-settings-title"><h1>Settings</h1></header><section class="nola-settings-section"><h2>General</h2></section><header class="nola-popup-header"><h1>Nola Translator</h1></header>');
       const titleSizes=()=>['.nola-settings-title h1','.nola-settings-section h2','.nola-popup-header h1'].map(selector=>snapshot(root.querySelector(selector)).size);
+      root.insertAdjacentHTML('beforeend', '<span class="nola-badge type-small font-normal">Ready</span><span class="nola-badge type-small font-normal nola-trigger-state">On</span><p class="nola-status">Connected</p>');
+      const tagMetrics=()=>[...root.querySelectorAll('.nola-badge,.nola-status')].map(snapshot);
+      const lightTags=tagMetrics();
       const lightTitles=titleSizes();
       host.dataset.theme='dark';
       const darkTitles=titleSizes();
+      const darkTags=tagMetrics();
       delete host.dataset.theme;
-      return {hostRoot:getComputedStyle(document.documentElement).fontSize,body:snapshot(root.querySelector('p')),button:snapshot(root.querySelector('button')),code:snapshot(root.querySelector('code')),heading,section,reading,viewerScale:documentText.getBoundingClientRect().height/before,lightTitles,darkTitles};
+      return {hostRoot:getComputedStyle(document.documentElement).fontSize,body:snapshot(root.querySelector('p')),button:snapshot(root.querySelector('button')),code:snapshot(root.querySelector('code')),heading,section,reading,viewerScale:documentText.getBoundingClientRect().height/before,lightTitles,darkTitles,lightTags,darkTags};
     })()`)
     if (state.hostRoot !== '36px' || state.body.size !== '14px' || state.body.line !== '22px' || state.body.family.includes('Noto Sans JP') || state.button.radius !== '18px' || state.code.size !== '14px' || state.code.weight !== '600') fail({ target: 'browser-shadow' }, 'Browser font isolation failed', state)
     if (state.heading.size !== '24px' || state.heading.line !== '32px' || state.heading.weight !== '600' || state.section.size !== '20px' || state.section.line !== '28px' || state.reading.size !== '14px' || state.reading.line !== '22px' || Math.abs(state.viewerScale - 1.5) > 0.01 || state.button.size !== '14px') fail({ target: 'browser-document' }, 'Document typography or zoom failed', state)
     if (state.lightTitles.join(',') !== '24px,20px,14px' || state.darkTitles.join(',') !== '24px,20px,15px') fail({ target: 'browser-headings' }, 'Extension heading hierarchy mismatch', state)
+    if ([...state.lightTags,...state.darkTags].some(tag => tag.size !== '14px' || tag.line !== '20px' || tag.weight !== '400')) fail({ target: 'browser-status-tags' }, 'Status tags must use secondary typography', state)
     await writeFile(resolve(output, 'design-browser-results.json'), JSON.stringify({ state, failures }, null, 2))
     console.log(JSON.stringify({ state, failures }, null, 2)); app.exit(failures.length ? 1 : 0); return
   }
@@ -827,7 +1123,11 @@ async function main() {
       for (const [name, hash, page] of pages) {
         await goto(window, hash, page)
         await delay(180)
-        const required = { screen: '.screen-page', games: '.game-library', game: '#game-name', bookshelf: '.comic-bookshelf', editor: '.comic-workflow__inspector', reader: '.comic-editor--reader', glossary: '.settings-panels', terms: '.settings-panels table' }[name]
+        const required = { screen: '.screen-page', games: '.game-library', game: '#game-name', bookshelf: '.comic-bookshelf', editor: '.comic-workflow__inspector', reader: '.comic-page--reader', glossary: '.settings-panels', terms: '.settings-panels table' }[name]
+        for (let attempt = 0; attempt < 40; attempt++) {
+          if (await window.webContents.executeJavaScript(`!!document.querySelector(${JSON.stringify(required)}) && !!document.querySelector('.nola-main')?.innerText.trim()`)) break
+          await delay(50)
+        }
         const state = await window.webContents.executeJavaScript(`(() => {
           const main = document.querySelector('.nola-main');
           return { text: main?.innerText, overflow: document.documentElement.scrollWidth > innerWidth + 2,

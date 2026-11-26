@@ -124,7 +124,7 @@ export function MoreTab() {
         <IdentityRow name={packageInfo.productName} description={t('more.appVersion', { version: packageInfo.version })} image={nolaLogoUrl} isLogo
           action={<div className="settings-more__identity-actions">
             <ExternalAction href={REPOSITORY_URL} label={t('more.sourceCode')} icon={<Github aria-hidden="true" />} />
-            <Button variant="tertiary" size="sm" disabled={updateChecking} onClick={() => void checkUpdates()}>
+            <Button variant="secondary" size="sm" disabled={updateChecking} onClick={() => void checkUpdates()}>
               {updateChecking ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}{t('appUpdate.checkNow')}
             </Button>
           </div>} />
@@ -136,7 +136,7 @@ export function MoreTab() {
       <SettingGroup legend={t('settings.groupReport')}>
         <SettingsRow label={t('settings.copyDiagnostics')}><CopyDiagnostics /></SettingsRow>
         <SettingsRow label={t('settings.openLogs')} desc={t('settings.openLogsHint')} descriptionTooltip>
-          <Button variant="tertiary" size="sm" onClick={() => { void openLogsDirectory() }}>{t('settings.openLogs')}</Button>
+          <Button variant="secondary" size="sm" onClick={() => { void openLogsDirectory() }}>{t('settings.openLogs')}</Button>
         </SettingsRow>
         <SettingsRow label={t('settings.githubIssue')} desc={t('settings.githubIssueHint')} descriptionTooltip>
           <ExternalAction href={`${REPOSITORY_URL}/issues`} label={t('settings.openInBrowser')} />
@@ -207,7 +207,7 @@ function ExternalAction({ href, label, icon }: ExternalActionProps) {
   // Electron opens HTTPS links in the default browser through setWindowOpenHandler.
   // Keep external actions as anchors while reusing the shared outlined button appearance.
   return (
-    <Button nativeButton={false} role="link" variant="tertiary" size="sm" className="settings-more__link no-underline"
+    <Button nativeButton={false} role="link" variant="secondary" size="sm" className="settings-more__link no-underline"
       render={<a href={href} target="_blank" rel="noreferrer" />}>
       {icon}{label}<ExternalLink aria-hidden="true" />
     </Button>
@@ -237,7 +237,7 @@ function CopyDiagnostics() {
   }
 
   return (
-    <Button variant="tertiary" size="sm" disabled={pending} onClick={() => void copy()}>
+    <Button variant="secondary" size="sm" disabled={pending} onClick={() => void copy()}>
       {pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : copied ? <Check aria-hidden="true" /> : null}
       {copied ? t('common.copied') : t('settings.copyDiagnostics')}
     </Button>

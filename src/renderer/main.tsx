@@ -56,7 +56,7 @@ const bridge = createIpcBridge()
 const onOverlayToastEmpty = isOverlayToastDocument ? () => bridge.app.dismissOverlayToast?.() : undefined
 // Migration owns the data files before stores or engine IPC can safely start.
 if (!isMigrationDocument && !isOverlayToastDocument) initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument && !isWorkspaceDocument, overlayMenu: isOverlayMenuDocument, offline: !isOverlayDocument && !isWorkspaceDocument })
-if (!isMigrationDocument && !isOverlayToastDocument && !isOverlayDocument && !isOverlayMenuDocument && !isWorkspaceDocument) initTextProcessing(true)
+if (!isMigrationDocument && !isOverlayToastDocument && !isOverlayDocument && !isOverlayMenuDocument && !isWorkspaceDocument) initTextProcessing()
 
 function OverlayToastWindow() {
   useEffect(() => bridge.events.onMainErrorNotification?.(notification => {

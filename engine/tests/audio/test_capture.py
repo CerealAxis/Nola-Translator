@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -13,6 +14,29 @@ from nola_translator_engine.audio.capture import (
 )
 from nola_translator_engine.audio.devices import AudioDeviceRecord, _stable_device_id
 from nola_translator_engine.audio.resample import FRAME_DURATION_MS
+from nola_translator_engine.audio import capture as capture_module
+
+
+@pytest.mark.parametrize('initialized', [0, 1, -2147417850])
+@pytest.mark.parametrize('fails', [False, True])
+def test_capture_initializes_com_on_the_calling_thread(monkeypatch, initialized, fails):
+    calls = []
+    ole = SimpleNamespace(CoInitializeEx=lambda *_: calls.append('initialize') or initialized,
+                          CoUninitialize=lambda: calls.append('uninitialize'))
+    monkeypatch.setattr(capture_module, 'sys', SimpleNamespace(platform='win32'))
+    monkeypatch.setattr(capture_module.ctypes, 'WinDLL', lambda _: ole, raising=False)
+    def start(self):
+        calls.append('start')
+        if fails:
+            raise OSError('capture failed')
+    monkeypatch.setattr(PortAudioCapture, '_start', start)
+    capture = PortAudioCapture(_device())
+    if fails:
+        with pytest.raises(OSError, match='capture failed'):
+            capture.start()
+    else:
+        capture.start()
+    assert calls == ['initialize', 'start'] + (['uninitialize'] if initialized >= 0 else [])
 
 
 def test_bounded_callback_queue_drops_oldest_chunk_without_blocking() -> None:

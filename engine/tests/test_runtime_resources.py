@@ -201,6 +201,7 @@ class _FakeCapture:
     dropped_chunks = 0
 
     def __init__(self, _device: object, *, request_id: str | None = None) -> None:
+        self.device = _device
         self.started = False
 
     def start(self) -> None:
@@ -326,7 +327,7 @@ def test_start_session_rejects_unsupported_m2m100_language(tmp_path, monkeypatch
 
     assert events[0].type == "error"
     assert events[0].code == "invalidConfiguration"
-    assert "unsupportedTranslationLanguage (m2m100)" in events[0].details["reason"]
+    assert events[0].details["reason"] == "unsupportedTranslationLanguage"
 
 
 def test_selected_recognition_model_gates_and_loads_that_directory(

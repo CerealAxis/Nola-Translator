@@ -1,4 +1,5 @@
 import { modelConfigurationSchema } from './model-capabilities'
+import { ttsVoiceRefSchema } from './tts/voice-ref'
 import { z } from 'zod'
 import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from './pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from './index-translate'
@@ -86,6 +87,7 @@ export const sessionConfigSchema = z
     s2sModel: z.enum(REALTIME_S2S_MODELS).nullable().optional(),
     speechOutputDeviceId: z.string().max(512).optional(),
     speechVoice: z.string().max(256).optional(),
+    speechVoiceRef: ttsVoiceRefSchema.optional(),
     speechModelId: z.string().max(256).optional(),
     audioSource: audioSourceSchema,
     compute: computeSettingsSchema.optional(),

@@ -5,6 +5,10 @@ import { wordRuleMutationSchema, wordRuleTestSchema, resolveWordRules, realtimeW
 import { generateText } from 'ai'
 import { FeatureActivity, type FeatureLease } from './feature-activity'
 import { ModelGateway } from './model-gateway'
+import { createTtsRuntime, type TtsRuntime } from './tts/tts-runtime'
+import { registerVoiceLibraryIpc } from './tts/voice-library-ipc'
+import { synthesisVoiceRef } from '../shared/tts/settings-migration'
+import { migrateLegacyVoice } from '../shared/tts/migration'
 import { NolaTray } from './tray'
 import { ScreenTranslation } from './screen-translation'
 import { GlossaryStore, realtimeGlossarySnapshot } from './glossary-store'
@@ -67,7 +71,6 @@ import { aliyunConnectionReady } from '../shared/cloud-models'
 import { clearDataRootPointer, clearPendingDataMigration, defaultDataRoot, fallbackDataRoot, legacyDefaultDataRoot, readDataRootPointer, readPendingDataMigration, resolveDataRoot, setSessionDataRoot, writeDataRootPointer, writePendingDataMigration } from './data-root'
 import { freeBytesForDirectory } from './disk-usage'
 import { dataRootEntries, migrateDataRoot, planDataRootMigration } from './data-migration'
-import { migrateLegacyUserData } from './legacy-migration'
 import { MeetingStore } from './meeting-store'
 import { cleanupStorageCaches, modelStorageEnvironment } from './model-storage'
 import { registerEngineIpc } from './ipc'
@@ -111,6 +114,7 @@ let flushDesktopData: (() => Promise<void>) | undefined
 let browserConnection: BrowserConnection | null = null
 let tray: NolaTray | null = null
 let gateway: ModelGateway | null = null
+let ttsRuntime: TtsRuntime | undefined
 let stopWorkbench: (() => Promise<void>) | null = null
 let stopOnboardingCard: (() => void) | null = null
 let stopSessions: (() => Promise<void>) | null = null
@@ -453,11 +457,7 @@ if (!hasSingleInstanceLock) {
     }), 30_000)
     healthTimer.unref()
     app.once('will-quit', () => clearInterval(healthTimer))
-    // The app's own stores resolve from the single data root, not from `userData`, which is
-    // left as Chromium's disposable state; it is still read here as the destination of the
-    // FluentCaptions -> Nola rename migration. See `data-root.ts` for why the two stay apart.
-    const userData = app.getPath('userData')
-    await migrateLegacyUserData(app.getPath('appData'), userData)
+    // Application data and Chromium state use separate roots.
     let dataRoot = resolveDataRoot()
     // No workers are running yet. Also discard caches left at the affected release's C: root.
     for (const root of new Set([dataRoot, legacyDefaultDataRoot()].filter((root): root is string => root !== null))) {
@@ -470,7 +470,7 @@ if (!hasSingleInstanceLock) {
     //
     // Nothing in this step may abort startup. A rejection here would abort the `whenReady`
     // chain before `createMainWindow`, and an app that never opens is a far worse outcome than
-    // a data root that did not finish moving — the same trade `migrateLegacyUserData` makes.
+    // a data root that did not finish moving.
     //
     // Both sides come out of `normalize` in `data-root.ts`; this only folds case and a trailing
     // separator, so the same folder written two ways cannot look like a move onto itself.
@@ -598,7 +598,7 @@ if (!hasSingleInstanceLock) {
       await credentials.remove(provider).catch(error => console.error('[credentials] obsolete translator key removal failed', error))
     }
     // A read-only data root must not take the window down with it; the store degrades to empty.
-    await meetings.initialize(join(dataRoot, 'history.jsonl')).catch((error) =>
+    await meetings.initialize().catch((error) =>
       console.error('meeting storage is unavailable', error),
     )
     handleMeetingAudio(meetings)
@@ -647,6 +647,7 @@ if (!hasSingleInstanceLock) {
           return { ...spec, env: { ...spec.env, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? bundledLlamaDirectory } }
         },
         env: { ...resourceEnvironment,
+          NOLA_TTS_DATA_ROOT: dataRoot,
           NOLA_TEXT_PROCESSING_PATH: join(dataRoot, 'text-processing.json'),
           NOLA_COMIC_DIR: join(dataRoot, 'comics'),
           NOLA_COMIC_FONT_PATH: app.isPackaged ? join(process.resourcesPath, 'fonts', 'NotoSansCJK-SC-VF.otf')
@@ -670,7 +671,7 @@ if (!hasSingleInstanceLock) {
       if (!backend.ready) {
         backendRestart ??= backend.start().then(
           () => undefined,
-          error => { logDiagnostic('backend.restart.failed', { error }) },
+          error => { logDiagnostic('backend.restart.failed', { error }); throw error },
         ).finally(() => { backendRestart = undefined })
         await backendRestart
       }
@@ -902,6 +903,15 @@ if (!hasSingleInstanceLock) {
     })
     const prepareRealtimeCredentials = async (config: SessionConfig, current: AppSettings, s2sModel?: string) => {
       const resolved: BackendSessionConfig = { ...config }
+      if (!s2sModel && config.outputMode === 'speech' && ttsRuntime) {
+        const rawBinding = config.speechModelId || current.synthesis.modelId
+        const binding = rawBinding.startsWith('cloud:') || rawBinding.startsWith('resource:') ? rawBinding : `resource:${rawBinding}`
+        resolved.speechSnapshot = await ttsRuntime.orchestrator.resolve({ schemaVersion: 1, requestId: randomUUID(),
+          modelBinding: binding, voiceRef: config.speechVoiceRef ?? (config.speechVoice
+            ? migrateLegacyVoice(config.speechVoice, binding).voiceRef : synthesisVoiceRef(current)),
+          text: ' ', targetLanguage: config.targetLanguages[0] ?? current.translation.targetLanguage }, 'realtime')
+        if (binding.startsWith('cloud:') && resolved.speechSnapshot.providerId !== 'mimo') resolved.speechRelay = await ttsRuntime.realtimeRelay(resolved.speechSnapshot)
+      }
       if (s2sModel) {
         const apiKey = await credentials.get('aliyun-asr')
         if (!aliyunConnectionReady(current, !!apiKey.trim())) throw new Error('S2S_CONFIGURATION_MISSING')
@@ -988,6 +998,7 @@ if (!hasSingleInstanceLock) {
         const target = (workspaceWindow && !workspaceWindow.isDestroyed() ? workspaceWindow : mainWindow)?.webContents
         if (speech && (!target || target.isDestroyed())) return
         const token = randomUUID()
+        let speechRelayToken: string | undefined
         let configured = false
         const send = (channel: string, value?: unknown) => {
           if (target && !target.isDestroyed()) target.send(channel, token, value)
@@ -1036,10 +1047,11 @@ if (!hasSingleInstanceLock) {
             measurement?.fence(generation)
             send('realtime:playback-fence', generation)
           },
-          onClose: resetPlayback,
-          onLoss: () => { resetPlayback(); sessions.releaseOnLoss(true) },
+          onClose: () => { resetPlayback(); if (speechRelayToken) ttsRuntime?.relay.release(speechRelayToken) },
+          onLoss: () => { resetPlayback(); if (speechRelayToken) ttsRuntime?.relay.release(speechRelayToken); sessions.releaseOnLoss(true) },
         })
         const resolved = directConfig ?? await prepareRealtimeCredentials(config, current)
+        speechRelayToken = resolved.speechRelay?.token
         const speechModel = config.speechModelId?.replace(/^resource:/, '') || current.synthesis.modelId
         const mapped = mapSessionConfig(resolved, {
           ...current, synthesis: { ...current.synthesis,
@@ -1048,7 +1060,7 @@ if (!hasSingleInstanceLock) {
         }, await client.models(), {
           output: config.outputMode, outputDeviceId: config.speechOutputDeviceId,
           s2sModel,
-          ...(speech && !s2sModel && speechModel === MIMO_TTS_BINDING && isModelEnabled(current, 'tts', speechModel)
+          ...(speech && !s2sModel && speechModel.startsWith(MIMO_TTS_BINDING) && isModelEnabled(current, 'tts', speechModel)
             ? { ttsApiKey: await credentials.get('mimo-tts') } : {}),
         })
         if (!mapped) {
@@ -1109,12 +1121,14 @@ if (!hasSingleInstanceLock) {
       await ensureRealtimeBackend()
       if (!backend?.ready) throw new MeetingModeError({ key: 'meeting.backendUnavailable' })
       const client = new BackendSession(backend, { onEvent: () => {} })
+      const speechRelayTokens: string[] = []
+      const releaseTts = () => { for (const token of speechRelayTokens) ttsRuntime?.relay.release(token) }
       try {
         const enabled = await client.models()
         if (s2sModel && !enabled.has(s2sModel)) throw new MeetingModeError({ key: 'meeting.s2sModelUnavailable' })
         const speechModel = sceneModelBinding(current, 'tts') || current.synthesis.modelId
         const synthesis = { ...current.synthesis, modelId: speechModel.replace(/^resource:/, '') }
-        const ttsApiKey = !s2sModel && synthesis.modelId === MIMO_TTS_BINDING ? await credentials.get('mimo-tts') : undefined
+        const ttsApiKey = !s2sModel && synthesis.modelId.startsWith(MIMO_TTS_BINDING) ? await credentials.get('mimo-tts') : undefined
         const config = resolveSessionModelBindings({
           ...recognitionFieldsOf(current.recognition), ...fallbackTranslationFieldsOf(current.translation),
           audioSource: mode.uplinkEnabled ? { kind: 'microphone', deviceId: mode.microphoneId }
@@ -1127,18 +1141,29 @@ if (!hasSingleInstanceLock) {
           translationProvider: current.translation.provider, translationModelId: current.translation.localModelId,
         })
         const resolved = await prepareRealtimeCredentials(config, current, s2sModel)
-        const mapDirection = (direction: SessionConfig) => {
-          return mapSessionConfig(direction, { ...current, synthesis }, enabled, { output: 'speech', s2sModel, ttsApiKey })
+        let meetingVoiceRef = mode.voiceRef
+        const mapDirection = async (direction: SessionConfig) => {
+          const prepared = await prepareRealtimeCredentials({ ...direction, outputMode: 'speech', speechModelId: speechModel,
+            speechVoiceRef: meetingVoiceRef }, current, s2sModel)
+          if (prepared.speechRelay) speechRelayTokens.push(prepared.speechRelay.token)
+          if (prepared.speechSnapshot?.profileId) meetingVoiceRef = { kind: 'profile', profileId: prepared.speechSnapshot.profileId, revision: prepared.speechSnapshot.profileRevision }
+          return mapSessionConfig(prepared, { ...current, synthesis }, enabled, { output: 'speech', s2sModel, ttsApiKey })
         }
-        const uplink = mode.uplinkEnabled ? mapDirection(resolved) : undefined
-        const downlink = mode.downlinkEnabled ? mapDirection({ ...resolved, audioSource: mode.downlinkSource === 'application'
+        const uplink = mode.uplinkEnabled ? await mapDirection(resolved) : undefined
+        const downlink = mode.downlinkEnabled ? await mapDirection({ ...resolved, audioSource: mode.downlinkSource === 'application'
           ? { kind: 'processAudio', deviceId: mode.applicationId } : { kind: 'virtualInput', deviceId: mode.downlinkInputId },
           sourceLanguage: sourceOf(mode.remoteLanguage), targetLanguages: [mode.localLanguage] }) : undefined
         if (mode.uplinkEnabled && !uplink || mode.downlinkEnabled && !downlink) throw new MeetingModeError({ key: 'meeting.modelConfiguration' })
         if (downlink?.config.input.capture_backend === 'windows_process_include') await client.preflightProcess(downlink.config.input.process_selection_id!)
         if (!s2sModel) await syncRealtimeGlossary(backend, await glossary.snapshot())
-        return { backend, uplink, downlink }
-      } finally { client.close() }
+        if (speechRelayTokens.length > 1 && ttsRuntime) {
+          const combined = await ttsRuntime.relay.combine(speechRelayTokens)
+          speechRelayTokens.splice(0, speechRelayTokens.length, combined.token)
+          for (const direction of [uplink, downlink]) if (direction) Object.assign(direction.headers,
+            { 'x-nola-tts-relay-url': combined.url, 'x-nola-tts-relay-token': combined.token })
+        }
+        return { backend, uplink, downlink, releaseTts }
+      } catch (error) { releaseTts(); throw error } finally { client.close() }
     }, snapshot => {
       for (const window of [mainWindow, workspaceWindow, overlayWindow]) {
         if (window && !window.isDestroyed()) window.webContents.send('meeting-mode:changed', snapshot)
@@ -1410,7 +1435,23 @@ if (!hasSingleInstanceLock) {
       gatewayLease?.release()
       gatewayLease = null
     }
+    ttsRuntime = await createTtsRuntime(dataRoot, {
+      inventory: async binding => {
+        await ensureRealtimeBackend()
+        if (!backend?.ready) throw new Error('voiceInventoryUnavailable')
+        const result = await inferBackendModel(backend, { id: randomUUID(), kind: 'tts', model: binding }, AbortSignal.timeout(120_000), { inspect: true })
+        return result?.voiceInventory ?? result?.voices?.map(id => ({ id, name: id })) ?? []
+      },
+      settings: () => settings.current(), credential: provider => credentials.get(provider),
+      resources: async () => {
+        await whenRuntimeReady()
+        if (engine!.currentState !== 'ready') await engine!.start()
+        return (await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')).resources
+      },
+    })
     gateway = new ModelGateway({
+      hasCredential: provider => credentials.has(provider),
+      tts: ttsRuntime.orchestrator,
       ocr: screenOcr,
       configureBackendLoading: async (mode, models, signal) => {
         if (!models.length && !backend?.ready) return
@@ -1479,6 +1520,8 @@ if (!hasSingleInstanceLock) {
         if (snapshot.state === 'failed' || snapshot.state === 'stopped') { gatewayLease?.release(); gatewayLease = null }
       },
     })
+    registerVoiceLibraryIpc(ttsRuntime, { handle: loggedHandle,
+      authorize: event => assertFeatureSender(event, true), infer: (request, signal) => gateway!.infer(request, signal) })
     loggedHandle('cloud-model:chatgpt-plan', (event, raw: unknown) => {
       assertFeatureSender(event, true)
       return chatGptPlan.handle(chatGptPlanRequest.parse(raw))
@@ -1528,10 +1571,11 @@ if (!hasSingleInstanceLock) {
       }
       if (capability === 'TTS' && request.text && speech?.capability === 'TTS') {
         if (binding === MIMO_TTS_BINDING && !(await credentials.get('mimo-tts')).trim()) throw cloudModelError('CLOUD_MODEL_KEY_REQUIRED')
-        const voice = request.voice?.trim() || (binding === MIMO_TTS_BINDING ? settings.current().synthesis.voice : undefined)
+        const voice = request.voice?.trim()
         let result
         try {
-          result = await gateway!.infer({ id: randomUUID(), kind: 'tts', model: binding, text: request.text, voice }, signal, false, true)
+          result = await gateway!.infer({ id: randomUUID(), kind: 'tts', model: binding, text: request.text, voice,
+            voiceRef: request.voiceRef, target: request.targetLanguage ?? settings.current().translation.targetLanguage }, signal, false, true)
         } catch (error) {
           throw cloudModelProbeError(error, signal)
         }
@@ -1612,10 +1656,6 @@ if (!hasSingleInstanceLock) {
     }, 1000)
     processingNoticeTimer.unref()
     app.once('will-quit', () => clearInterval(processingNoticeTimer))
-    loggedHandle('text-processing:load', (event, legacy: Record<string, unknown>) => {
-      assertFeatureSender(event, true)
-      return textProcessing.migrate(legacy)
-    })
     loggedHandle('text-processing:snapshot', async event => {
       if (gameTranslation?.ownsOverlay(event.sender.id)) {
         if (event.senderFrame !== event.sender.mainFrame || !isTrustedRendererUrl(event.sender.getURL(), __dirname)) throw new Error('Access denied')
@@ -1778,6 +1818,7 @@ if (!hasSingleInstanceLock) {
       }
       if (event.type === 'sessionStopped') {
         sessionActive = false
+        ttsRuntime?.sessionVoices.close(event.sessionId)
         latencyWindow.finish(event.sessionId)
       }
       if (event.type === 'caption' && event.segment.isFinal && !sessions.isBrowserEvent(event)) {
@@ -1901,6 +1942,7 @@ app.on('before-quit', (event) => {
     })
     .then(() => desktopData?.pending ? drainLoggedIpc() : undefined)
     .then(() => gateway?.dispose())
+    .then(async () => { await ttsRuntime?.relay.close(); ttsRuntime?.sessionVoices.clear(); ttsRuntime?.library.close() })
     .finally(() => screenOcr?.dispose())
     .finally(async () => { await backendInitialization?.catch(() => {}); await backend?.stop() })
     .finally(() => engine!.stop())

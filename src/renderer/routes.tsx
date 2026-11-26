@@ -102,6 +102,8 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab | TextProce
       return '#/game'
     case 'comic-translation':
       return options?.id ? `#/comic-translation/${encodeURIComponent(options.id)}` : '#/comic-translation'
+    case 'voices':
+      return '#/voices'
     case 'model-gateway':
       return '#/model-gateway'
     case 'records':
@@ -127,6 +129,7 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab | TextProce
  * 要么把窗口带出应用。
  */
 const PARENT_ROUTES: Record<RouteId, RouteId | null> = {
+  voices: 'home',
   home: null,
   workspace: 'home',
   workbench: 'home',
@@ -193,6 +196,8 @@ export function parseRoute(hash: string): Route {
     }
     case 'model-gateway':
       return { route: 'model-gateway', path: '#/model-gateway' }
+    case 'voices':
+      return { route: 'voices', path: '#/voices' }
     case 'records': {
       const id = segments[1]
       if (id === undefined) return { route: 'records', path: '#/records' }
@@ -311,7 +316,8 @@ export function useRoute(): UseRoute {
 // -- 渲染 ---------------------------------------------------------------------
 
 /** 路由 id 到页面标题。文案是页面自己的名字，不是"占位"两个字。 */
-export const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title' | 'meeting.title' | 'screen.title' | 'suite.gameTitle' | 'suite.comicTitle' | 'workbench.title'> = {
+export const ROUTE_TITLES: Record<RouteId, 'workbench.voice' | 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title' | 'meeting.title' | 'screen.title' | 'suite.gameTitle' | 'suite.comicTitle' | 'workbench.title'> = {
+  voices: 'workbench.voice',
   home: 'nav.home',
   workspace: 'nav.workspace',
   workbench: 'workbench.title',

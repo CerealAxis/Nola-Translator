@@ -138,7 +138,7 @@ export function ShortcutsTab({ settings, headingActionTarget }: SettingsPanelPro
     <TooltipTrigger render={<Button variant="bare" size="icon-sm" disabled={disabled} aria-label={label} onClick={onClick}>{content}</Button>} />
     <TooltipContent>{label}</TooltipContent>
   </Tooltip>
-  const restoreDefaults = <Button variant="outline" size="sm" disabled={busy || !snapshot || !changed}
+  const restoreDefaults = <Button variant="secondary" size="sm" disabled={busy || !snapshot || !changed}
     onClick={() => void restoreAll()}>{t('shortcuts.restoreAll')}</Button>
   return <div className="settings-panel shortcuts-page">
     <div className="shortcuts-page__toolbar">

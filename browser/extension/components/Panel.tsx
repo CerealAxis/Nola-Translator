@@ -136,7 +136,7 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
       })}
       <Field className="nola-subtitle-style-row"><FieldLabel htmlFor="nola-subtitle-bold">{t('subtitleBold')}</FieldLabel><Switch id="nola-subtitle-bold" checked={preferences.subtitleBold} onCheckedChange={value => save({ subtitleBold: value })}><SwitchThumb /></Switch></Field>
       <Field className="nola-subtitle-style-row"><FieldLabel htmlFor="nola-subtitle-hover">{t('subtitlePauseOnHover')}</FieldLabel><Switch id="nola-subtitle-hover" checked={preferences.subtitlePauseOnHover} onCheckedChange={value => save({ subtitlePauseOnHover: value })}><SwitchThumb /></Switch></Field>
-      <Button variant="outline" onClick={() => save(Object.fromEntries((['subtitleSourceSize', 'subtitleSourceColor', 'subtitleSourceFont', 'subtitleTranslationSize', 'subtitleTranslationColor', 'subtitleTranslationFont', 'subtitleBold', 'subtitleBackground', 'subtitleBackgroundOpacity', 'subtitlePauseOnHover'] as const).map(key => [key, DEFAULT_PREFERENCES[key]])))}><RefreshCw />{t('resetStyle')}</Button>
+      <Button variant="secondary" onClick={() => save(Object.fromEntries((['subtitleSourceSize', 'subtitleSourceColor', 'subtitleSourceFont', 'subtitleTranslationSize', 'subtitleTranslationColor', 'subtitleTranslationFont', 'subtitleBold', 'subtitleBackground', 'subtitleBackgroundOpacity', 'subtitlePauseOnHover'] as const).map(key => [key, DEFAULT_PREFERENCES[key]])))}><RefreshCw />{t('resetStyle')}</Button>
     </FieldGroup>}
   </section>
 }

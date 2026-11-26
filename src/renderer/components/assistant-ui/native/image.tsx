@@ -516,7 +516,7 @@ function ImageZoom({ src, alt, children, labels }: ImageZoomProps) {
                 ref={closeRef}
                 type="button"
                 size="icon"
-                variant="tertiary"
+                variant="secondary"
                 aria-label={labels.close}
                 onClick={(e) => {
                   e.stopPropagation();

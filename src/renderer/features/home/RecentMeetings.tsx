@@ -83,7 +83,7 @@ export function RecentMeetings(): ReactNode {
     const title = t(features[feature].name)
     const destination = hasRecord ? recordPath(record.meetingId) : pathOf(feature)
     return (
-      <Button variant="outline" size="sm" aria-label={label + ' · ' + title} onClick={() => navigate(destination)}>
+      <Button variant="secondary" size="sm" aria-label={label + ' · ' + title} onClick={() => navigate(destination)}>
         {label}<ChevronRight data-icon="inline-end" aria-hidden="true" />
       </Button>
     )
@@ -133,7 +133,7 @@ export function RecentMeetings(): ReactNode {
                   ) : canHaveRecords && failed ? (
                     <div className="flex flex-wrap items-center justify-between gap-3 py-3">
                       <p role="status" className="type-muted text-nola-ui-muted-foreground">{t('errors.meetingsLoadFailed')}</p>
-                      <Button variant="outline" size="sm" onClick={retryLoad}>{t('common.retry')}</Button>
+                      <Button variant="secondary" size="sm" onClick={retryLoad}>{t('common.retry')}</Button>
                     </div>
                   ) : (
                     <HomeListRow

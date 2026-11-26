@@ -35,7 +35,7 @@ it('uses the current defaults at execution time and ignores a model ID supplied 
   await executeTool(tools, 'translate_text', { model: 'resource:unselected', text: 'Hello', source: 'en', target: 'zh' })
   expect(runDirectModel).toHaveBeenLastCalledWith(context.services, expect.objectContaining({ model: 'resource:new-default-mt', kind: 'mt' }), context.signal)
   await executeTool(tools, 'synthesize_speech', { model: 'resource:unselected', text: 'Hello', voice: '' })
-  expect(runDirectModel).toHaveBeenLastCalledWith(context.services, expect.objectContaining({ model: 'resource:default-tts', voice: 'default-voice' }), context.signal)
+  expect(runDirectModel).toHaveBeenLastCalledWith(context.services, expect.objectContaining({ model: 'resource:default-tts', voiceRef: { kind: 'preset', modelBinding: 'resource:default-tts', voiceId: 'default-voice' }, target: settings.translation.targetLanguage }), context.signal)
   expect(artifact).toHaveBeenCalledWith('data:audio/wav;base64,AA==')
 })
 

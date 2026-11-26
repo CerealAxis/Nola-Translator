@@ -259,3 +259,40 @@
   border-bottom: 0;
   min-height: 0;
 }
+
+.model-language-field--compact {
+  padding-block: 0;
+  border-radius: var(--field-radius);
+}
+.model-language-field--no-arrow {
+  position: relative;
+}
+.model-language-field--no-arrow .model-language-toggle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  border-radius: inherit;
+}
+.model-language-field--no-arrow .model-language-chips {
+  position: relative;
+  pointer-events: none;
+}
+.model-language-field--no-arrow .model-language-chip-remove {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.model-language-field--compact .model-language-chips { padding-block: calc(var(--label-gap) / 2); }
+
+.model-editor__body {
+  scroll-padding-block: var(--description-gap);
+}
+.model-editor__body :is(input, button, [role="switch"]) {
+  scroll-margin-block: var(--description-gap);
+}
+
+.tts-voice-config__actions {
+  gap: var(--description-gap);
+}

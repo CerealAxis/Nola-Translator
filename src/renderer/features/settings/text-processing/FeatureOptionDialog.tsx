@@ -223,7 +223,7 @@ export function FeatureOptionDialog({
             <FeatureOptionFormBody feature={feature} draft={draft} setDraft={setDraft} id={id} invalid={invalid} />
           </CardContent>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="secondary" disabled={saving} onClick={() => onOpenChange(false)}>
               {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={invalid || saving}>
@@ -268,7 +268,7 @@ export function FeatureOptionCard({
         <CardContent className="flex flex-col gap-4">
           <FeatureOptionFormBody feature={feature} draft={draft} setDraft={setDraft} id={id} invalid={invalid} />
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" nativeButton={false} render={<a href={back} />}>
+            <Button type="button" variant="secondary" nativeButton={false} render={<a href={back} />}>
               {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={invalid}>

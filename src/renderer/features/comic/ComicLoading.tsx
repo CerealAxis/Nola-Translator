@@ -58,7 +58,7 @@ export function ComicImage({
         <div className="comic-image__fallback">
           {retry ? (
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => {
                 setResult(undefined)

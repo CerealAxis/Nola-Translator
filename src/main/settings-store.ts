@@ -1,9 +1,9 @@
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute } from 'node:path'
 import { computeSettingsSchema, DEFAULT_COMPUTE_SETTINGS } from '../shared/compute'
 
 import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
-import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_OFF } from '../shared/github-proxies'
+import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_OFF } from '../shared/github-proxies'
 import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFF } from '../shared/pypi-mirrors'
 import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
 import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
@@ -12,78 +12,16 @@ import { customModelSchema, synchronizeCustomModel } from '../shared/custom-mode
 import { LANGUAGE_CODES } from '../shared/languages'
 import { mergeModelPolicy, modelPolicyOf, modelPolicySchema } from '../shared/model-policy'
 import { meetingModeSettingsSchema } from '../shared/meeting-mode'
+import { migrateTtsSettings, persistedTtsSettings } from '../shared/tts/settings-migration'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
 export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 3; browserConnection?: { enabled: boolean } }
 
-const SETTINGS_MIGRATION_JOURNAL = '.migration-v3.json'
-const SETTINGS_MIGRATION_BACKUP = '.migration-v3.bak'
-const SETTINGS_TEMPORARY = '.tmp'
-class SettingsMigrationError extends Error {}
-
-/** Roll back an interrupted single-file migration before any session writer can start. */
-async function recoverSettingsMigration(path: string): Promise<void> {
-  const journalPath = `${path}${SETTINGS_MIGRATION_JOURNAL}`
-  const backupPath = `${path}${SETTINGS_MIGRATION_BACKUP}`
-  try {
-    await readFile(journalPath, 'utf8')
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      await rm(backupPath, { force: true }).catch(() => undefined)
-      await rm(`${path}${SETTINGS_TEMPORARY}`, { force: true }).catch(() => undefined)
-      return
-    }
-    throw error
-  }
-  try {
-    await readFile(backupPath)
-    await rm(path, { force: true })
-    await rename(backupPath, path)
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    // The backup is removed only after the new file is installed, so its absence means commit finished.
-    try {
-      await readFile(path)
-    } catch {
-      await rename(`${path}.migration-v3.old`, path)
-    }
-  }
-  await rm(`${path}${SETTINGS_TEMPORARY}`, { force: true }).catch(() => undefined)
-  await rm(`${path}.migration-v3.old`, { force: true }).catch(() => undefined)
-  await rm(backupPath, { force: true }).catch(() => undefined)
-  await rm(journalPath, { force: true })
-}
-
-/** Stage, back up, and switch settings as one recoverable startup transaction. */
-async function commitSettingsMigration(path: string, contents: string): Promise<void> {
-  const journalPath = `${path}${SETTINGS_MIGRATION_JOURNAL}`
-  const backupPath = `${path}${SETTINGS_MIGRATION_BACKUP}`
-  const temporaryPath = `${path}${SETTINGS_TEMPORARY}`
-  await mkdir(dirname(path), { recursive: true })
-  await copyFile(path, backupPath)
-  await writeFile(journalPath, JSON.stringify({ from: 2, to: 3 }), 'utf8')
-  try {
-    await writeFile(temporaryPath, contents, 'utf8')
-    await rename(path, `${path}.migration-v3.old`)
-    try {
-      await rename(temporaryPath, path)
-    } catch (error) {
-      await rename(`${path}.migration-v3.old`, path).catch(() => undefined)
-      throw error
-    }
-    await rm(`${path}.migration-v3.old`, { force: true })
-    await rm(backupPath, { force: true })
-    await rm(journalPath, { force: true })
-  } catch (error) {
-    await recoverSettingsMigration(path).catch(() => undefined)
-    await rm(`${path}.migration-v3.old`, { force: true }).catch(() => undefined)
-    throw error
-  }
-}
+class SettingsVersionError extends Error {}
 
 function realtimeSettings(value: unknown): NonNullable<AppSettings['realtime']> {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
-  const { s2sModel, virtualInputDeviceId, speakerDetection: _legacySpeakerDetection, ...other } = source
+  const { s2sModel, virtualInputDeviceId, ...other } = source
   return {
     ...other,
     latencyDetection: source.latencyDetection === true,
@@ -123,9 +61,6 @@ function sanitizeVideoCaptionAudioSource(value: unknown): 'tab' | 'system' {
 function sanitizeVideoCaptionDeviceId(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 && value.length <= 512 && value !== 'defaultOutput' ? value : undefined
 }
-
-/** A pre-migration `settings.json` `translation` block: old key names, every value unknown. */
-type LegacyTranslation = Record<string, unknown>
 
 /** Old installations default to local recognition; malformed connection fields never survive reload. */
 function sanitizeCloudSettings(settings: AppSettings): void {
@@ -181,101 +116,15 @@ function sanitizeCloudSettings(settings: AppSettings): void {
   fallback.cloudModel = bounded(fallback.cloudModel, DEFAULT_SETTINGS.translation.fallback.cloudModel, 256)
 }
 
-const LEGACY_TRANSLATION_KEYS = ['hymt2ModelId', 'openaiEndpoint', 'openaiModel', 'ollamaEndpoint', 'ollamaModel'] as const
-
-/**
- * Fallbacks for the retired `ollama` provider, used only when its legacy keys are missing.
- */
-const LEGACY_OLLAMA_ENDPOINT = 'http://127.0.0.1:11434'
-const LEGACY_OLLAMA_MODEL = 'qwen3:4b'
-
-/**
- * Rewrites a legacy-shaped `translation` block into the current provider shape.
- *
- * Only the old provider's own fields are touched, and they are read from that provider, so
- * running it twice on one file is idempotent. The other four legacy pairs still hold defaults
- * nobody edited — an unused `ollamaEndpoint` is still `http://127.0.0.1:11434` — so moving all
- * five at once would overwrite the migrated values with those defaults.
- */
-function migrateTranslation(raw: LegacyTranslation): LegacyTranslation {
-  const next: LegacyTranslation = { ...raw }
-  const legacy = typeof next.provider === 'string' ? next.provider : ''
-
-  if (!TRANSLATION_PROVIDERS.includes(legacy as (typeof TRANSLATION_PROVIDERS)[number])) {
-    switch (legacy) {
-      case 'hymt2':
-        next.provider = 'local'
-        if (typeof raw.hymt2ModelId === 'string') next.localModelId = raw.hymt2ModelId
-        break
-      case 'm2m100':
-        // `localModelId` is the only field left that distinguishes an M2M100 user; their
-        // `hymt2ModelId` is an untouched default, so it is written rather than carried over.
-        next.provider = 'local'
-        next.localModelId = 'm2m100-418m'
-        break
-      case 'openai':
-        next.provider = 'cloud'
-        next.cloudApiFormat = 'chat-completions'
-        if (typeof raw.openaiEndpoint === 'string') next.cloudEndpoint = raw.openaiEndpoint
-        if (typeof raw.openaiModel === 'string') next.cloudModel = raw.openaiModel
-        break
-      case 'ollama':
-        // Ollama is an API format under `cloud` now, not a provider of its own.
-        next.provider = 'cloud'
-        next.cloudApiFormat = 'ollama'
-        // A missing legacy key gets the engine's own default; `DEFAULT_SETTINGS.translation`
-        // would supply the OpenAI pair instead (see the two constants above).
-        next.cloudEndpoint = typeof raw.ollamaEndpoint === 'string' ? raw.ollamaEndpoint : LEGACY_OLLAMA_ENDPOINT
-        next.cloudModel = typeof raw.ollamaModel === 'string' ? raw.ollamaModel : LEGACY_OLLAMA_MODEL
-        break
-      default:
-        // An unknown provider (the retired `argos` among them) falls back to the default local
-        // model rather than persisting a value no dropdown offers.
-        next.provider = 'local'
-        next.localModelId = DEFAULT_SETTINGS.translation.localModelId
-        break
-    }
-  }
-  for (const key of LEGACY_TRANSLATION_KEYS) delete next[key]
-  return next
-}
-
-/** Must be in the dropdown allowlist. Files predating single-select store the former multi-select array, so its first allowed entry wins. */
 function sanitizeTargetLanguage(value: unknown): string {
-  const candidates = Array.isArray(value) ? value : [value]
-  const match = candidates.find(
-    (item): item is string =>
-      typeof item === 'string' && (TARGET_LANGUAGE_OPTIONS as readonly string[]).includes(item),
-  )
-  return match ?? DEFAULT_SETTINGS.translation.targetLanguage
+  return typeof value === 'string' && (TARGET_LANGUAGE_OPTIONS as readonly string[]).includes(value)
+    ? value : DEFAULT_SETTINGS.translation.targetLanguage
 }
 
-/**
- * Moves the GitHub accelerator off the old free-text box and normalizes saved nodes to the picker.
- * The former default node becomes automatic mode so upgrades receive the same region-aware default.
- *
- * An empty value normalizes to automatic mode without changing the accelerator toggle, so a user's
- * disabled setting stays disabled while every stored node value remains a valid catalog value.
- *
- * A file that already carries the toggle is not one of these older files, and its boolean is the
- * newer answer: deriving the switch from the address alone would turn a user back on who had turned
- * acceleration off while leaving a node selected.
- */
-function migrateGithubAccelerate(raw: Partial<AppSettings['network']> | undefined, migrateFormerDefault: boolean): Partial<Pick<AppSettings['network'], 'useGithubAccelerate' | 'githubAccelerateUrl'>> {
+function normalizeGithubAccelerate(raw: Partial<AppSettings['network']> | undefined) {
   const value = raw?.githubAccelerateUrl
-  if (typeof value !== 'string') return {}
-  const trimmed = value.trim()
-  // Normalizing here as well as in the older branch below keeps the stored address and the node the
-  // picker highlights the same one: the picker resolves anything outside the catalog to `auto`, so a
-  // value left unnormalized would sit behind a row that is not the address actually in use.
-  const node = raw?.useGithubAccelerate === false
-    ? GITHUB_PROXY_OFF
-    : !trimmed || trimmed === GITHUB_PROXY_AUTO || (migrateFormerDefault && trimmed === GITHUB_PROXY_DEFAULT)
-    ? GITHUB_PROXY_AUTO
-    : trimmed ? findGithubProxyNode(trimmed) ?? GITHUB_PROXY_DEFAULT : GITHUB_PROXY_DEFAULT
-  if (typeof raw?.useGithubAccelerate === 'boolean') return { githubAccelerateUrl: node }
-  if (!trimmed) return { useGithubAccelerate: false, githubAccelerateUrl: node }
-  return { useGithubAccelerate: true, githubAccelerateUrl: node }
+  return { githubAccelerateUrl: raw?.useGithubAccelerate === false ? GITHUB_PROXY_OFF
+    : typeof value === 'string' ? findGithubProxyNode(value.trim()) ?? GITHUB_PROXY_AUTO : GITHUB_PROXY_AUTO }
 }
 
 export class SettingsStore {
@@ -291,53 +140,26 @@ export class SettingsStore {
 
   async load(): Promise<AppSettings> {
     try {
-      await recoverSettingsMigration(this.path)
       const raw = JSON.parse(await readFile(this.path, 'utf8')) as Partial<AppSettings> & {
         version?: unknown
         realtime?: unknown
-        translation?: Partial<AppSettings['translation']> & {
-          allowIntermediate?: unknown
-          /** The pre-single-select multi-select field; migrated to targetLanguage on load. */
-          targetLanguages?: unknown
-        }
         overlay?: Partial<AppSettings['overlay']> & {
           fontFamily?: unknown
-          /** Retired; the rolling overlay derives its own budget from the stage height. */
-          maxLines?: unknown
-          translationMaxLines?: unknown
-          /** The caption lock is session state now, so a stored value is discarded rather than restored. */
-          locked?: unknown
         }
-        /** The pre-`network` top-level mirror toggle; migrated into `network` on load. */
-        useHuggingFaceMirror?: unknown
       }
-      if (typeof raw.version === 'number' && raw.version > 3) throw new SettingsMigrationError('Settings require a newer Nola version')
-      // The legacy Argos relay toggle meant something else, so drop it rather than mapping it onto translateIntermediate.
-      const rawTranslation = migrateTranslation({ ...(raw.translation ?? {}) })
-      delete rawTranslation.allowIntermediate
-      const legacyTargets = rawTranslation.targetLanguages
-      delete rawTranslation.targetLanguages
+      if (typeof raw.version === 'number' && raw.version > 3) throw new SettingsVersionError('Settings require a newer Nola version')
+      const rawTranslation = { ...(raw.translation ?? {}) }
       const realtime = realtimeSettings(raw.realtime)
-      const legacyAliyunModel = raw.recognition?.aliyunModel
-      const knownLiveTranslate = legacyAliyunModel === 'qwen3.8-livetranslate-flash-realtime'
-        || legacyAliyunModel === 'qwen3.5-livetranslate-flash-realtime'
-      const legacyTarget = rawTranslation.targetLanguage ?? (Array.isArray(legacyTargets) ? legacyTargets.find(value => typeof value === 'string') : undefined)
-      if (raw.version !== 3 && legacyTarget === 'none' && raw.realtime?.outputMode === undefined) {
-        realtime.outputMode = 'source'
-      }
-      if (raw.version !== 3 && raw.realtime?.s2sModel === undefined && raw.recognition?.provider === 'aliyun' && knownLiveTranslate && rawTranslation.provider !== 'recognition') {
-        realtime.s2sModel = legacyAliyunModel
-      } else if (raw.realtime?.s2sModel === undefined && raw.recognition?.provider === 'aliyun' &&
-        (knownLiveTranslate || legacyAliyunModel === undefined) && realtime.outputMode !== 'source' &&
+      const aliyunModel = raw.recognition?.aliyunModel
+      const knownLiveTranslate = aliyunModel === 'qwen3.8-livetranslate-flash-realtime'
+        || aliyunModel === 'qwen3.5-livetranslate-flash-realtime'
+      if (raw.realtime?.s2sModel === undefined && raw.recognition?.provider === 'aliyun' &&
+        (knownLiveTranslate || aliyunModel === undefined) && realtime.outputMode !== 'source' &&
         (realtime.outputMode === 'speech' || rawTranslation.provider === 'recognition')) {
-        realtime.s2sModel = legacyAliyunModel ?? 'qwen3.8-livetranslate-flash-realtime'
+        realtime.s2sModel = aliyunModel ?? 'qwen3.8-livetranslate-flash-realtime'
       }
-      // The two retired line-count settings; the rolling overlay derives its budget from the stage height.
       const rawOverlay = { ...(raw.overlay ?? {}) }
       delete rawOverlay.fontFamily
-      delete rawOverlay.maxLines
-      delete rawOverlay.translationMaxLines
-      delete rawOverlay.locked
       this.settings = {
         ...structuredClone(DEFAULT_SETTINGS),
         ...raw,
@@ -357,7 +179,7 @@ export class SettingsStore {
         },
         modelGateway: {
           ...DEFAULT_SETTINGS.modelGateway,
-          ...(settingsPatchSchema.safeParse({ modelGateway: raw.modelGateway ?? (raw as { localGateway?: unknown }).localGateway }).data?.modelGateway ?? {}),
+          ...(settingsPatchSchema.safeParse({ modelGateway: raw.modelGateway }).data?.modelGateway ?? {}),
         },
         uiLanguage: typeof raw.uiLanguage === 'string' && ['auto', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja', 'en'].includes(raw.uiLanguage)
           ? raw.uiLanguage as AppSettings['uiLanguage']
@@ -376,30 +198,9 @@ export class SettingsStore {
             : typeof raw.network?.pytorchWheelMirrorUrl === 'string'
               ? findPytorchWheelMirrorNode(raw.network.pytorchWheelMirrorUrl) ?? PYTORCH_WHEEL_MIRROR_AUTO
               : PYTORCH_WHEEL_MIRROR_AUTO,
-          // A build from before the group kept the mirror toggle at the top level; reading it here
-          // is the one place that value is honoured, so a user who turned it off does not get it
-          // back from the default above.
-          ...(typeof raw.useHuggingFaceMirror === 'boolean' && typeof raw.network?.useHuggingFaceMirror !== 'boolean'
-            ? { useHuggingFaceMirror: raw.useHuggingFaceMirror }
-            : {}),
-          // A legacy file with a non-empty address predates the explicit switch, so preserve its
-          // implied enabled state; files without the address use the current default.
-          ...migrateGithubAccelerate(raw.network, typeof raw.version !== 'number' || raw.version < 2),
-          // Version 2 makes automatic mirror routing the default for every existing installation.
-          // This migration runs once; subsequent user-selected nodes and disabled switches persist.
-          ...(typeof raw.version !== 'number' || raw.version < 2 ? {
-            usePypiMirror: true,
-            pypiMirrorUrl: PYPI_MIRROR_AUTO,
-            pytorchWheelMirrorUrl: PYTORCH_WHEEL_MIRROR_AUTO,
-            useHuggingFaceMirror: true,
-            useGithubAccelerate: true,
-            githubAccelerateUrl: GITHUB_PROXY_AUTO,
-          } : {}),
+          ...normalizeGithubAccelerate(raw.network),
         },
-        recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}),
-          ...(raw.recognition?.provider === 'aliyun' && raw.recognition.aliyunModel === undefined
-            ? { aliyunModel: 'qwen3.8-livetranslate-flash-realtime' } : {}),
-        },
+        recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
         recording: { ...DEFAULT_SETTINGS.recording, ...(raw.recording ?? {}) },
         appearance: {
           interfaceFont: desktopTypographyShape.interfaceFont.safeParse(raw.appearance?.interfaceFont).data ?? DEFAULT_SETTINGS.appearance.interfaceFont,
@@ -431,7 +232,6 @@ export class SettingsStore {
             : DEFAULT_SETTINGS.translation.intermediateTranslationIntervalMs,
         },
       }
-      // The three retired recognition ids all migrate to Qwen3-ASR 1.7B; `sourceLanguage` is sanitized separately.
       if (!RECOGNITION_MODEL_IDS.some(id => id === this.settings.recognition.modelId) && !this.settings.recognition.modelId.startsWith('hub:')) {
         this.settings.recognition = { ...this.settings.recognition, modelId: 'qwen3-asr-1.7b-hf' }
       }
@@ -439,11 +239,9 @@ export class SettingsStore {
         ...this.settings.recognition,
         sourceLanguage: sanitizeSourceLanguage(this.settings.recognition.sourceLanguage),
       }
-      // The legacy array takes priority; the current single value still goes through the allowlist.
       this.settings.translation.targetLanguage = sanitizeTargetLanguage(
-        legacyTargets ?? this.settings.translation.targetLanguage,
+        this.settings.translation.targetLanguage,
       )
-      // `migrateTranslation` already lands on a valid provider; this catches a hand-edited file.
       if (!TRANSLATION_PROVIDERS.includes(this.settings.translation.provider)) {
         this.settings.translation.provider = 'local'
       }
@@ -451,51 +249,9 @@ export class SettingsStore {
         this.settings.translation.localModelId,
       )
       sanitizeCloudSettings(this.settings)
-      // Old default caption colors are upgraded to the video-reference style, but only while the user has customized neither.
-      const overlay = this.settings.overlay
-      if (rawOverlay.translationColor?.toUpperCase() === '#BFC2C8') {
-        overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
-      }
-      if (overlay.backgroundColor === '#202020' && (overlay.translationColor === '#E6F2FF' || overlay.translationColor === '#D6E9FF')) {
-        overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
-        overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
-      }
-      // Legacy floating-bar defaults, upgraded field by field and only where the stored value is
-      // still the untouched legacy one, so custom colours and sizes survive.
-      if (rawOverlay.backgroundColor === '#111111' && rawOverlay.backgroundOpacity === 0.84) {
-        overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
-        overlay.backgroundOpacity = DEFAULT_SETTINGS.overlay.backgroundOpacity
-        if (rawOverlay.fontSize === 26) overlay.fontSize = DEFAULT_SETTINGS.overlay.fontSize
-        if (rawOverlay.translationFontSize === 22) overlay.translationFontSize = DEFAULT_SETTINGS.overlay.translationFontSize
-        if (rawOverlay.sourceColor === '#FFFFFF') overlay.sourceColor = DEFAULT_SETTINGS.overlay.sourceColor
-        if (rawOverlay.translationColor === '#FFFFFF') overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
-      }
-      if (rawOverlay.backgroundColor === '#30343A' && rawOverlay.backgroundOpacity === 0.62) {
-        overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
-        overlay.backgroundOpacity = DEFAULT_SETTINGS.overlay.backgroundOpacity
-        if (rawOverlay.fontSize === 20) overlay.fontSize = DEFAULT_SETTINGS.overlay.fontSize
-        if (rawOverlay.sourceColor === '#FFFFFF') overlay.sourceColor = DEFAULT_SETTINGS.overlay.sourceColor
-        if (rawOverlay.translationColor === '#FFFFFF') overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
-      }
-      // The earliest bar was a #202020 slab left translucent, which over a bright window reads as a
-      // washed-out grey card; only untouched legacy values move, a re-tinted card keeps its own.
-      if (rawOverlay.backgroundColor === '#202020' && (rawOverlay.sourceColor ?? '').toUpperCase() === '#FFFFFF') {
-        overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
-        overlay.backgroundOpacity = DEFAULT_SETTINGS.overlay.backgroundOpacity
-        if ((rawOverlay.translationColor ?? '').toUpperCase() === '#FFFFFF') {
-          overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
-        }
-      }
-      if (raw.version !== 3) {
-        const { videoCaptions: _runScopedVideoCaptions, ...persisted } = this.settings
-        try {
-          await commitSettingsMigration(this.path, JSON.stringify(persisted, null, 2))
-        } catch (error) {
-          throw new SettingsMigrationError('Settings migration did not commit', { cause: error })
-        }
-      }
+      migrateTtsSettings(this.settings)
     } catch (error) {
-      if (error instanceof SettingsMigrationError || ((error as NodeJS.ErrnoException)?.code && (error as NodeJS.ErrnoException).code !== 'ENOENT')) {
+      if (error instanceof SettingsVersionError || ((error as NodeJS.ErrnoException)?.code && (error as NodeJS.ErrnoException).code !== 'ENOENT')) {
         this.loadFailure = error
         throw error
       }
@@ -541,6 +297,8 @@ export class SettingsStore {
     }
     // Writes share the load-time allowlist so no write path can persist an invalid language code.
     next.translation = synchronizeCustomModel(next.translation, patch.translation)
+    if (patch.synthesis?.voice !== undefined && patch.synthesis.voiceRef === undefined) next.synthesis.voiceRef = undefined
+    migrateTtsSettings(next)
     next.recognition.sourceLanguage = sanitizeSourceLanguage(next.recognition.sourceLanguage)
     next.translation.targetLanguage = sanitizeTargetLanguage(next.translation.targetLanguage)
     next.translation.localModelId = sanitizeLocalModelId(next.translation.localModelId)
@@ -551,7 +309,7 @@ export class SettingsStore {
       : undefined
     await mkdir(dirname(this.path), { recursive: true })
     const temporary = `${this.path}.tmp`
-    const { videoCaptions: _runScopedVideoCaptions, ...persisted } = next
+    const { videoCaptions: _runScopedVideoCaptions, ...persisted } = persistedTtsSettings(next)
     await writeFile(temporary, JSON.stringify(persisted, null, 2), 'utf8')
     await rename(temporary, this.path)
     this.settings = next

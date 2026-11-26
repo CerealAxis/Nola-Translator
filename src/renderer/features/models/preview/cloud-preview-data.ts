@@ -1,3 +1,4 @@
+import { ttsModelCatalog } from '../../../../shared/tts/model-catalog'
 import { ALIYUN_ASR_MODELS, DEFAULT_SETTINGS, MINIMAX_RECOGNITION_MODELS, REALTIME_S2S_MODELS } from '../../../../shared/settings'
 import { GOOGLE_TRANSLATE_ENDPOINT } from '../../../../shared/google-translate'
 import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_PUBLIC_MODEL } from '../../../../shared/index-translate'
@@ -35,7 +36,7 @@ const chatTemplates = Object.fromEntries(astrBotChatPresets.map((preset): [AstrB
 ])) as Record<AstrBotChatService, Template>
 
 const speechTemplates = Object.fromEntries(astrBotSpeechPresets.map((preset): [AstrBotSpeechService, Template] => [
-  preset.id, { ...preset, endpoint: preset.endpoint || astrBotSpeechPreset(preset.id)?.fallback || '', models: { [preset.capability]: [preset.model] } },
+  preset.id, { ...preset, endpoint: preset.endpoint || astrBotSpeechPreset(preset.id)?.fallback || '', models: { [preset.capability]: ttsModelCatalog[preset.id]?.models ?? [preset.model] } },
 ])) as Record<AstrBotSpeechService, Template>
 
 export const templates: Record<Service, Template> = {

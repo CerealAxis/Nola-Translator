@@ -109,7 +109,7 @@ it('toggles speech independently of model and device selection', async () => {
     const output = screen.getByRole('combobox', { name: '输出设备' })
     const option = await within(model).findByRole('option', { name: 'Local speech' })
     fireEvent.change(model, { target: { value: (option as HTMLOptionElement).value } })
-    expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ synthesis: { modelId: resourceId, voice: '' } }))
+    expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ synthesis: { modelId: resourceId } }))
     expect(output).toBeEnabled()
     fireEvent.change(output, { target: { value: 'speakers' } })
     expect(update).toHaveBeenLastCalledWith({ realtime: { speechOutputDeviceId: 'speakers' } })

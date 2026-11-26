@@ -26,7 +26,6 @@ export interface FeatureOptions {
   count?: string
   keepEnd?: boolean
   keepSingle?: boolean
-  rules?: Rule[]
   vndbId?: string
   vndbTargets?: { replace: boolean; glossary: boolean }
 }
@@ -57,34 +56,21 @@ function toast(issue: TextProcessingResult['issues'][number]) {
   notifyError(translate(reason, language), { description: label ? translate(label, language) : undefined })
 }
 
-function legacySettings() {
-  const values: Record<string, unknown> = {}
-  try {
-    for (let index = 0; index < localStorage.length; index++) {
-      const key = localStorage.key(index)
-      if (!key?.startsWith(PREFIX)) continue
-      try { values[key.slice(PREFIX.length)] = JSON.parse(localStorage.getItem(key) ?? 'null') }
-      catch { /* Keep a damaged entry from interrupting migration of the others. */ }
-    }
-  } catch { /* Storage is unavailable in this document. */ }
-  return values
-}
-
-function connect(migrate: boolean) {
+function connect() {
   const api = getBridge()?.textProcessing
   if (!api) return undefined
   const changed = api.onChanged(update)
   const notice = api.onError(toast)
-  const ready = (migrate ? api.load(legacySettings()) : api.snapshot()).then(update).finally(() => {
+  const ready = api.snapshot().then(update).finally(() => {
     loadSettled = true
     update()
   })
-  void ready.catch(() => { if (migrate) toast({ feature: 'settings', reason: 'load' }) })
+  void ready.catch(() => toast({ feature: 'settings', reason: 'load' }))
   return { api, ready, close: () => { changed(); notice() } }
 }
 
-export function initTextProcessing(migrate: boolean) {
-  connection ??= connect(migrate)
+export function initTextProcessing() {
+  connection ??= connect()
 }
 
 if (import.meta.hot) import.meta.hot.dispose(() => connection?.close())
@@ -97,6 +83,7 @@ export function useTextProcessingReady() {
 export function readPreviewSetting<T>(name: string, fallback: T): T {
   if (pending.has(name)) return pending.get(name)!.value as T
   if (committed) return Object.hasOwn(committed.values, name) ? committed.values[name] as T : fallback
+  if (connection) return fallback
   try {
     const stored = localStorage.getItem(PREFIX + name)
     if (stored !== null) return JSON.parse(stored) as T
@@ -135,7 +122,7 @@ export async function writePreviewSetting(name: string, value: unknown): Promise
 
 export function usePreviewSetting<T>(name: string, fallback: T) {
   useSyncExternalStore(subscribe, () => version)
-  useEffect(() => { initTextProcessing(false) }, [])
+  useEffect(() => { initTextProcessing() }, [])
   return [readPreviewSetting(name, fallback), (value: T) => writePreviewSetting(name, value)] as const
 }
 

@@ -65,7 +65,7 @@ describe('independent feature activity', () => {
     const failed = { ...ready, services: { ...ready.services, asr: { ...ready.services.asr, state: 'failed' as const, error: 'CUDA out of memory: private traceback' } } }
     act(() => { receive(failed); receive({ ...failed, connections: 2 }) })
     expect(notifyError).toHaveBeenCalledOnce()
-    expect(notifyError).toHaveBeenCalledWith('ASR 模型不可用', { description: '可用内存不足。请关闭其他模型或选择更小的模型后重试。', supportCode: 'MDL-020' })
+    expect(notifyError).toHaveBeenCalledWith('启动失败', { description: 'ASR 模型：可用内存不足。请关闭其他模型或选择更小的模型后重试。', supportCode: 'MDL-020' })
   })
 
   it('does not report capability failures emitted during a normal gateway shutdown', async () => {
@@ -84,4 +84,26 @@ describe('independent feature activity', () => {
     act(() => receive({ ...ready, state: 'stopping', services: { ...ready.services, llm: { ...ready.services.llm, state: 'failed', error: 'aborted' } } }))
     expect(notifyError).not.toHaveBeenCalled()
   })
+})
+
+
+it.each([
+  ['BACKEND_DEPENDENCY_MISSING', '应用的 Python 组件不完整，请更新或重新安装软件后重试。'],
+  ['EADDRINUSE', '网关端口已被占用，请更换端口后重试。'],
+  ['BACKEND_START_TIMEOUT', '语音处理服务启动超时，请关闭占用资源的程序后重试。'],
+])('explains gateway startup failure %s once with an action', async (errorCode, description) => {
+  vi.mocked(notifyError).mockClear()
+  const service = { state: 'stopped' as const, model: '', name: '' }
+  const services = { asr: service, mt: service, tts: service, llm: service }
+  const idle: ModelGatewaySnapshot = { state: 'stopped', address: '', port: 17860, connections: 0, activeRequests: 0, requests: [], services }
+  let receive!: (snapshot: ModelGatewaySnapshot) => void
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+  vi.spyOn(store, 'getBridge').mockReturnValue({ gateway: { snapshot: async () => idle,
+    onChanged: (callback: typeof receive) => { receive = callback; return () => undefined },
+  } } as unknown as NolaBridge)
+  render(<FeatureActivityNotice />)
+  await act(async () => undefined)
+  const failed = { ...idle, state: 'failed' as const, errorCode }
+  act(() => { receive(failed); receive({ ...failed }) })
+  expect(notifyError).toHaveBeenCalledExactlyOnceWith('启动失败', { description })
 })

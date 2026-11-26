@@ -1,13 +1,20 @@
+import { getBridge } from '@/store'
+import { llmPreviewCopy } from './llm-preview-copy'
+import { ModelIdInput } from './ModelIdInput'
+import { TtsVoiceConfiguration, ttsVoiceDrafts, serializeTtsVoices, type TtsVoiceDraft } from './TtsVoiceConfiguration'
+import { TtsVoiceSelector } from '@/components/tts/TtsVoiceSelector'
 import { TooltipHint, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ttsVoicePresets } from '../../../../shared/tts-voice-presets'
+import { astrBotSpeechBinding } from '../../../../shared/astrbot-speech-presets'
+import { useTtsCapabilities } from '@/components/tts/use-tts-capabilities'
+import { ttsCatalogCapabilities } from '../../../../shared/tts/catalog'
+import type { TtsVoiceRef } from '../../../../shared/tts/voice-ref'
+import { presetVoiceId } from '../../../../shared/tts/settings-migration'
+import { ttsText } from '@/i18n/tts-ui'
 import { astrBotSpeechPreset } from '../../../../shared/astrbot-speech-presets'
 import { CHATGPT_PLAN_SERVICE } from '../../../../shared/chatgpt-plan'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { notifyError, notifyInfo } from '@/components/primitives/notify'
-import { ChevronDown, Download, Eye, EyeOff, Image, Pencil, Plus, Trash2 } from 'lucide-react'
-import { Combobox as ComboboxPrimitive } from '@base-ui/react/combobox'
-import { Combobox, ComboboxContent, ComboboxItem, ComboboxList } from '@/components/ui/combobox'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import { notifyError, notifyInfo, notifySuccess } from '@/components/primitives/notify'
+import { Download, Eye, EyeOff, Image, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Field, FieldLabel } from '@/components/ui/field'
@@ -112,9 +119,9 @@ export function CloudDetails({ connection, creating, onSave, onCancel, saving, s
   const presets = templates[connection.service].models[connection.capability] ?? []
   const [draft, setDraft] = useState(() => ({
     ...connection,
-    models: creating && presets[0] ? [{
+    models: creating && connection.capability !== 'TTS' && presets[0] ? [{
       id: presets[0], name: speech?.voiceOnly ? speech.name : presets[0], enabled: true,
-      ...(speech?.voice !== undefined ? { voice: speech.voice } : {}),
+      ...(speech?.voice !== undefined ? { tts: { defaultVoiceRef: { kind: 'preset' as const, modelBinding: astrBotSpeechBinding(speech.id), voiceId: speech.voice } } } : {}),
     }] : connection.models,
   }))
   const draftRef = useRef(draft)
@@ -286,7 +293,7 @@ export function CloudDetails({ connection, creating, onSave, onCancel, saving, s
       {visible.length ? <ul>{visible.map(model => <li key={model.id}>
         <div className="cpv-model-info">
           <Tooltip><TooltipTrigger render={<span className="type-body" />}>{model.name || model.id}</TooltipTrigger><TooltipContent>{model.id}</TooltipContent></Tooltip>
-          {model.voice && <span className="cpv-model-tags"><TooltipHint content={t('workbench.voice')}><Badge variant="outline">{model.voice}</Badge></TooltipHint></span>}
+          {presetVoiceId(model.tts?.defaultVoiceRef) && <span className="cpv-model-tags"><TooltipHint content={t('workbench.voice')}><Badge variant="outline">{presetVoiceId(model.tts?.defaultVoiceRef)}</Badge></TooltipHint></span>}
           {model.llm && <span className="cpv-model-tags">
             <TooltipHint content={`${t('settings.contextWindow')} ${model.llm.contextWindow.toLocaleString()}`}><Badge variant="outline">{contextTag(model.llm.contextWindow)}</Badge></TooltipHint>
             {model.llm.images && <TooltipHint content={t('suite.supportsImages')}><Badge variant="outline">
@@ -306,7 +313,7 @@ export function CloudDetails({ connection, creating, onSave, onCancel, saving, s
               } catch { /* The parent displays the save error. */ }
             }}>{t('common.confirm')}</Button>
           </> : <>
-            <CloudModelTest key={JSON.stringify([model.id, model.profileId, model.voice, connection.endpoint, connection.protocol, connection.workspace, connection.region])}
+            <CloudModelTest key={JSON.stringify([model.id, model.profileId, model.tts?.defaultVoiceRef, connection.endpoint, connection.protocol, connection.workspace, connection.region])}
               connection={connection} model={model} disabled={Boolean(creating || saving)} />
             <Button variant="bare" size="icon-sm" disabled={fetchingModels} tooltip={copy('editModel')} aria-label={copy('editModel') + ' ' + model.id} onClick={() => setEditor({ modelId: model.id })}><Pencil /></Button>
             <Button variant="bare" size="icon-sm" tooltip={t('modelsSettingsUi.deleteModel')} aria-label={t('modelsSettingsUi.deleteModel') + ' ' + model.id} onClick={() => setRemoval(model.id)}><Trash2 /></Button>
@@ -339,57 +346,81 @@ function CloudLanguageDetails({ connection, modelId }: { connection: Connection;
 function PresetModelEditor({ model, connection, onSave, onCancel }: {
   model?: CloudModel; connection: Connection; onSave: (value: CloudModel) => void; onCancel: () => void
 }) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
+  const text = (key: Parameters<typeof ttsText>[1]) => ttsText(language, key)
   const uid = useId()
   const presets = templates[connection.service].models[connection.capability] ?? []
-  const choices = [...new Set(model ? [model.id, ...presets] : presets)].filter(id =>
-    model?.id === id || !connection.models.some(existing => existing.id === id))
-  const initialId = model?.id ?? choices[0] ?? ''
+  const choices = [...new Set(model ? [model.id, ...presets] : presets)]
+  const initialId = model?.id ?? ''
   const speech = astrBotSpeechPreset(connection.service)
-  const initialVoice = model?.voice ?? speech?.voice ?? 'mimo_default'
+  const binding = speech ? astrBotSpeechBinding(speech.id, model?.profileId) : ''
+  const initialRef: TtsVoiceRef = model?.tts?.defaultVoiceRef ?? { kind: 'engine-default' }
+  const initialRows = (): TtsVoiceDraft[] => ttsVoiceDrafts(ttsCatalogCapabilities(connection.service, initialId, binding), model?.tts?.capabilityOverride?.presetVoices, initialRef, model?.tts?.presetVoiceIds ?? (model ? undefined : []))
+  const [smart, setSmart] = useState(true)
+  const edited = useRef(false)
+  const changedId = useRef(false)
   const [id, setId] = useState(initialId)
-  const [voice, setVoice] = useState(initialVoice)
+  const [selected, setSelected] = useState<TtsVoiceRef>(initialRef)
+  const [rows, setRows] = useState(initialRows)
   const tts = connection.capability === 'TTS'
-  const copy = useCloudPreviewCopy()
-  const voices = speech ? ttsVoicePresets(speech.id, id.trim()) : []
-  const fixedModels = connection.service === 'aliyun' || connection.service === 'minimax' || connection.service === 'google' || connection.service === 'microsoft' || connection.service === 'mymemory'
+  const { capabilities } = useTtsCapabilities(tts && id.trim() && (id.trim() === model?.id || presets.includes(id.trim())) ? binding : '', id.trim() || undefined, true)
+  const base = ttsCatalogCapabilities(connection.service, id.trim(), binding)
+  const voiceCapabilities = capabilities ?? base
+  const profileConditioning = base.supports.cloning === true || base.supports.voiceDesign === true
+  const requiresProfile = !base.conditioning?.includes('preset') && profileConditioning
+  const [lookupId, setLookupId] = useState('')
+  useEffect(() => {
+    if (!tts || !smart || !lookupId || lookupId !== id.trim() || !presets.includes(lookupId) || edited.current) return
+    let active = true
+    const timer = window.setTimeout(async () => {
+      let matched = ttsCatalogCapabilities(connection.service, lookupId, binding)
+      try { matched = await getBridge()?.voices?.capabilities(binding, false, lookupId, true) ?? matched } catch { /* Static inventory remains available without a connection. */ }
+      if (!active) return
+      setRows(ttsVoiceDrafts(matched))
+      setSelected(matched.presetVoices[0] ? { kind: 'preset', modelBinding: binding, voiceId: matched.presetVoices[0].id } : { kind: 'engine-default' })
+      setLookupId('')
+      notifySuccess(llmPreviewCopy[language].matched)
+    }, 350)
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [lookupId, smart, id])
+  const capabilityKey = JSON.stringify(capabilities)
+  useEffect(() => {
+    if (capabilities && model && !edited.current && !changedId.current) setRows(ttsVoiceDrafts(capabilities, model.tts?.capabilityOverride?.presetVoices, initialRef, model.tts?.presetVoiceIds))
+  }, [capabilityKey])
+  const changeId = (value: string) => {
+    setId(value)
+    if (value.trim() === id.trim()) return
+    edited.current = false
+    changedId.current = true
+    if (!value.trim()) { setRows([]); setSelected({ kind: 'engine-default' }) }
+    setLookupId(tts && smart ? value.trim() : '')
+  }
 
-  return <ModelEditorDialog editing={!!model} canSave={!!id.trim() && !connection.models.some(row => row !== model && row.id === id.trim())} onCancel={onCancel}
-    onReset={() => { setId(initialId); setVoice(initialVoice) }} onSave={() => {
-      onSave({ id: id.trim(), name: speech?.voiceOnly ? speech.name : model?.id === id ? model.name : id.trim(), enabled: model?.enabled ?? true, ...(model?.profileId ? { profileId: model.profileId } : {}), ...(tts ? { voice: voice.trim() } : {}) })
+  const configuredRows = rows.filter(row => row.configured)
+  const validRows = configuredRows.every(row => !!row.id.trim() && rows.every(other => row === other || row.id.trim() !== other.id.trim()))
+  const sameModel = model?.id === id.trim()
+  const matching = tts && smart && !!lookupId && lookupId === id.trim() && presets.includes(lookupId)
+  return <ModelEditorDialog editing={!!model} canSave={!!id.trim() && !matching && (requiresProfile || validRows) && !connection.models.some(row => row !== model && row.id === id.trim())} onCancel={onCancel}
+    onReset={() => { changedId.current = false; edited.current = false; setSmart(true); setLookupId(''); setId(initialId); setRows(initialRows()); setSelected(initialRef) }} onSave={() => {
+      const override = sameModel ? model.tts?.capabilityOverride : undefined
+      onSave({ id: id.trim(), name: speech?.voiceOnly ? speech.name : sameModel ? model.name : id.trim(), enabled: model?.enabled ?? true,
+        ...(model?.profileId ? { profileId: model.profileId } : {}), ...(tts ? { tts: { ...(sameModel ? model.tts : {}),
+          defaultVoiceRef: requiresProfile && selected.kind === 'preset' ? { kind: 'engine-default' } : selected.kind === 'preset' && rows.some(row => row.configured && row.id === selected.voiceId) ? { ...selected, voiceId: selected.voiceId.trim() } : selected,
+          presetVoiceIds: requiresProfile ? [] : rows.map(row => row.configured ? row.id.trim() : row.id),
+          capabilityOverride: { ...override, presetVoices: requiresProfile ? [] : serializeTtsVoices(rows) } } } : {}) })
     }}>
-    {!speech?.voiceOnly && <Field>
+    {tts && <Field className="flex-row items-center justify-between"><FieldLabel htmlFor={uid + '-smart'}>{llmPreviewCopy[language].smart}</FieldLabel><Switch id={uid + '-smart'} checked={smart} onCheckedChange={checked => { edited.current = false; setSmart(checked); setLookupId(checked ? id.trim() : '') }}><SwitchThumb /></Switch></Field>}
+    {<Field>
       <FieldLabel htmlFor={uid + '-model'}>{t('settings.modelId')}</FieldLabel>
-      {fixedModels ? <SettingSelect id={uid + '-model'} ariaLabel={t('settings.modelId')} value={id}
-        options={choices.map(value => ({ value, label: value }))} onChange={setId} />
-        : <Input id={uid + '-model'} value={id} maxLength={256} onValueChange={setId} />}
+      <ModelIdInput id={uid + '-model'} label={t('settings.modelId')} value={id} options={choices}
+        disabledOptions={connection.models.filter(item => item !== model).map(item => item.id)} onChange={changeId} />
     </Field>}
-    {tts && <Field>
-      <FieldLabel htmlFor={uid + '-voice'}>{t('workbench.voice')}</FieldLabel>
-      {voices.length ? <Combobox
-        items={voices}
-        value={voices.find(option => option.value === voice) ?? null}
-        inputValue={voice}
-        itemToStringValue={option => option.value}
-        itemToStringLabel={option => option.value}
-        filter={null}
-        onInputValueChange={(value, details) => { if (details.reason === 'input-change') setVoice(value) }}
-        onValueChange={option => { if (option) setVoice(option.value) }}>
-        <InputGroup>
-          <ComboboxPrimitive.Input id={uid + '-voice'} maxLength={256} render={<InputGroupInput />} />
-          <InputGroupAddon align="inline-end">
-            <ComboboxPrimitive.Trigger aria-label={copy('presetVoices')} render={<Button type="button" variant="bare" size="icon-sm" />}>
-              <ChevronDown aria-hidden="true" />
-            </ComboboxPrimitive.Trigger>
-          </InputGroupAddon>
-        </InputGroup>
-        <ComboboxContent>
-          <ComboboxList>
-            {(option: typeof voices[number]) => <ComboboxItem key={option.value} value={option}>{option.label}</ComboboxItem>}
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox> : <Input id={uid + '-voice'} value={voice} maxLength={256} onValueChange={setVoice} />}
-    </Field>}
-    {id.trim() && <CloudLanguageDetails connection={connection} modelId={id.trim()} />}
+    {tts && (requiresProfile ? <Field>
+      <FieldLabel>{text(base.supports.voiceDesign === true ? 'designs' : 'clones')}</FieldLabel>
+      <TooltipHint content={!sameModel ? text('saveModelFirst') : undefined}>
+        <div><TtsVoiceSelector profilesOnly modelBinding={binding} targetLanguage={base.languages.mode === 'finite' ? base.languages.values[0] : 'auto'} value={selected} onChange={setSelected} disabled={!sameModel} /></div>
+      </TooltipHint>
+    </Field> : <TtsVoiceConfiguration rows={rows} onChange={next => { edited.current = true; setLookupId(''); setRows(next) }} selected={selected} onSelect={setSelected} capabilities={voiceCapabilities} catalogCapabilities={base} binding={binding} />)}
+    {!tts && id.trim() && <CloudLanguageDetails connection={connection} modelId={id.trim()} />}
   </ModelEditorDialog>
 }

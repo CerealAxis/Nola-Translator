@@ -26,6 +26,7 @@ dependencies = [
   "pydantic==2.13.4",
   "PyAudioWPatch==0.2.12.8",
   "scipy==1.15.3",
+  "soundfile==0.14.0",
   "sentencepiece==0.2.1",
   "transformers==5.17.0",
   "uvicorn==0.54.0"

@@ -1,3 +1,4 @@
+import { languageName } from '../../../../shared/languages'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AudioPlayer } from '@/components/assistant-ui/native/media-player'
 import { useId, useState } from 'react'
@@ -16,7 +17,12 @@ import { customModelsOf } from '../../../../shared/custom-models'
 import type { CloudModelListRequest, CloudModelProbeRequest, RemoteChatModel } from '../../../../shared/cloud-model-tools'
 import { CHATGPT_PLAN_SERVICE } from '../../../../shared/chatgpt-plan'
 import { normalizeThrownError, restoreIpcError } from '../../../../shared/ipc-error'
-import { ttsVoicePresets } from '../../../../shared/tts-voice-presets'
+import { TtsVoiceSelector } from '@/components/tts/TtsVoiceSelector'
+import { useTtsCapabilities } from '@/components/tts/use-tts-capabilities'
+import type { TtsVoiceRef } from '../../../../shared/tts/voice-ref'
+import { SettingSelect } from '../../settings/SettingsPage'
+import { ttsFailureReason } from '@/components/tts/tts-error-copy'
+import { ttsText } from '@/i18n/tts-ui'
 import speechSample from '../../workbench/assets/speech-preview.wav?url'
 import { pcmWavData } from '../../workbench/audio-attachment'
 import type { CloudModel, Connection } from './cloud-preview-data'
@@ -45,13 +51,14 @@ const failureCopy = {
 
 export function useCloudModelFailure() {
   const copy = useCloudPreviewCopy()
-  return (operation: 'fetchModelsFailed' | 'connectionFailed' | 'previewFailed', error: unknown) => {
+  const { language } = useI18n()
+  return (operation: 'fetchModelsFailed' | 'connectionFailed' | 'previewFailed', error: unknown, targetLanguage?: string) => {
     const cause = restoreIpcError(error)
     const { code } = normalizeThrownError(cause)
     if (Object.hasOwn(failureCopy, code)) {
       notifyError(copy(operation), { description: copy(failureCopy[code as keyof typeof failureCopy]) })
     } else {
-      notifyError(copy(operation), { cause })
+      notifyError(copy(operation), { cause, description: ttsFailureReason(language, cause, targetLanguage) })
     }
   }
 }
@@ -160,8 +167,8 @@ export function CloudModelTest({ connection, model, disabled }: { connection: Co
       aria-label={label + ' ' + model.id} onClick={tts ? () => setPreview(true) : () => void test()}>
       {testing ? <LoaderCircle className="motion-safe:animate-spin" /> : <PlugZap />}
     </Button>
-    {preview && <CloudVoicePreview connection={connection} model={model} onClose={() => setPreview(false)} generate={async (text, voice) => {
-      const { audio } = await run({ capability: 'TTS', binding, text, ...(voice ? { voice } : {}) })
+    {preview && <CloudVoicePreview connection={connection} model={model} onClose={() => setPreview(false)} generate={async (text, voiceRef, targetLanguage) => {
+      const { audio } = await run({ capability: 'TTS', binding, text, voiceRef, targetLanguage })
       if (!audio) throw Object.assign(new Error(), { code: 'CLOUD_MODEL_NO_AUDIO' })
       return audio
     }} />}
@@ -169,28 +176,27 @@ export function CloudModelTest({ connection, model, disabled }: { connection: Co
 }
 
 function CloudVoicePreview({ connection, model, onClose, generate }: {
-  connection: Connection; model: CloudModel; onClose: () => void; generate: (text: string, voice: string) => Promise<string>
+  connection: Connection; model: CloudModel; onClose: () => void; generate: (text: string, voice: TtsVoiceRef, language: string) => Promise<string>
 }) {
   const copy = useCloudPreviewCopy()
   const notifyFailure = useCloudModelFailure()
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const textId = useId()
   const voiceId = useId()
   const speech = astrBotSpeechPreset(connection.service)
-  const presets = speech ? ttsVoicePresets(speech.id, model.id) : []
-  const initialVoice = model.voice?.trim() || speech?.voice || ''
-  const voices = presets.length
-    ? initialVoice && !presets.some(option => option.value === initialVoice) ? [{ value: initialVoice, label: initialVoice }, ...presets] : presets
-    : initialVoice ? [{ value: initialVoice, label: initialVoice }] : []
+  const binding = speech ? astrBotSpeechBinding(speech.id, model.profileId) : ''
+  const { capabilities } = useTtsCapabilities(binding)
+  const initialVoice: TtsVoiceRef = model.tts?.defaultVoiceRef ?? { kind: 'engine-default' }
   const [text, setText] = useState(() => copy('auditionSample'))
   const [voice, setVoice] = useState(initialVoice)
+  const [targetLanguage, setTargetLanguage] = useState(stores.settings.getState().settings?.translation.targetLanguage ?? 'zh')
   const [audio, setAudio] = useState('')
   const [loading, setLoading] = useState(false)
   const play = async () => {
     setLoading(true)
     setAudio('')
-    try { setAudio(await generate(text.trim(), voice.trim())) }
-    catch (error) { notifyFailure('previewFailed', error) }
+    try { setAudio(await generate(text.trim(), voice, targetLanguage)) }
+    catch (error) { notifyFailure('previewFailed', error, targetLanguage) }
     finally { setLoading(false) }
   }
   return <ModelEditorDialog title={copy('audition')} saveLabel={<>{loading && <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" />}{copy('generatePreview')}</>} canSave={!!text.trim() && !loading}
@@ -199,16 +205,14 @@ function CloudVoicePreview({ connection, model, onClose, generate }: {
       <FieldLabel htmlFor={textId}>{copy('auditionText')}</FieldLabel>
       <Textarea id={textId} value={text} maxLength={1000} onChange={event => setText(event.currentTarget.value)} />
     </Field>
+    <Field><FieldLabel htmlFor={voiceId + '-language'}>{ttsText(language, 'language')}</FieldLabel>
+      <SettingSelect id={voiceId + '-language'} value={targetLanguage} ariaLabel={ttsText(language, 'language')}
+        options={(capabilities?.languages.mode === 'finite' ? capabilities.languages.values : [targetLanguage]).map(value => ({ value, label: languageName(value, language) }))}
+        onChange={setTargetLanguage} />
+    </Field>
     <Field>
       <FieldLabel htmlFor={voiceId}>{t('workbench.voice')}</FieldLabel>
-      <Select value={voice || null} disabled={!voices.length || loading} onValueChange={value => { if (typeof value === 'string') setVoice(value) }}>
-        <SelectTrigger id={voiceId} aria-label={t('workbench.voice')}>
-          <SelectValue>{voices.find(option => option.value === voice)?.label ?? voice}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>{voices.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup>
-        </SelectContent>
-      </Select>
+      <TtsVoiceSelector id={voiceId} modelBinding={binding} targetLanguage={targetLanguage} value={voice} onChange={setVoice} disabled={loading} />
     </Field>
     {audio && <AudioPlayer src={audio} title={copy('audition')} className="max-w-none" />}
   </ModelEditorDialog>

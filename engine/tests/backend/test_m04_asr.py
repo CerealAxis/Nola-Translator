@@ -322,7 +322,8 @@ def test_production_asr_pipeline_commits_accepted_pcm_on_eof_or_pause(monkeypatc
         async def translate(self, *args, **kwargs):
             return await self.mt.translate(*args, **kwargs)
 
-        async def synthesize(self, ctx, *, text, voice, request):
+        async def synthesize(self, ctx, *, synthesis, request):
+            text = synthesis.text
             assert text == "zh:Recognized audio."
             assert ctx.provider_options == ({"api_key": "mimo-test-key", "endpoint": "", "model": ""}
                                             if output == "mimo" else {})

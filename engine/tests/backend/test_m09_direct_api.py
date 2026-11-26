@@ -151,7 +151,8 @@ def test_realtime_cloud_gateway_holds_provider_lease_and_keeps_credentials_priva
 
 def test_direct_mimo_inference_forwards_the_private_header_to_tts_only():
     class Gateway:
-        async def synthesize(self, context, *, text, voice, request):
+        async def synthesize(self, context, *, synthesis, request):
+            assert synthesis.text == "Hello"
             expected = {"api_key": "test-mimo-key"} if request.model_id == MIMO_TTS_MODEL else {}
             assert context.provider_options == expected
             return SynthesisResult([SynthesisChunk(b"\x01\x00", 24000, terminal=True)])

@@ -60,7 +60,7 @@ export function TranslationCompatibilityDialog(props: TranslationCompatibilityDi
         </div>
         <DialogFooter>
           <Button variant="secondary" onClick={() => setChoosingModel(true)}>{t('modelConfig.changeModel')}</Button>
-          <Button variant="tertiary" onClick={props.onClose}>{t('common.close')}</Button>
+          <Button variant="secondary" onClick={props.onClose}>{t('common.close')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

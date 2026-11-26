@@ -341,7 +341,8 @@ def test_cascade_transcribes_translates_and_synthesizes_both_directions(audio, m
                 self.transcribed.append(ctx.pipeline_id)
                 return AsrObservation("Spoken phrase", language=language, is_final=True)
 
-        async def synthesize(self, ctx, *, text, voice, request):
+        async def synthesize(self, ctx, *, synthesis, request):
+            text = synthesis.text
             self.synthesized.append((ctx.pipeline_id, text))
             return SynthesisResult([SynthesisChunk(b"\x00\x20" * 320, 16000, terminal=True)])
 

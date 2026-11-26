@@ -23,7 +23,7 @@ export function FeatureCard({ primary, className, icon, title, description, butt
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
       <CardFooter className="border-0 bg-transparent p-0">
-        <Button variant={primary ? 'default' : 'outline'} size="sm" onClick={onButtonClick} className="nola-entry__action">{buttonText}<ArrowRight data-icon="inline-end" aria-hidden="true" /></Button>
+        <Button variant={primary ? 'default' : 'secondary'} size="sm" onClick={onButtonClick} className="nola-entry__action">{buttonText}<ArrowRight data-icon="inline-end" aria-hidden="true" /></Button>
       </CardFooter>
     </Card>
   )

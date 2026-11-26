@@ -35,7 +35,7 @@ export function StopSessionDialog({ isOpen, onOpenChange, onEnd }: StopSessionDi
             <AlertDialog.Description data-slot="dialog-description">{t('workspace.endConfirmBody')}</AlertDialog.Description>
           </DialogHeader>
           <DialogFooter>
-            <AlertDialog.Close render={<Button variant="tertiary" size="sm" className="rounded-xl" />}>{t('workspace.keepGoing')}</AlertDialog.Close>
+            <AlertDialog.Close render={<Button variant="secondary" size="sm" className="rounded-xl" />}>{t('workspace.keepGoing')}</AlertDialog.Close>
             <Button variant="danger" size="sm" className="rounded-xl" onClick={() => { onEnd(); onOpenChange(false) }}>{t('workspace.end')}</Button>
           </DialogFooter>
         </AlertDialogContent>
@@ -88,7 +88,7 @@ export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRe
         </DialogHeader>
         {handle.detail ? <p className="type-body mb-4 text-muted">{t(handle.detail)}</p> : null}
         <DialogFooter>
-          <Button variant="tertiary" size="sm" className="rounded-xl" onClick={() => onCopyDiagnostics({
+          <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => onCopyDiagnostics({
             supportCode,
             correlationId: state.errorRequestId ?? undefined,
           })}>

@@ -84,7 +84,8 @@ export function installedPlaygroundModels(
     }
   }
   if (settings) for (const model of configuredBatchSpeechModels(settings, credentials)) {
-    if (model.kind === 'asr' || model.kind === 'tts') models.push({ id: model.binding, name: model.name, kind: model.kind, batchSpeech: true })
+    if (model.kind === 'asr' || model.kind === 'tts') models.push({ id: model.binding, name: model.name, kind: model.kind, batchSpeech: true,
+      sourceLanguages: model.sourceLanguages, targetLanguages: model.targetLanguages })
   }
   const order: ModelKind[] = ['llm', 'asr', 'mt', 'tts']
   return models.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind))

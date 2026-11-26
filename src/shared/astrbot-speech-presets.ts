@@ -7,7 +7,7 @@ export const astrBotSpeechPresets = [
   { id: 'edge-tts', name: 'Edge TTS', capability: 'TTS', endpoint: '', model: 'edge-tts', voice: 'zh-CN-XiaoxiaoNeural', icon: 'Microsoft', keyless: true, voiceOnly: true,
     fields: { rate: '+0%', volume: '+0%', pitch: '+0Hz' } },
   { id: 'fishaudio-tts', name: 'FishAudio TTS(API)', capability: 'TTS', endpoint: 'https://api.fish.audio/v1', model: 's2-pro', voice: '',
-    fields: { character: '可莉' }, icon: 'FishAudio' },
+    icon: 'FishAudio' },
   { id: 'dashscope-tts', name: '阿里云百炼 TTS(API)', capability: 'TTS', endpoint: '', model: 'cosyvoice-v1', voice: 'loongstella', icon: 'Bailian' },
   { id: 'azure-tts', name: 'Azure TTS', capability: 'TTS', endpoint: '', model: 'azure-tts', voice: 'zh-CN-YunxiaNeural', icon: 'Azure', voiceOnly: true,
     fields: { region: 'eastus', style: 'cheerful', role: 'Boy', rate: '1', volume: '100' } },

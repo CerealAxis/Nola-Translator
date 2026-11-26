@@ -693,7 +693,8 @@ class EngineRuntime:
             return self.service.handle(command)
 
         try:
-            model_id, missing_resources = self._validate_model_selection(command.config)
+            model_id, missing_resources, config = self._validate_model_selection(command.config)
+            command = command.model_copy(update={"config": config})
         except ResourceActionError as error:
             # The model ids are free-form strings now, so an id the resource table has never heard
             # of arrives here as a lookup failure. It is a configuration problem, not a crash, and
@@ -819,7 +820,7 @@ class EngineRuntime:
         self._write_engine_status()
         return events
 
-    def _validate_model_selection(self, config: ModelSelection) -> tuple[str, list[str]]:
+    def _validate_model_selection(self, config: ModelSelection) -> tuple[str, list[str], ModelSelection]:
         """The recognition id a config names, and the required ids whose weights are absent.
 
         A prewarm runs this before loading, so a config it accepted is one the session start
@@ -860,7 +861,7 @@ class EngineRuntime:
             recognition_source = "zh" if source == "zh-Hant" else source
             if recognition_source != "auto" and recognition_source not in supported:
                 if recognition.supportsAutoDetection:
-                    config.sourceLanguage = "auto"
+                    config = config.model_copy(update={"sourceLanguage": "auto"})
                     source = "auto"
                 else:
                     raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedRecognitionLanguage", "language": source})
@@ -873,7 +874,7 @@ class EngineRuntime:
         return model_id, [
             resource_id for resource_id in required_resources
             if not self.resources.is_installed(resource_id)
-        ]
+        ], config
 
     async def _prewarm(self, command: PrewarmModelsCommand) -> list[EngineEvent]:
         """Keep the wire name for compatibility; load both local models without inference."""
@@ -884,7 +885,8 @@ class EngineRuntime:
 
         config = command.config
         try:
-            model_id, missing_resources = self._validate_model_selection(config)
+            model_id, missing_resources, config = self._validate_model_selection(config)
+            command = command.model_copy(update={"config": config})
             translation_model_id = (
                 self._local_translation_model_id(config)
                 if config.targetLanguages and (config.translationProvider == "local" or config.fallbackTranslationProvider == "local")

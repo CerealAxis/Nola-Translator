@@ -17,6 +17,7 @@ type PreparedMeeting = {
   backend: MeetingBackend
   uplink?: MappedBackendSession
   downlink?: MappedBackendSession
+  releaseTts?: () => void
 }
 
 function meetingFailure(error: z.infer<typeof backendError>, meetingId: string, method: string): MeetingError {
@@ -61,7 +62,7 @@ export class MeetingModeError extends Error {
 export class MeetingMode {
   private current: MeetingModeSnapshot = { state: 'idle', passthroughActive: false }
   private lease?: FeatureLease
-  private active?: { backend: MeetingBackend; id: string; resources: Set<string> }
+  private active?: { backend: MeetingBackend; id: string; resources: Set<string>; releaseTts?: () => void }
   private starting?: Promise<MeetingModeSnapshot>
   private abortStart?: AbortController
   private stopping?: Promise<MeetingModeSnapshot>
@@ -107,15 +108,16 @@ export class MeetingMode {
 
   private async startGroup(settings: MeetingModeSettings): Promise<MeetingModeSnapshot> {
     try {
-      const { backend, uplink, downlink } = await this.prepare(settings)
+      const { backend, uplink, downlink, releaseTts } = await this.prepare(settings)
       if (this.stopping) {
+        releaseTts?.()
         this.release()
         return this.publish({ state: 'idle', passthroughActive: false, meetingId: this.current.meetingId, segments: this.current.segments })
       }
       const id = randomUUID()
       const resources = new Set([uplink, downlink].filter((lane): lane is MappedBackendSession => !!lane).flatMap(({ config: { pipeline } }) =>
         pipeline.kind === 'cascade' ? [pipeline.asr_model, pipeline.translation_model, pipeline.fallback_translation_model, pipeline.tts_model].filter((item): item is string => !!item) : []))
-      this.active = { backend, id, resources }
+      this.active = { backend, id, resources, releaseTts }
       backend.once('exit', this.backendLost)
       this.abortStart = new AbortController()
       const result = await this.request('POST', {
@@ -216,6 +218,7 @@ export class MeetingMode {
   private release(): void {
     clearTimeout(this.poll)
     this.active?.backend.off('exit', this.backendLost)
+    this.active?.releaseTts?.()
     this.active = undefined
     this.lease?.release()
     this.lease = undefined

@@ -21,6 +21,7 @@ from nola_translator_engine.protocol import (
 )
 from nola_translator_engine.recognition.base import RecognitionUpdate
 from nola_translator_engine.recognition.streaming import StreamingRecognizer
+from nola_translator_engine.recognition.volume_gate import SileroVadSegmenter
 from nola_translator_engine.runtime import EngineRuntime
 from nola_translator_engine.service import EngineService
 from nola_translator_engine.translation.base import ProviderTranslation
@@ -207,8 +208,8 @@ async def test_bounded_queue_ack_sequences_and_stream_isolation(tmp_path, monkey
     assert overflow.code == "audioBufferOverflow"
     for changes, code in [({"sessionId": "other"}, "sessionNotRunning"),
             ({"streamId": "other"}, "invalidConfiguration"),
-            ({"epoch": 1}, "invalidConfiguration"), ({"sequence": 9}, "invalidMessage"),
-            ({"sequence": 11}, "invalidMessage")]:
+            ({"epoch": 1}, "invalidConfiguration"), ({"sequence": 9}, "sessionAudioOutOfOrder"),
+            ({"sequence": 11}, "sessionAudioOutOfOrder")]:
         assert (await runtime.handle(audio(**dict(dict(sessionId=session_id), **changes))))[0].code == code
     await runtime.close()
 
@@ -276,6 +277,8 @@ async def test_wrong_session_stop_does_not_teardown_live_stream(tmp_path, monkey
 @pytest.mark.asyncio
 async def test_browser_start_keeps_model_capability_validation(tmp_path, monkeypatch):
     runtime = EngineRuntime(tmp_path / "models", lambda _: None)
+    configuration = runtime.resources.configuration('sensevoice-small').model_copy(update={'languages': ['en'], 'supportsAutoDetection': False})
+    monkeypatch.setattr(runtime.resources, 'configuration', lambda _: configuration)
     loader = AsyncMock()
     monkeypatch.setattr(runtime, "_configure_device_plan", loader)
     result = await runtime.handle(StartSessionCommand(protocolVersion=1, type="startSession", requestId="start",
@@ -354,12 +357,13 @@ async def locked_runtime(tmp_path, monkeypatch):
     runtime._active_recognition_runtime = model
     monkeypatch.setattr(runtime.resources, "is_installed", lambda _: True)
     monkeypatch.setattr(runtime, "_configure_device_plan", AsyncMock())
+    monkeypatch.setattr(SileroVadSegmenter, '_speech_probability', lambda self, samples: 1.0)
 
     async def create_recognizer(_command):
-        return StreamingRecognizer(model, block_ms=20)
+        return StreamingRecognizer(model, block_ms=20, segmenter=SileroVadSegmenter(min_voiced_ms=20))
 
     monkeypatch.setattr(runtime, "_create_recognizer", create_recognizer)
-    monkeypatch.setattr(runtime, "_fresh_recognizer", lambda: StreamingRecognizer(model, block_ms=20))
+    monkeypatch.setattr(runtime, "_fresh_recognizer", lambda: StreamingRecognizer(model, block_ms=20, segmenter=SileroVadSegmenter(min_voiced_ms=20)))
     start = StartSessionCommand(protocolVersion=1, type="startSession", requestId="start", config=config())
     session_id = (await runtime.handle(start))[0].sessionId
     await runtime.handle(reset(session_id))

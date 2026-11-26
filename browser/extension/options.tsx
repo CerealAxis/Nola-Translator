@@ -26,7 +26,7 @@ import { ColorField, ConnectionStatus, languageOptions, LiveServiceField, RangeF
 import { createProvider, DEFAULT_PROVIDERS, isBundledProviderCopy, loadProviders, saveProviders, requestProviderAccess, PROVIDER_PRESETS, exportProviderConfig, visibleProviderConnections, type ProviderConnection, type Capability } from './providers'
 import { GlossaryManager } from './components/GlossaryManager'
 import { parseOptionsRoute } from './options-route'
-import { extensionGlossary, migrateLegacyGlossary, restoreExtensionConfiguration } from './glossary-store'
+import { extensionGlossary, restoreExtensionConfiguration } from './glossary-store'
 import { emptyGlossary, glossaryDocumentSchema } from '../../src/shared/glossary'
 import { clearTranslationCache, synthesize, testProvider, translate, translateImage } from './provider-client'
 import { encodeClipboardImage } from './image-translation'
@@ -89,7 +89,7 @@ function NumberField({ label, value, onChange, min = 0, max = 100, step = 1 }: {
 }
 function FileAction({ label, accept, disabled, onFile }: { label: string; accept: string; disabled?: boolean; onFile: (file: File) => void }) {
   const input = useRef<HTMLInputElement>(null)
-  return <div className="nola-file-action"><Button variant="outline" disabled={disabled} onClick={() => input.current?.click()}><Upload data-icon="inline-start" />{label}</Button><input ref={input} type="file" aria-label={label} accept={accept} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onFile(file) }} /></div>
+  return <div className="nola-file-action"><Button variant="secondary" disabled={disabled} onClick={() => input.current?.click()}><Upload data-icon="inline-start" />{label}</Button><input ref={input} type="file" aria-label={label} accept={accept} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onFile(file) }} /></div>
 }
 function Group({ title, children }: { title?: string; children: ReactNode }) {
   return <section className="nola-settings-section">{title && <h2>{title}</h2>}<FieldGroup>{children}</FieldGroup></section>
@@ -115,7 +115,7 @@ function ShortcutField({ label, value, defaultValue, onChange, modifierOnly = fa
 function LanguageMultiField({ settings, locale, save, t }: { settings: Preferences; locale: Parameters<typeof languageOptions>[0]; save: Save; t: T }) {
   const [query, setQuery] = useState('')
   const languages = languageOptions(locale)
-  return <Field><FieldLabel>{t('skipLanguages')}</FieldLabel><Popover><PopoverTrigger render={<Button variant="outline" aria-label={t('skipLanguages')} />}><span className="nola-language-selection">{settings.skipLanguages.length ? languages.filter(option => settings.skipLanguages.includes(option.value)).map(option => option.label).join(', ') : t('none')}</span><ChevronDown data-icon="inline-end" /></PopoverTrigger><PopoverContent className="nola-hub-provider-picker"><PopoverTitle>{t('skipLanguages')}</PopoverTitle><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput aria-label={t('searchLanguages')} placeholder={t('searchLanguages')} value={query} onChange={e => setQuery(e.target.value)} /></InputGroup>{languages.filter(option => option.label.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(option => <Toggle key={option.value} label={option.label} checked={settings.skipLanguages.includes(option.value)} onChange={checked => save('skipLanguages', checked ? [...settings.skipLanguages, option.value] : settings.skipLanguages.filter(value => value !== option.value))} />)}</PopoverContent></Popover></Field>
+  return <Field><FieldLabel>{t('skipLanguages')}</FieldLabel><Popover><PopoverTrigger render={<Button variant="secondary" aria-label={t('skipLanguages')} />}><span className="nola-language-selection">{settings.skipLanguages.length ? languages.filter(option => settings.skipLanguages.includes(option.value)).map(option => option.label).join(', ') : t('none')}</span><ChevronDown data-icon="inline-end" /></PopoverTrigger><PopoverContent className="nola-hub-provider-picker"><PopoverTitle>{t('skipLanguages')}</PopoverTitle><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput aria-label={t('searchLanguages')} placeholder={t('searchLanguages')} value={query} onChange={e => setQuery(e.target.value)} /></InputGroup>{languages.filter(option => option.label.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(option => <Toggle key={option.value} label={option.label} checked={settings.skipLanguages.includes(option.value)} onChange={checked => save('skipLanguages', checked ? [...settings.skipLanguages, option.value] : settings.skipLanguages.filter(value => value !== option.value))} />)}</PopoverContent></Popover></Field>
 }
 function JsonField({ label, value, onChange, error }: { label: string; value: object; onChange: (value: Record<string, string>) => void; error: string }) {
   const id = useId()
@@ -138,7 +138,7 @@ function JsonField({ label, value, onChange, error }: { label: string; value: ob
 function ConfirmAction({ label, description, onConfirm, t }: { label: string; description: string; onConfirm(): Promise<void>; t: T }) {
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
-  return <><Button variant="outline" onClick={() => setOpen(true)}>{label}</Button><Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogTitle>{label}</DialogTitle><DialogDescription>{description}</DialogDescription><DialogFooter><DialogClose render={<Button variant="outline" disabled={pending} />}>{t('cancel')}</DialogClose><Button variant="destructive" disabled={pending} onClick={() => { setPending(true); void onConfirm().then(() => setOpen(false)).catch(() => showToast({ type: 'error', description: t('internalError') })).finally(() => setPending(false)) }}>{label}</Button></DialogFooter></DialogContent></Dialog></>
+  return <><Button variant="secondary" onClick={() => setOpen(true)}>{label}</Button><Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogTitle>{label}</DialogTitle><DialogDescription>{description}</DialogDescription><DialogFooter><DialogClose render={<Button variant="secondary" disabled={pending} />}>{t('cancel')}</DialogClose><Button variant="danger" disabled={pending} onClick={() => { setPending(true); void onConfirm().then(() => setOpen(false)).catch(() => showToast({ type: 'error', description: t('internalError') })).finally(() => setPending(false)) }}>{label}</Button></DialogFooter></DialogContent></Dialog></>
 }
 function ProviderEditor({ providers, settings, onChange, t }: { providers: ProviderConnection[]; settings: Preferences; onChange: (providers: ProviderConnection[]) => Promise<void>; t: T }) {
   const [selected, setSelected] = useState('desktop')
@@ -187,7 +187,7 @@ function ProviderEditor({ providers, settings, onChange, t }: { providers: Provi
   }
   return <div className="nola-provider-layout">
     <aside className="nola-provider-rail" aria-label={t('apiProviders')}>
-      <Popover open={adding} onOpenChange={setAdding}><PopoverTrigger render={<Button variant="outline" className="nola-provider-add" />}><Plus data-icon="inline-start" />{t('add')}</PopoverTrigger><PopoverContent className="nola-provider-picker" align="start"><PopoverTitle>{t('preset')}</PopoverTitle><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput aria-label={t('searchOptions')} placeholder={t('searchOptions')} value={addSearch} onChange={e => setAddSearch(e.target.value)} /></InputGroup><div className="nola-provider-picker-list">{PROVIDER_PRESETS.filter(p => p.id !== 'nola' && p.name.toLowerCase().includes(addSearch.toLowerCase())).map(p => <Button variant="bare" className="justify-start" key={p.id} disabled={pending} onClick={() => {
+      <Popover open={adding} onOpenChange={setAdding}><PopoverTrigger render={<Button variant="secondary" className="nola-provider-add" />}><Plus data-icon="inline-start" />{t('add')}</PopoverTrigger><PopoverContent className="nola-provider-picker" align="start"><PopoverTitle>{t('preset')}</PopoverTitle><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput aria-label={t('searchOptions')} placeholder={t('searchOptions')} value={addSearch} onChange={e => setAddSearch(e.target.value)} /></InputGroup><div className="nola-provider-picker-list">{PROVIDER_PRESETS.filter(p => p.id !== 'nola' && p.name.toLowerCase().includes(addSearch.toLowerCase())).map(p => <Button variant="bare" className="justify-start" key={p.id} disabled={pending} onClick={() => {
         const existing = p.id === 'index-translate' ? undefined : providers.find(item => item.preset === p.id && isBundledProviderCopy(item))
         if (existing) { setSelected(existing.id); setAdding(false); setAddSearch(''); return }
         const created = createProvider(p.id)
@@ -217,7 +217,7 @@ function ProviderEditor({ providers, settings, onChange, t }: { providers: Provi
           <JsonField key={`${provider.id}-options`} label={t('advancedOptions')} value={provider.options} onChange={options => update({ options })} error={t('invalidConfig')} />
         </FieldGroup></details>}
       </>}
-      {provider.preset !== 'nola' && <div className="nola-actions"><Button disabled={pending || !provider.name.trim()} onClick={() => void save()}>{t('save')}</Button><Button variant="outline" size="icon" disabled={pending} aria-label={t('testConnection')} tooltip={t(testing ? 'testingConnection' : 'testConnection')} onClick={() => void test()}>{testing ? <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" /> : <PlugZap aria-hidden="true" />}</Button>{!bundledIndex && <ConfirmAction label={t('remove')} description={t('confirmRemoveProvider')} t={t} onConfirm={async () => {
+      {provider.preset !== 'nola' && <div className="nola-actions"><Button disabled={pending || !provider.name.trim()} onClick={() => void save()}>{t('save')}</Button><Button variant="secondary" size="icon" disabled={pending} aria-label={t('testConnection')} tooltip={t(testing ? 'testingConnection' : 'testConnection')} onClick={() => void test()}>{testing ? <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" /> : <PlugZap aria-hidden="true" />}</Button>{!bundledIndex && <ConfirmAction label={t('remove')} description={t('confirmRemoveProvider')} t={t} onConfirm={async () => {
         const bindings = ['pageProvider', 'selectionProvider', 'inputProvider', 'subtitleProvider', 'asrProvider', 'ttsProvider', 's2sProvider', 'llmProvider'].filter(key => settings[key as keyof Preferences] === provider.id)
         if (bindings.length) await savePreferences(Object.fromEntries(bindings.map(key => [key, 'desktop'])))
         await onChange(providers.filter(p => p.id !== provider.id)); drafts.current.delete(provider.id); setSelected('desktop')
@@ -324,7 +324,7 @@ function TranslationCenter({ settings, providers, locale, t }: { settings: Prefe
         </div>
       </div>
     </div>
-    <div className="nola-hub-results"><div className="nola-hub-toolbar"><Popover><PopoverTrigger render={<Button variant="outline" />}><Languages data-icon="inline-start" />{t('provider')}<Badge>{active.length}</Badge><ChevronDown data-icon="inline-end" /></PopoverTrigger><PopoverContent className="nola-hub-provider-picker" align="end"><PopoverTitle>{t('selectProviders')}</PopoverTitle>{available.map(p => <Toggle key={p.id} label={p.name} checked={selected.includes(p.id)} onChange={checked => selectProvider(p.id, checked)} />)}</PopoverContent></Popover><Button variant="bare" size="icon-sm" aria-label={t('apiProviders')} tooltip={t('apiProviders')} onClick={() => { window.location.hash = 'apiProviders' }}><Settings2 /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('expand')} tooltip={t('expand')} onClick={() => setCollapsed([])}><ChevronDown /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('collapse')} tooltip={t('collapse')} onClick={() => setCollapsed(active)}><ChevronUp /></Button></div>
+    <div className="nola-hub-results"><div className="nola-hub-toolbar"><Popover><PopoverTrigger render={<Button variant="secondary" />}><Languages data-icon="inline-start" />{t('provider')}<Badge>{active.length}</Badge><ChevronDown data-icon="inline-end" /></PopoverTrigger><PopoverContent className="nola-hub-provider-picker" align="end"><PopoverTitle>{t('selectProviders')}</PopoverTitle>{available.map(p => <Toggle key={p.id} label={p.name} checked={selected.includes(p.id)} onChange={checked => selectProvider(p.id, checked)} />)}</PopoverContent></Popover><Button variant="bare" size="icon-sm" aria-label={t('apiProviders')} tooltip={t('apiProviders')} onClick={() => { window.location.hash = 'apiProviders' }}><Settings2 /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('expand')} tooltip={t('expand')} onClick={() => setCollapsed([])}><ChevronDown /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('collapse')} tooltip={t('collapse')} onClick={() => setCollapsed(active)}><ChevronUp /></Button></div>
       {active.map(id => {
         const provider = available.find(p => p.id === id) ?? DEFAULT_PROVIDERS.find(p => p.id === imageProvider)!
         const result = results[id], expanded = !collapsed.includes(id)
@@ -393,18 +393,18 @@ function Backup({ settings, t }: { settings: Preferences; t: T }) {
     try {
       if (file.size > 10_000_000) throw new Error()
       const data: unknown = JSON.parse(await file.text())
-      if (!data || typeof data !== 'object' || !('version' in data) || ![1, 2].includes(data.version as number) || !('preferences' in data) || !data.preferences || typeof data.preferences !== 'object' || Array.isArray(data.preferences)) throw new Error()
+      if (!data || typeof data !== 'object' || !('version' in data) || data.version !== 2 || !('preferences' in data) || !data.preferences || typeof data.preferences !== 'object' || Array.isArray(data.preferences)) throw new Error()
       const imported = readPreferences(data.preferences as Record<string, unknown>)
       const currentGlossary = await extensionGlossary.snapshot()
-      const glossary = data.version === 2 && 'glossary' in data ? glossaryDocumentSchema.parse(data.glossary) : migrateLegacyGlossary(imported.glossary, t('suite.glossaryTitle'), t('suite.migrationReview'))
+      const glossary = glossaryDocumentSchema.parse('glossary' in data ? data.glossary : undefined)
       await restoreExtensionConfiguration({ glossary, preferences: imported, ...('providers' in data ? { providers: data.providers } : {}) }, currentGlossary.revision)
       showToast({ type: 'success', description: t('saved') })
     } catch { showToast({ type: 'error', description: t('invalidConfig') }) } finally { setImporting(false) }
   }
   return <>
-    <Group title={t('exportConfig')}><p className="nola-muted">{t('exportHelp')}</p><Toggle label={t('includeKeys')} checked={secrets} onChange={setSecrets} /><div className="nola-form-actions"><Button variant="outline" onClick={() => void exportConfig()}><Download data-icon="inline-start" />{t('exportConfig')}</Button><FileAction label={t('importConfig')} accept="application/json,.json" disabled={importing} onFile={file => void importConfig(file)} /></div></Group>
+    <Group title={t('exportConfig')}><p className="nola-muted">{t('exportHelp')}</p><Toggle label={t('includeKeys')} checked={secrets} onChange={setSecrets} /><div className="nola-form-actions"><Button variant="secondary" onClick={() => void exportConfig()}><Download data-icon="inline-start" />{t('exportConfig')}</Button><FileAction label={t('importConfig')} accept="application/json,.json" disabled={importing} onFile={file => void importConfig(file)} /></div></Group>
     <Group title={t('storageActions')}>
-      <Field><div className="nola-setting-copy"><FieldLabel>{t('clearCache')}</FieldLabel><p>{t('clearCacheHelp')}</p></div><Button variant="outline" onClick={() => { void clearTranslationCache().then(() => showToast({ type: 'success', description: t('saved') })).catch(() => showToast({ type: 'error', description: t('internalError') })) }}>{t('clearCache')}</Button></Field>
+      <Field><div className="nola-setting-copy"><FieldLabel>{t('clearCache')}</FieldLabel><p>{t('clearCacheHelp')}</p></div><Button variant="secondary" onClick={() => { void clearTranslationCache().then(() => showToast({ type: 'success', description: t('saved') })).catch(() => showToast({ type: 'error', description: t('internalError') })) }}>{t('clearCache')}</Button></Field>
       <Field><div className="nola-setting-copy"><FieldLabel>{t('resetSettings')}</FieldLabel><p>{t('resetHelp')}</p></div><ConfirmAction label={t('resetSettings')} description={t('confirmResetSettings')} t={t} onConfirm={async () => { const glossary = await extensionGlossary.snapshot(); await restoreExtensionConfiguration({ glossary: emptyGlossary(), preferences: DEFAULT_PREFERENCES }, glossary.revision); showToast({ type: 'success', description: t('saved') }) }} /></Field>
     </Group>
     <Group title={t('logTitle')}>
@@ -413,8 +413,8 @@ function Backup({ settings, t }: { settings: Preferences; t: T }) {
         <Textarea id={logId} readOnly rows={8} value={logs.length ? logs.slice().reverse().map(entry => `${entry.time}  ${entry.context}  ${entry.event}  ${entry.code}  v${entry.version}  ${entry.browser || ''}`).join('\n') : t('logEmpty')} />
       </Field>
       <div className="nola-form-actions">
-        <Button variant="outline" onClick={() => { void refreshLogs().catch(() => showToast({ type: 'error', description: t('internalError') })) }}><RefreshCw data-icon="inline-start" />{t('refresh')}</Button>
-        <Button variant="outline" onClick={() => void exportLogs()}><Download data-icon="inline-start" />{t('logExport')}</Button>
+        <Button variant="secondary" onClick={() => { void refreshLogs().catch(() => showToast({ type: 'error', description: t('internalError') })) }}><RefreshCw data-icon="inline-start" />{t('refresh')}</Button>
+        <Button variant="secondary" onClick={() => void exportLogs()}><Download data-icon="inline-start" />{t('logExport')}</Button>
         <ConfirmAction label={t('logClear')} description={t('logClearConfirm')} t={t} onConfirm={async () => { await clearDiagnostics(); setLogs([]) }} />
       </div>
     </Group>

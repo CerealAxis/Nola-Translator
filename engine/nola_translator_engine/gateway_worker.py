@@ -130,7 +130,7 @@ class PersistentSynthesizer:
         metadata = json.loads((root / 'config.json').read_text(encoding='utf8'))
         if metadata.get('model_type') == 'qwen3_tts':
             self.mode = metadata.get('tts_model_type', '')
-            if self.mode not in ('custom_voice', 'voice_design'):
+            if self.mode not in ('custom_voice', 'voice_design', 'base'):
                 raise ValueError('A reference voice is required by this TTS model')
             self.model = load_qwen3_tts(root, device)
             self.voices = list(self.model.get_supported_speakers() or [])
@@ -143,8 +143,10 @@ class PersistentSynthesizer:
         self.pipeline = pipeline('text-to-audio', model=self.model, device=device, trust_remote_code=False)
         self.mode = 'pipeline'
 
-    def synthesize(self, text, voice=''):
+    def synthesize(self, text, voice='', *, language='auto', conditioning=None, reference_audio=None, controls=None):
         from .local_call import encode_audio
+        if conditioning and conditioning.get('kind') == 'preset':
+            voice = conditioning['voiceId']
         if voice and voice not in self.voices:
             raise ValueError('Unknown voice')
         if self.mode == 'crisp':
@@ -153,14 +155,10 @@ class PersistentSynthesizer:
             if speaker:
                 session.set_speaker_name(speaker)
             audio, rate = session.synthesize(text), session.output_sample_rate()
-        elif self.mode == 'custom_voice':
-            speaker = voice or (self.voices[0] if self.voices else None)
-            if not speaker:
-                raise ValueError('The model does not expose a speaker')
-            wavs, rate = self.model.generate_custom_voice(text=text, speaker=speaker, language='Auto')
-            audio = wavs[0]
-        elif self.mode == 'voice_design':
-            wavs, rate = self.model.generate_voice_design(text=text, language='Auto', instruct='A clear, neutral speaking voice.')
+        elif self.mode in ('custom_voice', 'voice_design', 'base'):
+            from .local_call import generate_qwen3_tts
+            wavs, rate = generate_qwen3_tts(self.model, self.mode, text, voice, language=language,
+                conditioning=conditioning, reference_audio=reference_audio, controls=controls)
             audio = wavs[0]
         else:
             result = self.pipeline(text)
@@ -393,7 +391,9 @@ class GatewayWorker:
         remote_translation = self.kind == 'mt' and config is not None and config.translationProvider != 'local'
         async with self._inference_scope(remote_translation, request.get('id')):
             if self.kind == 'tts':
-                result = await asyncio.to_thread(self.synthesizer.synthesize, text, request.get('voice', ''))
+                result = await asyncio.to_thread(self.synthesizer.synthesize, text, request.get('voice', ''),
+                    language=request.get('language') or request.get('target') or 'auto',
+                    conditioning=request.get('conditioning'), reference_audio=request.get('reference_audio'), controls=request.get('controls'))
                 return await asyncio.to_thread(speech_format, result, request.get('response_format', 'mp3'))
             if runtime is None:
                 raise ValueError('The fallback translator is not enabled')

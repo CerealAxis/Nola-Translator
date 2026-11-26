@@ -69,10 +69,10 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
             finishStep(t('workbench.audioPrepared'))
             beginStep('nola_transcribe_audio', { model: config.model })
           } else if (config.kind === 'mt') beginStep(image ? 'nola_translate_image' : 'nola_translate_text', { model: config.model, target: config.target })
-          else if (config.kind === 'tts') beginStep('nola_synthesize_speech', { model: config.model, voice: config.voice })
+          else if (config.kind === 'tts') beginStep('nola_synthesize_speech', { model: config.model, target: config.target })
           const result = await app.directModel!({ id, model: config.model, kind: config.kind as 'asr' | 'mt' | 'tts',
             text: user?.parts.filter(part => part.type === 'text').map(part => part.text).join('\n') ?? '',
-            source: config.source, target: config.target, voice: config.voice,
+            source: config.source, target: config.target, voiceRef: config.voiceRef,
             ...(recognitionAudio ? { audio: recognitionAudio } : {}), ...(image?.type === 'file' ? { image: image.url } : {}),
           }).catch(error => { throw inferenceError(error) })
           signal?.throwIfAborted()

@@ -1,3 +1,4 @@
+import { emptyGlossary } from '../../src/shared/glossary'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,7 +25,7 @@ vi.mock('./providers', async original => { const actual = await original<typeof 
 vi.mock('./glossary-store', async original => {
   const actual = await original<typeof import('./glossary-store')>()
   return { ...actual, extensionGlossary: {
-    snapshot: vi.fn(async () => glossaryDocument ??= actual.migrateLegacyGlossary(settings.glossary, 'Terminology')),
+    snapshot: vi.fn(async () => glossaryDocument ??= emptyGlossary()),
     command: vi.fn(async request => { glossaryDocument = applyGlossaryMutation(glossaryDocument!, request); return glossaryDocument }),
     onChanged: vi.fn(() => () => {}),
   }, restoreExtensionConfiguration: vi.fn(async () => {}) }
@@ -221,7 +222,8 @@ describe('extension settings', () => {
     expect(showToast).toHaveBeenCalledWith({ type: 'error', description: browserText('en')('shortcutConflict') })
   })
   it('requires confirmation before removing a term or a site rule', async () => {
-    settings = { ...settings, glossary: [{ source: 'API', target: '接口', sites: '' }], siteRules: [{ host: 'example.com', includeSelectors: '', excludeSelectors: '' }] }
+    settings = { ...settings, siteRules: [{ host: 'example.com', includeSelectors: '', excludeSelectors: '' }] }
+    glossaryDocument = { ...emptyGlossary(), libraries: [{ id: crypto.randomUUID(), name: 'Terms', description: '', enabled: true, scope: { mode: 'global' }, entries: [{ id: crypto.randomUUID(), source: 'API', target: '接口', targetLanguage: '*', caseSensitive: true, enabled: true }] }] }
     const user = userEvent.setup(); render(<Options />)
     await user.click(screen.getByRole('button', { name: 'Terminology' }))
     await user.click(await screen.findByRole('button', { name: 'Edit' }))
@@ -250,14 +252,14 @@ describe('extension settings', () => {
     const user = userEvent.setup(); render(<Options />)
     await user.click(screen.getByRole('button', { name: 'Translation center' }))
     await user.type(screen.getByRole('textbox', { name: 'Text to translate' }), 'Hello')
-    await user.click(screen.getByRole('button', { name: 'Translate text' }))
+    await user.click(screen.getByRole('button', { name: browserText('en')('startTranslation') }))
     await waitFor(() => expect(translate).toHaveBeenCalled())
     const signal = vi.mocked(translate).mock.calls[0][4]
     await user.click(screen.getByRole('button', { name: 'Close' }))
     expect(signal?.aborted).toBe(true)
     await act(async () => finish('Late translation'))
     expect(screen.queryByText('Late translation')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Translate text' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: browserText('en')('startTranslation') })).toBeDisabled()
   })
   it('shows desktop connection status inside the Nola card', async () => {
     const user = userEvent.setup(); render(<Options />)
@@ -359,8 +361,8 @@ describe('extension settings', () => {
       expect(translateImage).not.toHaveBeenCalled()
       expect(screen.getByText(t('providerImageUnsupported'))).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: t('readAloud') })).not.toBeInTheDocument()
-      await user.click(screen.getByRole('button', { name: t('imageTranslate') }))
-      expect(translateImage).toHaveBeenCalledExactlyOnceWith(image, settings.pageLanguage, expect.any(AbortSignal))
+      await user.click(screen.getByRole('button', { name: t('startTranslation') }))
+      expect(translateImage).toHaveBeenCalledExactlyOnceWith(image, settings.pageLanguage, expect.any(AbortSignal), 'Original text')
       expect(translate).not.toHaveBeenCalled()
       expect(requestProviderAccess).not.toHaveBeenCalled()
       expect(await screen.findByText('Image translation result')).toBeInTheDocument()
@@ -373,7 +375,7 @@ describe('extension settings', () => {
     const user = userEvent.setup(); render(<Options />)
     await user.click(screen.getByRole('button', { name: 'Translation center' }))
     await user.type(screen.getByRole('textbox', { name: 'Text to translate' }), 'Hello')
-    await user.click(screen.getByRole('button', { name: 'Translate text' }))
+    await user.click(screen.getByRole('button', { name: browserText('en')('startTranslation') }))
     await waitFor(() => expect(translate).toHaveBeenCalledWith('Hello', 'auto', 'zh', 'selection', expect.any(AbortSignal), settings.pageProvider))
     expect(await screen.findByText('Translated text')).toBeInTheDocument()
     expect(screen.getByText(/^\d+ ms$|^\d+\.\d{2} s$/)).toBeInTheDocument()

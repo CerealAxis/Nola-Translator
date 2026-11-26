@@ -4,7 +4,7 @@ import { translateWith } from './provider-execution'
 import { createProvider } from './providers'
 import type { GlossaryMatch } from '../../src/shared/glossary'
 import { resolveGlossaryTerms } from '../../src/shared/glossary-match'
-import { migrateLegacyGlossary } from './glossary-store'
+import { emptyGlossary } from '../../src/shared/glossary'
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 const match: GlossaryMatch = { signature: 'terms', terms: [{ source: 'Nola', target: '', caseSensitive: false, mode: 'keep' }], hits: [{ entryId: 'e', libraryId: 'l', start: 6, end: 10, actual: 'NoLa', term: { source: 'NoLa', target: '', caseSensitive: false, mode: 'keep' } }] }
@@ -21,7 +21,7 @@ it('keeps a matched term together when a translation chunk boundary crosses it',
   expect(chunks.join('')).toBe('Hello NoLa!')
 })
 it('keeps the original match decision across chunk boundaries and adjusts existing hit offsets', () => {
-  const document = migrateLegacyGlossary([{ source: 'cat', target: '猫', sites: '' }], 'Terms')
+  const document = { ...emptyGlossary(), libraries: [{ id: crypto.randomUUID(), name: 'Terms', description: '', enabled: true, scope: { mode: 'global' as const }, entries: [{ id: crypto.randomUUID(), source: 'cat', target: '猫', targetLanguage: '*', caseSensitive: true, enabled: true }] }] }
   const text = 'x'.repeat(3500) + 'cat'
   const request = { text, targetLanguage: 'zh', context: { scenario: 'tool' as const }, selection: { mode: 'auto' as const } }
   const matched = resolveGlossaryTerms(document, request)

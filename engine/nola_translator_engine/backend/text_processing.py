@@ -293,8 +293,7 @@ def _features(document, phase, kind, source, target):
 
 
 def _rules(values, feature):
-    options = values.get(f"options:{feature}", {})
-    tables = values.get(f"tables:{feature}", [{"rules": options.get("rules", [])}])
+    tables = values.get(f"tables:{feature}", [])
     return itertools.chain.from_iterable(table["rules"] for table in tables)
 
 

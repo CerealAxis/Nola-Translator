@@ -52,7 +52,7 @@ describe('MeetingStore', () => {
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'nola-meetings-'))
     store = new MeetingStore(join(root, 'meetings'))
-    await store.initialize(join(root, 'history.jsonl'))
+    await store.initialize()
   })
 
   afterEach(async () => {
@@ -84,7 +84,7 @@ describe('MeetingStore', () => {
     await store.append('game-session', segment('one', 1234, 'first'))
     await store.append('game-session', segment('two', 2234, 'second'))
     const reopened = new MeetingStore(join(root, 'meetings'))
-    await reopened.initialize(join(root, 'history.jsonl'))
+    await reopened.initialize()
     expect(reopened.get(meta.meetingId)).toMatchObject({ sourceKind: 'game', gameId: game.id, segmentCount: 2, durationMs: 1000, state: 'interrupted' })
   })
 
@@ -124,7 +124,7 @@ describe('MeetingStore', () => {
     store.attach(second.meetingId, 'session-b')
 
     const reopened = new MeetingStore(join(root, 'meetings'))
-    await reopened.initialize(join(root, 'history.jsonl'))
+    await reopened.initialize()
     expect((await reopened.segments(first.meetingId)).map((item) => item.sourceText)).toEqual(['kept'])
     // A crashed engine sends no sessionStopped, so an unfinished meeting survives a restart.
     expect(reopened.get(second.meetingId)?.endedAtMs).toBeUndefined()
@@ -132,7 +132,7 @@ describe('MeetingStore', () => {
 
   it('同一天的会议按 _1/_2 递增, 不同天重新从 0 开始', async () => {
     const store2 = new MeetingStore(join(root, 'seq'))
-    await store2.initialize(join(root, 'history.jsonl'))
+    await store2.initialize()
     const fakeNow = vi.spyOn(Date, 'now')
     fakeNow.mockReturnValue(new Date(2026, 8, 29, 22, 50, 0).getTime())
     expect((await store2.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })).daySequence).toBe(0)
@@ -142,7 +142,7 @@ describe('MeetingStore', () => {
 
   it('跨天后序号重新从 0 开始', async () => {
     const store2 = new MeetingStore(join(root, 'seq2'))
-    await store2.initialize(join(root, 'history.jsonl'))
+    await store2.initialize()
     const fakeNow = vi.spyOn(Date, 'now')
     fakeNow.mockReturnValue(new Date(2026, 8, 29, 22, 50, 0).getTime())
     await store2.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })
@@ -196,7 +196,7 @@ describe('MeetingStore', () => {
     }))
 
     const reopened = new MeetingStore(join(root, 'meetings'))
-    await reopened.initialize(join(root, 'unused-history.jsonl'))
+    await reopened.initialize()
     expect(reopened.get(meeting.meetingId)?.audioFile).toBeUndefined()
     expect(reopened.get(meeting.meetingId)?.audioDurationMs).toBeUndefined()
     expect(reopened.audioPathFor(meeting.meetingId)).toBeNull()
@@ -210,7 +210,7 @@ describe('MeetingStore', () => {
     }))
 
     const reopened = new MeetingStore(join(root, 'meetings'))
-    await reopened.initialize(join(root, 'unused-history.jsonl'))
+    await reopened.initialize()
     expect(reopened.get(meeting.meetingId)?.audioDurationMs).toBe(1000)
     expect(reopened.audioPathFor(meeting.meetingId)).toContain('audio.wav')
   })
@@ -222,7 +222,7 @@ describe('MeetingStore', () => {
     await expect(store.rename(meeting.meetingId, '   ')).rejects.toThrow('MEETING_NAME_EMPTY')
 
     const reopened = new MeetingStore(join(root, 'meetings'))
-    await reopened.initialize(join(root, 'history.jsonl'))
+    await reopened.initialize()
     expect(reopened.get(meeting.meetingId)?.title).toBe('周会')
 
     await store.remove(meeting.meetingId)
@@ -237,28 +237,6 @@ describe('MeetingStore', () => {
     await expect(readFile(join(root, 'meetings', meeting.meetingId, 'meeting.json'), 'utf8')).rejects.toThrow()
   })
 
-  it('旧 history.jsonl 只迁一次, 且跳过中间结果与被截断的那一行', async () => {
-    await writeFile(
-      join(root, 'history.jsonl'),
-      [
-        JSON.stringify(segment('a', 0, 'first')),
-        JSON.stringify(segment('b', 1000, 'partial', false)),
-        '{"segmentId":"c","startedAtMs":2000,"sourceTe',
-        JSON.stringify(segment('d', 3000, 'last')),
-      ].join('\n'),
-      'utf8',
-    )
-    const legacy = new MeetingStore(join(root, 'legacy'))
-    await legacy.initialize(join(root, 'history.jsonl'))
-    const meetings = legacy.list()
-    expect(meetings).toHaveLength(1)
-    expect((await legacy.segments(meetings[0].meetingId)).map((item) => item.sourceText)).toEqual(['first', 'last'])
-
-    // The marker the first import wrote keeps the second startup from re-importing.
-    const again = new MeetingStore(join(root, 'legacy'))
-    await again.initialize(join(root, 'history.jsonl'))
-    expect(again.list()).toHaveLength(1)
-  })
 
   it('乱序与重复的 segment 按 revision 收敛, 并按时间排序', async () => {
     const meeting = await store.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })

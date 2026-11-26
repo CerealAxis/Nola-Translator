@@ -20,7 +20,7 @@ function bytes(value: number): string { return `${(value / 1024 ** 3).toFixed(2)
 
 /** Loader tag for a model. The soft variant of the old chip was a muted fill with inherited text. */
 function LoaderChip({ loaders, className }: { loaders: string; className?: string }) {
-  return <span className={['inline-flex w-fit shrink-0 items-center rounded-2xl bg-default px-1 py-0 type-small text-foreground', className ?? ''].filter(Boolean).join(' ')}>{loaders}</span>
+  return <span className={['inline-flex w-fit shrink-0 items-center rounded-2xl bg-default px-1 py-0 type-small font-normal text-foreground', className ?? ''].filter(Boolean).join(' ')}>{loaders}</span>
 }
 
 /** Busy marker for a button that starts an operation; the button itself carries the disabled state. */

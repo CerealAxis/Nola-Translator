@@ -80,7 +80,7 @@ export function ExportDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="tertiary" size="sm" onClick={() => onOpenChange(false)}>
+          <Button variant="secondary" size="sm" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
           <Button size="sm" disabled={exporting || meetingId === null} onClick={submit}>

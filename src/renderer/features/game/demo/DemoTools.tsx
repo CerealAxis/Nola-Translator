@@ -545,7 +545,7 @@ function ToolWorkspace(props: ToolProps) {
                         {visible.map((id) => (
                           <Button
                             key={id}
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             aria-pressed={id in flags ? !!flags[id] : undefined}
                             onClick={() => handleAction(id)}
@@ -560,7 +560,7 @@ function ToolWorkspace(props: ToolProps) {
                       </div>
                     </>
                   ) : (
-                    <Button variant="outline" onClick={restore}>
+                    <Button variant="secondary" onClick={restore}>
                       {label('restore')}
                     </Button>
                   )}
@@ -571,11 +571,11 @@ function ToolWorkspace(props: ToolProps) {
                     </label>
                   )}
                   <div className="gt-tool-actions">
-                    <Button variant="outline" onClick={() => setCustomize(!customize)} aria-expanded={customize}>
+                    <Button variant="secondary" onClick={() => setCustomize(!customize)} aria-expanded={customize}>
                       <Settings2 />
                       {label('customize')}
                     </Button>
-                    <Button variant="outline" onClick={() => go('shortcuts')}>
+                    <Button variant="secondary" onClick={() => go('shortcuts')}>
                       <Keyboard />
                       {label('shortcuts')}
                     </Button>
@@ -597,7 +597,7 @@ function ToolWorkspace(props: ToolProps) {
                           {alternateTools.includes(id) && (
                             <Button
                               size="xs"
-                              variant="outline"
+                              variant="secondary"
                               aria-pressed={swapped.includes(id)}
                               onClick={() =>
                                 setSwapped(swapped.includes(id) ? swapped.filter((k) => k !== id) : [...swapped, id])
@@ -656,7 +656,7 @@ function ToolWorkspace(props: ToolProps) {
                   </div>
                   <div className="gt-tool-actions">
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       onClick={() => {
                         setCreating(false)
                         setRecording(!recording)
@@ -684,7 +684,7 @@ function ToolWorkspace(props: ToolProps) {
                         onChange={(e) => setCustomName(e.target.value)}
                       />
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         disabled={!customName.trim() || !hotkeysOn}
                         onClick={() => {
                           setCreating(true)
@@ -771,7 +771,7 @@ function ToolWorkspace(props: ToolProps) {
                       <Button
                         key={id}
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         onClick={() => handleAction(id)}
                         onContextMenu={(e) => {
                           e.preventDefault()
@@ -800,7 +800,7 @@ function ToolWorkspace(props: ToolProps) {
                   />
                   <Button
                     className="gt-tool-fit"
-                    variant="outline"
+                    variant="secondary"
                     disabled={!current || !Object.values(routes).some(Boolean)}
                     onClick={() => {
                       if (current) send(current)

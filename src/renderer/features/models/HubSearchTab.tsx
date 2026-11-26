@@ -333,7 +333,7 @@ export function HubSearchTab({ onGoSources }: HubSearchTabProps) {
       <AlertTitle>{t('models.experimentalNoticeTitle')}</AlertTitle>
       <AlertDescription>
         {t('models.experimentalNoticeBody')}
-        <Button variant="tertiary" size="sm" onClick={onGoSources}>{t('models.experimentalNoticeAction')}</Button>
+        <Button variant="secondary" size="sm" onClick={onGoSources}>{t('models.experimentalNoticeAction')}</Button>
       </AlertDescription>
     </Alert>
     <TabsRoot value={filter} onValueChange={value => { if (value) setFilter(value as Filter) }}>
@@ -367,13 +367,13 @@ export function HubSearchTab({ onGoSources }: HubSearchTabProps) {
           onCancel={() => { void actions.models.manageResource(liveId, 'cancel').catch((cause: unknown) => {
             notifyError(t('modelsSettingsUi.cancelDownloadFailed'), { cause })
           }) }}
-          footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onClick={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="outline" size="sm" onClick={() => setDetail(hit)}>
+          footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onClick={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="secondary" size="sm" onClick={() => setDetail(hit)}>
             {t('models.openDetails')}
           </Button></div>} />
       })}
     </div> : null}
     {!awaiting && !failed ? <div ref={bottom} className="models-search__pagination" aria-live="polite">
-      {nextCursor ? <Button disabled={loadingMore} aria-busy={loadingMore} variant="tertiary"  onClick={() => loadMore(announceSuccess)}>{loadingMore ? <Spinner /> : null}
+      {nextCursor ? <Button disabled={loadingMore} aria-busy={loadingMore} variant="secondary"  onClick={() => loadMore(announceSuccess)}>{loadingMore ? <Spinner /> : null}
         {loadingMore ? t('common.loading') : moreFailed ? t('models.retry') : t('models.loadMore')}
       </Button> : visible.length > 0 ? <p className="type-muted text-muted">{t('models.noMoreResults')}</p> : null}
     </div> : null}

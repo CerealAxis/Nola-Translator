@@ -13,7 +13,7 @@ it('migrates existing profiles to tray close and independent gateway defaults', 
   await writeFile(path, JSON.stringify({ version: 2, translation: { targetLanguage: 'ja' } }))
   const restored = await new SettingsStore(path).load()
   expect(restored.closeBehavior).toBe('tray')
-  expect(restored.synthesis).toEqual({ modelId: '', voice: '' })
+  expect(restored.synthesis).toMatchObject({ modelId: '', voice: '', voiceRef: { kind: 'engine-default' } })
   expect(restored.modelGateway).toEqual(DEFAULT_SETTINGS.modelGateway)
   expect(restored.translation.targetLanguage).toBe('ja')
 })
@@ -25,7 +25,10 @@ it('persists independent capability switches, TTS selection and close preference
   await store.update({ synthesis: { modelId: 'tts-qwen3-tts-crisp-0.6b-base-q4-k', voice: 'test-voice' }, modelGateway: { asr: true, tts: true, port: 17861 }, closeBehavior: 'quit' })
   await store.update({ modelGateway: { loadMode: 'direct', mt: false, llm: true, llmModel: 'custom:chat', externalEnabled: false }, synthesis: { voice: 'other-voice' } })
   const restored = await new SettingsStore(path).load()
-  expect(restored.synthesis).toEqual({ modelId: 'tts-qwen3-tts-crisp-0.6b-base-q4-k', voice: 'other-voice' })
+  expect(restored.synthesis).toMatchObject({ modelId: 'tts-qwen3-tts-crisp-0.6b-base-q4-k', voice: 'other-voice',
+    voiceRef: { kind: 'preset', modelBinding: 'resource:tts-qwen3-tts-crisp-0.6b-base-q4-k', voiceId: 'other-voice' },
+    legacyVoice: { rawVoice: 'other-voice', verificationStatus: 'unverified' } })
+  expect(JSON.parse(await readFile(path, 'utf8')).synthesis).not.toHaveProperty('voice')
   expect(restored.modelGateway).toMatchObject({ asr: true, mt: false, tts: true, port: 17861, llm: true, llmModel: 'custom:chat', externalEnabled: false })
   expect(restored.closeBehavior).toBe('quit')
   expect(restored.modelGateway.loadMode).toBe('direct')
@@ -47,7 +50,7 @@ it('sanitizes corrupt persisted gateway and synthesis groups on load', async () 
   const restored = await new SettingsStore(path).load()
   expect(restored.closeBehavior).toBe('tray')
   expect(restored.modelGateway).toEqual(DEFAULT_SETTINGS.modelGateway)
-  expect(restored.synthesis).toEqual(DEFAULT_SETTINGS.synthesis)
+  expect(restored.synthesis).toMatchObject({ ...DEFAULT_SETTINGS.synthesis, voiceRef: { kind: 'engine-default' } })
 })
 
 it('validates and persists per-capability concurrency without losing sibling limits', async () => {

@@ -20,7 +20,6 @@ const options = z.object({
   count: z.string().regex(/^\d{1,8}$/).optional(),
   keepEnd: z.boolean().optional(),
   keepSingle: z.boolean().optional(),
-  rules: z.array(rule).max(10000).optional(),
   vndbId: z.string().trim().regex(/^(?:v?\d{1,10})?$/i).optional(),
   vndbTargets: z.object({ replace: z.boolean(), glossary: z.boolean() }).optional(),
 })
@@ -42,7 +41,6 @@ export function parseTextSetting(key: string, value: unknown): unknown {
 
 export interface TextProcessingConfig {
   revision: number
-  migrated: boolean
   values: Record<string, unknown>
 }
 
@@ -73,7 +71,6 @@ export function textProcessingErrorKey(reason: string) {
 }
 
 export interface TextProcessingBridge {
-  load: (legacy: Record<string, unknown>) => Promise<TextProcessingConfig>
   snapshot: () => Promise<TextProcessingConfig>
   save: (key: string, value: unknown) => Promise<TextProcessingConfig>
   preview: (text: string, overrides?: Record<string, unknown>) => Promise<TextProcessingResult>

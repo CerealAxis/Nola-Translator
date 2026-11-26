@@ -29,6 +29,7 @@ export type SessionConfig = {
   s2sModel?: import('./settings').RealtimeS2sModel | null
   speechOutputDeviceId?: string
   speechVoice?: string
+  speechVoiceRef?: import('./tts/voice-ref').TtsVoiceRef
   speechModelId?: string
   max_segment_ms?: number
   silence_end_ms?: number

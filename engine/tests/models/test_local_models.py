@@ -52,7 +52,7 @@ def test_qwen3_tts_probe_uses_local_tts_loader(tmp_path, monkeypatch, mode):
     monkeypatch.setitem(sys.modules, 'qwen_tts', SimpleNamespace(Qwen3TTSModel=SimpleNamespace(from_pretrained=load)))
     monkeypatch.setattr(compute, 'probe_devices', lambda _: ([SimpleNamespace(torchDevice='cpu', recognition=True, score=0)], None, None))
     assert local_models._probe_runtime(tmp_path, entry, entry.adapter_id) == ('qwen3-tts', 'synthesis')
-    assert calls == (['load'] if mode == 'base' else ['load', mode])
+    assert calls == (['load', mode] if mode == 'custom_voice' else ['load'])
 
 
 def snapshot(tmp_path):

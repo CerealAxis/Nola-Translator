@@ -114,7 +114,7 @@ function CopyDiagnosticsButton(): ReactNode {
   }
 
   return (
-    <Button variant="tertiary" size="sm" onClick={onClick} disabled={copied}>
+    <Button variant="secondary" size="sm" onClick={onClick} disabled={copied}>
       {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
       {copied ? t('settings.copied') : t('errors.copyDiagnosticsAction')}
     </Button>

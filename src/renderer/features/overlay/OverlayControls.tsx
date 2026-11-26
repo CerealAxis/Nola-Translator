@@ -20,6 +20,10 @@ import { useModelSelection, useAvailableModels, modelBindingPatch, savedBindingO
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import { TtsVoiceSelector } from '@/components/tts/TtsVoiceSelector'
+import { synthesisVoiceRef } from '../../../shared/tts/settings-migration'
+import { ttsText } from '@/i18n/tts-ui'
 import { Spinner } from '@/components/ui/spinner'
 import { Mic, Pause, Play } from 'lucide-react'
 
@@ -114,7 +118,7 @@ function startConfigOf(settings: AppSettings, devices: readonly AudioDevice[], o
     ...(outputMode === 'speech' ? { speechOutputDeviceId: settings.realtime?.speechOutputDeviceId } : {}),
     ...(outputMode === 'speech' && !s2sModel ? {
       speechModelId: speechModelId.startsWith('resource:') ? speechModelId.slice(9) : speechModelId,
-      ...(settings.synthesis.voice ? { speechVoice: settings.synthesis.voice } : {}),
+      speechVoiceRef: synthesisVoiceRef(settings),
     } : {}),
   }
 }
@@ -371,9 +375,16 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               {starting ? <Spinner /> : running ? <Pause aria-hidden="true" /> : status === 'paused' ? <Play aria-hidden="true" /> : <Mic aria-hidden="true" />}
             </Button>
 
+            {outputMode === 'speech' && !s2sModel && <Popover>
+              <PopoverTrigger render={<Button variant="secondary" size="sm" />}>{ttsText(settings.uiLanguage, 'voice')}</PopoverTrigger>
+              <PopoverContent><TtsVoiceSelector usage="realtime" modelBinding={tts.binding} targetLanguage={settings.translation.targetLanguage}
+                value={synthesisVoiceRef(settings)} disabled={active} onChange={voiceRef => {
+                  void actions.settings.updateSettings({ synthesis: { voiceRef } }).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
+                }} /></PopoverContent>
+            </Popover>}
             {active && playbackJob ? <>
               {playbackJob.state === 'failed' ? <Button variant="secondary" size="sm" className="rounded-xl" aria-label={t('session.retryPlayback')} onClick={() => { void actions.session.resolvePlayback(playbackJob.jobId, 'retry').catch(error => notifyError(t('session.playbackActionFailed'), { cause: error })) }}>{t('session.retryPlayback')}</Button> : null}
-              <Button variant="outline" size="sm" className="rounded-xl" aria-label={t('session.skipPlayback')} onClick={() => { void actions.session.resolvePlayback(playbackJob.jobId, 'skip').catch(error => notifyError(t('session.playbackActionFailed'), { cause: error })) }}>{t('session.skipPlayback')}</Button>
+              <Button variant="secondary" size="sm" className="rounded-xl" aria-label={t('session.skipPlayback')} onClick={() => { void actions.session.resolvePlayback(playbackJob.jobId, 'skip').catch(error => notifyError(t('session.playbackActionFailed'), { cause: error })) }}>{t('session.skipPlayback')}</Button>
             </> : null}
 
             {!translationDisabled ? <>

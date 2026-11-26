@@ -63,12 +63,12 @@ export function ScreenToolbar({ api, snapshot }: { api: ScreenTranslationBridge;
   return <section ref={surface} className="screen-toolbar" aria-label={t('suite.toolbar')}>
     <div className="screen-toolbar__main">
       <TooltipHint content={t(`screen.states.${status}`)}><span className="screen-toolbar__drag" aria-label={t(`screen.states.${status}`)}><GripVertical /></span></TooltipHint>
-      <Button variant="outline" size="sm" disabled={busy} onClick={() => void toggleSettings()}>{t(`suite.${config.captureMode}`)}</Button>
-      <Button variant="outline" size="sm" tooltip={t('suite.readOnce')} disabled={busy || status === 'editing' || status === 'starting'} onClick={() => void run({ action: 'readOnce' })}><ScanText data-icon="inline-start" />{t('suite.readOnceAction')}</Button>
-      <Button variant="outline" size="sm" tooltip={t(paused || !reading ? 'suite.resume' : 'suite.pause')} disabled={busy || status === 'editing'} onClick={() => void run({ action: paused ? 'resume' : reading ? 'pause' : 'start' })}>{paused || !reading ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}{t(paused || !reading ? 'suite.resumeAction' : 'suite.pauseAction')}</Button>
-      <Button variant="destructive" size="sm" onClick={() => void api.command({ action: 'stop' }).catch(() => setFailed(true))}><Square data-icon="inline-start" />{t('screen.stop')}</Button>
-      <Button variant="outline" size="icon-sm" aria-label={t('suite.display')} aria-expanded={expanded} onClick={() => void toggleSettings()}><Settings2 /></Button>
-      <Button variant="outline" size="icon-sm" aria-label={t('suite.hideToolbar')} onClick={() => void run({ action: 'hideToolbar' })}><X /></Button>
+      <Button variant="secondary" size="sm" disabled={busy} onClick={() => void toggleSettings()}>{t(`suite.${config.captureMode}`)}</Button>
+      <Button variant="secondary" size="sm" tooltip={t('suite.readOnce')} disabled={busy || status === 'editing' || status === 'starting'} onClick={() => void run({ action: 'readOnce' })}><ScanText data-icon="inline-start" />{t('suite.readOnceAction')}</Button>
+      <Button variant="secondary" size="sm" tooltip={t(paused || !reading ? 'suite.resume' : 'suite.pause')} disabled={busy || status === 'editing'} onClick={() => void run({ action: paused ? 'resume' : reading ? 'pause' : 'start' })}>{paused || !reading ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}{t(paused || !reading ? 'suite.resumeAction' : 'suite.pauseAction')}</Button>
+      <Button variant="danger" size="sm" onClick={() => void api.command({ action: 'stop' }).catch(() => setFailed(true))}><Square data-icon="inline-start" />{t('screen.stop')}</Button>
+      <Button variant="secondary" size="icon-sm" aria-label={t('suite.display')} aria-expanded={expanded} onClick={() => void toggleSettings()}><Settings2 /></Button>
+      <Button variant="secondary" size="icon-sm" aria-label={t('suite.hideToolbar')} onClick={() => void run({ action: 'hideToolbar' })}><X /></Button>
     </div>
     {failed && <div className="screen-toolbar__status" role="alert">{busy && <Spinner />}{t('suite.actionFailed')}</div>}
     {expanded && <div className="screen-toolbar__settings">
@@ -84,7 +84,7 @@ export function ScreenToolbar({ api, snapshot }: { api: ScreenTranslationBridge;
           <SelectContent><SelectGroup>{sources.map(source => <SelectItem value={source.id} key={source.id}>{source.name}</SelectItem>)}</SelectGroup></SelectContent>
         </Select>{!sources.length && <span>{t('suite.noWindows')}</span>}
       </Field>}
-      {config.captureMode !== 'cursor' && <Button variant="outline" size="sm" disabled={busy || config.captureMode === 'window' && !config.sourceId} onClick={() => void run({ action: 'edit' })}>{t('screen.edit')}</Button>}
+      {config.captureMode !== 'cursor' && <Button variant="secondary" size="sm" disabled={busy || config.captureMode === 'window' && !config.sourceId} onClick={() => void run({ action: 'edit' })}>{t('screen.edit')}</Button>}
       <Field className="screen-toolbar__switch"><FieldLabel htmlFor="toolbar-overlay">{t('suite.overlayVisible')}</FieldLabel><Switch id="toolbar-overlay" checked={snapshot.overlayVisible !== false} disabled={busy} onCheckedChange={() => void run({ action: 'toggleOverlay' })}><SwitchThumb /></Switch></Field>
     </div>}
   </section>

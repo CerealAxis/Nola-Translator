@@ -1,4 +1,5 @@
 import { astrBotSpeechPresetForBinding } from './astrbot-speech-presets'
+import type { TtsPresetVoiceDescriptor } from './tts/capabilities'
 import { z } from 'zod'
 import type { SessionConfig } from './contracts'
 import type { ResourceRecord } from './contracts'
@@ -127,6 +128,7 @@ export interface GatewayServiceSnapshot {
   error?: string
   errorCode?: string
   voices?: string[]
+  voiceInventory?: TtsPresetVoiceDescriptor[]
   providerName?: string
   nativeTranslation?: boolean
   fallback?: boolean
@@ -167,6 +169,15 @@ export interface ModelGatewaySnapshot {
     instances: { instance_id: string; model_id: string; state: string; active_leases: number }[]
   }
   error?: string
+  errorCode?: string
+}
+
+export function gatewayStartupHint(code?: string) {
+  if (code === 'BACKEND_DEPENDENCY_MISSING') return 'gateway.startupDependencyHint' as const
+  if (code === 'BACKEND_START_TIMEOUT') return 'gateway.startupTimeoutHint' as const
+  if (code === 'FILE_NOT_FOUND' || code === 'ENOENT') return 'gateway.startupRuntimeMissingHint' as const
+  if (code === 'EADDRINUSE') return 'gateway.startupPortHint' as const
+  return 'gateway.startupRetryHint' as const
 }
 export interface ModelGatewayApi {
   snapshot(): Promise<ModelGatewaySnapshot>

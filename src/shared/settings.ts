@@ -125,7 +125,8 @@ export type AppSettings = {
   translation: TranslationSettings
   compute: ComputeSettings
   browserConnection: { enabled: boolean }
-  synthesis: { modelId: string; voice: string }
+  synthesis: { modelId: string; voice: string; voiceRef?: import('./tts/voice-ref').TtsVoiceRef;
+    legacyVoice?: import('./tts/migration').LegacyVoiceOrigin }
   realtime?: RealtimeSettings
   meetingMode?: import('./meeting-mode').MeetingModeSettings
   modelGateway: ModelGatewaySettings

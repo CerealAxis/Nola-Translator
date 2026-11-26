@@ -119,7 +119,8 @@ export function LlmPreviewEditor({ provider, model, existingIds = [], local = fa
     manual.current.clear()
     setLookupId(smart && !restoringSavedId ? nextId : '')
     setLookup(undefined)
-    setDraft(fields(restoringSavedId ? model : undefined))
+    if (restoringSavedId) setDraft(fields(model))
+    else setDraft(current => ({ ...current, name: '' }))
   }
 
   function reset() {

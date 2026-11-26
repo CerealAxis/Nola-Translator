@@ -100,9 +100,9 @@ export function ScreenRegionEditor({ api, snapshot }: { api: ScreenTranslationBr
     </div>)}
     <div className="screen-editor__toolbar" onPointerDown={event => event.stopPropagation()}>
       <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{regions.length} / {MAX_SCREEN_REGIONS}</Badge>
-        <Button variant="outline" disabled={!selected || busy} onClick={remove}><Trash2 data-icon="inline-start" />{t('screen.remove')}<ShortcutKeys value={bindings.remove} /></Button>
-        <Button variant="outline" disabled={!regions.length || busy} onClick={() => { setRegions([]); setSelected(undefined) }}>{t('screen.clear')}</Button>
-        <Button variant="outline" disabled={busy} onClick={cancel}><X data-icon="inline-start" />{t('screen.cancel')}<ShortcutKeys value={bindings.cancel} /></Button>
+        <Button variant="secondary" disabled={!selected || busy} onClick={remove}><Trash2 data-icon="inline-start" />{t('screen.remove')}<ShortcutKeys value={bindings.remove} /></Button>
+        <Button variant="secondary" disabled={!regions.length || busy} onClick={() => { setRegions([]); setSelected(undefined) }}>{t('screen.clear')}</Button>
+        <Button variant="secondary" disabled={busy} onClick={cancel}><X data-icon="inline-start" />{t('screen.cancel')}<ShortcutKeys value={bindings.cancel} /></Button>
         <Button disabled={!regions.length || busy} onClick={() => { setBusy(true); void api.command({ action: 'regions', regions }).catch(() => setBusy(false)) }}><Check data-icon="inline-start" />{t('screen.confirm')}</Button>
       </div></div>
   </div>

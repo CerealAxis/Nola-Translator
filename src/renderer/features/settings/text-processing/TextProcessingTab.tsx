@@ -49,9 +49,7 @@ function useFeatureSummary() {
       return count <= 1 ? t('suite.textRepeatAuto') : t('suite.textRepeatTimes', { count })
     }
     if (feature.editor === 'replace') {
-      const legacy = readPreviewSetting<FeatureOptions | null>('options:' + feature.id, null)
-      const fallback = legacy?.rules?.length ? [{ id: 'default', name: t(feature.label), rules: legacy.rules }] : []
-      const tables = readPreviewSetting<RuleTable[]>('tables:' + feature.id, fallback)
+      const tables = readPreviewSetting<RuleTable[]>('tables:' + feature.id, [])
       if (!tables.length) return t('suite.textNotConfigured')
       const rules = tables.reduce((sum, table) => sum + table.rules.length, 0)
       return t('suite.textTablesSummary', { tables: tables.length, rules })
@@ -171,9 +169,7 @@ export function TextProcessingTab({ route }: { route: Route }) {
   }, [activeDialogFeature])
 
   const replaceTables = useMemo(() => {
-    const legacy = readPreviewSetting<FeatureOptions | null>('options:replace', null)
-    const fallback = legacy?.rules?.length ? [{ id: 'default', name: 'replace', rules: legacy.rules }] : []
-    return readPreviewSetting<RuleTable[]>('tables:replace', fallback)
+    return readPreviewSetting<RuleTable[]>('tables:replace', [])
   }, [activeDialogFeature])
 
   const sandboxOutput = useProcessingPreview(sampleInput,

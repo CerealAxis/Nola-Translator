@@ -305,11 +305,11 @@ export function DocumentWorkbench() {
 
   return <main className="nola-doc-workbench">
     <header className="nola-doc-header">
-      <TooltipHint content={t('settings')}><a href="options.html" data-slot="button" data-variant="outline" aria-label={t('settings')} className={buttonVariants({ variant: 'outline', size: 'icon-sm', className: 'button' })}><ArrowLeft aria-hidden="true" /></a></TooltipHint>
+      <TooltipHint content={t('settings')}><a href="options.html" data-slot="button" data-variant="secondary" aria-label={t('settings')} className={buttonVariants({ variant: 'secondary', size: 'icon-sm', className: 'button' })}><ArrowLeft aria-hidden="true" /></a></TooltipHint>
       <h1>{t('documentTranslation')}</h1>
       {opened && <Tooltip><TooltipTrigger render={<span className="nola-doc-filename truncate" />}>{opened.file.name}</TooltipTrigger><TooltipContent>{opened.file.name}</TooltipContent></Tooltip>}
       {opened && <div className="nola-doc-header-actions">
-        <Button variant="outline" size="sm" disabled={Boolean(busy) || running} onClick={() => picker.current?.click()}><Upload data-icon="inline-start" />{t('documentChoose')}</Button>
+        <Button variant="secondary" size="sm" disabled={Boolean(busy) || running} onClick={() => picker.current?.click()}><Upload data-icon="inline-start" />{t('documentChoose')}</Button>
         <Button size="sm" disabled={Boolean(busy) || running || !units.length || values.size !== units.length} onClick={() => void download()}><Download data-icon="inline-start" />{t(busy === 'exporting' ? 'documentExporting' : 'documentExport')}</Button>
       </div>}
     </header>
@@ -334,12 +334,12 @@ export function DocumentWorkbench() {
         <ChoiceField label={t('source')} value={source} options={[{ value: 'auto', label: t('autoDetect') }, ...options]} disabled={Boolean(busy)} onChange={value => changeLanguage('source', value)} t={t} />
         <ChoiceField label={t('target')} value={target} options={options} disabled={Boolean(busy)} onChange={value => changeLanguage('target', value)} t={t} />
         <ChoiceField label={t('provider')} value={provider} options={serviceOptions.map(item => ({ value: item.id, label: item.name }))} disabled={running} onChange={setProvider} t={t} />
-        <Button variant={running ? 'outline' : 'default'} disabled={Boolean(busy) || !units.length || values.size === units.length} onClick={() => running ? request.current?.abort() : void start()}>
+        <Button variant={running ? 'secondary' : 'default'} disabled={Boolean(busy) || !units.length || values.size === units.length} onClick={() => running ? request.current?.abort() : void start()}>
           {running ? <Pause data-icon="inline-start" /> : <Languages data-icon="inline-start" />}{t(complete ? 'documentDone' : running ? 'documentPause' : values.size || failed ? 'documentResume' : 'documentStart')}
         </Button>
         <div className="nola-doc-views" role="group" aria-label={t('bilingualPage')}>
-          <Button variant="outline" size="sm" aria-pressed={original} aria-disabled={original && !translation} onClick={() => { if (translation) setOriginal(!original) }}><PanelLeft data-icon="inline-start" aria-hidden="true" />{t('documentOriginal')}</Button>
-          <Button variant="outline" size="sm" aria-pressed={translation} aria-disabled={translation && !original} onClick={() => { if (original) setTranslation(!translation) }}><PanelRight data-icon="inline-start" aria-hidden="true" />{t('documentTranslated')}</Button>
+          <Button variant="secondary" size="sm" aria-pressed={original} aria-disabled={original && !translation} onClick={() => { if (translation) setOriginal(!original) }}><PanelLeft data-icon="inline-start" aria-hidden="true" />{t('documentOriginal')}</Button>
+          <Button variant="secondary" size="sm" aria-pressed={translation} aria-disabled={translation && !original} onClick={() => { if (original) setTranslation(!translation) }}><PanelRight data-icon="inline-start" aria-hidden="true" />{t('documentTranslated')}</Button>
         </div>
       </div>
       {(busy === 'opening' || scans) && <div className="nola-doc-status">
@@ -348,12 +348,12 @@ export function DocumentWorkbench() {
       </div>}
       <div ref={compare} className="nola-doc-compare" data-both={both} data-resizing={resizing} style={{ '--doc-split': split / 100, '--doc-zoom': zoom / 100 } as CSSProperties}>
       <div className="nola-doc-viewer-toolbar">
-        <Button variant="outline" size="icon-sm" aria-label={previousLabel} tooltip={previousLabel} disabled={currentPage === 0} onClick={() => goToPage(currentPage - 1)}><ChevronLeft /></Button>
+        <Button variant="secondary" size="icon-sm" aria-label={previousLabel} tooltip={previousLabel} disabled={currentPage === 0} onClick={() => goToPage(currentPage - 1)}><ChevronLeft /></Button>
         <span aria-label={pageLabel} aria-live="polite">{currentPage + 1} / {opened.doc.sections.length}</span>
-        <Button variant="outline" size="icon-sm" aria-label={nextLabel} tooltip={nextLabel} disabled={currentPage >= opened.doc.sections.length - 1} onClick={() => goToPage(currentPage + 1)}><ChevronRight /></Button>
-        <Button variant="outline" size="icon-sm" aria-label={zoomOutLabel} tooltip={zoomOutLabel} disabled={zoom <= 50} onClick={() => setZoom(value => Math.max(50, value - 10))}><ZoomOut /></Button>
+        <Button variant="secondary" size="icon-sm" aria-label={nextLabel} tooltip={nextLabel} disabled={currentPage >= opened.doc.sections.length - 1} onClick={() => goToPage(currentPage + 1)}><ChevronRight /></Button>
+        <Button variant="secondary" size="icon-sm" aria-label={zoomOutLabel} tooltip={zoomOutLabel} disabled={zoom <= 50} onClick={() => setZoom(value => Math.max(50, value - 10))}><ZoomOut /></Button>
         <span>{zoom}%</span>
-        <Button variant="outline" size="icon-sm" aria-label={zoomInLabel} tooltip={zoomInLabel} disabled={zoom >= 200} onClick={() => setZoom(value => Math.min(200, value + 10))}><ZoomIn /></Button>
+        <Button variant="secondary" size="icon-sm" aria-label={zoomInLabel} tooltip={zoomInLabel} disabled={zoom >= 200} onClick={() => setZoom(value => Math.min(200, value + 10))}><ZoomIn /></Button>
       </div>
         {original && preview('source')}
         {both && <div className="nola-doc-divider" role="separator" aria-label={t('documentDivider')} aria-orientation="vertical" aria-valuemin={20} aria-valuemax={80} aria-valuenow={split} tabIndex={0}
@@ -379,7 +379,7 @@ export function DocumentWorkbench() {
           <DialogDescription>{t('documentChangeLanguageNotice')}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>{t('cancel')}</DialogClose>
+          <DialogClose render={<Button variant="secondary" />}>{t('cancel')}</DialogClose>
           <Button onClick={() => { if (pendingLanguage) applyLanguage(pendingLanguage.kind, pendingLanguage.value) }}>{t('documentChangeLanguage')}</Button>
         </DialogFooter>
       </DialogContent>

@@ -1,33 +1,29 @@
+# Node.js & frontend
 node_modules/
 out/
 dist/
+.vite/
+
+# Testing & coverage
 coverage/
 /playwright-report/
 /test-results/
 /artifacts/
-/.notices-tmp/
-/vendor/
-/models/
-.vite/
-.zcode/
+
+# Python
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .tox/
 .nox/
-.env
-.env.*
-!.env.example
-*.log
-.DS_Store
-Thumbs.db
 .venv/
-/.codex/
-/.codex-attachments/
-/docs/.vitepress/cache/
-/docs/.vitepress/.temp/
-/docs/.media-dist/
-/docs/PRD
+__pycache__/
+*.py[cod]
+*.egg-info/
+/engine/uv.lock
+
+# Build & release
+/.notices-tmp/
 engine/build/
 engine/dist/
 browser/extension/dist-firefox/
@@ -40,27 +36,54 @@ release-v[0-9]*/
 !/build/runtime-catalog.json
 !/build/runtime-recipes.json
 !/build/installer.nsh
-__pycache__/
-*.py[cod]
-*.egg-info/
+
+# Documentation
+/docs/.vitepress/cache/
+/docs/.vitepress/.temp/
+/docs/.media-dist/
+/docs/PRD
+
+# Dependencies & models
+/vendor/
+/models/
+
+# Environment & logs
+.env
+.env.*
+!.env.example
+*.log
+/logs/
+
+# IDE & AI tools
+.zcode/
+/.codex/
+/.codex-attachments/
 .claude
 .codex-remote-attachments
+/.agents/
+/.idea/
+/chatgpt-plan.json
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Application settings & credentials
 /data-location.json
 /data-migration-pending.json
 /workspace-window.json
 /settings.json
 /text-processing.json
 /credentials.json
+/screen-translation.json
+
+# Application data & caches
 /history.jsonl
 /session-journal/
 /meetings/
 /cache/
 /runtimes/
 /.cache/
-/engine/uv.lock
-/logs/
 /comics/
-/.agents/
-/.idea/
-/chatgpt-plan.json
-/screen-translation.json
+/voices/
+/voices.sqlite3

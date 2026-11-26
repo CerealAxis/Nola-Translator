@@ -7,6 +7,9 @@ import { LANGUAGE_CODES } from './languages'
 import type { AvailableGatewayModel, GatewayCapability } from './model-gateway'
 import { MIMO_TTS_BINDING, MIMO_TTS_LANGUAGES, MIMO_TTS_NAME, type AppSettings, type CredentialProvider } from './settings'
 import { isCloudModelDisabled, isModelEnabled } from './model-policy'
+import { ttsCatalogCapabilities } from './tts/catalog'
+import { ttsLanguageCompatibility } from './tts/compatibility'
+import { mergeTtsCapabilities } from './tts/capability-overrides'
 
 /** The main process supplies credential presence; this catalog never reads or returns secrets. */
 export function buildConfiguredCloudModels(settings: AppSettings, credentials: Readonly<Record<CredentialProvider, boolean>>): Record<GatewayCapability, AvailableGatewayModel[]> {
@@ -16,8 +19,9 @@ export function buildConfiguredCloudModels(settings: AppSettings, credentials: R
   }
   const providers: Record<string, string> = { microsoft: 'Microsoft Translator', google: 'Google Translate', mymemory: 'MyMemory', 'index-translate': 'Index Translate', recognition: 'Aliyun LiveTranslate' }
   const add = (model: AvailableGatewayModel) => {
-    if (!isCloudModelDisabled(settings, model.kind, model.binding)) result[model.kind].push(model)
+    if (!isCloudModelDisabled(settings, model.kind, model.binding) && !result[model.kind].some(item => item.binding === model.binding)) result[model.kind].push(model)
   }
+  for (const model of configuredBatchSpeechModels(settings, credentials)) if (model.kind === 'tts') add(model)
   for (const model of cloudModelsOf(settings, credentials).filter(item => item.ready)) {
     if (model.profile) {
       const profile = model.profile
@@ -50,8 +54,11 @@ export function configuredBatchSpeechModels(settings: AppSettings, credentials: 
     return connection.models.flatMap(model => {
       const binding = astrBotSpeechBinding(preset.id, model.profileId)
       if (!model.enabled || (binding === MIMO_TTS_BINDING && !isModelEnabled(settings, 'tts', binding))) return []
+      const capability = preset.capability === 'TTS' ? mergeTtsCapabilities(ttsCatalogCapabilities(preset.id, model.id, binding), model.tts?.capabilityOverride) : undefined
       return [{ binding, name: preset.voiceOnly ? connection.name : model.name,
-        kind: preset.capability === 'ASR' ? 'asr' : 'tts', origin: 'cloud', free: !!preset.keyless }]
+        kind: preset.capability === 'ASR' ? 'asr' : 'tts', origin: 'cloud', free: !!preset.keyless,
+        ...(capability ? { targetLanguages: capability.languages.mode === 'unknown' ? [...LANGUAGE_CODES]
+          : LANGUAGE_CODES.filter(language => ttsLanguageCompatibility(capability, language) === 'compatible') } : {}) }]
     })
   })
 }

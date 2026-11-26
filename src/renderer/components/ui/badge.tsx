@@ -4,7 +4,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 export const badgeVariants = cva(
-  'nola-badge group/badge inline-flex min-h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 type-small whitespace-nowrap transition-all focus-visible:border-nola-ui-ring focus-visible:ring-[3px] focus-visible:ring-nola-ui-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-nola-ui-destructive aria-invalid:ring-nola-ui-destructive/20 dark:aria-invalid:ring-nola-ui-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!',
+  'nola-badge group/badge inline-flex min-h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 type-small font-normal whitespace-nowrap transition-all    has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-nola-ui-destructive aria-invalid:ring-nola-ui-destructive/20 dark:aria-invalid:ring-nola-ui-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!',
   {
     variants: {
       variant: {

@@ -123,7 +123,8 @@ async def test_direct_tts_encodes_gateway_chunks_as_wav():
     assert result.voices == ["voice-1"]
     assert result.audio == wav(24000)
     args = gateway.synthesize.await_args.kwargs
-    assert args["voice"] == "voice-1"
+    assert args["synthesis"].conditioning.voice_id == "voice-1"
+    assert args["synthesis"].language == "en"
     assert args["request"].model_id == "chosen"
     assert args["request"].target_language == "en"
     assert args["request"].required_outputs == ["speech"]

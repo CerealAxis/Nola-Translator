@@ -384,7 +384,7 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
             <div className="flex flex-wrap items-center gap-2">
               <span className="type-small text-nola-ui-muted-foreground">{t('suite.textSelectedCount', { count: selected.length })}</span>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 disabled={busy}
                 onClick={() =>
@@ -399,7 +399,7 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
                 {p('enable')}
               </Button>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 disabled={busy}
                 onClick={() =>
@@ -414,7 +414,7 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
                 {p('disable')}
               </Button>
               <Button
-                variant="destructive"
+                variant="danger"
                 size="sm"
                 onClick={() =>
                   setDeleting({
@@ -609,19 +609,19 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
                     <EmptyTitle>{t('suite.noMatches')}</EmptyTitle>
                   </EmptyHeader>
                   {query && (
-                    <Button size="sm" variant="outline" onClick={() => setQuery('')}>{t('suite.textClearSearch')}</Button>
+                    <Button size="sm" variant="secondary" onClick={() => setQuery('')}>{t('suite.textClearSearch')}</Button>
                   )}
                 </Empty>
               )}
               {shownEntries.length > 50 && (
                 <div className="flex items-center justify-end gap-2">
-                  <Button variant="outline" size="sm" disabled={!page} onClick={() => { setPage(page - 1); setSelected([]) }}>
+                  <Button variant="secondary" size="sm" disabled={!page} onClick={() => { setPage(page - 1); setSelected([]) }}>
                     {t('suite.previous')}
                   </Button>
                   <span className="type-muted tabular-nums">
                     {page + 1} / {Math.ceil(shownEntries.length / 50)}
                   </span>
-                  <Button variant="outline" size="sm" disabled={(page + 1) * 50 >= shownEntries.length} onClick={() => { setPage(page + 1); setSelected([]) }}>
+                  <Button variant="secondary" size="sm" disabled={(page + 1) * 50 >= shownEntries.length} onClick={() => { setPage(page + 1); setSelected([]) }}>
                     {t('suite.next')}
                   </Button>
                 </div>
@@ -711,7 +711,7 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
                 </FieldGroup>
               </CardContent>
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" disabled={busy} onClick={() => setLibraryDraft(undefined)}>{t('common.cancel')}</Button>
+                <Button type="button" variant="secondary" disabled={busy} onClick={() => setLibraryDraft(undefined)}>{t('common.cancel')}</Button>
                 <Button disabled={busy || !wordRuleLibrarySchema.safeParse(libraryDraft).success} type="submit">
                   {t('suite.save')}
                 </Button>
@@ -729,7 +729,7 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
-              variant="destructive"
+              variant="danger"
               disabled={busy}
               onClick={() => {
                 if (deleting)
@@ -813,7 +813,7 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
             </FieldGroup>
           </CardContent>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" disabled={busy} onClick={() => setCsvOpen(false)}>{t('common.cancel')}</Button>
+            <Button type="button" variant="secondary" disabled={busy} onClick={() => setCsvOpen(false)}>{t('common.cancel')}</Button>
             <Button
               disabled={busy || !library || !csv?.entries.length || !!csv?.errors.length}
               onClick={() => {
@@ -876,7 +876,7 @@ export function WordRulesTab({ kind, libraryId }: { kind: WordRuleKind; libraryI
                 </FieldGroup>
               </CardContent>
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setTesting(false)}>{t('common.close')}</Button>
+                <Button type="button" variant="secondary" onClick={() => setTesting(false)}>{t('common.close')}</Button>
                 <Button
                   disabled={!testText || busy || !api}
                   onClick={() => {

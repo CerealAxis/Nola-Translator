@@ -86,10 +86,10 @@ function ProcessList({ onOpenChange, onPick }: Omit<PickerProps, 'open'>) {
           <Input type="search" aria-label={label('process')} placeholder={label('process')} value={query}
             onChange={event => { setQuery(event.target.value); setSelected(undefined) }} />
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => { setWindowMode(!windowMode); setSelected(undefined) }}>
+            <Button variant="secondary" size="sm" onClick={() => { setWindowMode(!windowMode); setSelected(undefined) }}>
               {windowMode ? <ListFilter /> : <MousePointer2 />}{label(windowMode ? 'processList' : 'pickWindow')}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => { setRefreshed(true); setQuery(''); setSelected(undefined) }}>
+            <Button variant="secondary" size="sm" onClick={() => { setRefreshed(true); setQuery(''); setSelected(undefined) }}>
               <RefreshCw />{label('refresh')}
             </Button>
             <span role="status" className="sr-only">{refreshed ? label('refreshed') : ''}</span>
@@ -97,7 +97,7 @@ function ProcessList({ onOpenChange, onPick }: Omit<PickerProps, 'open'>) {
         </>}
       <div role="group" aria-label={label(loadingTitle ? 'loadTitle' : windowMode ? 'pickWindow' : 'processList')}
         className={windowMode && !loadingTitle ? 'grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-2' : 'grid gap-2'}>
-        {rows.map(game => <Button key={game.id} variant="outline" aria-pressed={selected?.id === game.id}
+        {rows.map(game => <Button key={game.id} variant="secondary" aria-pressed={selected?.id === game.id}
           className="h-auto w-full justify-start whitespace-normal py-2 text-start aria-pressed:border-nola-ui-primary"
           onClick={() => setSelected(game)}>
           {windowMode && !loadingTitle ? <Monitor /> : <Gamepad2 />}
@@ -117,8 +117,8 @@ function ProcessList({ onOpenChange, onPick }: Omit<PickerProps, 'open'>) {
       </label>}
     </CardContent>
     <DialogFooter>
-      {loadingTitle && <Button variant="outline" onClick={() => { setLoadingTitle(false); setSelected(undefined) }}>{label('restore')}</Button>}
-      <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
+      {loadingTitle && <Button variant="secondary" onClick={() => { setLoadingTitle(false); setSelected(undefined) }}>{label('restore')}</Button>}
+      <Button variant="secondary" onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
       <Button disabled={!selected} onClick={confirm}>{loadingTitle ? label('loadTitle') : t('common.confirm')}</Button>
     </DialogFooter>
   </DialogContent>
@@ -255,7 +255,7 @@ export function ThreadPicker({ open, onOpenChange, threads, onChange, embedded, 
     <CardContent className={groupClass}>
       <div className="flex flex-wrap items-center gap-2">
         <Input type="search" className="min-w-0 flex-1" aria-label={t('suite.searchDialogue')} placeholder={t('suite.search')} value={query} onChange={event => setQuery(event.target.value)} />
-        <Button variant="outline" size="sm" disabled={waiting} onClick={advance}><ChevronRight />{label('next')}</Button>
+        <Button variant="secondary" size="sm" disabled={waiting} onClick={advance}><ChevronRight />{label('next')}</Button>
       </div>
       {threadIds.filter(id => !removed.includes(id) && [label(id), current(id), ...history[id]].some(text => text.toLowerCase().includes(query.trim().toLowerCase())))
         .map(id => <div className="grid gap-2 border-b border-nola-ui-border pb-3" key={id}>
@@ -300,7 +300,7 @@ export function ThreadPicker({ open, onOpenChange, threads, onChange, embedded, 
         </label>
         <div className="mt-2 grid gap-2">{threadIds.map(id => <div key={id} className={rowClass}>
           <span>{label(id)}</span>
-          <Button variant="outline" size="sm" aria-label={label(removed.includes(id) ? 'insertThread' : 'removeThread') + ' · ' + label(id)} onClick={() => {
+          <Button variant="secondary" size="sm" aria-label={label(removed.includes(id) ? 'insertThread' : 'removeThread') + ' · ' + label(id)} onClick={() => {
             if (removed.includes(id)) setRemoved(removed.filter(thread => thread !== id))
             else {
               setRemoved([...removed, id])
@@ -358,7 +358,7 @@ function AddGames({ games, onAdd, onClose }: Pick<LibraryProps, 'games' | 'onAdd
           <Checkbox checked={copyProfile} onCheckedChange={setCopyProfile} />{label('copyProfile')}
         </label>}
       </CardContent>
-      <DialogFooter><Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
+      <DialogFooter><Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
         <Button disabled={!selected.length || (selected.every(id => games.some(game => game.id === id)) && !copyProfile)} onClick={add}>{label('addSelected')}</Button>
       </DialogFooter>
     </DialogContent>
@@ -464,14 +464,14 @@ export function DemoLibrary({ games, recentIds = [], onAdd, onPlay, onBack, onRe
   }
   return <div className="game-page min-w-0">
     <PageHeader title={t('suite.gameLibrary')} actions={<>
-      <Button variant="outline" onClick={onBack}><ArrowLeft />{t('suite.gameTitle')}</Button>
+      <Button variant="secondary" onClick={onBack}><ArrowLeft />{t('suite.gameTitle')}</Button>
       <Button onClick={() => setAdding(true)}><Plus />{t('suite.addGame')}</Button>
     </>} />
     <Card><CardContent className={groupClass}>
       <div className="flex flex-wrap items-center gap-2">
-        {(['all', 'recent'] as const).map(id => <Button key={id} size="sm" variant={id === list ? 'default' : 'outline'}
+        {(['all', 'recent'] as const).map(id => <Button key={id} size="sm" variant={id === list ? 'default' : 'secondary'}
           aria-pressed={id === list} onClick={() => setActiveList(id)}>{label(id === 'all' ? 'allGames' : 'recent')}</Button>)}
-        {groups.map(name => <Button key={name} size="sm" variant={name === selectedList ? 'default' : 'outline'}
+        {groups.map(name => <Button key={name} size="sm" variant={name === selectedList ? 'default' : 'secondary'}
           aria-pressed={name === selectedList} onClick={() => setActiveList(listKey(name))}>{name}</Button>)}
         <Button size="icon-sm" variant="bare" disabled={!profiles.length} tooltip={label('newList')} aria-label={label('newList')}
           onClick={() => { setListName(''); setMembers([]); setCreateList(true) }}><FolderPlus /></Button>
@@ -489,8 +489,8 @@ export function DemoLibrary({ games, recentIds = [], onAdd, onPlay, onBack, onRe
       <CardContent className={groupClass}>
         <p className="break-all type-muted text-muted">{game.emulator ? 'PSP · ' + (game.originalId ?? game.id) : game.process}</p>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => onPlay(game)}><Play />{t('suite.launch')}</Button>
-          <Button variant="outline" size="sm" onClick={() => setProfileId(game.id)}>{label('details')}</Button>
+          <Button variant="secondary" size="sm" onClick={() => onPlay(game)}><Play />{t('suite.launch')}</Button>
+          <Button variant="secondary" size="sm" onClick={() => setProfileId(game.id)}>{label('details')}</Button>
           {list !== 'recent' && <Button size="icon-sm" variant="bare" tooltip={label(selectedList ? 'removeFromList' : 'remove')} aria-label={label(selectedList ? 'removeFromList' : 'remove') + ' · ' + game.name}
             onClick={() => setRemove(game)}><Trash2 /></Button>}
         </div>
@@ -503,8 +503,8 @@ export function DemoLibrary({ games, recentIds = [], onAdd, onPlay, onBack, onRe
     {remove && <Dialog open onOpenChange={open => { if (!open) setRemove(undefined) }}>
       <DialogContent><DialogHeader><DialogTitle>{label(selectedList ? 'removeFromList' : 'remove')}</DialogTitle><DialogCloseButton /></DialogHeader>
         <CardContent>{remove.name}</CardContent>
-        <DialogFooter><Button variant="outline" onClick={() => setRemove(undefined)}>{t('common.cancel')}</Button>
-          <Button variant="destructive" onClick={() => {
+        <DialogFooter><Button variant="secondary" onClick={() => setRemove(undefined)}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={() => {
             if (selectedList) update({ ...remove, lists: remove.lists?.filter(name => name !== selectedList) })
             else onRemove(remove.id)
             setRemove(undefined)
@@ -518,7 +518,7 @@ export function DemoLibrary({ games, recentIds = [], onAdd, onPlay, onBack, onRe
           {profiles.map(game => <label className="flex items-center gap-2" key={game.id}>
             <Checkbox checked={members.includes(game.id)} onCheckedChange={checked => setMembers(checked ? [...members, game.id] : members.filter(id => id !== game.id))} />{game.name}
           </label>)}
-        </CardContent><DialogFooter><Button variant="outline" onClick={() => setCreateList(false)}>{t('common.cancel')}</Button>
+        </CardContent><DialogFooter><Button variant="secondary" onClick={() => setCreateList(false)}>{t('common.cancel')}</Button>
           <Button onClick={saveList} disabled={!listName.trim() || !members.length || groups.includes(listName.trim())}>{t('common.confirm')}</Button></DialogFooter>
       </DialogContent>
     </Dialog>}

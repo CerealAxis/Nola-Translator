@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs'
-import { appendFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, open, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 
@@ -9,7 +9,6 @@ const META_FILE = 'meeting.json'
 const SEGMENTS_FILE = 'segments.jsonl'
 const AUDIO_FILE = 'audio.mp3'
 const LEGACY_AUDIO_FILE = 'audio.wav'
-const MIGRATION_MARKER = 'migrated-history-v1'
 const WAV_HEADER_BYTES = 44
 
 function hasMpegAudioFrame(bytes: Buffer): boolean {
@@ -144,10 +143,9 @@ export class MeetingStore {
     return next
   }
 
-  async initialize(legacyHistoryPath: string): Promise<void> {
+  async initialize(): Promise<void> {
     await mkdir(this.root, { recursive: true })
     await this.loadAll()
-    await this.migrateLegacyHistory(legacyHistoryPath)
   }
 
   private async loadAll(): Promise<void> {
@@ -210,52 +208,6 @@ export class MeetingStore {
         console.error('meeting interrupted rewrite failed', error)
       }
     }
-  }
-
-  private async migrateLegacyHistory(legacyPath: string): Promise<void> {
-    if (this.cache.size > 0) return
-    const marker = join(this.root, MIGRATION_MARKER)
-    try {
-      await stat(marker)
-      return
-    } catch {
-      // No marker yet, so the flat legacy history may still be waiting to be imported.
-    }
-    let raw: string
-    try {
-      raw = await readFile(legacyPath, 'utf8')
-    } catch {
-      return
-    }
-    const segments = parseSegments(raw).filter((segment) => segment.isFinal)
-    await writeFile(marker, new Date().toISOString(), 'utf8')
-    if (segments.length === 0) return
-    const startedAtMs = Date.now()
-    const meetingId = `legacy-${meetingIdFor(new Date(startedAtMs))}`
-    const first = segments[0]
-    const last = segments[segments.length - 1]
-    const contentStartedAtMs = first.startedAtMs
-    const contentEndedAtMs = last.endedAtMs ?? last.startedAtMs
-    const meta: MeetingMeta = {
-      meetingId,
-      title: '',
-      titleIsCustom: false,
-      startedAtMs,
-      endedAtMs: startedAtMs + contentEndedAtMs,
-      // Same measure as a live recording: content span, not wall-clock.
-      durationMs: Math.max(0, contentEndedAtMs - contentStartedAtMs),
-      daySequence: 0,
-      segmentCount: segments.length,
-      sourceLanguage: segments.find((segment) => segment.sourceLanguage)?.sourceLanguage ?? 'auto',
-      targetLanguage: segments[0].translations[0]?.targetLanguage ?? 'zh',
-      contentStartedAtMs,
-      contentEndedAtMs,
-    }
-    const directory = this.directory(meetingId)
-    await mkdir(directory, { recursive: true })
-    await writeFile(join(directory, SEGMENTS_FILE), segments.map((segment) => JSON.stringify(segment)).join('\n') + '\n', 'utf8')
-    await writeMeta(directory, meta)
-    this.cache.set(meetingId, meta)
   }
 
   private nextDaySequence(at: number): number {

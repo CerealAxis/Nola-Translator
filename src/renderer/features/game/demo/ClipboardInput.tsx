@@ -48,8 +48,8 @@ export function ClipboardInput({ visible, automatic, request, write, onRead }: C
     <label htmlFor={id} className="type-small">{s('content')}</label>
     <Textarea id={id} rows={2} value={draft} onChange={event => setDraft(event.currentTarget.value)} />
     <div className="game-demo-scene-actions">
-      <Button variant="outline" size="sm" disabled={!draft.trim()} onClick={copy}>{s('copy')}</Button>
-      <Button variant="outline" size="sm" disabled={!clipboard} onClick={() => onRead(clipboard, true)}>{s('append')}</Button>
+      <Button variant="secondary" size="sm" disabled={!draft.trim()} onClick={copy}>{s('copy')}</Button>
+      <Button variant="secondary" size="sm" disabled={!clipboard} onClick={() => onRead(clipboard, true)}>{s('append')}</Button>
     </div>
   </div>
 }

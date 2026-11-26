@@ -48,16 +48,16 @@ it('opens a dialog, fills an exact match and preserves a manual value entered du
   expect(save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ ...openAiModels[0], maxOutputTokens: 4096, pdf: true }))
 })
 
-it('drops values for the previous catalog ID and accepts an unlisted model', () => {
+it('preserves the draft for an unlisted model until a new catalog match arrives', () => {
   const save = vi.fn()
   render(<LlmPreviewEditor provider="openai" model={openAiModels[1]} onCancel={vi.fn()} onSave={save} />)
   fireEvent.change(screen.getByLabelText('模型 ID'), { target: { value: 'private-chat' } })
-  expect(screen.getByLabelText('上下文窗口')).toHaveValue(null)
-  expect(screen.getByRole('checkbox', { name: '图片' })).not.toBeChecked()
+  expect(screen.getByLabelText('上下文窗口')).toHaveValue(128000)
+  expect(screen.getByRole('checkbox', { name: '图片' })).toBeChecked()
   fireEvent.change(screen.getByLabelText('上下文窗口'), { target: { value: '65536' } })
   fireEvent.change(screen.getByLabelText('最大输出 Token'), { target: { value: '8192' } })
   fireEvent.click(screen.getByRole('button', { name: '保存' }))
-  expect(save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 'private-chat', name: 'private-chat', contextWindow: 65536, maxOutputTokens: 8192, images: false }))
+  expect(save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 'private-chat', name: 'private-chat', contextWindow: 65536, maxOutputTokens: 8192, images: true }))
 })
 
 it('matches typed IDs only within the selected provider and blocks duplicates', () => {

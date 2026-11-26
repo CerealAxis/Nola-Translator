@@ -118,10 +118,7 @@ function RuleTables({
 }) {
   const { t } = useI18n()
   const base = textProcessingPath + '/config/' + feature.id
-  const [legacy] = usePreviewSetting<FeatureOptions | null>('options:' + feature.id, null)
-  const migrated = legacy?.rules ?? []
-  const [tables, save] = usePreviewSetting<RuleTable[]>('tables:' + feature.id, migrated.length
-    ? [{ id: 'default', name: t(feature.label), rules: migrated }] : [])
+  const [tables, save] = usePreviewSetting<RuleTable[]>('tables:' + feature.id, [])
   const [nameDraft, setNameDraft] = useState<{ id?: string; name: string }>()
   const [deleting, setDeleting] = useState<RuleTable>()
   const table = tables.find(item => item.id === tableId)
@@ -258,7 +255,7 @@ function RuleTables({
               </Field>
             </CardContent>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setNameDraft(undefined)}>
+              <Button type="button" variant="secondary" onClick={() => setNameDraft(undefined)}>
                 {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={!nameDraft?.name.trim()}>
@@ -279,7 +276,7 @@ function RuleTables({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => {
+            <AlertDialogAction variant="danger" onClick={() => {
               if (deleting) save(tables.filter(item => item.id !== deleting.id))
               setDeleting(undefined)
             }}>
@@ -580,7 +577,7 @@ function RuleEntries({
                 <EmptyTitle>{t(rules.length ? 'suite.textNoMatches' : 'suite.textNoRules')}</EmptyTitle>
               </EmptyHeader>
               {rules.length > 0 && (
-                <Button size="sm" variant="outline" onClick={() => setQuery('')}>
+                <Button size="sm" variant="secondary" onClick={() => setQuery('')}>
                   {t('suite.textClearSearch')}
                 </Button>
               )}
@@ -597,7 +594,7 @@ function RuleEntries({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => {
+            <AlertDialogAction variant="danger" onClick={() => {
               onChange([])
               setConfirmClear(false)
             }}>

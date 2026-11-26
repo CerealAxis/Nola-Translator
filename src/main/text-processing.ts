@@ -10,40 +10,17 @@ import {
 } from '../shared/text-processing'
 import type { BackendSupervisor } from './backend-supervisor'
 
-const initial: TextProcessingConfig = { revision: 0, migrated: false, values: {} }
+const initial: TextProcessingConfig = { revision: 0, values: {} }
 const maxBytes = 8 * 1024 * 1024
 const optimizationIds = ['replace-before', 'skip-punctuation', 'python-optimize', 'replace-after', 'arabic']
 const embeddedPreprocessing = new Set(['normalize', 'breaks', 'tags', 'braces', 'replace', 'python-pre'])
 const nameSchema = z.object({ original: z.string().min(1).max(200), name: z.string().min(1).max(200) })
 const configSchema = z.object({
-  revision: z.number().int().nonnegative(), migrated: z.boolean(),
+  revision: z.number().int().nonnegative(),
   values: z.record(z.string(), z.unknown()),
 })
-const legacyScripts = ['python-pre', 'python-optimize']
-
-function parseValues(values: Record<string, unknown>, legacy = false): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(values)) {
-    try {
-      result[key] = parseTextSetting(key, value)
-    } catch (error) {
-      if (!legacy) throw error
-    }
-  }
-  if (legacy) {
-    for (const feature of legacyScripts) {
-      const options = values['options:' + feature] as { script?: unknown } | undefined
-      const tables = values['tables:' + feature]
-      const rules: { script?: unknown }[] = Array.isArray(tables)
-        ? tables.flatMap(table => Array.isArray(table?.rules) ? table.rules : []).filter(Boolean) : []
-      const script = rules.find(rule => typeof rule.script === 'string' && rule.script.trim())?.script ?? options?.script
-      const key = 'script:' + feature
-      if (!(key in result) && typeof script === 'string' && script.length <= 262144) result[key] = script
-      // The old preview could save scripts, but it never ran them.
-      if (result.enabled) (result.enabled as Record<string, boolean>)[feature] = false
-    }
-  }
-  return result
+function parseValues(values: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, parseTextSetting(key, value)]))
 }
 
 async function fetchVndbNames(id: string) {
@@ -135,14 +112,6 @@ export class TextProcessing {
     return operation
   }
 
-  migrate(legacy: Record<string, unknown>) {
-    return this.update(async () => {
-      if (this.document.migrated) return this.document
-      return { ...this.document, revision: this.document.revision + 1, migrated: true,
-        values: { ...parseValues(legacy, true), ...this.document.values } }
-    })
-  }
-
   save(key: string, value: unknown) {
     const parsed = parseTextSetting(key, value)
     let importedLibrary: GlossaryLibrary | undefined
@@ -159,9 +128,8 @@ export class TextProcessing {
           if (!names.length) throw new Error('vndb')
           const name = 'VNDB ' + id
           if (replace) {
-            const legacy = values['options:replace-before'] as { rules?: TextReplacementTable['rules'] } | undefined
             const tables = values['tables:replace-before'] as TextReplacementTable[] | undefined
-            const current = tables ?? (legacy?.rules?.length ? [{ id: 'default', name: 'replace-before', rules: legacy.rules }] : [])
+            const current = tables ?? []
             const existing = current.find(table => table.id === 'vndb-' + id)
             const patterns = new Set(existing?.rules.map(rule => rule.pattern))
             const rules = names.filter(item => !patterns.has(item.original)).map(item => ({

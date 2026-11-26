@@ -1,5 +1,15 @@
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Switch, SwitchThumb } from '@/components/ui/switch'
+import { useTtsCapabilities } from '@/components/tts/use-tts-capabilities'
+import { ttsCatalogCapabilities } from '../../../../shared/tts/catalog'
+import type { TtsVoiceRef } from '../../../../shared/tts/voice-ref'
+import { TtsVoiceConfiguration, ttsVoiceDrafts, serializeTtsVoices } from './TtsVoiceConfiguration'
+import { TtsVoiceSelector } from '@/components/tts/TtsVoiceSelector'
+import { ttsText } from '@/i18n/tts-ui'
+import { llmPreviewCopy } from './llm-preview-copy'
 import { Download, Pencil, Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ModelDownloadSource, ResourceRecord } from '@/bridge'
 import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 import { Badge } from '@/components/ui/badge'
@@ -124,15 +134,16 @@ function LocalChatEditor({ record, onClose }: { record: ResourceRecord; onClose:
 
 function LocalModelEditor({ record, onClose }: { record: ResourceRecord; onClose: () => void }) {
   const { t, language } = useI18n()
+  if (record.kind === 'ttsModel') return <LocalTtsEditor record={record} onClose={onClose} />
   if (record.kind === 'recognitionModel' || record.kind === 'translationModel') {
     return <ModelConfigurationDialog record={record} onClose={onClose} hideRemove className="model-editor" />
   }
-  const label = modelWorkspaceText(language, record.kind === 'ttsModel' ? 'speechLanguages' : 'supportedLanguages')
+  const label = modelWorkspaceText(language, 'supportedLanguages')
   return <ModelEditorDialog editing onCancel={onClose}>
     <SettingsRow label={t('settings.model')}>{visualModelName(record)}</SettingsRow>
     {record.languages.length > 0
-      ? <ModelLanguageSelect label={label} value={record.languages} codes={record.languages} onChange={() => undefined} readOnly genericChinese={record.kind === 'ttsModel'} />
-      : (record.kind === 'ttsModel' || record.kind === 'ocrModel') && <SettingsRow label={label}>
+      ? <ModelLanguageSelect label={label} value={record.languages} codes={record.languages} onChange={() => undefined} readOnly />
+      : record.kind === 'ocrModel' && <SettingsRow label={label}>
         <span className="type-muted">{modelWorkspaceText(language, 'languagesUnknown')}</span>
       </SettingsRow>}
   </ModelEditorDialog>
@@ -223,4 +234,44 @@ export function LocalDownloadDialog({ family, installed, onClose, onInstall, bus
       </DialogFooter>
     </DialogContent>
   </Dialog>
+}
+
+function LocalTtsEditor({ record, onClose }: { record: ResourceRecord; onClose(): void }) {
+  const { language, t } = useI18n()
+  const binding = `resource:${record.resourceId}`
+  const saved = stores.settings.getState().settings?.modelWorkspace?.localTts?.[record.resourceId]
+  const { capabilities } = useTtsCapabilities(binding, undefined, true)
+  const base = ttsCatalogCapabilities(/qwen3.*tts|tts.*qwen3/i.test(record.resourceId + record.name) ? 'qwen3-tts' : record.provider, record.resourceId, binding)
+  if (base.languages.mode === 'unknown' && record.languages.length) base.languages = { mode: 'finite', values: record.languages }
+  const caps = capabilities ?? base
+  const [selected, setSelected] = useState<TtsVoiceRef>(saved?.defaultVoiceRef ?? (base.presetVoices[0] ? { kind: 'preset', modelBinding: binding, voiceId: base.presetVoices[0].id } : { kind: 'engine-default' }))
+  const [rows, setRows] = useState(() => ttsVoiceDrafts(base, saved?.capabilityOverride?.presetVoices, selected, saved?.presetVoiceIds))
+  const [smart, setSmart] = useState(true)
+  const [edited, setEdited] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const key = JSON.stringify(capabilities)
+  useEffect(() => { if (capabilities && smart && !edited) setRows(current => ttsVoiceDrafts(capabilities, serializeTtsVoices(current), selected, saved?.presetVoiceIds)) }, [key, smart])
+  const profileOnly = !caps.conditioning?.includes('preset') && (caps.supports.cloning === true || caps.supports.voiceDesign === true)
+  const configured = rows.filter(row => row.configured)
+  const valid = configured.every(row => !!row.id.trim() && rows.every(other => row === other || row.id.trim() !== other.id.trim()))
+  return <ModelEditorDialog editing onCancel={onClose} canSave={!saving && valid} onSave={async () => {
+    setSaving(true)
+    try {
+      await enqueueModelWorkspaceSave(() => {
+        const current = stores.settings.getState().settings?.modelWorkspace ?? emptyWorkspace
+        return updateSettings({ modelWorkspace: { ...current, localTts: { ...current.localTts, [record.resourceId]: {
+          ...saved, defaultVoiceRef: selected.kind === 'preset' ? { ...selected, voiceId: selected.voiceId.trim() } : selected,
+          presetVoiceIds: rows.map(row => row.configured ? row.id.trim() : row.id),
+          capabilityOverride: { ...saved?.capabilityOverride, presetVoices: serializeTtsVoices(rows) },
+        } } } })
+      })
+      notifySuccess(t('modelConfig.saved')); onClose()
+    } catch (cause) { notifyError(t('modelConfig.saveFailed'), { cause }) }
+    finally { setSaving(false) }
+  }}>
+    <Field className="flex-row items-center justify-between"><FieldLabel htmlFor="local-tts-smart">{llmPreviewCopy[language].smart}</FieldLabel><Switch id="local-tts-smart" checked={smart} onCheckedChange={checked => { setSmart(checked); setEdited(checked); if (checked) { setRows(ttsVoiceDrafts(caps)); notifySuccess(llmPreviewCopy[language].matched) } }}><SwitchThumb /></Switch></Field>
+    <Field><FieldLabel htmlFor="local-tts-model">{t('settings.modelId')}</FieldLabel><Input id="local-tts-model" value={record.resourceId} readOnly /></Field>
+    {profileOnly ? <Field><FieldLabel>{ttsText(language, caps.supports.voiceDesign === true ? 'designs' : 'clones')}</FieldLabel><TtsVoiceSelector profilesOnly modelBinding={binding} targetLanguage={record.languages[0] ?? 'auto'} value={selected} onChange={setSelected} /></Field>
+      : <TtsVoiceConfiguration rows={rows} onChange={next => { setEdited(true); setRows(next) }} selected={selected} onSelect={setSelected} capabilities={caps} catalogCapabilities={base} binding={binding} />}
+  </ModelEditorDialog>
 }

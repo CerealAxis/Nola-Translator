@@ -253,7 +253,7 @@ export function RuntimeComponents() {
               {t(confirmKind === 'onnx' ? 'runtime.uninstallOnnxBody' : 'runtime.uninstallBody')}
             </AlertDialog.Description>
             <DialogFooter className="flex justify-end gap-2">
-              <Button variant="tertiary" size="sm" onClick={() => setConfirmKind(null)}>{t('common.cancel')}</Button>
+              <Button variant="secondary" size="sm" onClick={() => setConfirmKind(null)}>{t('common.cancel')}</Button>
               <Button variant="danger" size="sm" disabled={state.runtimeBusy} onClick={() => { if (confirmKind) void uninstall(confirmKind) }}>
                 {t('runtime.uninstall')}
               </Button>

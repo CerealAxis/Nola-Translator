@@ -109,10 +109,10 @@ it('stores each scene switch separately', () => {
   expect(screen.getByRole('switch', { name: '文本处理' })).not.toBeChecked()
 })
 
-it('preserves the single-table preview and reads Luna TSV rows with quoted multiline cells', async () => {
-  localStorage.setItem('nola:text-processing-preview:options:replace', JSON.stringify({
+it('reads Luna TSV rows with quoted multiline cells', async () => {
+  localStorage.setItem('nola:text-processing-preview:tables:replace', JSON.stringify([{ id: 'default', name: '替换',
     rules: [{ id: 'test', pattern: 'Old', replacement: 'New', regex: false }],
-  }))
+  }]))
   render(<TextProcessingTab route={parseRoute(base + '/config/replace/default')} />)
   expect(screen.getByRole('cell', { name: 'Old' })).toBeInTheDocument()
   fireEvent.change(document.querySelector('input[type="file"]')!, {
@@ -167,29 +167,4 @@ it.each([
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   fireEvent.click(save)
   expect(localStorage.getItem(storageKey)).toBe(JSON.stringify(sample))
-})
-
-it('loads a script from the previous table and persists edits to the single form', async () => {
-  const key = 'nola:text-processing-preview:tables:python-pre'
-  const oldTable = JSON.stringify([{ id: 'old', rules: [{ script: 'def POSTSOLVE(text):\n    return text' }] }])
-  localStorage.setItem(key, oldTable)
-  const scriptRoute = parseRoute(base + '/config/python-pre/old')
-  const first = render(<TextProcessingTab route={scriptRoute} />)
-  const getEditor = async () => {
-    const textbox = await screen.findByRole('textbox', { name: 'Python 脚本' }, { timeout: 5000 })
-    return EditorView.findFromDOM(textbox.closest<HTMLElement>('.cm-editor')!)!
-  }
-  const editor = await getEditor()
-  expect(editor.state.doc.toString()).toBe('def POSTSOLVE(text):\n    return text')
-  act(() => editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: 'def POSTSOLVE():\n    return "invalid"' } }))
-  fireEvent.click(screen.getByRole('button', { name: '保存' }))
-  expect(screen.getByRole('alert')).toHaveTextContent('POSTSOLVE(text)')
-  expect(localStorage.getItem('nola:text-processing-preview:script:python-pre')).toBeNull()
-  const edited = 'def POSTSOLVE(text):\n    return text.strip()'
-  act(() => editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: edited } }))
-  fireEvent.click(screen.getByRole('button', { name: '保存' }))
-  expect(localStorage.getItem(key)).toBe(oldTable)
-  first.unmount()
-  render(<TextProcessingTab route={scriptRoute} />)
-  expect((await getEditor()).state.doc.toString()).toBe(edited)
 })

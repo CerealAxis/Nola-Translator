@@ -28,16 +28,58 @@ def load_qwen3_tts(root: Path, device: str):
     return Qwen3TTSModel.from_pretrained(str(root), device_map=device, local_files_only=True)
 
 
-def generate_qwen3_tts(model, mode: str | None, text: str, voice: str | None = None):
+def generate_qwen3_tts(model, mode: str | None, text: str, voice: str | None = None,
+                      *, language: str = 'auto', conditioning: dict | None = None,
+                      reference_audio: str | None = None, controls: dict | None = None):
+    seed = (controls or {}).get('seed', (conditioning or {}).get('seed'))
+    if seed is not None:
+        import torch
+        with torch.random.fork_rng():
+            torch.manual_seed(seed)
+            condition = {key: value for key, value in (conditioning or {}).items() if key != 'seed'}
+            control = {key: value for key, value in (controls or {}).items() if key != 'seed'}
+            return generate_qwen3_tts(model, mode, text, voice, language=language, conditioning=condition,
+                reference_audio=reference_audio, controls=control)
+    language_names = {'zh': 'Chinese', 'en': 'English', 'ja': 'Japanese', 'ko': 'Korean',
+        'de': 'German', 'fr': 'French', 'ru': 'Russian', 'pt': 'Portuguese', 'es': 'Spanish',
+        'it': 'Italian', 'auto': 'Auto'}
+    language = language_names.get(language.split('-')[0].lower(), language)
+    conditioning, controls = conditioning or {}, controls or {}
     if mode == 'custom_voice':
         voices = model.get_supported_speakers() or []
-        speaker = voice or (voices[0] if voices else None)
+        speaker = conditioning.get('voiceId') or voice or (voices[0] if voices else None)
         if not speaker:
             raise ValueError('This Qwen3-TTS model does not expose a selectable speaker')
-        return model.generate_custom_voice(text=text, speaker=speaker, language='Auto')
+        if isinstance(speaker, str) and speaker not in voices:
+            raise ValueError('Unknown Qwen3-TTS speaker')
+        kwargs = {'instruct': controls['instruct']} if controls.get('instruct') else {}
+        return model.generate_custom_voice(text=text, speaker=speaker, language=language, **kwargs)
     if mode == 'voice_design':
-        return model.generate_voice_design(text=text, language='Auto', instruct='A clear, neutral speaking voice.')
-    raise ValueError('This Base model needs a reference voice. Select a CustomVoice or VoiceDesign model.')
+        description = conditioning.get('description')
+        if conditioning.get('kind') != 'design' or not description:
+            raise ValueError('VoiceDesign requires a saved design description')
+        recipe = conditioning.get('recipe') or {}
+        schema = conditioning.get('recipeSchema', 'nola-description-v1')
+        if schema == 'qwen3-tts-generation-v1':
+            allowed = {'do_sample', 'temperature', 'top_p', 'top_k', 'repetition_penalty', 'max_new_tokens'}
+            if recipe.keys() - allowed:
+                raise ValueError('Unsupported Qwen3-TTS recipe parameter')
+            parameters = recipe
+        elif schema == 'nola-description-v1' and not (recipe.keys() - {'galleryId'}):
+            parameters = {}
+        else:
+            raise ValueError('Unsupported voice design recipe')
+        return model.generate_voice_design(text=text, language=language, instruct=description, **parameters)
+    if conditioning.get('kind') != 'reference-audio' or not reference_audio:
+        raise ValueError('This Base model needs a reference voice')
+    import soundfile as sf
+    samples, sample_rate = sf.read(io.BytesIO(base64.b64decode(reference_audio.split(',', 1)[1], validate=True)), dtype='float32')
+    if samples.ndim > 1:
+        samples = samples.mean(axis=1)
+    transcript = conditioning.get('transcript')
+    if not transcript:
+        raise ValueError('Voice cloning requires the reference transcript')
+    return model.generate_voice_clone(text=text, language=language, ref_audio=(samples, sample_rate), ref_text=transcript)
 
 
 def torch_device_for_tts(compute, devices) -> str:
@@ -195,7 +237,8 @@ def synthesize(resources, request, compute):
                 voices = list(session.speakers() or [])
                 if request.get('inspect'):
                     return {'text': '', 'voices': voices}
-                voice = request.get('voice')
+                condition = request.get('conditioning') or {}
+                voice = condition.get('voiceId') if condition.get('kind') == 'preset' else request.get('voice')
                 if voice:
                     if voice not in voices:
                         raise ValueError('Selected voice is not provided by this model')
@@ -235,7 +278,9 @@ def synthesize(resources, request, compute):
         voices = model.get_supported_speakers() or []
         if request.get('inspect'):
             return {'text': '', 'voices': voices}
-        wavs, rate = generate_qwen3_tts(model, config.get('tts_model_type'), request['text'], request.get('voice'))
+        wavs, rate = generate_qwen3_tts(model, config.get('tts_model_type'), request['text'], request.get('voice'),
+            language=request.get('language') or request.get('target') or 'auto', conditioning=request.get('conditioning'),
+            reference_audio=request.get('reference_audio'), controls=request.get('controls'))
         return {'text': request['text'], 'audio': encode_audio(wavs[0], rate), 'voices': voices}
     from transformers import AutoConfig, AutoModelForTextToWaveform, AutoModelForTextToSpectrogram, pipeline
     from .translation.transformers_causal import load_verified_model
@@ -533,6 +578,8 @@ async def infer_batch(requests, runtime):
 
 
 def synthesize_batch(resources, requests, compute):
+    if any(request.get('conditioning') or request.get('target') or request.get('language') for request in requests):
+        return [synthesize(resources, request, compute) for request in requests]
     model_id = requests[0].get('resourceId')
     root = resources.model_path(model_id)
     config_path = root / 'config.json'

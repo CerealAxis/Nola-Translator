@@ -10,6 +10,7 @@ import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } fro
 import { computeSettingsPatchSchema } from '../shared/compute'
 import { REALTIME_S2S_MODELS, RECOGNITION_MODEL_IDS, UI_FONTS } from '../shared/settings'
 import { meetingModeSettingsSchema } from '../shared/meeting-mode'
+import { ttsVoiceRefSchema } from '../shared/tts/voice-ref'
 
 export const desktopTypographyShape = {
   interfaceFont: z.enum(UI_FONTS),
@@ -55,7 +56,11 @@ const localModelIdSchema = z.union([
 export const settingsPatchSchema = z.object({
   meetingMode: meetingModeSettingsSchema.optional(),
   closeBehavior: z.enum(['tray', 'quit']).optional(),
-  synthesis: z.object({ modelId: z.string().max(512), voice: z.string().max(256) }).partial().optional(),
+  synthesis: z.object({ modelId: z.string().max(512), voice: z.string().max(256), voiceRef: ttsVoiceRefSchema,
+    legacyVoice: z.object({ rawVoice: z.string(), modelBinding: z.string(), providerId: z.string().optional(),
+      connectionId: z.string().optional(), accountScope: z.string().optional(),
+      verificationStatus: z.enum(['verified', 'unverified']), migrationVersion: z.literal(1) }),
+  }).partial().optional(),
   realtime: z.object({
     outputMode: z.enum(['source', 'translation', 'speech']),
     latencyDetection: z.boolean(),

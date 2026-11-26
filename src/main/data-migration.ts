@@ -98,7 +98,7 @@ function errorCode(error: unknown): string | undefined {
 /**
  * Whether `child` is `parent` or sits below it. Exported so `app-ipc.ts` can ask the same question of a legacy `modelStoragePath` rather than hand-write a second containment check.
  *
- * Case-insensitive, matching how `legacy-migration.ts` compares roots; on a case-sensitive volume that only makes the check more eager, so it fails towards refusing a migration rather than deleting one.
+ * Case-insensitive on Windows; on a case-sensitive volume that only makes the check more eager, so it fails towards refusing a migration rather than deleting one.
  */
 export function isSameOrInside(parent: string, child: string): boolean {
   const from = resolve(parent).toLowerCase()
@@ -144,7 +144,7 @@ async function sameFileContent(left: string, right: string): Promise<boolean> {
 /**
  * Whether the destination already holds this entry's content.
  *
- * Every file is compared by a streamed SHA-256 digest, never by size alone: `secure-store.ts`'s `get()` deletes the ciphertext before it throws, so a size-equal but different `credentials.json` is keys already lost, and only matching content makes deleting the source copy safe. Streaming keeps large runtime files out of memory.
+ * Every file is compared by a streamed SHA-256 digest: equal sizes do not establish that encrypted credentials were copied intact. Streaming keeps large runtime files out of memory.
  *
  * Directories must match member names, sizes and content before they can be treated as already migrated.
  */

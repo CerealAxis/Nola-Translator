@@ -14,6 +14,7 @@ import { LANGUAGE_CODES } from '../shared/languages'
 import { defaultModelBinding, isCloudModelDisabled, isModelEnabled, modelEnablePatch, modelPolicyOf, quickGatewayBinding, sceneModelBinding, sceneModelPatch } from '../shared/model-policy'
 import { notifyError, notifyGatewayStartIssue, notifyWarning } from '@/components/primitives/notify'
 import { cloudModelsOf } from '../shared/cloud-models'
+import { configuredBatchSpeechModels } from '../shared/model-availability'
 
 const imageTranslationIds = new Set<string>([...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS])
 
@@ -159,7 +160,7 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
   return {
     asr: merge('asr', asrOptions),
     mt: merge('mt', loaded('mt') ? [loaded('mt')!] : [], realtime('mt'), cloudMt),
-    tts: merge('tts', loaded('tts') ? [loaded('tts')!] : [], realtime('tts'), credentials['mimo-tts'] && isModelEnabled(settings, 'tts', MIMO_TTS_BINDING) ? [
+    tts: merge('tts', loaded('tts') ? [loaded('tts')!] : [], realtime('tts'), configuredBatchSpeechModels(settings, credentials).filter(model => model.kind === 'tts'), credentials['mimo-tts'] && isModelEnabled(settings, 'tts', MIMO_TTS_BINDING) ? [
       { binding: MIMO_TTS_BINDING, name: MIMO_TTS_NAME, kind: 'tts', origin: 'cloud', free: false, targetLanguages: MIMO_TTS_LANGUAGES },
     ] : []),
     llm: merge('llm', loaded('llm') ? [loaded('llm')!] : [], realtime('llm'), llmClouds),
@@ -258,7 +259,7 @@ function legacyModelBindingPatch(kind: GatewayCapability, binding: string, setti
   const normalized = normalizeModelBinding(kind, binding)
   if (!normalized) return {}
   if (kind === 'llm' || kind === 'ocr') return sceneModelPatch(settings, kind, normalized)
-  if (kind === 'tts') return { synthesis: { modelId: bindingIsLocal(normalized) ? normalized.slice(9) : normalized, voice: '' } }
+  if (kind === 'tts') return { synthesis: { modelId: bindingIsLocal(normalized) ? normalized.slice(9) : normalized } }
   if (kind === 'asr') {
     return bindingIsLocal(normalized)
       ? { recognition: { provider: 'local', modelId: normalized.slice(9) as RecognitionModelId } }

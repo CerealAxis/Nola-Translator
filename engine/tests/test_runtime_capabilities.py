@@ -85,8 +85,9 @@ def test_script_variants_survive_runtime_normalization():
 def test_invalid_recognition_language_falls_back_to_auto_when_supported(tmp_path):
     runtime = EngineRuntime(tmp_path, lambda event: None)
     config = start_config(sourceLanguage="ky", targetLanguages=[])
-    runtime._validate_model_selection(config)
-    assert config.sourceLanguage == "auto"
+    _, _, normalized = runtime._validate_model_selection(config)
+    assert normalized.sourceLanguage == "auto"
+    assert config.sourceLanguage == "ky"
 
 
 @pytest.mark.asyncio
