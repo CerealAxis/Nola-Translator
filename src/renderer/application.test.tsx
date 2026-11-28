@@ -10,11 +10,11 @@ vi.mock('./routes', async importOriginal => ({ ...await importOriginal<typeof im
 it('shows the application sidebar outside settings', () => {
   const { result } = renderHook(useApplicationNavigation)
   expect(result.current.map(item => item.id)).toEqual([
-    'home', 'models', 'model-gateway', 'workspace', 'meeting', 'screen-translation',
-    'game-translation', 'game-translation-demo', 'comic-translation', 'voices', 'workbench', 'browser', 'settings',
+    'home', 'models', 'model-gateway', 'voices', 'workspace', 'meeting', 'screen-translation',
+    'game-translation', 'game-translation-demo', 'comic-translation', 'workbench', 'browser', 'settings',
   ])
   expect(result.current.filter(item => item.section === 'features').map(item => item.id)).toEqual([
-    'workspace', 'meeting', 'screen-translation', 'game-translation', 'game-translation-demo', 'comic-translation', 'voices', 'workbench', 'browser',
+    'workspace', 'meeting', 'screen-translation', 'game-translation', 'game-translation-demo', 'comic-translation', 'workbench', 'browser',
   ])
   result.current.find(item => item.id === 'browser')?.onPress?.()
   expect(route.navigate).toHaveBeenLastCalledWith('#/settings/browser')

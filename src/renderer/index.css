@@ -237,7 +237,7 @@ html[data-overlay-toast="true"] #splash {
     flex-direction: column;
     width: 100%;
     min-height: 0;
-    padding: 0 var(--space-2) var(--space-2);
+    padding: 0 var(--space-2);
     overflow: hidden;
   }
   .nola-sidebar[data-collapsible="icon"] {
@@ -284,6 +284,7 @@ html[data-overlay-toast="true"] #splash {
   .nola-sidebar-footer {
     flex: none;
     margin-block-start: var(--space-2);
+    padding-block-end: var(--space-1);
   }
   .nola-sidebar-account {
     display: flex;
@@ -1707,7 +1708,7 @@ html[data-reduce-motion="true"] .image-generation__grid::after { animation: none
 
 .nola-home-section__heading {
   margin: 0 0 var(--space-2);
-  @apply type-h2;
+  @apply type-h3;
 }
 
 .nola-home-list-row {
@@ -5577,7 +5578,7 @@ html[data-screen-window] body, html[data-screen-window] #root {
 .settings-page__heading {
   margin: 0;
   overflow-wrap: anywhere;
-  @apply type-h4;
+  @apply type-h3;
 }
 
 .settings-panels {
@@ -7129,8 +7130,7 @@ html[data-reduce-motion="true"] .dev-motion-dot[data-running="true"] {
     min-height: 0;
     overflow-y: auto;
     color: var(--foreground);
-    font: 400 0.875rem / 1.375rem var(--font-ui);
-    letter-spacing: normal;
+    @apply type-body;
   }
   .nola-workspace-notes-editor .tiptap {
     min-height: 100%;
@@ -7163,16 +7163,10 @@ html[data-reduce-motion="true"] .dev-motion-dot[data-running="true"] {
     margin-block: var(--space-2) var(--space-1);
   }
   .nola-workspace-notes-editor h1 {
-    font: 600 1.25rem / 1.75rem var(--font-ui);
+    @apply type-h4;
   }
-  .nola-workspace-notes-editor h2 {
-    font: 600 1rem / 1.5rem var(--font-ui);
-  }
-  .nola-workspace-notes-editor h3 {
-    font: 600 1.25rem / 1.75rem var(--font-ui);
-  }
-  .nola-workspace-notes-editor :is(h4, h5, h6) {
-    font: 600 0.875rem / 1.375rem var(--font-ui);
+  .nola-workspace-notes-editor :is(h2, h3, h4, h5, h6) {
+    @apply type-body font-semibold;
   }
   .nola-workspace-notes-editor ul {
     list-style: disc;

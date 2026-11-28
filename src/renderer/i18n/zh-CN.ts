@@ -3,7 +3,6 @@ import { desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyZh } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
-import { latencyZh } from './latency-ui'
 import { meetingZh } from './meeting-ui'
 import { gatewayZh } from './gateway-ui'
 import { workbenchZh } from './workbench-ui'
@@ -28,7 +27,6 @@ import { browserZh } from './browser-ui'
 import { runtimeZh } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const zhCN = {
-  latency: latencyZh,
   gateway: gatewayZh,
   meeting: meetingZh,
   modelsPolicy: modelPolicyZh,

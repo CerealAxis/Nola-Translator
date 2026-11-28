@@ -15,7 +15,7 @@ export interface VoiceLibraryApi {
   list(): Promise<TtsVoiceProfile[]>;
   save(profile: TtsVoiceProfile, expectedRevision?: number): Promise<TtsVoiceProfile>;
   delete(id: string, expectedRevision: number): Promise<TtsVoiceProfile>;
-  importAudio(profileId: string, role: 'reference' | 'sample' | 'consent'): Promise<{ assetId: string; mime: string; durationMs?: number } | null>;
+  importAudio(profileId: string, role: 'reference' | 'sample' | 'consent'): Promise<{ assetId: string; mime: string; durationMs?: number; fileName: string } | null>;
   audio(assetId: string): Promise<string>;
   capabilities(modelBinding: string, refresh?: boolean, modelId?: string, catalog?: boolean): Promise<TtsModelCapabilities>;
   compatibility(modelBinding: string, targetLanguage: string, refs: TtsVoiceRef[], usage?: TtsUsage): Promise<TtsVoiceCompatibility[]>;

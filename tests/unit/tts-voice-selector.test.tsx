@@ -131,6 +131,19 @@ it('keeps a legacy selection in a profile-only field disabled even when it resol
   expect(onChange).not.toHaveBeenCalled()
 })
 
+it('treats an unset profile-only voice as a placeholder instead of an unavailable option', async () => {
+  const onChange = vi.fn(), user = userEvent.setup()
+  api.current!.list = async () => [profile]
+  api.current!.compatibility = async (_binding, _language, refs) => refs.map(ref => ({ ref, compatible: true }))
+  render(<TtsVoiceSelector profilesOnly modelBinding="cloud:mimo" targetLanguage="en" value={{ kind: 'engine-default' }} onChange={onChange} />)
+  await user.click(screen.getByRole('combobox', { name: '音色' }))
+  expect(screen.queryByRole('option', { name: /选择音色/ })).not.toBeInTheDocument()
+  const option = await screen.findByRole('option', { name: /Narrator/ })
+  await waitFor(() => expect(option).not.toHaveAttribute('aria-disabled', 'true'))
+  await user.click(option)
+  expect(onChange).toHaveBeenCalledWith({ kind: 'profile', profileId: profile.id })
+})
+
 it('does not requery on close or repeat a failed-check Toast before recovery', async () => {
   const compatibility = vi.fn().mockRejectedValue(new Error('offline'))
   api.current!.compatibility = compatibility

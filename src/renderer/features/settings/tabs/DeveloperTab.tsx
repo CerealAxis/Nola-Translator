@@ -19,6 +19,7 @@ import type { LucideIcon } from 'lucide-react'
 import { StatusPill } from '@/components/primitives'
 import type { StatusPillTone } from '@/components/primitives'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty'
 import { AlertDialogContent, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -140,11 +141,11 @@ function ButtonGroup() {
       <SettingsRow label={t('dev.buttonStates')} desc={t('dev.buttonStatesDesc')} descriptionTooltip>
         <div className="dev-strip">
           <Button variant="secondary" disabled>{t('dev.buttonDisabled')}</Button>
-          <Button variant="default" disabled>
-            <LoaderCircle className="animate-spin" aria-hidden="true" />
+          <Button variant="default" disabled aria-busy="true">
+            <Spinner data-icon="inline-start" />
             {t('dev.buttonPending')}
           </Button>
-          <Button variant="secondary" disabled><Check aria-hidden="true" />{t('dev.buttonCurrent')}</Button>
+          <Button variant="default" aria-pressed="true"><Check data-icon="inline-start" aria-hidden="true" />{t('dev.buttonCurrent')}</Button>
         </div>
       </SettingsRow>
 

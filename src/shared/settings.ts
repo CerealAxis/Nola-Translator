@@ -140,7 +140,6 @@ export type RealtimeS2sModel = typeof REALTIME_S2S_MODELS[number]
 
 export type RealtimeSettings = {
   outputMode?: 'source' | 'translation' | 'speech'
-  latencyDetection?: boolean
   speechOutputDeviceId?: string
   s2sModel?: RealtimeS2sModel | null
   quickS2sModel?: RealtimeS2sModel | null
@@ -367,7 +366,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   compute: { ...DEFAULT_COMPUTE_SETTINGS },
   browserConnection: { enabled: true },
   synthesis: { modelId: '', voice: '' },
-  realtime: { outputMode: 'translation', latencyDetection: false, speechOutputDeviceId: '' },
+  realtime: { outputMode: 'translation', speechOutputDeviceId: '' },
   modelGateway: { ...DEFAULT_MODEL_GATEWAY },
   closeBehavior: 'tray',
   version: 3,

@@ -53,7 +53,6 @@ export interface CaptionLineProps {
   paused?: boolean
   className?: string
   'data-testid'?: string
-  latencySegmentId?: string
   copySpans?: SubtitleCopySpan[]
 }
 
@@ -79,7 +78,6 @@ export function CaptionLine({
   paused = false,
   className,
   'data-testid': testId,
-  latencySegmentId,
   copySpans,
 }: CaptionLineProps) {
   const copyId = useId()
@@ -107,8 +105,6 @@ export function CaptionLine({
       data-current={current ? 'true' : 'false'}
       data-interim={interim ? 'true' : 'false'}
       data-testid={testId}
-      data-latency-segment={latencySegmentId}
-      data-latency-kind={latencySegmentId ? kind : undefined}
       data-subtitle-copy-id={copySpans ? copyId : undefined}
       data-subtitle-copy={copySpans ? JSON.stringify(copySpans) : undefined}
       // The 12px left slot holds the marker bar, which sits in the slot rather than over

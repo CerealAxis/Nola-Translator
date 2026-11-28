@@ -1,6 +1,7 @@
 import { dialog, type IpcMainInvokeEvent } from 'electron'
 import { readFile, stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import { basename } from 'node:path'
 import { z } from 'zod'
 import { ttsVoiceProfileSchema, voiceAssetIdSchema } from '../../shared/tts/voice-profile'
 import { ttsVoiceRefSchema } from '../../shared/tts/voice-ref'
@@ -43,7 +44,7 @@ export function registerVoiceLibraryIpc(runtime: TtsRuntime, options: {
     if ((await stat(selection.filePaths[0])).size > 32 * 1024 * 1024) throw new Error('voiceReferenceTooLarge')
     const asset = await runtime.assets.write(id, role, await readFile(selection.filePaths[0]))
     runtime.library.addAsset(asset)
-    return { assetId: asset.id, mime: asset.mime, durationMs: asset.durationMs }
+    return { assetId: asset.id, mime: asset.mime, durationMs: asset.durationMs, fileName: basename(selection.filePaths[0]) }
   })
   handle('preview', async (binding, ref, text, language) => {
     const model = z.string().min(1).max(512).parse(binding), voiceRef = ttsVoiceRefSchema.parse(ref)

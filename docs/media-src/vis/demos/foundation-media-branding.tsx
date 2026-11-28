@@ -18,8 +18,8 @@ export default function Demo() {
                   <li className="px-3 py-2">行李提取</li>
                 </ul>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant={focused ? 'outline' : 'default'}>筛选</Button>
-                  <Button variant={focused ? 'outline' : 'default'}>导出</Button>
+                  <Button variant={focused ? 'secondary' : 'default'}>筛选</Button>
+                  <Button variant={focused ? 'secondary' : 'default'}>导出</Button>
                 </div>
               </CardContent>
             </Card>

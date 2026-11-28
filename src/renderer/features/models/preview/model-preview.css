@@ -140,7 +140,7 @@
 }
 
 .model-workspace__source-name > .nola-badge {
-  font-size: 0.875em;
+  font-size: var(--text-muted);
   font-weight: var(--font-weight-regular);
   color: var(--muted-foreground);
 }

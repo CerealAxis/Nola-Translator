@@ -35,7 +35,7 @@ export function AppearancePair() {
           <CardHeader><CardTitle>海岸观察</CardTitle><CardDescription>今天 16:42 更新</CardDescription></CardHeader>
           <CardContent className="fa-appearance-content">
             <p>潮水退去，礁石间留下了清澈的水潭。</p>
-            <div className="fa-appearance-toolbar"><span>12 篇笔记</span><Button variant="outline" size="icon" aria-label="更多"><Ellipsis /></Button></div>
+            <div className="fa-appearance-toolbar"><span>12 篇笔记</span><Button variant="secondary" size="icon" aria-label="更多"><Ellipsis /></Button></div>
             <div className="fa-context-menu"><span><Copy aria-hidden="true" />复制内容</span><span><Download aria-hidden="true" />导出文件</span></div>
           </CardContent>
         </Card>
@@ -70,7 +70,7 @@ export function MaterialLayers() {
         </svg>
         <p className="fa-caption-overlay">海风带来了远处的潮声。</p>
       </div>
-      <div className="fa-material-toolbar"><span>海湾片段 · 00:12</span><Button variant="outline" size="icon" aria-label="更多"><Ellipsis /></Button></div>
+      <div className="fa-material-toolbar"><span>海湾片段 · 00:12</span><Button variant="secondary" size="icon" aria-label="更多"><Ellipsis /></Button></div>
       <Card className="fa-material-menu"><CardContent><span><Copy aria-hidden="true" />复制字幕</span><span><Download aria-hidden="true" />导出片段</span></CardContent></Card>
     </div>
   </div>;
@@ -97,7 +97,7 @@ export function MotionUpdate() {
   return <div className="foundation-board" data-scene="appearance-motion">
     <div className="fa-motion">
       <div className="fa-motion-bar"><h3>字幕校对</h3>
-        <Button variant="outline" onClick={() => setCorrected(!corrected)}>
+        <Button variant="secondary" onClick={() => setCorrected(!corrected)}>
           {corrected ? '撤销校对' : '应用校对'}
         </Button>
       </div>

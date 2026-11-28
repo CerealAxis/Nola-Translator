@@ -3,7 +3,6 @@ import { desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyEn } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
-import { latencyEn } from './latency-ui'
 import { meetingEn } from './meeting-ui'
 import { gatewayEn } from './gateway-ui'
 import { workbenchEn } from './workbench-ui'
@@ -24,7 +23,6 @@ import { browserEn } from './browser-ui'
 import { runtimeEn } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
-  latency: latencyEn,
   gateway: gatewayEn,
   meeting: meetingEn,
   modelsPolicy: modelPolicyEn,

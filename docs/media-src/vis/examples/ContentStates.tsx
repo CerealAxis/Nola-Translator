@@ -26,7 +26,7 @@ export default function ContentStates() {
           {visible.length ? <Table>
             <TableHeader><TableRow><TableHead>模型</TableHead><TableHead>能力</TableHead><TableHead>状态</TableHead></TableRow></TableHeader>
             <TableBody>{visible.map(model => <TableRow key={model.name}><TableCell>{model.name}</TableCell><TableCell>{model.kind}</TableCell><TableCell>{model.status}</TableCell></TableRow>)}</TableBody>
-          </Table> : <Empty className="vis-example__empty"><EmptyHeader><EmptyMedia variant="icon"><Search aria-hidden="true" /></EmptyMedia><EmptyTitle>没有匹配的模型</EmptyTitle><EmptyDescription>试试其他名称，或清除搜索条件。</EmptyDescription></EmptyHeader><EmptyContent><Button type="button" variant="outline" onClick={() => setQuery('')}>清除搜索</Button></EmptyContent></Empty>}
+          </Table> : <Empty className="vis-example__empty"><EmptyHeader><EmptyMedia variant="icon"><Search aria-hidden="true" /></EmptyMedia><EmptyTitle>没有匹配的模型</EmptyTitle><EmptyDescription>试试其他名称，或清除搜索条件。</EmptyDescription></EmptyHeader><EmptyContent><Button type="button" variant="secondary" onClick={() => setQuery('')}>清除搜索</Button></EmptyContent></Empty>}
         </CardContent>
       </Card>
     </div>

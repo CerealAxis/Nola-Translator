@@ -11,7 +11,7 @@ export default function ModelPopover() {
           <div className="vis-example__model-row">
             <div><strong>Nola Lite MT</strong><span>已安装 · 文本翻译</span></div>
             <Popover>
-              <PopoverTrigger render={<Button type="button" variant="outline" size="sm" />}>查看详情</PopoverTrigger>
+              <PopoverTrigger render={<Button type="button" variant="secondary" size="sm" />}>查看详情</PopoverTrigger>
               <PopoverContent className="vis-example__popover" align="end">
                 <PopoverHeader>
                   <PopoverTitle>Nola Lite MT</PopoverTitle>

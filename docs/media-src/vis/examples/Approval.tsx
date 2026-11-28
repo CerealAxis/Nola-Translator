@@ -17,9 +17,9 @@ export default function Approval() {
         </CardContent>
         <CardFooter className="vis-example__actions">
           {decision === 'waiting' ? <>
-            <Button type="button" variant="outline" onClick={() => setDecision('rejected')}>拒绝</Button>
+            <Button type="button" variant="secondary" onClick={() => setDecision('rejected')}>拒绝</Button>
             <Button type="button" onClick={() => setDecision('accepted')}>批准</Button>
-          </> : <Button type="button" variant="outline" onClick={() => setDecision('waiting')}>重新演示</Button>}
+          </> : <Button type="button" variant="secondary" onClick={() => setDecision('waiting')}>重新演示</Button>}
         </CardFooter>
       </Card>
     </div>

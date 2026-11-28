@@ -86,10 +86,6 @@ export type NolaTranslatorApi = {
   comic?: import('./comic').ComicBridge
   gameTranslation?: import('./game-translation').GameTranslationBridge
   listComics?(): Promise<import('./comic').ComicProjectSummary[]>
-  getLatencySnapshot?(): Promise<import('./latency').LatencySnapshot | undefined>
-  openLatencyWindow?(): Promise<void>
-  onLatencySnapshot?(listener: (snapshot: import('./latency').LatencySnapshot) => void): () => void
-  reportLatencyPaint?(sessionId: string, segmentId: string, kind: 'source' | 'translation', at: number): Promise<boolean>
   gateway?: import('./model-gateway').ModelGatewayApi
   activity?: import('./feature-activity').FeatureActivityApi
   meetingMode?: import('./meeting-mode').MeetingModeApi

@@ -45,14 +45,14 @@ export function UndoExample() {
   }
 
   return <div className="fig-stay-example" data-scene="undo-states"><Table><TableHeader><TableRow><TableHead>记录</TableHead><TableHead>内容</TableHead><TableHead>操作</TableHead></TableRow></TableHeader><TableBody>
-    {records.filter(record => visible.includes(record.id)).map(record => <TableRow key={record.id}><TableCell>{record.name}</TableCell><TableCell>{record.detail}</TableCell><TableCell><Button type="button" variant="outline" size="sm" onClick={() => remove(record.id)}>移除</Button></TableCell></TableRow>)}
+    {records.filter(record => visible.includes(record.id)).map(record => <TableRow key={record.id}><TableCell>{record.name}</TableCell><TableCell>{record.detail}</TableCell><TableCell><Button type="button" variant="secondary" size="sm" onClick={() => remove(record.id)}>移除</Button></TableCell></TableRow>)}
   </TableBody></Table></div>;
 }
 
 export function DetailPopoverExample() {
   return <div className="fig-stay-example" data-scene="detail-popover"><Table><TableHeader><TableRow><TableHead>资源</TableHead><TableHead>状态</TableHead><TableHead>操作</TableHead></TableRow></TableHeader><TableBody>
     {resources.map(resource => <TableRow key={resource.id}><TableCell>{resource.name}</TableCell><TableCell>{resource.status}</TableCell><TableCell>
-      <Popover><PopoverTrigger render={<Button type="button" variant="outline" size="sm" />}>查看详情</PopoverTrigger>
+      <Popover><PopoverTrigger render={<Button type="button" variant="secondary" size="sm" />}>查看详情</PopoverTrigger>
         <PopoverContent className="fig-stay-popover" side="top" align="end"><PopoverHeader><PopoverTitle>{resource.name}</PopoverTitle><PopoverDescription>{resource.description}</PopoverDescription></PopoverHeader>
           <dl className="fig-stay-details"><dt>版本</dt><dd>{resource.version}</dd><dt>区域</dt><dd>{resource.region}</dd><dt>状态</dt><dd>{resource.status}</dd></dl>
         </PopoverContent>
@@ -66,7 +66,7 @@ export function InlineDetailsExample() {
 
   return <div className="fig-stay-example" data-scene="inline-states"><Table><TableHeader><TableRow><TableHead>资源</TableHead><TableHead>状态</TableHead><TableHead>操作</TableHead></TableRow></TableHeader><TableBody>
     {resources.map(resource => <Fragment key={resource.id}>
-      <TableRow><TableCell>{resource.name}</TableCell><TableCell>{resource.status}</TableCell><TableCell><Button type="button" variant="outline" size="sm" aria-expanded={expandedId === resource.id} aria-controls={`details-${resource.id}`} onClick={() => setExpandedId(current => current === resource.id ? null : resource.id)}>{expandedId === resource.id ? '收起' : '展开'}</Button></TableCell></TableRow>
+      <TableRow><TableCell>{resource.name}</TableCell><TableCell>{resource.status}</TableCell><TableCell><Button type="button" variant="secondary" size="sm" aria-expanded={expandedId === resource.id} aria-controls={`details-${resource.id}`} onClick={() => setExpandedId(current => current === resource.id ? null : resource.id)}>{expandedId === resource.id ? '收起' : '展开'}</Button></TableCell></TableRow>
       {expandedId === resource.id && <TableRow className="fig-stay-expanded-row"><TableCell colSpan={3}><div id={`details-${resource.id}`} className="fig-stay-inline-content"><p>{resource.description}</p><dl className="fig-stay-details"><dt>版本</dt><dd>{resource.version}</dd><dt>区域</dt><dd>{resource.region}</dd></dl></div></TableCell></TableRow>}
     </Fragment>)}
   </TableBody></Table></div>;

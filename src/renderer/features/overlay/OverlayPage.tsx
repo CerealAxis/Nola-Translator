@@ -196,19 +196,12 @@ export function OverlayPage() {
                   <ToggleGroupItem value="sentence">{t('workspace.layoutSentence')}</ToggleGroupItem>
               </ToggleGroup>
             </div>}
-            <div className="nola-settings-fields col-span-full" data-slot="quick-toggles">
-            <div className="nola-settings-field" data-slot="quick-latency">
-              <ModelAvailabilityLabel label={t('latency.title')} hint={t('latency.toggleHint')} />
-              <SettingSwitch ariaLabel={t('latency.title')} isSelected={settings.realtime?.latencyDetection === true}
-                isDisabled={sessionActive} onChange={latencyDetection => patch({ realtime: { latencyDetection } })} />
-            </div>
             <div className="nola-settings-field" data-slot="quick-speech">
               {s2sModel && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(targetLanguage)
                 ? <ModelAvailabilityLabel label={t('session.speakTranslation')} hint={t('session.speechLanguageUnavailable')} />
                 : <span>{t('session.speakTranslation')}</span>}
               <SettingSwitch ariaLabel={t('session.speakTranslation')} isSelected={speechEnabled} isDisabled={sessionActive || translationDisabled || !speechEnabled && !!s2sModel && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(targetLanguage)}
                 onChange={enabled => patch({ realtime: { outputMode: enabled ? 'speech' : 'translation' } })} />
-            </div>
             </div>
             {speechEnabled && !s2sModel ? <div className="nola-settings-field">
               <label htmlFor="quick-voice">{t('workbench.voice')}</label>

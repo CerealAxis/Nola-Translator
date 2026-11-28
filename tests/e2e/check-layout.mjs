@@ -447,15 +447,14 @@ async function main() {
       const state = await window.webContents.executeJavaScript(`(() => {
         const voice = document.querySelector('#quick-voice'); voice?.scrollIntoView({ block: 'center' });
         const field = voice?.closest('.nola-settings-field'); const next = field?.nextElementSibling;
-        const latency = document.querySelector('[data-slot="quick-latency"]'); const speech = document.querySelector('[data-slot="quick-speech"]');
-        const a = latency?.getBoundingClientRect(), b = speech?.getBoundingClientRect();
-        const cols = getComputedStyle(document.querySelector('[data-slot="quick-toggles"]')).gridTemplateColumns.split(' ').length;
+        const speech = document.querySelector('[data-slot="quick-speech"]');
         const v = voice?.getBoundingClientRect(), o = next?.querySelector('[role="combobox"]')?.getBoundingClientRect();
+        const speechBox = speech?.getBoundingClientRect(), voiceBox = field?.getBoundingClientRect();
         return { found: !!voice, overflow: document.documentElement.scrollWidth > innerWidth + 1,
-          toggleOrder: !!a && !!b && (cols === 2 ? Math.abs(a.top-b.top)<2 && a.left<b.left : a.top<b.top),
+          paired: !!speechBox && !!voiceBox && Math.abs(speechBox.top-voiceBox.top)<2 && voiceBox.left>speechBox.left,
           sameHeight: !!v && !!o && Math.abs(v.height-o.height)<2, fullWidth: field?.classList.contains('col-span-full') };
       })()`)
-      if (!state.found || state.overflow || !state.toggleOrder || !state.sameHeight || state.fullWidth) fail({ theme, width, zoom }, 'tts-selector-layout', state)
+      if (!state.found || state.overflow || !state.paired || !state.sameHeight || state.fullWidth) fail({ theme, width, zoom }, 'tts-selector-layout', state)
       await window.webContents.executeJavaScript(`document.querySelector('#quick-voice')?.focus()`)
       await window.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 })
       await window.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 })
@@ -732,7 +731,7 @@ async function main() {
       const bodySize = dark ? '15px' : '14px';
       const heights = { '14px': dark ? ['20px'] : ['20px','22px'], '20px':['28px'], '24px':['32px'], '30px':['36px'], '36px':['40px'] };
       if (dark) heights['15px'] = ['22px'];
-      const invalidText = [...document.querySelectorAll('.nola-main *')].filter(el => visible(el) && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && !el.closest('svg, .nola-caption-preview, .nola-caption-card, .comic-bubble-canvas__stage')).map(inspect).filter(s => !heights[s.size]?.includes(s.line) || !['400', '500', '600','800'].includes(s.weight));
+      const invalidText = [...document.querySelectorAll('.nola-main *')].filter(el => visible(el) && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && !el.closest('svg, .nola-caption-preview, .nola-caption-card, .comic-bubble-canvas__stage, .game-demo-game-text')).map(inspect).filter(s => !heights[s.size]?.includes(s.line) || !['400', '500', '600','800'].includes(s.weight));
       const buttons = [...document.querySelectorAll('[data-slot="button"]')].filter(visible).map(inspect);
       const glass = [...document.querySelectorAll('.card, [data-slot="dialog-content"], [data-slot="sidebar-inner"], [data-slot="popover-content"]')].filter(visible).map(inspect).filter(s => s.blur !== 'none');
       return { page: document.querySelector('[data-page]')?.dataset.page, root: root.fontSize, family: getComputedStyle(document.body).fontFamily, density: document.documentElement.dataset.density, fontState: document.documentElement.dataset.fontState,
@@ -742,7 +741,9 @@ async function main() {
     })()`)
     const suite = [...PAGES,
       { name: 'model-gateway', hash: '#/model-gateway' },
+      { name: 'voices', hash: '#/voices' },
       { name: 'game-translation', hash: '#/game-translation' },
+      { name: 'game-translation-demo', hash: '#/game' },
       { name: 'comic-translation', hash: '#/comic-translation' },
       { name: 'comic-editor', page: 'comic-translation', hash: '#/comic-translation/' + suiteId },
     ]
@@ -799,6 +800,24 @@ async function main() {
           }
           await settle(window)
           const current = await state()
+          if (target.name === 'home') {
+            const sidebar = await window.webContents.executeJavaScript(`(() => {
+              const shell = document.querySelector('.nola-sidebar');
+              const nav = document.querySelector('.nola-sidebar-nav');
+              const footer = document.querySelector('.nola-sidebar-footer');
+              const last = nav.querySelector('[data-slot="sidebar-group"]:last-child [data-slot="sidebar-menu-item"]:last-child');
+              nav.scrollTop = nav.scrollHeight;
+              const navRect = nav.getBoundingClientRect(), footerRect = footer.getBoundingClientRect(), lastRect = last.getBoundingClientRect();
+              const result = { bottomGap: shell.getBoundingClientRect().bottom - footerRect.bottom,
+                overlap: navRect.bottom > footerRect.top + 1, lastReachable: lastRect.bottom <= navRect.bottom + 1 && lastRect.top >= navRect.top - 1,
+                accountAction: !!footer.querySelector('button[aria-label]') };
+              nav.scrollTop = 0;
+              return result;
+            })()`)
+            if (sidebar.bottomGap > 12 || sidebar.bottomGap < -1 || sidebar.overlap || !sidebar.lastReachable || !sidebar.accountAction) {
+              fail(context, 'Sidebar footer or final navigation item is inaccessible', sidebar)
+            }
+          }
           if (target.page === 'settings') {
             const headings = await window.webContents.executeJavaScript(`(() => {
               const metrics = el => {
@@ -811,7 +830,7 @@ async function main() {
               return { title: title && metrics(title), groups, browserNames };
             })()`)
             const bodyHeading = dark ? '15px/22px/600' : '14px/22px/600'
-            if (headings.title !== '20px/28px/600' ||
+            if (headings.title !== '24px/32px/600' ||
                 headings.groups.some(value => value !== bodyHeading) ||
                 (target.name === 'settings/browser' && (headings.browserNames.length !== 4 || headings.browserNames.some(value => value !== bodyHeading)))) {
               fail(context, 'Settings typography mismatch', { headings })
@@ -822,7 +841,7 @@ async function main() {
               const el = document.querySelector(selector);
               return el && [getComputedStyle(el).fontSize,getComputedStyle(el).fontWeight].join('/');
             })`)
-            if (levels.join(',') !== '36px/800,30px/600,20px/600') fail(context, 'Home heading hierarchy mismatch', { levels })
+            if (levels.join(',') !== '36px/800,24px/600,20px/600') fail(context, 'Home heading hierarchy mismatch', { levels })
           }
           if (zoom === 1 && width === 1180 && ['overlay', 'model-gateway', 'models'].includes(target.name)) {
             const body = dark ? '15px/22px' : '14px/22px'
@@ -904,7 +923,7 @@ async function main() {
       if (!selected || current.fontState !== 'ready' || !current.family.includes(font) || code.family.includes('Noto') || code.size !== '14px') fail({ action: 'font selection', font }, 'Font isolation failed', { current, code })
       else interactions.push('Font selector -> ' + font + ' loads; code font stays independent')
     }
-    const reset = await window.webContents.executeJavaScript(`(() => { const button = [...document.querySelectorAll('.settings-group__actions button')].find(el => el.textContent.includes('恢复默认')); button?.click(); return !!button })()`)
+    const reset = await window.webContents.executeJavaScript(`(() => { const button = [...document.querySelectorAll('.settings-group__heading button')].find(el => el.textContent.includes('恢复默认')); button?.click(); return !!button })()`)
     await settle(window)
     current = await state()
     scenarios++

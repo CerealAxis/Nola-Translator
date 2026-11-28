@@ -20,15 +20,15 @@ export function ActionIcons() {
     <div className="fm-icon-comparison">
       <figure>
         <div className="fm-icon-vocabulary">
-          <Button variant="outline" size="icon" aria-label="搜索"><Search aria-hidden="true" /></Button>
-          <Button variant="outline" size="icon" aria-label="复制"><Copy aria-hidden="true" /></Button>
-          <Button variant="outline" size="icon" aria-label="导出"><ArrowDownToLine aria-hidden="true" /></Button>
+          <Button variant="secondary" size="icon" aria-label="搜索"><Search aria-hidden="true" /></Button>
+          <Button variant="secondary" size="icon" aria-label="复制"><Copy aria-hidden="true" /></Button>
+          <Button variant="secondary" size="icon" aria-label="导出"><ArrowDownToLine aria-hidden="true" /></Button>
         </div>
         <figcaption>图标大小与线条一致</figcaption>
       </figure>
       <figure>
         <div className="fm-icon-vocabulary">
-          <Button variant="outline"><ArrowDownToLine data-icon="inline-start" aria-hidden="true" />导出文本</Button>
+          <Button variant="secondary"><ArrowDownToLine data-icon="inline-start" aria-hidden="true" />导出文本</Button>
         </div>
         <figcaption>图标与相邻文字对齐</figcaption>
       </figure>

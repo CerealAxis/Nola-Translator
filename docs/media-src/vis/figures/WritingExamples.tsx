@@ -45,7 +45,7 @@ export function WritingActions() {
   return (
     <div className="foundation-board" data-writing-scene="actions" inert>
       <div className="writing-action-flow">
-        <div className="writing-action-entry"><Button variant="outline">导出字幕</Button></div>
+        <div className="writing-action-entry"><Button variant="secondary">导出字幕</Button></div>
         <ArrowRight className="writing-action-arrow" aria-hidden="true" />
         <Dialog open={false}>
           <Card className="writing-dialog" role="dialog" aria-labelledby={`${id}-title`}>
@@ -61,7 +61,7 @@ export function WritingActions() {
                 </Field>
               </FieldGroup>
             </CardContent>
-            <DialogFooter><Button variant="outline">取消</Button><Button>导出</Button></DialogFooter>
+            <DialogFooter><Button variant="secondary">取消</Button><Button>导出</Button></DialogFooter>
           </Card>
         </Dialog>
       </div>
@@ -90,7 +90,7 @@ export function WritingRecovery() {
 
   return (
     <div className="foundation-board writing-toast-example" data-writing-scene="recovery">
-      <Button variant="outline" onClick={showFailure}>显示错误通知</Button>
+      <Button variant="secondary" onClick={showFailure}>显示错误通知</Button>
       <ToastProvider />
     </div>
   );

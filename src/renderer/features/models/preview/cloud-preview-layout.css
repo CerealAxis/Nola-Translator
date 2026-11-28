@@ -137,8 +137,8 @@
 }
 
 .cpv-model-tags > .nola-badge {
-  font-size: 0.875em;
-  font-weight: 400;
+  font-size: var(--text-muted);
+  font-weight: var(--font-weight-regular);
   color: var(--muted-foreground);
 }
 

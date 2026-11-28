@@ -96,7 +96,7 @@ export function Specimen() {
           </CardContent>
           <CardFooter className="vis-specimen__actions">
             <Dialog>
-              <DialogTrigger render={<Button type="button" variant="outline" />}>预览字幕</DialogTrigger>
+              <DialogTrigger render={<Button type="button" variant="secondary" />}>预览字幕</DialogTrigger>
               <DialogContent className="vis-specimen__dialog">
                 <DialogHeader>
                   <DialogTitle>字幕预览</DialogTitle>
@@ -113,7 +113,7 @@ export function Specimen() {
                   </div>
                 </CardContent>
                 <DialogFooter>
-                  <DialogClose render={<Button type="button" variant="outline" />}>关闭</DialogClose>
+                  <DialogClose render={<Button type="button" variant="secondary" />}>关闭</DialogClose>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

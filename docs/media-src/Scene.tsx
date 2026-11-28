@@ -40,7 +40,7 @@ export function Scene({ browser = false }: SceneProps) {
 
 function PlayerControls({ playing, setPlaying }: { playing: boolean; setPlaying: (playing: boolean) => void }) {
   const { t } = useI18n()
-  return <div className="docs-player-controls"><Button variant="tertiary" size="icon" aria-label={playing ? t('workspace.pause') : t('workspace.resume')} onClick={() => setPlaying(!playing)}>{playing ? <Pause aria-hidden="true" style={controlIconStyle} /> : <Play aria-hidden="true" style={controlIconStyle} />}</Button><Volume2 aria-hidden="true" /><span>00:23 / 12:14</span><div className="docs-player-progress"><i /></div><Captions aria-hidden="true" /><Maximize aria-hidden="true" /></div>
+  return <div className="docs-player-controls"><Button variant="bare" size="icon" aria-label={playing ? t('workspace.pause') : t('workspace.resume')} onClick={() => setPlaying(!playing)}>{playing ? <Pause aria-hidden="true" style={controlIconStyle} /> : <Play aria-hidden="true" style={controlIconStyle} />}</Button><Volume2 aria-hidden="true" /><span>00:23 / 12:14</span><div className="docs-player-progress"><i /></div><Captions aria-hidden="true" /><Maximize aria-hidden="true" /></div>
 }
 
 function BrowserCaption() {

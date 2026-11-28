@@ -11,7 +11,7 @@ export function VisibleToolsExample() {
   return <div className="fig-board" data-scene="visible-tools">
     <Card className="fig-light-visible"><CardHeader><CardTitle>每周读书会</CardTitle><CardDescription>周五下午 · 社区活动</CardDescription></CardHeader><CardContent className="fig-light-visible-content">
       <p>分享本周读过的一篇文章。</p>
-      <Button type="button" variant={saved ? 'default' : 'outline'} aria-pressed={saved} onClick={() => setSaved(value => !value)}><Star data-icon="inline-start" aria-hidden="true" />{saved ? '已收藏 13' : '收藏 12'}</Button>
+      <Button type="button" variant={saved ? 'default' : 'secondary'} aria-pressed={saved} onClick={() => setSaved(value => !value)}><Star data-icon="inline-start" aria-hidden="true" />{saved ? '已收藏 13' : '收藏 12'}</Button>
     </CardContent></Card>
   </div>;
 }
@@ -23,7 +23,7 @@ export function HoverToolsExample() {
 
   return <div className="fig-board" data-scene="hover-tools">
     <Table className="fig-light-hover-table"><TableHeader><TableRow><TableHead>规则条目</TableHead><TableHead>操作</TableHead></TableRow></TableHeader><TableBody>
-      {ruleNames.map(name => <TableRow key={name} data-selected={selected === name || undefined}><TableCell>{name}</TableCell><TableCell><Button type="button" variant="outline" size="sm" onClick={() => setSelected(name)}>{selected === name ? '已查看' : '查看'}</Button></TableCell></TableRow>)}
+      {ruleNames.map(name => <TableRow key={name} data-selected={selected === name || undefined}><TableCell>{name}</TableCell><TableCell><Button type="button" variant="secondary" size="sm" onClick={() => setSelected(name)}>{selected === name ? '已查看' : '查看'}</Button></TableCell></TableRow>)}
     </TableBody></Table>
   </div>;
 }
@@ -61,7 +61,7 @@ export function EditModeToolsExample() {
 
   return <div className="fig-board" data-scene="edit-mode-tools">
     <Table className="fig-light-edit-table"><TableHeader><TableRow><TableHead>文本</TableHead><TableHead>操作</TableHead></TableRow></TableHeader><TableBody>
-      {rows.map(row => <TableRow key={row.id}><TableCell>{editingId === row.id ? <Input ref={inputRef} aria-label="编辑文本" value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') save(); if (event.key === 'Escape') setEditingId(null); }} /> : row.text}</TableCell><TableCell>{editingId === row.id ? <div className="fig-light-edit-actions"><Button type="button" size="sm" onClick={save}>完成</Button><Button type="button" variant="outline" size="sm" onClick={() => setEditingId(null)}>取消</Button></div> : <Button type="button" variant="outline" size="sm" onClick={() => start(row.id, row.text)}>修改</Button>}</TableCell></TableRow>)}
+      {rows.map(row => <TableRow key={row.id}><TableCell>{editingId === row.id ? <Input ref={inputRef} aria-label="编辑文本" value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') save(); if (event.key === 'Escape') setEditingId(null); }} /> : row.text}</TableCell><TableCell>{editingId === row.id ? <div className="fig-light-edit-actions"><Button type="button" size="sm" onClick={save}>完成</Button><Button type="button" variant="secondary" size="sm" onClick={() => setEditingId(null)}>取消</Button></div> : <Button type="button" variant="secondary" size="sm" onClick={() => start(row.id, row.text)}>修改</Button>}</TableCell></TableRow>)}
     </TableBody></Table>
   </div>;
 }

@@ -35,13 +35,11 @@ function seamNeedsSpace(previous: string, next: string): boolean {
 export function CaptionTrack({
   lines,
   kind,
-  latencyKind = kind,
   maxLines,
   layout,
 }: {
   lines: readonly TrackLine[]
   kind: 'source' | 'translation'
-  latencyKind?: 'source' | 'translation'
   maxLines: number
   layout: 'rolling' | 'sentence'
 }) {
@@ -123,7 +121,7 @@ export function CaptionTrack({
       >
         <div className="nola-caption-track-flow nola-caption-track-sentence" ref={viewport}>
           <div className="nola-caption-track-content" ref={content}>
-            {entries.map((entry) => <p className="nola-caption-entry" key={entry.key} data-latency-segment={entry.key} data-latency-kind={latencyKind} data-subtitle-copy-id={entry.subtitleCopy ? `${copyId}:${entry.key}` : undefined} data-subtitle-copy={entry.subtitleCopy ? JSON.stringify(entry.subtitleCopy) : undefined}>
+            {entries.map((entry) => <p className="nola-caption-entry" key={entry.key} data-subtitle-copy-id={entry.subtitleCopy ? `${copyId}:${entry.key}` : undefined} data-subtitle-copy={entry.subtitleCopy ? JSON.stringify(entry.subtitleCopy) : undefined}>
               {kind === 'translation' ? <CaptionRevisionText text={entry.text} stableText={entry.stableText} /> : entry.text}
             </p>)}
           </div>
@@ -156,7 +154,7 @@ export function CaptionTrack({
           <p className="nola-caption-entry" aria-live="polite" aria-atomic="false">
             {entries.flatMap((entry, index) => [
               index > 0 && seamNeedsSpace(entries[index - 1].text, entry.text) ? ' ' : null,
-              <span className="nola-caption-segment" key={entry.key} data-latency-segment={entry.key} data-latency-kind={latencyKind} data-subtitle-copy-id={entry.subtitleCopy ? `${copyId}:${entry.key}` : undefined} data-subtitle-copy={entry.subtitleCopy ? JSON.stringify(entry.subtitleCopy) : undefined}>
+              <span className="nola-caption-segment" key={entry.key} data-subtitle-copy-id={entry.subtitleCopy ? `${copyId}:${entry.key}` : undefined} data-subtitle-copy={entry.subtitleCopy ? JSON.stringify(entry.subtitleCopy) : undefined}>
                 {kind === 'translation' ? <CaptionRevisionText text={entry.text} stableText={entry.stableText} /> : entry.text}
               </span>,
             ])}

@@ -119,24 +119,23 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
     ]
   }
   const entries = [
-    ['overview', 'home', 'nav.home', LayoutDashboard, '#/'],
-    ['overview', 'models', 'nav.models', Settings, pathOf('models')],
-    ['overview', 'model-gateway', 'nav.modelGateway', Network, '#/model-gateway'],
-    ['features', 'workspace', 'nav.workspace', AudioLines, '#/workspace'],
-    ['features', 'meeting', 'meeting.navTitle', Headphones, '#/meeting'],
-    ['features', 'screen-translation', 'screen.navTitle', ScanText, '#/screen-translation'],
-    ['features', 'game-translation', 'suite.gameTitle', Gamepad2, '#/game-translation'],
-    ['features', 'game-translation-demo', 'suite.gameTitle', Joystick, pathOf('game-translation-demo')],
-    ['features', 'comic-translation', 'suite.comicTitle', BookOpen, '#/comic-translation'],
+    ['overview', 'home', t('nav.home'), LayoutDashboard, '#/'],
+    ['overview', 'models', t('nav.models'), Settings, pathOf('models')],
+    ['overview', 'model-gateway', t('nav.modelGateway'), Network, '#/model-gateway'],
+    ['overview', 'voices', ttsText(language, 'title'), AudioLines, '#/voices'],
+    ['features', 'workspace', t('nav.workspace'), AudioLines, '#/workspace'],
+    ['features', 'meeting', t('meeting.navTitle'), Headphones, '#/meeting'],
+    ['features', 'screen-translation', t('screen.navTitle'), ScanText, '#/screen-translation'],
+    ['features', 'game-translation', t('suite.gameTitle'), Gamepad2, '#/game-translation'],
+    ['features', 'game-translation-demo', t('suite.gameTitle'), Joystick, pathOf('game-translation-demo')],
+    ['features', 'comic-translation', t('suite.comicTitle'), BookOpen, '#/comic-translation'],
   ] as const
   return [
-    ...entries.map(([section, id, key, icon, path]) => ({
-      section, id, label: t(key), icon, path,
+    ...entries.map(([section, id, label, icon, path]) => ({
+      section, id, label, icon, path,
       active: route === id || id === 'workspace' && route === 'overlay',
       onPress: () => navigate(path),
     })),
-    { section: 'features', id: 'voices', label: ttsText(language, 'title'), icon: AudioLines, path: '#/voices', active: route === 'voices',
-      onPress: () => navigate('#/voices') },
     { section: 'features', id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#/workbench',
       onPress: () => navigate('#/workbench'),
     },

@@ -32,15 +32,6 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); stores.settings.setState(initialSettings); stores.models.setState(initialModels) })
 
-it('keeps latency detection off by default and saves the opt-in', () => {
-  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
-  render(<OverlayPage />)
-  const toggle = screen.getByRole('switch', { name: '延迟检测' })
-  expect(toggle).toHaveAttribute('aria-checked', 'false')
-  fireEvent.click(toggle)
-  expect(update).toHaveBeenCalledWith({ realtime: { latencyDetection: true } })
-})
-
 it('leaves speech playback off by default', () => {
   render(<OverlayPage />)
   expect(screen.getByRole('switch', { name: '播报译音' })).toHaveAttribute('aria-checked', 'false')

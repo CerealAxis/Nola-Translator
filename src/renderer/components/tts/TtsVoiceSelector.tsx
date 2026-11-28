@@ -45,9 +45,10 @@ export function TtsVoiceSelector({ modelBinding, targetLanguage, targetLanguages
   }, [capabilities, profiles, value, profilesOnly, sessionSpeakers, modelBinding, language])
   const key = voiceRefKey(value)
   const selected = options.find(item => voiceRefKey(item.ref) === key)
+  const emptySelection = profilesOnly && value.kind === 'engine-default'
   const missing = value.kind === 'profile' && profilesLoaded && !profiles.some(profile => profile.id === value.profileId && !profile.deletedAt)
   const label = missing ? text('missing') : selected?.name ?? (value.kind === 'preset' ? value.voiceId : text('chooseVoice'))
-  const refs = selected ? options.map(item => item.ref) : [...options.map(item => item.ref), value]
+  const refs = selected || emptySelection ? options.map(item => item.ref) : [...options.map(item => item.ref), value]
   const { results, pending, failed } = useVoiceCompatibility(modelBinding, capabilities ? languages : [], refs,
     JSON.stringify([refreshRevision, profiles.map(profile => [profile.id, profile.revision, profile.deletedAt])]), usage)
   const reason = (item?: TtsVoiceCompatibility) => !languages.length ? text('noOutputDirection')
@@ -60,9 +61,9 @@ export function TtsVoiceSelector({ modelBinding, targetLanguage, targetLanguages
     if (notice && notified.current !== notice) { notified.current = notice; notifyError(reason(selectedResult)) }
     if (selectedResult?.compatible) notified.current = ''
   }, [notice, selectedResult?.compatible])
-  const entries = selected ? options : [...options, { ref: value, name: label }]
+  const entries = selected || emptySelection ? options : [...options, { ref: value, name: label }]
   return <div className="select settings-control-field">
-    <Select value={key} open={open} onOpenChange={next => { setOpen(next); if (next) setRefreshRevision(revision => revision + 1) }} disabled={disabled || !modelBinding}
+    <Select value={emptySelection ? null : key} open={open} onOpenChange={next => { setOpen(next); if (next) setRefreshRevision(revision => revision + 1) }} disabled={disabled || !modelBinding}
       onValueChange={next => {
         const item = options.find(item => voiceRefKey(item.ref) === next)
         if (item && results.get(String(next))?.compatible) onChange(item.ref)
@@ -70,7 +71,7 @@ export function TtsVoiceSelector({ modelBinding, targetLanguage, targetLanguages
       <SelectTrigger id={id} className="settings-select-trigger" aria-label={text('voice')} aria-busy={pending || !capabilities}>
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
-      <SelectContent className="settings-select-content" align="start" alignItemWithTrigger={false}>
+      <SelectContent className="settings-select-content" align="start" side={profilesOnly ? 'top' : 'bottom'} alignItemWithTrigger={false}>
         <SelectGroup>
           {entries.map((item, index) => {
             const itemKey = voiceRefKey(item.ref), result = results.get(itemKey)

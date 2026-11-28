@@ -21,10 +21,9 @@ class SettingsVersionError extends Error {}
 
 function realtimeSettings(value: unknown): NonNullable<AppSettings['realtime']> {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
-  const { s2sModel, virtualInputDeviceId, ...other } = source
+  const { s2sModel, virtualInputDeviceId, latencyDetection: _latencyDetection, ...other } = source
   return {
     ...other,
-    latencyDetection: source.latencyDetection === true,
     outputMode: ['source', 'translation', 'speech'].includes(source.outputMode as string) ? source.outputMode as 'source' | 'translation' | 'speech' : 'translation',
     speechOutputDeviceId: typeof source.speechOutputDeviceId === 'string' && source.speechOutputDeviceId.length <= 512 ? source.speechOutputDeviceId : '',
     virtualInputDeviceId: typeof virtualInputDeviceId === 'string' && virtualInputDeviceId.length <= 512 ? virtualInputDeviceId : '',

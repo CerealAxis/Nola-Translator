@@ -4,12 +4,12 @@ export function appNameForLanguage(language: UiLanguage): string {
   return language === 'en' ? 'Nola Translator' : language === 'zh-TW' || language === 'zh-HK' ? '諾拉翻譯' : language === 'ko' ? '놀라 번역기' : language === 'ja' ? 'ノラ翻訳' : '诺拉翻译'
 }
 const titles = {
-  'zh-CN': ['工作台', '漫画翻译编辑器', '延迟检测', '屏幕翻译', '游戏字幕', '实时同传', '悬浮字幕', '使用引导', '数据迁移', '字幕菜单'],
-  'zh-TW': ['工作台', '漫畫翻譯編輯器', '延遲檢測', '螢幕翻譯', '遊戲字幕', '即時口譯', '懸浮字幕', '使用引導', '資料遷移', '字幕選單'],
-  'zh-HK': ['工作台', '漫畫翻譯編輯器', '延遲檢測', '螢幕翻譯', '遊戲字幕', '即時傳譯', '懸浮字幕', '使用引導', '資料遷移', '字幕選單'],
-  ko: ['워크벤치', '만화 번역 편집기', '지연 시간 측정', '화면 번역', '게임 자막', '실시간 통역', '플로팅 자막', '시작 안내', '데이터 이전', '자막 메뉴'],
-  ja: ['ワークベンチ', '漫画翻訳エディター', '遅延測定', '画面翻訳', 'ゲーム字幕', 'リアルタイム通訳', 'フローティング字幕', 'スタートガイド', 'データ移行', '字幕メニュー'],
-  en: ['Workbench', 'Comic Translation Editor', 'Latency Monitor', 'Screen Translation', 'Game Captions', 'Live Interpretation', 'Floating Captions', 'Getting Started', 'Data Migration', 'Caption Menu'],
+  'zh-CN': ['工作台', '漫画翻译编辑器', '屏幕翻译', '游戏字幕', '实时同传', '悬浮字幕', '使用引导', '数据迁移', '字幕菜单'],
+  'zh-TW': ['工作台', '漫畫翻譯編輯器', '螢幕翻譯', '遊戲字幕', '即時口譯', '懸浮字幕', '使用引導', '資料遷移', '字幕選單'],
+  'zh-HK': ['工作台', '漫畫翻譯編輯器', '螢幕翻譯', '遊戲字幕', '即時傳譯', '懸浮字幕', '使用引導', '資料遷移', '字幕選單'],
+  ko: ['워크벤치', '만화 번역 편집기', '화면 번역', '게임 자막', '실시간 통역', '플로팅 자막', '시작 안내', '데이터 이전', '자막 메뉴'],
+  ja: ['ワークベンチ', '漫画翻訳エディター', '画面翻訳', 'ゲーム字幕', 'リアルタイム通訳', 'フローティング字幕', 'スタートガイド', 'データ移行', '字幕メニュー'],
+  en: ['Workbench', 'Comic Translation Editor', 'Screen Translation', 'Game Captions', 'Live Interpretation', 'Floating Captions', 'Getting Started', 'Data Migration', 'Caption Menu'],
 } satisfies Record<UiLanguage, string[]>
 
 export const performanceMonitorTitles = {
@@ -24,13 +24,12 @@ export function windowTitleForUrl(raw: string, language: UiLanguage): string {
     const url = new URL(raw)
     const entry = url.pathname.split('/').at(-1)
     if (entry === 'performance-monitor.html') return performanceMonitorTitles[language]
-    if (entry === 'latency.html') feature = 2
-    else if (entry === 'screen.html') feature = url.searchParams.get('role') === 'game-overlay' ? 4 : 3
-    else if (entry === 'onboarding-card.html') feature = 7
-    else if (url.searchParams.has('migration')) feature = 8
-    else if (url.searchParams.has('overlayMenu')) feature = 9
-    else if (url.searchParams.has('workspace')) feature = 5
-    else if (url.searchParams.has('overlay') || url.searchParams.has('overlayToast')) feature = 6
+    if (entry === 'screen.html') feature = url.searchParams.get('role') === 'game-overlay' ? 3 : 2
+    else if (entry === 'onboarding-card.html') feature = 6
+    else if (url.searchParams.has('migration')) feature = 7
+    else if (url.searchParams.has('overlayMenu')) feature = 8
+    else if (url.searchParams.has('workspace')) feature = 4
+    else if (url.searchParams.has('overlay') || url.searchParams.has('overlayToast')) feature = 5
   } catch { /* A document loading without a URL retains the product name. */ }
   return feature === undefined ? appNameForLanguage(language) : titles[language][feature]
 }

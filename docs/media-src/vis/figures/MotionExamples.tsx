@@ -13,7 +13,7 @@ export function SlideExample() {
   return <div className="fig-board" data-scene="transition-slide">
     <div className="motion-toolbar">
       <strong>采访提纲</strong>
-      <Button variant="outline" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(!open)}>
+      <Button variant="secondary" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(!open)}>
         {open ? '收起详情' : '查看详情'}
       </Button>
     </div>
@@ -47,9 +47,9 @@ export function CarouselExample() {
       </div>
     </div>
     <div className="motion-page-controls">
-      <Button size="icon" variant="outline" aria-label="上一段" disabled={page === 0} onClick={() => setPage(page - 1)}><ChevronLeft /></Button>
+      <Button size="icon" variant="secondary" aria-label="上一段" disabled={page === 0} onClick={() => setPage(page - 1)}><ChevronLeft /></Button>
       <span aria-live="polite">第 {page + 1} 段，共 {excerpts.length} 段</span>
-      <Button size="icon" variant="outline" aria-label="下一段" disabled={page === excerpts.length - 1} onClick={() => setPage(page + 1)}><ChevronRight /></Button>
+      <Button size="icon" variant="secondary" aria-label="下一段" disabled={page === excerpts.length - 1} onClick={() => setPage(page + 1)}><ChevronRight /></Button>
     </div>
   </div>;
 }
@@ -59,7 +59,7 @@ export function FoldExample() {
     <Collapsible.Root>
       <div className="motion-toolbar">
         <strong>候车室的钟停了。</strong>
-        <Collapsible.Trigger render={<Button variant="outline" />}>译注<ChevronDown data-icon="inline-end" /></Collapsible.Trigger>
+        <Collapsible.Trigger render={<Button variant="secondary" />}>译注<ChevronDown data-icon="inline-end" /></Collapsible.Trigger>
       </div>
       <Collapsible.Panel className="motion-fold">
         <p>这里的“钟”指墙上的挂钟。</p>
@@ -74,7 +74,7 @@ export function AddExample() {
   return <div className="fig-board" data-scene="transition-states">
     <div className="motion-toolbar">
       <strong>篇目</strong>
-      <Button variant="outline" onClick={() => setAdded(!added)}>{added ? '重置' : '添加条目'}</Button>
+      <Button variant="secondary" onClick={() => setAdded(!added)}>{added ? '重置' : '添加条目'}</Button>
     </div>
     <Table aria-label="篇目"><TableHeader><TableRow><TableHead>篇名</TableHead><TableHead>字数</TableHead></TableRow></TableHeader>
       <TableBody>
@@ -92,7 +92,7 @@ export function DeleteExample() {
   return <div className="fig-board" data-scene="transition-delete">
     <div className="motion-toolbar">
       <strong>文稿</strong>
-      <Button variant="outline" onClick={() => setRemoved(!removed)}>{removed ? '重置' : '删除草稿'}</Button>
+      <Button variant="secondary" onClick={() => setRemoved(!removed)}>{removed ? '重置' : '删除草稿'}</Button>
     </div>
     <Collapsible.Root open={!removed} render={<ul className="motion-list" />}>
       <li><span>山间</span></li>
@@ -111,7 +111,7 @@ export function UpdateExample() {
         <TableRow><TableCell>河畔</TableCell><TableCell aria-live="polite" className={reviewed ? 'motion-highlight' : undefined}>{reviewed ? '已校对' : '待校对'}</TableCell></TableRow>
       </TableBody>
     </Table>
-    <Button variant="outline" onClick={() => setReviewed(!reviewed)}>{reviewed ? '重置' : '标为已校对'}</Button>
+    <Button variant="secondary" onClick={() => setReviewed(!reviewed)}>{reviewed ? '重置' : '标为已校对'}</Button>
   </div>;
 }
 
@@ -120,7 +120,7 @@ export function CalloutExample() {
     <div className="motion-toolbar">
       <strong>河畔.txt</strong>
       <Popover>
-        <PopoverTrigger render={<Button variant="outline" />}>文件信息</PopoverTrigger>
+        <PopoverTrigger render={<Button variant="secondary" />}>文件信息</PopoverTrigger>
         <PopoverContent className="motion-popover" align="end">
           <PopoverHeader><PopoverTitle>文件信息</PopoverTitle></PopoverHeader>
           <dl><dt>格式</dt><dd>纯文本</dd><dt>编码</dt><dd>UTF-8</dd></dl>

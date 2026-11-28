@@ -55,8 +55,6 @@ import { registerAppIpc, resetOverlayLock } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
 import { BackendSupervisor, backendLaunchSpec } from './backend-supervisor'
 import { BackendSession, mapBrowserSessionConfig, mapSessionConfig, type BackendSessionConfig } from './backend-session'
-import { captionPaint, latencyMeta, LatencySession, latencyWavePoint } from './latency-session'
-import { LatencyWindow } from './latency-window'
 import { PerformanceMonitorWindow } from './performance-monitor-window'
 import { gatewayPerformanceSnapshot } from './gateway-performance'
 import { BackendScreenOcr, backendAsrHeaders, backendMtHeaders, backendCloudAsr, backendCloudMt, gatewayMtBackup, inferBackendModel, inferBackendMt, openBackendAsrStream, openBackendLanguageModel, backendGatewayControl, backendGatewayInstances, probeBackendS2s } from './backend-direct-model'
@@ -840,7 +838,6 @@ if (!hasSingleInstanceLock) {
     }))
     const desktopEngine = createSessionEngine()
     const browserEngine = createSessionEngine()
-    const latencyWindow = new LatencyWindow(__dirname)
     const performanceMonitor = new PerformanceMonitorWindow(__dirname, () => gateway?.isRunning === true && !!backend?.ready)
     ipcMain.handle('model-gateway:performance-snapshot', event => {
       const signal = performanceMonitor.snapshotSignal(event)
@@ -855,35 +852,7 @@ if (!hasSingleInstanceLock) {
       await gatewayPerformanceSnapshot(backend, AbortSignal.timeout(4000))
       return performanceMonitor.open(settings.current().theme)
     })
-    loggedHandle('latency:open', event => {
-      assertFeatureSender(event, true)
-      latencyWindow.reopen(settings.current().theme)
-    })
-    let pendingLatency: LatencySession | undefined
-    let playbackEndpoint: { token: string; target: Electron.WebContents; client: BackendSession; latency?: LatencySession; ready: (result: true | 'audioRouteConflict' | 'audioPlaybackUnavailable') => void } | undefined
-    const outputObservation = z.object({
-      stream: z.string().min(1).max(128),
-      generation: z.number().int().nonnegative(),
-      firstAt: z.number().finite().nonnegative().optional(),
-      points: z.array(latencyWavePoint).max(128),
-    })
-    ipcMain.on('latency:output', (event, token: unknown, observation: unknown) => {
-      const endpoint = playbackEndpoint
-      if (!endpoint?.latency || event.sender !== endpoint.target || token !== endpoint.token
-          || event.senderFrame !== event.sender.mainFrame) return
-      const value = outputObservation.safeParse(observation)
-      if (value.success) endpoint.latency.output(value.data.stream, value.data.generation, value.data.firstAt, value.data.points)
-    })
-    ipcMain.handle('latency:paint', (event, sessionId: unknown, value: unknown) => {
-      if (typeof sessionId !== 'string' || event.senderFrame !== event.sender.mainFrame || !trustedContents(event.sender)) return false
-      const owner = BrowserWindow.fromWebContents(event.sender)
-      if (!owner?.isVisible() || owner.isMinimized() || ![workspaceWindow, overlayWindow, mainWindow].includes(owner)) return false
-      const measurement = latencyWindow.current(sessionId)
-      const parsed = captionPaint.safeParse(value)
-      if (!measurement || !parsed.success || Math.abs(Date.now() - parsed.data.at) > 5_000) return false
-      measurement.paint(parsed.data)
-      return true
-    })
+    let playbackEndpoint: { token: string; target: Electron.WebContents; client: BackendSession; ready: (result: true | 'audioRouteConflict' | 'audioPlaybackUnavailable') => void } | undefined
     loggedHandle('realtime:playback-ready', (event, token: unknown, result: unknown) => {
       const endpoint = playbackEndpoint
       if (endpoint && event.sender === endpoint.target && token === endpoint.token) {
@@ -983,12 +952,6 @@ if (!hasSingleInstanceLock) {
         if (activity.has('meeting')) throw new Error('FEATURE_CONFLICT:meeting')
         if (componentInstalling) throw new Error('runtimeInstallInProgress')
         const speech = config.outputMode === 'speech'
-        const measure = current.realtime?.latencyDetection === true
-        pendingLatency = measure ? new LatencySession({
-          available: false, speech, output: speech ? 'speech' : config.targetLanguages.length ? 'translation' : 'source',
-          route: 'cascade', providers: {},
-        }) : undefined
-        let measurement: LatencySession | undefined
         if (speech && config.audioSource.kind === 'systemOutput') throw new Error('systemAudioSpeechUnavailable')
         const s2sModel = config.outputMode === 'source' ? undefined
           : (config.s2sModel === undefined ? defaultRealtimeS2s(current) : config.s2sModel) ?? nativeRealtimeModel(config, current)
@@ -1020,7 +983,6 @@ if (!hasSingleInstanceLock) {
           void client.stop().catch(() => sessions.releaseOnLoss(true))
         }
         const client = new BackendSession(backend, {
-          onLatencyEvent: (kind, payload, epoch, at) => measurement?.backend(kind, payload, epoch, at),
           onEvent: event => {
             desktopEngine.emit('event', event)
             if (event.type === 'sessionStopped') resetPlayback()
@@ -1035,16 +997,15 @@ if (!hasSingleInstanceLock) {
             }
             try {
               configured = true
-              playbackEndpoint = { token, target, client, ready, latency: measurement }
+              playbackEndpoint = { token, target, client, ready }
               target.once('destroyed', playbackLost)
-              send('realtime:playback-configure', { device: config.speechOutputDeviceId, inputCable, measure: !!measurement })
+              send('realtime:playback-configure', { device: config.speechOutputDeviceId, inputCable })
             } catch {
               ready('audioPlaybackUnavailable')
             }
           }).catch(error => { resetPlayback(); throw error }),
           onChunk: chunk => send('realtime:playback-chunk', chunk),
           onFence: generation => {
-            measurement?.fence(generation)
             send('realtime:playback-fence', generation)
           },
           onClose: () => { resetPlayback(); if (speechRelayToken) ttsRuntime?.relay.release(speechRelayToken) },
@@ -1068,10 +1029,6 @@ if (!hasSingleInstanceLock) {
           throw new Error('invalidConfiguration')
         }
         if (!s2sModel && config.targetLanguages.length && config.outputMode !== 'source') await syncRealtimeGlossary(backend, await glossary.snapshot())
-        if (measure) {
-          mapped.config.latency_detection = true
-          measurement = pendingLatency = new LatencySession(latencyMeta(mapped, resolved))
-        }
         return { client, mapped }
       },
     })
@@ -1809,17 +1766,10 @@ if (!hasSingleInstanceLock) {
     desktopEngine.on('event', (event) => {
       if (event.type === 'sessionStarted') {
         sessionActive = true
-        const measurement = pendingLatency
-        pendingLatency = undefined
-        if (measurement) {
-          try { latencyWindow.start(event.sessionId, measurement, settings.current().theme) }
-          catch (error) { console.error('[latency] window failed to open', error) }
-        }
       }
       if (event.type === 'sessionStopped') {
         sessionActive = false
         ttsRuntime?.sessionVoices.close(event.sessionId)
-        latencyWindow.finish(event.sessionId)
       }
       if (event.type === 'caption' && event.segment.isFinal && !sessions.isBrowserEvent(event)) {
         void meetings.append(event.sessionId, event.segment).catch((error) =>
@@ -1832,7 +1782,6 @@ if (!hasSingleInstanceLock) {
     desktopEngine.on('state', state => {
       if (state === 'failed' || state === 'recovering' || state === 'stopped') {
         sessionActive = false
-        latencyWindow.finish()
       }
     })
     const workbench = registerWorkbench(() => mainWindow, __dirname, {

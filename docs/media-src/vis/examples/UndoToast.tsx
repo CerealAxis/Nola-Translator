@@ -27,7 +27,7 @@ export default function UndoToast() {
         <CardHeader><CardTitle>最近方案</CardTitle></CardHeader>
         <CardContent>
           {items.length ? <ul className="vis-example__item-list">
-            {items.map(name => <li key={name}><span>{name}</span><Button type="button" size="sm" variant="outline" onClick={() => remove(name)}>移除</Button></li>)}
+            {items.map(name => <li key={name}><span>{name}</span><Button type="button" size="sm" variant="secondary" onClick={() => remove(name)}>移除</Button></li>)}
           </ul> : <Empty><EmptyHeader><EmptyTitle>暂无方案</EmptyTitle><EmptyDescription>可用提示中的“撤销”恢复刚移除的方案。</EmptyDescription></EmptyHeader><EmptyContent /></Empty>}
         </CardContent>
       </Card>

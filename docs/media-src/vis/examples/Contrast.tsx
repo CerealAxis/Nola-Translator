@@ -5,7 +5,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { showToast } from '@/components/ui/toast';
 
 const versions = [
-  { title: '重点明确', previewVariant: 'outline' as const },
+  { title: '重点明确', previewVariant: 'secondary' as const },
   { title: '重点不明', previewVariant: 'default' as const },
 ];
 
@@ -28,7 +28,7 @@ export default function Contrast() {
                     <DialogDescription>旅途字幕 · English → 简体中文</DialogDescription>
                   </DialogHeader>
                   <CardContent><p lang="en">The next stop is Central Station.</p><p>下一站是中央车站。</p></CardContent>
-                  <DialogFooter><DialogClose render={<Button type="button" variant="outline" />}>关闭</DialogClose></DialogFooter>
+                  <DialogFooter><DialogClose render={<Button type="button" variant="secondary" />}>关闭</DialogClose></DialogFooter>
                 </DialogContent>
               </Dialog>
               <Button type="button" onClick={() => {

@@ -48,7 +48,6 @@ export interface MappedBackendSession {
     silence_end_ms?: number
     translation_preview?: boolean
     translation_preview_interval_ms?: number
-    latency_detection?: boolean
   }
   headers: Record<string, string>
   outputDeviceId?: string
@@ -185,7 +184,6 @@ export function mapSessionConfig(
 
 interface BackendSessionCallbacks {
   onEvent: (event: EngineEvent) => void
-  onLatencyEvent?: (kind: string | undefined, payload: unknown, epoch: number, at?: number) => void
   preparePlayback?: (inputCable?: string) => Promise<void>
   onClose?: () => void
   onChunk?: (chunk: PlaybackChunk) => void
@@ -610,7 +608,6 @@ export class BackendSession {
           } else if (event.event_seq && event.event_seq > this.eventCursor) {
             this.eventCursor = event.event_seq
             const epoch = event.epoch ?? 0
-            this.callbacks.onLatencyEvent?.(event.event_type, event.payload, epoch, event.emitted_at_unix_ms)
             this.receiveEvent(sessionId, event.event_type, event.payload, epoch)
           }
         } catch {

@@ -3,7 +3,6 @@ import { desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyTw } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
-import { latencyTw } from './latency-ui'
 import { meetingTw } from './meeting-ui'
 import { gatewayTw } from './gateway-ui'
 import { workbenchTw } from './workbench-ui'
@@ -13,7 +12,6 @@ import { onboardingTW } from './onboarding-ui'
 
 /** Complete Traditional Chinese dictionary for Taiwan. */
 export const zhTW: Dictionary = {
-  latency: latencyTw,
   gateway: gatewayTw,
   meeting: meetingTw,
   modelsPolicy: modelPolicyTw,

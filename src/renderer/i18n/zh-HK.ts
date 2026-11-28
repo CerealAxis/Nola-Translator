@@ -3,7 +3,6 @@ import { desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyHk } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
-import { latencyHk } from './latency-ui'
 import { meetingHk } from './meeting-ui'
 import { gatewayHk } from './gateway-ui'
 import { workbenchHk } from './workbench-ui'
@@ -13,7 +12,6 @@ import { onboardingHK } from './onboarding-ui'
 
 /** Complete Traditional Chinese dictionary for Hong Kong. */
 export const zhHK: Dictionary = {
-  latency: latencyHk,
   gateway: gatewayHk,
   meeting: meetingHk,
   modelsPolicy: modelPolicyHk,

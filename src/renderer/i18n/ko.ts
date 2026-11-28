@@ -3,7 +3,6 @@ import { desktopDataEntries, desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyKo, modelPolicyEntries } from './model-policy-ui'
 import { screenEntries, screenLocales } from './screen-ui'
 import { shortcutEntries, shortcutLocales } from './shortcuts-ui'
-import { latencyEntries, latencyKo } from './latency-ui'
 import { meetingKo, meetingEntries } from './meeting-ui'
 import { gatewayKo, gatewayEntries } from './gateway-ui'
 import { workbenchKo, workbenchEntries } from './workbench-ui'
@@ -17,7 +16,6 @@ const koMessages: Record<DictionaryKey, string> = {
   ...suiteEntries(suiteLocales.ko),
   ...screenEntries(screenLocales.ko),
   ...shortcutEntries(shortcutLocales.ko),
-  ...latencyEntries(latencyKo),
   'browser.desktopApplicationAudio': '데스크톱에서 선택한 앱',
   'browser.stepSpeechTranslation': '단계별 인식',
   'browser.directSpeechTranslation': '직접 음성 인식',

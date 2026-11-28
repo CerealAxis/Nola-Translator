@@ -1,4 +1,3 @@
-import type { LatencyWavePoint } from '../../shared/latency'
 
 export interface PlaybackChunk {
   claimId: string
@@ -23,8 +22,7 @@ export interface PlaybackAck {
 
 type PlaybackContext = Pick<AudioContext,
   'currentTime' | 'state' | 'destination' | 'resume' | 'createBuffer' | 'createBufferSource' | 'close'
-> & Partial<Pick<AudioContext, 'getOutputTimestamp' | 'outputLatency' | 'baseLatency'>>
-  & { setSinkId?: (sinkId: string) => Promise<void> }
+> & { setSinkId?: (sinkId: string) => Promise<void> }
 
 interface ScheduledChunk {
   source: AudioBufferSourceNode
@@ -66,7 +64,6 @@ export class RealtimePlaybackOwner {
   constructor(
     private readonly acknowledge: (ack: PlaybackAck) => void | Promise<void>,
     private readonly context: PlaybackContext = new AudioContext(),
-    private readonly observeOutput?: (streamId: string, generation: number, firstAt: number | undefined, points: LatencyWavePoint[]) => void,
   ) {}
 
   async setSinkId(sinkId: string): Promise<void> {
@@ -136,37 +133,10 @@ export class RealtimePlaybackOwner {
       source.start(startsAt)
       claim.nextTime = startsAt + frames / chunk.sampleRate
       if (chunk.chunkSeq === 0) this.report(claim, 'started')
-      if (this.observeOutput) {
-        try { this.measureOutput(chunk, buffer, startsAt) } catch { /* Diagnostics cannot interrupt playback. */ }
-      }
     } catch (error) {
       this.cancelActive('unknown')
       throw error
     }
-  }
-
-  private measureOutput(chunk: PlaybackChunk, buffer: AudioBuffer, startsAt: number): void {
-    const clock = this.context.getOutputTimestamp?.()
-    const start = clock && clock.performanceTime && clock.contextTime !== undefined
-      ? performance.timeOrigin + clock.performanceTime + (startsAt - clock.contextTime) * 1000
-      : Date.now() + (Math.max(0, startsAt - this.context.currentTime)
-        + (this.context.baseLatency ?? 0) + (this.context.outputLatency ?? 0)) * 1000
-    const channels = Array.from({ length: chunk.channels }, (_, index) => buffer.getChannelData(index))
-    const frames = channels[0].length
-    const step = Math.max(Math.round(chunk.sampleRate / 10), Math.ceil(frames / 128))
-    const points: LatencyWavePoint[] = []
-    for (let from = 0; from < frames; from += step) {
-      let min = 1
-      let max = -1
-      for (let i = from; i < Math.min(from + step, frames); i++) {
-        for (const channel of channels) {
-          min = Math.min(min, channel[i])
-          max = Math.max(max, channel[i])
-        }
-      }
-      points.push({ at: start + from / chunk.sampleRate * 1000, min, max })
-    }
-    this.observeOutput?.(chunk.audioStreamId, chunk.generation, chunk.chunkSeq === 0 ? start : undefined, points)
   }
 
   stop(nextGeneration: number): void {

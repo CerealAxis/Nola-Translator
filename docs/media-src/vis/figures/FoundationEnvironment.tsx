@@ -79,7 +79,7 @@ export function DirectionControls() {
             </SliderRoot>
             <div className="fe-scale"><span>0</span><span>100</span></div>
             <div className="fe-direction-tools">
-              <Button variant="outline">{direction === 'ltr' ? <ArrowLeft data-icon="inline-start" /> : <ArrowRight data-icon="inline-start" />}返回</Button>
+              <Button variant="secondary">{direction === 'ltr' ? <ArrowLeft data-icon="inline-start" /> : <ArrowRight data-icon="inline-start" />}返回</Button>
               <span><Check aria-hidden="true" />完成</span>
             </div>
           </div>

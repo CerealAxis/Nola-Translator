@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Play, Pencil, Trash2, Plus, Search, ChevronDown, Ellipsis, RefreshCw } from 'lucide-react'
+import { Play, Pencil, Trash2, Plus, Search, Ellipsis, RefreshCw, Upload } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { getBridge, stores, useStore } from '@/store'
 import { useAvailableModels } from '@/available-models'
@@ -15,9 +15,9 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { TooltipHint } from '@/components/ui/tooltip'
+import { useVoiceCompatibility } from '@/components/tts/use-voice-compatibility'
 import type { TtsVoiceBinding } from '../../../shared/tts/voice-binding'
 import { AudioPlayer } from '@/components/assistant-ui/native/media-player'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription,
@@ -26,7 +26,6 @@ import { SettingSelect } from '../settings/SettingsPage'
 import type { TtsVoiceProfile } from '../../../shared/tts/voice-profile'
 import type { TtsModelCapabilities } from '../../../shared/tts/capabilities'
 import { voiceRefKey, type TtsVoiceRef } from '../../../shared/tts/voice-ref'
-import { LANGUAGE_CODES, languageName } from '../../../shared/languages'
 import { ttsPreviewLanguage } from '../../../shared/tts/preview-language'
 import { astrBotSpeechBinding } from '../../../shared/astrbot-speech-presets'
 import { ttsCatalogCapabilities } from '../../../shared/tts/catalog'
@@ -60,14 +59,13 @@ export function VoiceLibraryPage() {
   const [selected, setSelected] = useState<VoiceTile>()
   const [originalRevision, setOriginalRevision] = useState<number>()
   const [deleting, setDeleting] = useState<TtsVoiceProfile>()
-  const [adding, setAdding] = useState(false)
+  const [fileName, setFileName] = useState('')
   const [providerDialog, setProviderDialog] = useState(false)
   const [bindings, setBindings] = useState<TtsVoiceBinding[]>([])
   const [remoteDeleting, setRemoteDeleting] = useState<TtsVoiceBinding>()
   const [preparing, setPreparing] = useState<{ profile: TtsVoiceProfile; binding: string; text: string; language: string }>()
   const [busy, setBusy] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [target, setTarget] = useState('')
   const [sampleText, setSampleText] = useState('')
   const [audio, setAudio] = useState<string | null>(null)
   const opener = useRef<HTMLElement | null>(null)
@@ -92,7 +90,7 @@ export function VoiceLibraryPage() {
   }, [api, catalogKey])
   const run = async (action: () => Promise<void>) => {
     setBusy(true)
-    try { await action() } catch (cause) { notifyError(text('failed'), { cause, description: ttsFailureReason(language, cause, target || undefined) }) } finally { setBusy(false) }
+    try { await action() } catch (cause) { notifyError(text('failed'), { cause, description: ttsFailureReason(language, cause, previewLanguage || undefined) }) } finally { setBusy(false) }
   }
   const designModels = catalog.tts.filter(item => capabilities[item.binding]?.supports.voiceDesign === true)
   const cloneModels = catalog.tts.filter(item => capabilities[item.binding]?.supports.cloning === true)
@@ -101,7 +99,7 @@ export function VoiceLibraryPage() {
   const originalDesign = profiles.find(item => item.id === draft?.id)?.representations.find(item => item.kind === 'design-recipe')
   const unchangedDesign = !!originalRevision && JSON.stringify(originalDesign) === JSON.stringify(design)
   const authoringCapability = design?.authoringModelBinding ? capabilities[design.authoringModelBinding] : undefined
-  const close = () => { setDraft(undefined); setSelected(undefined); setAudio(null) }
+  const close = () => { setDraft(undefined); setSelected(undefined); setAudio(null); setFileName('') }
   useEffect(() => {
     let active = true
     setBindings([])
@@ -118,40 +116,44 @@ export function VoiceLibraryPage() {
       ?? tile.profile?.representations.find(item => item.kind === 'reference-audio')?.assetId
     if (assetId) void run(async () => { setAudio(await api!.audio(assetId)) })
   }
-  const create = (kind: 'clone' | 'design') => {
+  const create = (kind: 'clone' | 'design', keepDraft = false) => {
     opener.current = addTrigger.current
     const now = new Date().toISOString()
-    setAdding(false); setSelected(undefined); setAudio(null); setOriginalRevision(undefined)
+    setSelected(undefined); setAudio(null); setOriginalRevision(undefined); setFileName('')
     const authoringModelBinding = designModels.some(item => item.binding === binding) ? binding : designModels[0]?.binding
-    setDraft({ schemaVersion: 1, id: crypto.randomUUID(), revision: 1, name: '', kind, representations: kind === 'design'
+    setDraft({ schemaVersion: 1, id: keepDraft && draft ? draft.id : crypto.randomUUID(), revision: 1,
+      name: keepDraft && draft ? draft.name : '',
+      kind, representations: kind === 'design'
       ? [{ kind: 'design-recipe', description: '', recipe: {}, recipeSchema: 'nola-description-v1', authoringModelBinding }]
-      : [], createdAt: now, updatedAt: now })
+      : [], createdAt: keepDraft && draft ? draft.createdAt : now, updatedAt: now })
   }
   const tiles: VoiceTile[] = [
     ...(capability?.presetVoices.map(voice => ({ name: voice.name, ref: { kind: 'preset' as const, modelBinding: binding, voiceId: voice.id } })) ?? []),
     ...profiles.filter(profile => !profile.deletedAt).map(profile => ({ name: profile.name, profile,
       ref: { kind: 'profile' as const, profileId: profile.id, revision: profile.revision } })),
   ].filter(item => item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+  const previewLanguage = selected && capability ? ttsPreviewLanguage(undefined, selected.profile, capability, selected.ref) : ''
+  const previewCompatibility = useVoiceCompatibility(binding, previewLanguage ? [previewLanguage] : [], selected ? [selected.ref] : [])
+  const selectedCompatibility = selected ? previewCompatibility.results.get(voiceRefKey(selected.ref)) : undefined
   const panelOpen = !!draft || !!selected
   const updateDesign = (patch: Partial<NonNullable<typeof design>>) => setDraft(current => current && ({ ...current,
     representations: current.representations.map(item => item.kind === 'design-recipe' ? { ...item, ...patch } : item) }))
   return <section className="flex min-w-0 flex-col gap-[var(--panel-gap)] p-[var(--page-padding)]">
     <header className="flex flex-wrap items-center justify-between gap-[var(--label-gap)]">
       <h1 className="type-h3">{text('title')}</h1>
-      {(cloneModels.length > 0 || designModels.length > 0 || capability?.voiceRegistration?.inspect) && <Popover open={adding} onOpenChange={setAdding}>
-        <PopoverTrigger ref={addTrigger} render={<Button />} disabled={!api || busy}><Plus aria-hidden="true" />{text('addVoice')}</PopoverTrigger>
-        <PopoverContent align="end">
-          {cloneModels.length > 0 && <Button variant="bare" className="justify-start" onClick={() => create('clone')}>{text('newClone')}</Button>}
-          {designModels.length > 0 && <Button variant="bare" className="justify-start" onClick={() => create('design')}>{text('newDesign')}</Button>}
-          {capability?.voiceRegistration?.inspect && <Button variant="bare" className="justify-start" onClick={() => { setAdding(false); setProviderDialog(true) }}>{text('providerVoices')}</Button>}
-        </PopoverContent>
-      </Popover>}
+      <div className="flex items-center gap-[var(--label-gap)]">
+        {capability?.voiceRegistration?.inspect && <Button variant="secondary" onClick={() => setProviderDialog(true)}>{text('providerVoices')}</Button>}
+        {(capability?.supports.cloning === true || capability?.supports.voiceDesign === true) &&
+          <Button ref={addTrigger} disabled={!api || busy} onClick={() => create(capability.supports.voiceDesign === true ? 'design' : 'clone')}>
+            <Plus aria-hidden="true" />{text('designVoice')}
+          </Button>}
+      </div>
     </header>
     <div className="flex flex-wrap items-center gap-[var(--field-gap)]">
       <div className="relative min-w-0 flex-1"><Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-nola-ui-muted-foreground" />
         <Input id="voice-search" type="search" className="ps-9" aria-label={text('search')} placeholder={text('search')} value={search} onValueChange={setSearch} /></div>
       <SettingSelect id="voice-model" value={binding} ariaLabel={text('model')} options={catalog.tts.map(item => ({ value: item.binding, label: item.name }))}
-        onChange={value => { setModel(value); setTarget(''); if (selected?.ref.kind === 'preset') close() }} />
+        onChange={value => { setModel(value); if (selected?.ref.kind === 'preset') close() }} />
 
     </div>
     <div className="min-w-0">
@@ -177,7 +179,7 @@ export function VoiceLibraryPage() {
     <Dialog open={panelOpen} onOpenChange={open => { if (!open && !busy) close() }}>
       <DialogContent finalFocus={opener} className="overflow-hidden">
         <DialogHeader className="flex flex-row items-center justify-between gap-[var(--label-gap)]">
-          <DialogTitle>{draft ? text(originalRevision ? 'edit' : draft.kind === 'design' ? 'newDesign' : 'newClone') : selected?.name}</DialogTitle>
+          <DialogTitle>{draft ? text(originalRevision ? 'edit' : 'designVoice') : selected?.name}</DialogTitle>
           {selected?.profile && <Popover><PopoverTrigger render={<Button variant="bare" size="icon-sm" />} aria-label={text('details')}><Ellipsis aria-hidden="true" /></PopoverTrigger>
             <PopoverContent align="end">
               {bindings.length === 0 && <span className="type-muted">{text('pending')}</span>}
@@ -195,59 +197,66 @@ export function VoiceLibraryPage() {
         <DialogCloseButton disabled={busy} />
         <div className="-m-[var(--space-1)] flex min-h-0 min-w-0 flex-col gap-[var(--field-gap)] overflow-y-auto p-[var(--space-1)]">
         {draft && <FieldGroup>
+          {!originalRevision && capability?.supports.cloning === true && capability.supports.voiceDesign === true &&
+            <Field><FieldLabel htmlFor="voice-method">{text('voiceMethod')}</FieldLabel><SettingSelect id="voice-method" ariaLabel={text('voiceMethod')}
+              value={draft.kind} options={[{ value: 'design', label: text('fromDescription') }, { value: 'clone', label: text('fromAudio') }]}
+              onChange={value => create(value as 'design' | 'clone', true)} /></Field>}
           <Field><FieldLabel htmlFor="voice-name">{text('name')}</FieldLabel><Input autoFocus id="voice-name" value={draft.name} maxLength={256} onValueChange={name => setDraft({ ...draft, name })} /></Field>
           {draft.kind === 'design' ? <>
             <Field><FieldLabel htmlFor="voice-description">{text('description')}</FieldLabel><Textarea id="voice-description" value={design?.description ?? ''} maxLength={8000} onChange={event => updateDesign({ description: event.target.value })} /></Field>
-            <Field><FieldLabel htmlFor="voice-authoring-model">{text('authoringModel')}</FieldLabel><SettingSelect id="voice-authoring-model" ariaLabel={text('authoringModel')}
-              value={design?.authoringModelBinding ?? ''} options={designModels.map(item => ({ value: item.binding, label: item.name }))}
-              onChange={authoringModelBinding => updateDesign({ authoringModelBinding, recipe: {}, recipeSchema: 'nola-description-v1', seed: capabilities[authoringModelBinding]?.supports.seed ? design?.seed : undefined })} /></Field>
+            <Field><FieldLabel htmlFor="voice-authoring-model">{text('authoringModel')}</FieldLabel>
+              {originalRevision ? <SettingSelect id="voice-authoring-model" ariaLabel={text('authoringModel')}
+                value={design?.authoringModelBinding ?? ''} options={designModels.map(item => ({ value: item.binding, label: item.name }))}
+                onChange={authoringModelBinding => updateDesign({ authoringModelBinding, recipe: {}, recipeSchema: 'nola-description-v1', seed: capabilities[authoringModelBinding]?.supports.seed ? design?.seed : undefined })} />
+                : <Input id="voice-authoring-model" value={catalog.tts.find(item => item.binding === binding)?.name ?? binding} readOnly />}</Field>
           </> : draft.kind === 'clone' && <>
-            <Button variant="secondary" disabled={busy} onClick={() => void run(async () => {
+            <Field className="rounded-[var(--field-radius)] border border-dashed border-nola-ui-border p-[var(--panel-padding)]">
+              <FieldLabel>{text('referenceAudio')}</FieldLabel>
+              <span className="type-muted">{text('audioFormats')}</span>
+              <Button variant="secondary" className="self-start" disabled={busy} onClick={() => void run(async () => {
               const asset = await api?.importAudio(draft.id, 'reference')
               if (asset) {
-                setDraft({ ...draft, primaryReferenceAssetId: asset.assetId, representations: [{ kind: 'reference-audio', assetId: asset.assetId, durationMs: asset.durationMs, transcript: reference?.transcript }] })
+                setDraft({ ...draft, primaryReferenceAssetId: asset.assetId, representations: [
+                  ...draft.representations.filter(item => item.kind !== 'reference-audio' || item.assetId !== draft.primaryReferenceAssetId),
+                  { kind: 'reference-audio', assetId: asset.assetId, durationMs: asset.durationMs, transcript: reference?.transcript },
+                ] })
+                setFileName(asset.fileName)
                 setAudio(await api!.audio(asset.assetId))
               }
-            })}>{text('importAudio')}</Button>
+            })}><Upload aria-hidden="true" />{reference ? text('replaceAudio') : text('chooseAudio')}</Button>
+              {reference && <span className="type-muted">{fileName || text('audioSelected')}{reference.durationMs ? ` · ${Math.round(reference.durationMs / 1000)} s` : ''}</span>}
+            </Field>
             {reference && <Field><FieldLabel htmlFor="voice-transcript">{text('transcript')}</FieldLabel><Textarea id="voice-transcript" value={reference.transcript ?? ''}
               onChange={event => setDraft({ ...draft, representations: draft.representations.map(item => item.kind === 'reference-audio' ? { ...item, transcript: event.target.value } : item) })} /></Field>}
           </>}
-          <Collapsible><CollapsibleTrigger render={<Button variant="bare" className="justify-start" />}>{text('details')}<ChevronDown aria-hidden="true" /></CollapsibleTrigger>
-            <CollapsibleContent><FieldGroup>
-              <Field><FieldLabel htmlFor="voice-default-language">{text('defaultLanguage')}</FieldLabel><SettingSelect id="voice-default-language" ariaLabel={text('defaultLanguage')}
-                value={draft.defaultLanguage ?? ''} options={[{ value: '', label: text('engineDefault') }, ...LANGUAGE_CODES.map(value => ({ value, label: languageName(value, language) }))]}
-                onChange={defaultLanguage => setDraft({ ...draft, defaultLanguage: defaultLanguage || undefined })} /></Field>
-              {design && authoringCapability?.supports.seed && <Field><FieldLabel htmlFor="voice-seed">{text('seed')}</FieldLabel><Input id="voice-seed" type="number" value={design.seed ?? ''}
-                onValueChange={value => updateDesign({ seed: value === '' ? undefined : Number(value) })} /></Field>}
-            </FieldGroup></CollapsibleContent>
-          </Collapsible>
+          {design && authoringCapability?.supports.seed && <Field><FieldLabel htmlFor="voice-seed">{text('seed')}</FieldLabel><Input id="voice-seed" type="number" value={design.seed ?? ''}
+            onValueChange={value => updateDesign({ seed: value === '' ? undefined : Number(value) })} /></Field>}
+        </FieldGroup>}
+        {selected && !draft && <FieldGroup>
+          <Field><FieldLabel htmlFor="voice-text">{text('previewText')}</FieldLabel><Textarea autoFocus id="voice-text" value={sampleText} maxLength={2000} onChange={event => setSampleText(event.target.value)} /></Field>
+          {selectedCompatibility && !selectedCompatibility.compatible && <p role="status" className="type-muted">{text('incompatible')}</p>}
         </FieldGroup>}
         {audio && <AudioPlayer key={audio} src={audio} title={draft?.name || selected?.name || text('preview')} durationMs={reference?.durationMs} className="max-w-none" />}
-        {selected && !draft && <FieldGroup>
-          <Field><FieldLabel htmlFor="voice-language">{text('language')}</FieldLabel><SettingSelect id="voice-language" value={target} ariaLabel={text('language')}
-            options={[{ value: '', label: text('previewDefault') }, ...(capability?.languages.mode === 'finite' ? capability.languages.values : LANGUAGE_CODES).map(value => ({ value, label: languageName(value, language) }))]} onChange={setTarget} /></Field>
-          <Field><FieldLabel htmlFor="voice-text">{text('previewText')}</FieldLabel><Textarea autoFocus id="voice-text" value={sampleText} maxLength={2000} onChange={event => setSampleText(event.target.value)} /></Field>
-        </FieldGroup>}
         </div>
         <DialogFooter>
           {draft ? <>
             <Button variant="secondary" disabled={busy} onClick={close}>{text('cancel')}</Button>
-            <Button disabled={busy || !draft.name.trim() || (draft.kind === 'design' ? !design?.description.trim() || (!authoringCapability?.supports.voiceDesign && !unchangedDesign) : draft.kind === 'clone' && !reference)} onClick={() => void run(async () => {
+            <Button disabled={busy || !draft.name.trim() || (draft.kind === 'design' ? !design?.description.trim() || (!authoringCapability?.supports.voiceDesign && !unchangedDesign) : draft.kind === 'clone' && (!reference || capability?.reference?.transcriptRequired && !reference.transcript?.trim()))} onClick={() => void run(async () => {
               if (!api) return
               await api.save(draft, originalRevision); notifySuccess(text('saved')); close(); await refresh()
             })}>{text('save')}</Button>
           </> : <>
             <Button variant="secondary" disabled={busy} onClick={close}>{text('close')}</Button>
-          <Button aria-busy={generating} disabled={busy || !binding || !sampleText.trim()} onClick={() => {
+          <Button aria-busy={generating} disabled={busy || !binding || !sampleText.trim() || previewCompatibility.pending || selectedCompatibility?.compatible === false} onClick={() => {
             setGenerating(true)
             setAudio(null)
             void run(async () => {
-              if (api && selected) { setAudio(await api.preview(binding, selected.ref, sampleText, ttsPreviewLanguage(target || undefined, selected.profile, capability!, selected.ref))); await refresh() }
+              if (api && selected) { setAudio(await api.preview(binding, selected.ref, sampleText, previewLanguage)); await refresh() }
             }).finally(() => setGenerating(false))
           }}>{generating && <Spinner />}{text(generating ? 'generating' : 'generate')}</Button>
           {selected?.profile && selected.profile.kind !== 'imported' && (selected.profile.kind === 'design' && !selected.profile.lockedSampleAssetId ? capability?.supports.voiceDesign : capability?.supports.cloning) === true && capability?.conditioning?.includes('provider-voice') && capability.voiceRegistration?.create && <Button variant="secondary" disabled={busy || !sampleText.trim()}
             onClick={() => setPreparing({ profile: selected.profile!, binding, text: sampleText,
-              language: ttsPreviewLanguage(target || undefined, selected.profile, capability, selected.ref) })}>{text('prepare')}</Button>}
+              language: previewLanguage })}>{text('prepare')}</Button>}
           </>}
         </DialogFooter>
       </DialogContent>

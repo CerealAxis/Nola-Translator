@@ -18,7 +18,6 @@ import { formatChineseCaption } from '@/chinese-script'
 import { CaptionLine } from './CaptionLine'
 import { splitTranslationText } from './translationText'
 import type { TranslationTextParts } from './translationText'
-import { useCaptionLatency } from './use-caption-latency'
 import { useSubtitleCopy } from './useSubtitleCopy'
 import type { SubtitleCopyMetadata } from '../../../shared/subtitle-word-rules'
 import { Badge } from '@/components/ui/badge'
@@ -42,7 +41,6 @@ export interface CaptionStageProps {
   /** The workspace shows timestamps; the floating window keeps the compact caption. */
   showTimestamps?: boolean
   sourceLanguage?: string
-  latencySessionId?: string
   showSpeaker?: boolean
   speakerLabels?: Readonly<Record<string, string>>
 }
@@ -104,14 +102,12 @@ export function CaptionStage({
   className,
   showTimestamps = false,
   sourceLanguage = 'auto',
-  latencySessionId,
   showSpeaker = false,
   speakerLabels,
 }: CaptionStageProps) {
   const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
   useSubtitleCopy(scrollRef, [...segments, ...(interim ? [interim] : [])].some(segment => !!(segment as CaptionSegment & SubtitleCopyMetadata).subtitleSourceCopy || segment.translations.some(translation => !!(translation as typeof translation & SubtitleCopyMetadata).subtitleCopy)))
-  useCaptionLatency(scrollRef, latencySessionId)
   const stickRef = useRef(true)
   const [following, setFollowing] = useState(true)
   /** Last segment to have played its entrance; a ref so StrictMode's double run cannot replay it. */
@@ -277,7 +273,6 @@ function Block({
             paused={paused}
             entering={entering}
             data-testid={`caption-source-${segment.segmentId}`}
-            latencySegmentId={segment.sourceText.trim() ? segment.segmentId : undefined}
           />
         ) : null}
         {showTranslation ? (
@@ -292,7 +287,6 @@ function Block({
             paused={paused}
             entering={entering}
             data-testid={`caption-target-${segment.segmentId}`}
-            latencySegmentId={parts ? segment.segmentId : undefined}
           />
         ) : null}
       </div>
@@ -314,7 +308,6 @@ function Block({
           entering={entering}
           className="nola-measure"
           data-testid={`caption-source-${segment.segmentId}`}
-          latencySegmentId={segment.sourceText.trim() ? segment.segmentId : undefined}
         />
       ) : null}
       {showTranslation ? (
@@ -330,7 +323,6 @@ function Block({
           entering={entering}
           className="nola-measure"
           data-testid={`caption-target-${segment.segmentId}`}
-          latencySegmentId={parts ? segment.segmentId : undefined}
         />
       ) : null}
     </div>

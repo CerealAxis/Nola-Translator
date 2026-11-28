@@ -54,7 +54,7 @@ export function InlineEditExample() {
   return <div className="fig-board" data-scene="edit-states">
     <div className="fig-dynamic-edit">
       <span className="fig-dynamic-label">项目名称</span>
-      {editing ? <div className="fig-dynamic-edit-content"><div className="fig-dynamic-edit-controls"><Input ref={inputRef} aria-label="项目名称" aria-invalid={Boolean(error)} aria-describedby={error ? 'dynamic-edit-error' : undefined} value={draft} onChange={event => { setDraft(event.target.value); setError(''); }} onKeyDown={onKeyDown} /><Button type="button" onClick={save}>确定</Button><Button type="button" variant="outline" onClick={cancel}>取消</Button></div>{error && <FieldError id="dynamic-edit-error">{error}</FieldError>}</div>
+      {editing ? <div className="fig-dynamic-edit-content"><div className="fig-dynamic-edit-controls"><Input ref={inputRef} aria-label="项目名称" aria-invalid={Boolean(error)} aria-describedby={error ? 'dynamic-edit-error' : undefined} value={draft} onChange={event => { setDraft(event.target.value); setError(''); }} onKeyDown={onKeyDown} /><Button type="button" onClick={save}>确定</Button><Button type="button" variant="secondary" onClick={cancel}>取消</Button></div>{error && <FieldError id="dynamic-edit-error">{error}</FieldError>}</div>
         : <TooltipProvider><Tooltip><TooltipTrigger render={<Button type="button" variant="link" ref={triggerRef} className="fig-dynamic-edit-trigger" onClick={() => { setDraft(name); setEditing(true); }} />}>{name}</TooltipTrigger><TooltipContent>单击编辑</TooltipContent></Tooltip></TooltipProvider>}
     </div>
   </div>;
@@ -103,7 +103,7 @@ export function HoverInvitationExample() {
       {[
         { name: '简洁模板', description: '标题、摘要与内容' },
         { name: '目录模板', description: '章节、目录与内容' },
-      ].map(template => <Card key={template.name} size="sm" className="fig-dynamic-template" tabIndex={0}><CardHeader><CardTitle>{template.name}</CardTitle><CardDescription>{template.description}</CardDescription></CardHeader><CardContent><div className="fig-dynamic-template-preview" aria-hidden="true"><span /><span /><span /></div></CardContent><CardFooter><Button type="button" variant="outline" size="sm">选择模板</Button></CardFooter></Card>)}
+      ].map(template => <Card key={template.name} size="sm" className="fig-dynamic-template" tabIndex={0}><CardHeader><CardTitle>{template.name}</CardTitle><CardDescription>{template.description}</CardDescription></CardHeader><CardContent><div className="fig-dynamic-template-preview" aria-hidden="true"><span /><span /><span /></div></CardContent><CardFooter><Button type="button" variant="secondary" size="sm">选择模板</Button></CardFooter></Card>)}
     </div>
   </div>;
 }
@@ -123,7 +123,7 @@ export function SearchFeedbackExample() {
       <Input aria-label="搜索项目" placeholder="搜索项目或负责人" value={query} onChange={event => setQuery(event.target.value)} />
       {matches.length ? <Table><TableHeader><TableRow><TableHead>项目</TableHead><TableHead>负责人</TableHead></TableRow></TableHeader><TableBody>
         {matches.map(project => <TableRow key={project.name}><TableCell>{project.name}</TableCell><TableCell>{project.owner}</TableCell></TableRow>)}
-      </TableBody></Table> : <div className="fig-dynamic-no-results" role="status"><span>没有匹配项目</span><Button type="button" variant="outline" size="sm" onClick={() => setQuery('')}>清空搜索</Button></div>}
+      </TableBody></Table> : <div className="fig-dynamic-no-results" role="status"><span>没有匹配项目</span><Button type="button" variant="secondary" size="sm" onClick={() => setQuery('')}>清空搜索</Button></div>}
     </div>
   </div>;
 }

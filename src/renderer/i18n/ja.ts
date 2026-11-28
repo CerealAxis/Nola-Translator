@@ -3,7 +3,6 @@ import { desktopDataEntries, desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyJa, modelPolicyEntries } from './model-policy-ui'
 import { screenEntries, screenLocales } from './screen-ui'
 import { shortcutEntries, shortcutLocales } from './shortcuts-ui'
-import { latencyEntries, latencyJa } from './latency-ui'
 import { meetingJa, meetingEntries } from './meeting-ui'
 import { gatewayJa, gatewayEntries } from './gateway-ui'
 import { workbenchJa, workbenchEntries } from './workbench-ui'
@@ -17,7 +16,6 @@ const jaMessages: Record<DictionaryKey, string> = {
   ...suiteEntries(suiteLocales.ja),
   ...screenEntries(screenLocales.ja),
   ...shortcutEntries(shortcutLocales.ja),
-  ...latencyEntries(latencyJa),
   'browser.desktopApplicationAudio': 'デスクトップで選択したアプリ',
   'browser.stepSpeechTranslation': '段階式認識',
   'browser.directSpeechTranslation': '直接音声認識',

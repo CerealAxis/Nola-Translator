@@ -352,7 +352,6 @@ function QuickWorkspacePage() {
                 showTimestamps
                 showSpeaker
                 sourceLanguage={settings?.recognition.sourceLanguage ?? 'auto'}
-                latencySessionId={settings?.realtime?.latencyDetection && currentConfig?.outputMode !== 'speech' ? session.sessionId ?? undefined : undefined}
                 emptyState={<Empty className="nola-workspace-empty"><EmptyHeader><EmptyTitle>{t('workspace.nothingYet')}</EmptyTitle><EmptyDescription>{t('workspace.nothingYetHint')}</EmptyDescription></EmptyHeader></Empty>}
               />
             </>

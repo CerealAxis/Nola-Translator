@@ -124,7 +124,6 @@
   .button:disabled,
   .button[aria-disabled="true"] {
     cursor: not-allowed;
-    opacity: 0.52;
   }
   .button svg {
     width: 16px;
@@ -2794,7 +2793,7 @@ body {
   @apply type-body font-medium;
 }
 
-:is(button, [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):is(:disabled, [aria-disabled="true"], [data-disabled]):not(:where(.nola-caption-mic[data-loading="true"])) {
+:is(button:not([data-slot="button"]), [data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):is(:disabled, [aria-disabled="true"], [data-disabled]):not(:where(.nola-caption-mic[data-loading="true"])) {
   color: var(--text-disabled);
   cursor: not-allowed;
   opacity: 1;

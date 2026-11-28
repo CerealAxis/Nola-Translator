@@ -23,10 +23,9 @@ function closeRealtimePlayback(): void {
   }
 }
 
-ipcRenderer.on('realtime:playback-configure', (_event, token: string, { device, inputCable, measure }: { device?: string; inputCable?: string; measure?: boolean }) => {
+ipcRenderer.on('realtime:playback-configure', (_event, token: string, { device, inputCable }: { device?: string; inputCable?: string }) => {
   closeRealtimePlayback()
-  const owner = new RealtimePlaybackOwner(ack => ipcRenderer.invoke('realtime:playback-ack', token, ack), undefined,
-    measure ? (stream, generation, firstAt, points) => ipcRenderer.send('latency:output', token, { stream, generation, firstAt, points }) : undefined)
+  const owner = new RealtimePlaybackOwner(ack => ipcRenderer.invoke('realtime:playback-ack', token, ack))
   const pending = (async () => {
     if (!device || device === 'default') return
     if (inputCable) {
@@ -258,14 +257,6 @@ const api: NolaTranslatorApi = {
     read: () => invoke('workspace:view'),
     update: patch => invoke('workspace:view', patch),
   },
-  getLatencySnapshot: () => ipcRenderer.invoke('latency:snapshot'),
-  openLatencyWindow: () => invoke('latency:open'),
-  onLatencySnapshot: listener => {
-    const receive = (_event: Electron.IpcRendererEvent, value: Parameters<typeof listener>[0]) => listener(value)
-    ipcRenderer.on('latency:changed', receive)
-    return () => ipcRenderer.off('latency:changed', receive)
-  },
-  reportLatencyPaint: (sessionId, segmentId, kind, at) => ipcRenderer.invoke('latency:paint', sessionId, { segmentId, kind, at }),
   requestQuit: () => invoke('app:request-quit'),
   confirmQuit: () => invoke('app:confirm-quit'),
   onQuitRequested: callback => {

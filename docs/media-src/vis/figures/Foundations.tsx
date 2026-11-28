@@ -35,7 +35,7 @@ function VerticalSpacing() {
         <Card className="fig-f-app-card">
           <CardHeader className="fig-f-gap-section"><CardTitle className="fig-f-gap-label">应用管理</CardTitle><CardDescription>创建于 5 月 12 日 · 林安</CardDescription></CardHeader>
           <CardContent className="fig-f-app-content">
-            <div className="fig-f-actions fig-f-gap-tools"><Button type="button">添加应用</Button><Button type="button" variant="outline">启动</Button><Button type="button" variant="outline">停止</Button></div>
+            <div className="fig-f-actions fig-f-gap-tools"><Button type="button">添加应用</Button><Button type="button" variant="secondary">启动</Button><Button type="button" variant="secondary">停止</Button></div>
             <Table aria-label="应用列表">
               <TableHeader><TableRow><TableHead><CheckBox label="选择全部" mixed /></TableHead><TableHead>应用名称</TableHead><TableHead>状态</TableHead></TableRow></TableHeader>
               <TableBody>{apps.map(([name, state], index) => <TableRow key={name}>
@@ -145,7 +145,7 @@ function FormAlignment() {
           <Field><FieldLabel htmlFor="fig-f-about">描述</FieldLabel><div><Textarea id="fig-f-about" rows={2} value="喜欢摄影和周末徒步。" readOnly /><FieldDescription>显示在个人主页上。</FieldDescription></div></Field>
         </FieldGroup>
       </CardContent>
-      <CardFooter className="fig-f-actions"><Button type="button">保存</Button><Button type="button" variant="outline">取消</Button></CardFooter>
+      <CardFooter className="fig-f-actions"><Button type="button">保存</Button><Button type="button" variant="secondary">取消</Button></CardFooter>
     </Card>
     <div className="fig-f-panel fig-f-key">
       <span className="fig-f-wide-note" data-mark="axis">标签末端与输入框起点分别对齐</span>
